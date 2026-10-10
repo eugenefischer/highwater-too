@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.3",
+  "version": "0.0.6",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -33,6 +33,12 @@
         "command": "highwater.newManuscript",
         "title": "New Manuscript",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.exportPdf",
+        "title": "Export PDF…",
+        "category": "Highwater Too",
+        "icon": "$(file-pdf)"
       },
       {
         "command": "highwater.export",
@@ -694,6 +700,10 @@
         {
           "command": "highwater.toggleInvisibles",
           "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.exportPdf",
+          "when": "editorLangId =~ /^highland-/"
         }
       ],
       "explorer/context": [
@@ -701,6 +711,13 @@
           "command": "highwater.convertToHighland",
           "when": "resourceExtname =~ /^\\.(fountain|spmd|md|markdown)$/",
           "group": "7_modification"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "highwater.exportPdf",
+          "when": "editorLangId == highland-fountain",
+          "group": "navigation"
         }
       ]
     },
@@ -765,10 +782,10 @@
     ]
   },
   "scripts": {
-    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --sourcemap --outfile=dist/extension.cjs",
+    "build": "node scripts/build.mjs",
     "package": "npm run build && vsce package --no-dependencies --skip-license --out ../../highwater-too.vsix",
-    "build:e2e": "esbuild e2e/suite.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/e2e/suite.cjs",
-    "test:e2e": "npm run build && npm run build:e2e && node --experimental-strip-types --no-warnings e2e/run.ts"
+    "build:e2e": "node scripts/build.mjs --e2e",
+    "test:e2e": "npm run build:e2e && node --experimental-strip-types --no-warnings e2e/run.ts"
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",
@@ -777,10 +794,14 @@
   },
   "dependencies": {
     "@highwater/bundle": "*",
-    "@highwater/parser": "*"
+    "@highwater/parser": "*",
+    "@highwater/pdf": "*"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/eugenefischer/highwater-too"
+  },
+  "imports": {
+    "#standard-fonts/*": "./dist/standard-fonts/*.cjs"
   }
 }

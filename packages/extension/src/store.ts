@@ -62,6 +62,11 @@ export class BundleStore {
     return [...seen].map(([name, isDirectory]) => ({ name, isDirectory }));
   }
 
+  /** Highland's settings block from info.json (print options and so on). */
+  async highlandSettings(path: string): Promise<Record<string, unknown>> {
+    return (await this.#current(path)).bundle.highlandSettings;
+  }
+
   /** Fountain, Markdown or plain text, from the bundle's text file. */
   async mode(path: string): Promise<"fountain" | "markdown" | "plain"> {
     return (await this.#current(path)).bundle.mode;

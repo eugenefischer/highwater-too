@@ -22,7 +22,7 @@ export function activate(context: vscode.ExtensionContext): void {
   vscode.workspace.textDocuments.forEach(track);
   const cache = registerLanguageFeatures(context, store);
   registerStatusBar(context, cache);
-  registerCommands(context);
+  registerCommands(context, store);
 
   context.subscriptions.push(
     { dispose: () => store.dispose() },

@@ -1,6 +1,6 @@
 /** Runs inside VS Code's extension host (see run.ts). A minimal runner: no test framework needed. */
 import * as assert from "node:assert/strict";
-import { copyFile, readdir, writeFile } from "node:fs/promises";
+import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readBundle, writeBundle } from "@highwater/bundle";
 import * as vscode from "vscode";
@@ -117,6 +117,21 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.commands.executeCommand("highwater.bold");
       assert.equal(editor.document.lineAt(last.lineNumber).text, "She runs home.");
       await vscode.commands.executeCommand("workbench.action.files.revert");
+    },
+  ],
+  [
+    "exports a screenplay as a PDF from inside VS Code",
+    async () => {
+      const path = await copyOf("Export");
+      const editor = await openScript(path);
+      const before = editor.document.getText();
+      const out = vscode.Uri.file(join(dir, "Export.pdf"));
+      // As the editor title button calls it: the document's URI first, then (tests only) the target.
+      await vscode.commands.executeCommand("highwater.exportPdf", editor.document.uri, { target: out });
+      assert.equal((await readBundle(path)).bundle.text, before, "the script is untouched");
+      const bytes = await readFile(out.fsPath);
+      assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
+      assert.ok(bytes.length > 5000, `PDF of ${bytes.length} bytes`);
     },
   ],
 ];

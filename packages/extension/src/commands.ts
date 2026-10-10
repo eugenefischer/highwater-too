@@ -5,7 +5,8 @@ import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
-import { splitBundlePath } from "./store.ts";
+import { exportScreenplay } from "./pdf-export.ts";
+import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
 
 const NEW: Record<string, { mode: DocumentMode; template: string; name: string }> = {
@@ -13,7 +14,7 @@ const NEW: Record<string, { mode: DocumentMode; template: string; name: string }
   manuscript: { mode: "markdown", template: "Manuscript", name: "Untitled Manuscript" },
 };
 
-export function registerCommands(context: vscode.ExtensionContext): void {
+export function registerCommands(context: vscode.ExtensionContext, store: BundleStore): void {
   const wrap = (open: string, close = open) => () => applyToSelections((text, s, e) => toggleWrap(text, s, e, open, close));
   context.subscriptions.push(
     vscode.commands.registerCommand("highwater.bold", wrap("**")),
@@ -29,6 +30,10 @@ export function registerCommands(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("highwater.newManuscript", () => newDocument("manuscript")),
     vscode.commands.registerCommand("highwater.export", exportText),
     vscode.commands.registerCommand("highwater.convertToHighland", convertToHighland),
+    // Menus (the editor title button) pass the document's URI; only an explicit option sets where to save.
+    vscode.commands.registerCommand("highwater.exportPdf", (resource?: unknown, options?: { target?: vscode.Uri }) =>
+      exportPdf(context, store, resource instanceof vscode.Uri ? resource : undefined, options?.target),
+    ),
   );
 }
 
@@ -128,4 +133,51 @@ function defaultFolder(): string {
     return dirname(p ? p.bundle : doc.uri.fsPath);
   }
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? homedir();
+}
+
+/**
+ * Exports a screenplay (the given one, else the active editor's) as a PDF, asking where to save
+ * unless `target` is given (tests). Uses the editor's text, so unsaved edits are included, and the
+ * document's own "Title Page" print option. Only ever writes a .pdf on disk (file: scheme).
+ */
+async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, resource?: vscode.Uri, target?: vscode.Uri): Promise<void> {
+  const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? vscode.window.activeTextEditor?.document;
+  if (!doc || !doc.languageId.startsWith("highland-")) {
+    void vscode.window.showInformationMessage("Open a Highland screenplay to export it as a PDF.");
+    return;
+  }
+  if (doc.languageId !== LANGUAGES.fountain) {
+    void vscode.window.showInformationMessage("PDF export for manuscripts arrives in the next milestone; screenplays export now.");
+    return;
+  }
+  const bundle = doc.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath)?.bundle : undefined;
+  const path = bundle ?? doc.uri.fsPath;
+  let titlePage = true;
+  if (bundle) {
+    const settings = (await store.highlandSettings(bundle)) as { printOptions?: { printTitlePage?: boolean } };
+    titlePage = settings.printOptions?.printTitlePage !== false;
+  }
+  const out =
+    target ??
+    (await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(path.replace(/\.(highland|fountain|spmd)$/i, "") + ".pdf"),
+      filters: { PDF: ["pdf"] },
+      title: "Export PDF",
+    }));
+  if (!out) return;
+  if (out.scheme !== "file" || !/\.pdf$/i.test(out.fsPath)) {
+    void vscode.window.showErrorMessage(`Not exporting: ${out.toString()} is not a .pdf file on disk.`);
+    return;
+  }
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Exporting ${basename(out.fsPath)}…` }, async () => {
+    const result = await exportScreenplay({ text: doc.getText(), path, fontDir: join(context.extensionPath, "dist", "fonts"), titlePage });
+    await vscode.workspace.fs.writeFile(out, result.pdf);
+    for (const problem of result.problems) void vscode.window.showWarningMessage(problem);
+    if (!target) {
+      void vscode.window.showInformationMessage(`Exported ${basename(out.fsPath)} (${result.pages} pages).`, "Open", "Reveal in Finder").then((choice) => {
+        if (choice === "Open") void vscode.env.openExternal(out);
+        if (choice === "Reveal in Finder") void vscode.commands.executeCommand("revealFileInOS", out);
+      });
+    }
+  });
 }
