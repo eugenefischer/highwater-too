@@ -1,5 +1,10 @@
 /**
- * @highwater/pdf: PDF layout: forked Better Fountain screenplay engine + manuscript layout (milestones M4, M5).
- * Must not import "vscode" (see spec, Code layout).
+ * @highwater/pdf: PDF layout and rendering for Highland's templates (milestones M4, M5).
+ * Our own layout engine on PDFKit, fed by @highwater/parser and Highland's measured layouts;
+ * ideas for dual dialogue and (MORE)/(CONT'D) follow Better Fountain. Must not import "vscode".
  */
 export const PACKAGE_NAME = "@highwater/pdf";
+export * from "./types.ts";
+export { SCREENPLAY, layoutScreenplay, type ScreenplayOptions } from "./screenplay.ts";
+export { defaultFontDir, renderPdf, type RenderOptions } from "./render.ts";
+export { plain, toRuns, wrapRuns, type InlineContext } from "./text.ts";
