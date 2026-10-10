@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "npm run build -w @highwater/extension",
+    "build": "npm run build -w highwater-too",
     "pdf-compare": "node --experimental-strip-types tools/pdf-compare/src/cli.ts",
     "ci": "npm run typecheck && npm test && npm run build"
   },

@@ -1,0 +1,7 @@
+src/**
+test/**
+e2e/**
+dist/e2e/**
+**/*.map
+.vscode-test/**
+tsconfig*.json

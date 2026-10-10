@@ -15,6 +15,6 @@ describe("extension manifest", () => {
     expect(manifest.main).toBe("./dist/extension.cjs");
   });
   it("registers its commands", () => {
-    expect(manifest.contributes.commands.map((c) => c.command)).toContain("highwater.hello");
+    expect(manifest.contributes.commands.map((c) => c.command)).toEqual(expect.arrayContaining(["highwater.hello", "highwater.open"]));
   });
 });

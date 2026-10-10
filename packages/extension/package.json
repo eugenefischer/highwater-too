@@ -1,5 +1,5 @@
 {
-  "name": "@highwater/extension",
+  "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
   "version": "0.0.1",
@@ -15,23 +15,62 @@
   ],
   "main": "./dist/extension.cjs",
   "activationEvents": [
-    "onStartupFinished"
+    "onFileSystem:highland"
   ],
   "contributes": {
     "commands": [
       {
+        "command": "highwater.open",
+        "title": "Open Highland Document\u2026",
+        "category": "Highwater Too"
+      },
+      {
         "command": "highwater.hello",
-        "title": "Highwater Too: Show Version"
+        "title": "Show Version",
+        "category": "Highwater Too"
       }
-    ]
+    ],
+    "customEditors": [
+      {
+        "viewType": "highwater.open",
+        "displayName": "Highland Document",
+        "selector": [
+          {
+            "filenamePattern": "*.highland"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "configuration": {
+      "title": "Highwater Too",
+      "properties": {
+        "highwater.historyFolder": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "Folder for writing history and session backups. Until it is set, backups of the last 10 sessions per document go to the extension's own storage."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --sourcemap --outfile=dist/extension.cjs",
-    "package": "npm run build && vsce package --no-dependencies"
+    "package": "npm run build && vsce package --no-dependencies --skip-license --out ../../highwater-too.vsix",
+    "build:e2e": "esbuild e2e/suite.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/e2e/suite.cjs",
+    "test:e2e": "npm run build && npm run build:e2e && node --experimental-strip-types --no-warnings e2e/run.ts"
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0"
+  },
+  "dependencies": {
+    "@highwater/bundle": "*",
+    "@highwater/parser": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eugenefischer/highwater-too"
   }
 }
