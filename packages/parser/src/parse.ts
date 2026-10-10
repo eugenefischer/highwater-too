@@ -1,6 +1,7 @@
 import type { BlankNode, BoneyardNode, Document, Element, Line, Mode, TextNode, TopNode } from "./ast.ts";
 import { isBlank, lineText, splitLines } from "./lines.ts";
 import { classifyFountain } from "./fountain.ts";
+import { classifyMarkdown, classifyPlain } from "./markdown.ts";
 import { findOverlays, hiddenRanges } from "./overlays.ts";
 import { readTitlePage } from "./title-page.ts";
 
@@ -67,7 +68,13 @@ export function parse(source: string, options: ParseOptions): Document {
   if (tail && tail.span.start === tail.span.end && nodes.length > 1) nodes.pop();
 
   const textNodes = nodes.filter((n): n is TextNode => n.kind === "text");
-  const elements: Element[] = options.mode === "fountain" ? classifyFountain(source, textNodes, hiddenRanges(overlays)) : [];
+  const hidden = hiddenRanges(overlays);
+  const elements: Element[] =
+    options.mode === "fountain"
+      ? classifyFountain(source, textNodes, hidden)
+      : options.mode === "markdown"
+        ? classifyMarkdown(source, textNodes, hidden)
+        : classifyPlain(source, textNodes, hidden);
 
   return { mode: options.mode, source, nodes, titlePage, overlays, elements, diagnostics };
 }

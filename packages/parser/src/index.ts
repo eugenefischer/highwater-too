@@ -9,3 +9,5 @@ export { findOverlays, hiddenRanges, logicalText, type LogicalText } from "./ove
 export { modeFromFileName, parse, type ParseOptions } from "./parse.ts";
 export { TITLE_PAGE_KEYS, fieldText, normalizeKey, readTitlePage } from "./title-page.ts";
 export { classifyFountain } from "./fountain.ts";
+export { classifyMarkdown, classifyPlain } from "./markdown.ts";
+export { inlineText, parseInline, parseInlineLines } from "./inline.ts";

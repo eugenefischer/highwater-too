@@ -113,6 +113,7 @@ export interface ElementBase {
 }
 
 export interface SceneHeading extends ElementBase {
+  inline: Inline[];
   kind: "sceneHeading";
   text: string;
   forced: boolean;
@@ -120,40 +121,47 @@ export interface SceneHeading extends ElementBase {
 }
 
 export interface Action extends ElementBase {
+  inline: Inline[];
   kind: "action";
   text: string;
   forced: boolean;
 }
 
 export interface Transition extends ElementBase {
+  inline: Inline[];
   kind: "transition";
   text: string;
   forced: boolean;
 }
 
 export interface Centered extends ElementBase {
+  inline: Inline[];
   kind: "centered";
   text: string;
 }
 
 /** Highland: a line ending in ">" (without a leading ">") prints right-aligned. */
 export interface RightAligned extends ElementBase {
+  inline: Inline[];
   kind: "rightAligned";
   text: string;
 }
 
 export interface Lyric extends ElementBase {
+  inline: Inline[];
   kind: "lyric";
   text: string;
 }
 
 export interface Section extends ElementBase {
+  inline: Inline[];
   kind: "section";
   level: number;
   text: string;
 }
 
 export interface Synopsis extends ElementBase {
+  inline: Inline[];
   kind: "synopsis";
   text: string;
 }
@@ -169,9 +177,9 @@ export interface DirectiveLine extends ElementBase {
 }
 
 export type DialoguePart =
-  | { kind: "parenthetical"; text: string; line: Line }
-  | { kind: "line"; text: string; line: Line }
-  | { kind: "lyric"; text: string; line: Line }
+  | { kind: "parenthetical"; text: string; inline: Inline[]; line: Line }
+  | { kind: "line"; text: string; inline: Inline[]; line: Line }
+  | { kind: "lyric"; text: string; inline: Inline[]; line: Line }
   /** Fountain's two-space line: an intentional empty line inside dialogue. */
   | { kind: "empty"; line: Line };
 
@@ -187,7 +195,66 @@ export interface Dialogue extends ElementBase {
   parts: DialoguePart[];
 }
 
+// Markdown (and plain-text) elements.
+
+export interface Heading extends ElementBase {
+  kind: "heading";
+  level: number;
+  text: string;
+  inline: Inline[];
+}
+
+/** One line of prose: in Highland's Markdown every line is its own paragraph. */
+export interface Paragraph extends ElementBase {
+  kind: "paragraph";
+  text: string;
+  inline: Inline[];
+}
+
+export interface BlockQuote extends ElementBase {
+  kind: "blockQuote";
+  /** One entry per quoted paragraph; an empty ">" line separates paragraphs. */
+  paragraphs: { text: string; inline: Inline[] }[];
+}
+
+/** `* * *`, printed as a centred "#". */
+export interface SceneBreak extends ElementBase {
+  kind: "sceneBreak";
+}
+
+export interface ListBlock extends ElementBase {
+  kind: "list";
+  items: { marker: string; ordered: boolean; level: number; text: string; inline: Inline[]; line: Line }[];
+}
+
+export interface TermList extends ElementBase {
+  kind: "termList";
+  items: { term: string; definition: string; termInline: Inline[]; definitionInline: Inline[]; line: Line }[];
+}
+
+export interface Table extends ElementBase {
+  kind: "table";
+  align: ("left" | "center" | "right" | null)[];
+  header: { text: string; inline: Inline[] }[];
+  rows: { text: string; inline: Inline[] }[][];
+}
+
+/** `[name]: url`, used by reference links; not printed. */
+export interface LinkDefinition extends ElementBase {
+  kind: "linkDefinition";
+  label: string;
+  url: string;
+}
+
 export type Element =
+  | Heading
+  | Paragraph
+  | BlockQuote
+  | SceneBreak
+  | ListBlock
+  | TermList
+  | Table
+  | LinkDefinition
   | SceneHeading
   | Action
   | Transition
@@ -199,3 +266,20 @@ export type Element =
   | PageBreak
   | DirectiveLine
   | Dialogue;
+
+// ---------------------------------------------------------------------------------------------
+// Inline content (step 3). Spans are source offsets; a node's span may contain hidden ranges
+// (revision tags, inline boneyards) that its text omits.
+
+export type InlineStyle = "italic" | "bold" | "boldItalic" | "underline" | "strike" | "highlight";
+
+export type Inline =
+  | { kind: "text"; text: string; span: Span }
+  | { kind: "styled"; style: InlineStyle; children: Inline[]; span: Span }
+  | { kind: "note"; text: string; span: Span }
+  | { kind: "link"; children: Inline[]; url: string | null; reference: string | null; span: Span }
+  | { kind: "image"; alt: string; src: string; span: Span }
+  /** An inline `{{…}}`, e.g. {{SERIES}} inside a heading. Interpreted in step 4. */
+  | { kind: "directive"; text: string; span: Span }
+  /** Between the physical lines of one element. */
+  | { kind: "lineBreak"; span: Span };

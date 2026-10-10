@@ -1,41 +1,27 @@
-import type { Dialogue, DialoguePart, Element, Line, Span, TextNode } from "./ast.ts";
-import { logicalText } from "./overlays.ts";
+import type { Dialogue, DialoguePart, Element, Span, TextNode } from "./ast.ts";
+import { inlineText, parseInline, parseInlineLines } from "./inline.ts";
+import { lineInfos, spanOf, trimmed, type L } from "./lineinfo.ts";
+import { sliceLogical, stripEnd, stripStart, trimLogical } from "./logical.ts";
 
-const PAGE_BREAK = /^={3,}\s*$/;
+export const PAGE_BREAK = /^={3,}\s*$/;
 const SECTION = /^(#+)\s*(.*)$/;
-const SYNOPSIS = /^=(?!=)\s*(.*)$/;
-const DIRECTIVES_ONLY = /^(?:\s*\{\{[^{}]*\}\})+\s*$/;
-const CENTERED = /^>\s*(.*?)\s*<$/;
+export const SYNOPSIS = /^=(?!=)\s*(.*)$/;
+export const DIRECTIVES_ONLY = /^(?:\s*\{\{[^{}]*\}\})+\s*$/;
+export const CENTERED = /^>\s*(.*?)\s*<$/;
 const FORCED_TRANSITION = /^>\s*(.+?)\s*$/;
 const FORCED_SCENE = /^\.(?![.])\s*(.+)$/;
 const SCENE = /^(?:INT\.?\/EXT|INT\/EXT|I\/E|INT|EXT|EST)[.\s]/i;
 const TRANSITION = /^[^\p{Ll}]*TO:$/u;
 const SCENE_NUMBER = /\s*#([\w.-]+)#\s*$/;
-const RIGHT_ALIGNED = /^(.*\S)\s*>$/;
+export const RIGHT_ALIGNED = /^(.*\S)\s*>$/;
 const PARENTHETICAL = /^\(.*\)$/;
 /** A cue: uppercase letters (extensions in parentheses may be mixed case), optional trailing ^. */
 const CUE = /^((?:[^\p{Ll}()^]*\p{Lu}[^\p{Ll}()^]*?))\s*((?:\([^)]*\)\s*)*)(\^)?\s*$/u;
 
-interface L {
-  line: Line;
-  /** Logical text with leading/trailing whitespace removed. */
-  text: string;
-  raw: string;
-}
-
-/** Elements that occupy exactly one line; after one, classification starts afresh on the next line. */
-type Single = "sceneHeading" | "transition" | "section" | "synopsis" | "pageBreak" | "directiveLine" | "centered" | "rightAligned";
-
 /** Pass 3 (Fountain): classifies each text node's lines into screenplay elements. */
 export function classifyFountain(source: string, nodes: TextNode[], hidden: Span[]): Element[] {
   const out: Element[] = [];
-  for (const node of nodes) {
-    const lines: L[] = node.lines.map((line) => {
-      const raw = logicalText(source, line.content, hidden).text;
-      return { line, raw, text: raw.trim() };
-    });
-    classifyNode(lines, out);
-  }
+  for (const node of nodes) classifyNode(lineInfos(source, node.lines, hidden), out);
   pairDualDialogue(out);
   return out;
 }
@@ -46,8 +32,7 @@ function classifyNode(lines: L[], out: Element[]): void {
   while (i < lines.length) {
     const l = lines[i]!;
     if (l.text === "") {
-      // Only tags or an inline boneyard on this line: nothing printable.
-      i++;
+      i++; // only tags or an inline boneyard on this line: nothing printable
       continue;
     }
     const single = classifySingle(l, atStart, lines[i + 1]);
@@ -58,9 +43,11 @@ function classifyNode(lines: L[], out: Element[]): void {
       continue;
     }
     if (l.text.startsWith("~")) {
-      const start = i;
-      while (i < lines.length && lines[i]!.text.startsWith("~")) i++;
-      for (const ly of lines.slice(start, i)) out.push({ kind: "lyric", text: ly.text.slice(1).trim(), span: ly.line.content, lines: [ly.line] });
+      while (i < lines.length && lines[i]!.text.startsWith("~")) {
+        const ly = lines[i++]!;
+        const inline = parseInline(stripStart(ly.lt, /~\s*/));
+        out.push({ kind: "lyric", text: inlineText(inline), inline, span: ly.line.content, lines: [ly.line] });
+      }
       atStart = true;
       continue;
     }
@@ -79,10 +66,14 @@ function classifyNode(lines: L[], out: Element[]): void {
     i++;
     while (i < lines.length && !breaksAction(lines[i]!)) i++;
     const block = lines.slice(start, i);
-    const text = block
-      .map((b, k) => (k === 0 && forced ? b.raw.replace(/^\s*!/, "") : b.raw).replace(/\s+$/, ""))
-      .join("\n");
-    out.push({ kind: "action", text, forced, span: spanOf(block), lines: block.map((b) => b.line) });
+    // Leading indentation is kept (Fountain preserves it in action); trailing whitespace is not.
+    const parts = block.map((b, k) => {
+      const end = b.raw.trimEnd().length;
+      const from = k === 0 && forced ? b.raw.indexOf("!") + 1 : 0;
+      return sliceLogical(b.lt, from, Math.max(from, end));
+    });
+    const inline = parseInlineLines(parts);
+    out.push({ kind: "action", text: inlineText(inline), inline, forced, span: spanOf(block), lines: block.map((b) => b.line) });
     atStart = false;
   }
 }
@@ -98,33 +89,47 @@ function classifySingle(l: L, atStart: boolean, next: L | undefined): Element | 
   if (PAGE_BREAK.test(t)) return { kind: "pageBreak", ...base };
   if (DIRECTIVES_ONLY.test(t)) return { kind: "directiveLine", text: t, ...base };
   let m = SECTION.exec(t);
-  if (m) return { kind: "section", level: m[1]!.length, text: m[2]!.trim(), ...base };
-  m = SYNOPSIS.exec(t);
-  if (m) return { kind: "synopsis", text: m[1]!.trim(), ...base };
-  m = CENTERED.exec(t);
-  if (m) return { kind: "centered", text: m[1]!, ...base };
-  m = FORCED_TRANSITION.exec(t);
-  if (m) return { kind: "transition", text: m[1]!.toUpperCase(), forced: true, ...base };
-  m = FORCED_SCENE.exec(t);
-  if (m) return sceneHeading(l, m[1]!, true);
-  if (atStart && SCENE.test(t)) return sceneHeading(l, t, false);
-  if (atStart && TRANSITION.test(t) && (!next || next.text === "" || SCENE.test(next.text) || FORCED_SCENE.test(next.text))) {
-    return { kind: "transition", text: t, forced: false, ...base };
+  if (m) {
+    const inline = parseInline(stripStart(l.lt, /#+\s*/));
+    return { kind: "section", level: m[1]!.length, text: inlineText(inline).trim(), inline, ...base };
   }
-  m = RIGHT_ALIGNED.exec(t);
-  if (m && !t.startsWith(">")) return { kind: "rightAligned", text: m[1]!, ...base };
+  if (SYNOPSIS.test(t)) {
+    const inline = parseInline(stripStart(l.lt, /=\s*/));
+    return { kind: "synopsis", text: inlineText(inline).trim(), inline, ...base };
+  }
+  if (CENTERED.test(t)) {
+    const inline = parseInline(stripEnd(stripStart(l.lt, />\s*/), /\s*</));
+    return { kind: "centered", text: inlineText(inline), inline, ...base };
+  }
+  if (FORCED_TRANSITION.test(t)) {
+    const inline = parseInline(stripStart(l.lt, />\s*/));
+    return { kind: "transition", text: inlineText(inline).toUpperCase(), inline, forced: true, ...base };
+  }
+  m = FORCED_SCENE.exec(t);
+  if (m) return sceneHeading(l, true);
+  if (atStart && SCENE.test(t)) return sceneHeading(l, false);
+  if (atStart && TRANSITION.test(t) && (!next || next.text === "" || SCENE.test(next.text) || FORCED_SCENE.test(next.text))) {
+    const inline = parseInline(trimmed(l));
+    return { kind: "transition", text: t, inline, forced: false, ...base };
+  }
+  if (RIGHT_ALIGNED.test(t) && !t.startsWith(">")) {
+    const inline = parseInline(stripEnd(l.lt, /\s*>/));
+    return { kind: "rightAligned", text: inlineText(inline), inline, ...base };
+  }
   return null;
 }
 
-function sceneHeading(l: L, text: string, forced: boolean): Element {
-  const m = SCENE_NUMBER.exec(text);
+function sceneHeading(l: L, forced: boolean): Element {
+  let lt = forced ? stripStart(l.lt, /\.\s*/) : trimmed(l);
+  const m = SCENE_NUMBER.exec(lt.text);
   let sceneNumber: { text: string; span: Span } | null = null;
   if (m) {
-    const at = l.line.content.start + l.raw.lastIndexOf(`#${m[1]}#`);
-    sceneNumber = { text: m[1]!, span: { start: at, end: at + m[1]!.length + 2 } };
-    text = text.slice(0, m.index);
+    const hashAt = lt.text.lastIndexOf(`#${m[1]}#`);
+    sceneNumber = { text: m[1]!, span: { start: lt.offsets[hashAt]!, end: lt.offsets[hashAt + m[1]!.length + 1]! + 1 } };
+    lt = trimLogical(sliceLogical(lt, 0, m.index));
   }
-  return { kind: "sceneHeading", text: text.trim(), forced, sceneNumber, span: l.line.content, lines: [l.line] };
+  const inline = parseInline(lt);
+  return { kind: "sceneHeading", text: inlineText(inline), inline, forced, sceneNumber, span: l.line.content, lines: [l.line] };
 }
 
 function readDialogue(lines: L[], i: number): { element: Dialogue; next: number } | null {
@@ -133,25 +138,25 @@ function readDialogue(lines: L[], i: number): { element: Dialogue; next: number 
   const forced = t.startsWith("@");
   if (forced) t = t.slice(1);
   else if (SCENE.test(t) || TRANSITION.test(t) || /^[\d\s.,:;!?'"-]+$/.test(t)) return null;
-  const m = CUE.exec(t);
-  let character: string;
-  let extensionsText: string;
-  let dual: string | undefined;
-  if (m) {
-    [, character = "", extensionsText = "", dual] = m;
-  } else if (forced) {
-    const f = /^(.*?)\s*((?:\([^)]*\)\s*)*)(\^)?\s*$/.exec(t)!;
-    [, character = "", extensionsText = "", dual] = f;
-  } else return null;
+  const m = CUE.exec(t) ?? (forced ? /^(.*?)\s*((?:\([^)]*\)\s*)*)(\^)?\s*$/.exec(t) : null);
+  if (!m) return null;
+  const [, character = "", extensionsText = "", dual] = m;
   const parts: DialoguePart[] = [];
   let j = i + 1;
   for (; j < lines.length; j++) {
     const l = lines[j]!;
     if (/^ {2,}$/.test(l.raw)) parts.push({ kind: "empty", line: l.line });
     else if (l.text === "") continue;
-    else if (PARENTHETICAL.test(l.text)) parts.push({ kind: "parenthetical", text: l.text, line: l.line });
-    else if (l.text.startsWith("~")) parts.push({ kind: "lyric", text: l.text.slice(1).trim(), line: l.line });
-    else parts.push({ kind: "line", text: l.text, line: l.line });
+    else if (PARENTHETICAL.test(l.text)) {
+      const inline = parseInline(trimmed(l));
+      parts.push({ kind: "parenthetical", text: inlineText(inline), inline, line: l.line });
+    } else if (l.text.startsWith("~")) {
+      const inline = parseInline(stripStart(l.lt, /~\s*/));
+      parts.push({ kind: "lyric", text: inlineText(inline), inline, line: l.line });
+    } else {
+      const inline = parseInline(trimmed(l));
+      parts.push({ kind: "line", text: inlineText(inline), inline, line: l.line });
+    }
   }
   if (!parts.some((p) => p.kind !== "parenthetical")) return null;
   const block = lines.slice(i, j);
@@ -180,8 +185,4 @@ function pairDualDialogue(elements: Element[]): void {
       else right.dual = null;
     }
   }
-}
-
-function spanOf(block: L[]): Span {
-  return { start: block[0]!.line.content.start, end: block.at(-1)!.line.content.end };
 }

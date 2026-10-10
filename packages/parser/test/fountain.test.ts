@@ -114,7 +114,7 @@ describe("action", () => {
 });
 
 describe("modes", () => {
-  it("leaves elements empty for Markdown and plain text until step 3", () => {
-    expect(parse("INT. HOUSE - DAY", { mode: "markdown" }).elements).toEqual([]);
+  it("does not apply screenplay rules in Markdown", () => {
+    expect(parse("INT. HOUSE - DAY", { mode: "markdown" }).elements.map((e) => e.kind)).toEqual(["paragraph"]);
   });
 });
