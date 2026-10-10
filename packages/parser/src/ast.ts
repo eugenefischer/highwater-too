@@ -32,7 +32,7 @@ export interface BoneyardNode {
   lines: Line[];
 }
 
-/** A run of non-blank lines. Step 2 and 3 classify these into scene headings, dialogue, paragraphs, … */
+/** A run of non-blank lines, classified into elements. */
 export interface TextNode {
   kind: "text";
   span: Span;
@@ -98,13 +98,15 @@ export interface Document {
   nodes: TopNode[];
   titlePage: TitlePageNode | null;
   overlays: Overlays;
-  /** Classified content in reading order (Fountain from step 2; Markdown from step 3). */
+  /** Classified content in reading order. */
   elements: Element[];
+  /** Every `{{…}}` directive outside the title page, in source order (directive lines and inline). */
+  directives: PlacedDirective[];
   diagnostics: Diagnostic[];
 }
 
 // ---------------------------------------------------------------------------------------------
-// Elements (step 2: Fountain). Text fields are logical text: boneyards and revision tags removed,
+// Elements. Text fields are logical text: boneyards and revision tags removed,
 // forcing characters and scene numbers stripped. `span` covers the element's lines in the source.
 
 export interface ElementBase {
@@ -170,10 +172,11 @@ export interface PageBreak extends ElementBase {
   kind: "pageBreak";
 }
 
-/** A line holding only `{{…}}` directives, e.g. {{HEADER: %p}}. Parsed in step 4. */
+/** A line holding only `{{…}}` directives, e.g. {{HEADER: %p}}. */
 export interface DirectiveLine extends ElementBase {
   kind: "directiveLine";
   text: string;
+  directives: PlacedDirective[];
 }
 
 export type DialoguePart =
@@ -268,7 +271,7 @@ export type Element =
   | Dialogue;
 
 // ---------------------------------------------------------------------------------------------
-// Inline content (step 3). Spans are source offsets; a node's span may contain hidden ranges
+// Inline content. Spans are source offsets; a node's span may contain hidden ranges
 // (revision tags, inline boneyards) that its text omits.
 
 export type InlineStyle = "italic" | "bold" | "boldItalic" | "underline" | "strike" | "highlight";
@@ -279,7 +282,56 @@ export type Inline =
   | { kind: "note"; text: string; span: Span }
   | { kind: "link"; children: Inline[]; url: string | null; reference: string | null; span: Span }
   | { kind: "image"; alt: string; src: string; span: Span }
-  /** An inline `{{…}}`, e.g. {{SERIES}} inside a heading. Interpreted in step 4. */
-  | { kind: "directive"; text: string; span: Span }
+  /** An inline `{{…}}`, e.g. {{SERIES}} inside a heading. */
+  | { kind: "directive"; text: string; directive: Directive; span: Span }
   /** Between the physical lines of one element. */
   | { kind: "lineBreak"; span: Span };
+
+// ---------------------------------------------------------------------------------------------
+// Directives (step 4). The parser reads them; numbering, dates, includes and page furniture are
+// applied later (series counter and include resolver in this package, the rest in the PDF engine).
+
+/** One piece of a header or footer slot. */
+export type PageTextPart =
+  | { kind: "text"; text: string }
+  /** %p */
+  | { kind: "page" }
+  /** %pp */
+  | { kind: "pageCount" }
+  /** %#: the current section (screenplay) or heading (manuscript) title */
+  | { kind: "section" };
+
+/** Null slots print nothing. */
+export interface PageTextSlots {
+  left: PageTextPart[] | null;
+  center: PageTextPart[] | null;
+  right: PageTextPart[] | null;
+}
+
+export type Directive =
+  /** `{{HEADER: …}}` / `{{FOOTER: …}}`; `off` for %none. */
+  | { kind: "header" | "footer"; off: boolean; slots: PageTextSlots }
+  /** `{{PAGENUMBER: n}}`; `value` is null when n is not a whole number. */
+  | { kind: "pageNumber"; value: number | null }
+  | { kind: "include"; path: string }
+  /**
+   * `{{SERIES}}` adds 1 to the document's one counter; `{{SERIES: 5}}` sets it to 5. Any other
+   * value is kept in `label` but ignored, as Highland does.
+   */
+  | { kind: "series"; start: number | null; label: string | null }
+  | { kind: "timestamp"; format: string | null }
+  /** `{{TOC}}`, `{{TOC: # ###}}`; `levels` null means every heading level. */
+  | { kind: "toc"; levels: number[] | null }
+  /** `{{%m:label}}` */
+  | { kind: "marker"; label: string }
+  /** Anything else: preserved and shown dimmed. */
+  | { kind: "other"; name: string; value: string | null };
+
+export interface PlacedDirective {
+  directive: Directive;
+  /** As written, braces included. */
+  text: string;
+  span: Span;
+  /** True inside a line of other text; false on a line holding only directives. */
+  inline: boolean;
+}

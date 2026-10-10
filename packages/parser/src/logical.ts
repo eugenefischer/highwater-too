@@ -1,8 +1,12 @@
-import type { LogicalText } from "./overlays.ts";
+import { offsetAt, type LogicalText } from "./overlays.ts";
 
 /** A sub-range [from, to) of a logical text, keeping the source mapping. */
 export function sliceLogical(lt: LogicalText, from: number, to = lt.text.length): LogicalText {
-  return { text: lt.text.slice(from, to), offsets: lt.offsets.slice(from, to).concat(to < lt.offsets.length - 1 ? [lt.offsets[to]!] : [lt.offsets.at(-1)!]) };
+  const text = lt.text.slice(from, to);
+  if (lt.offsets === null) return { text, base: lt.base + from, offsets: null };
+  const offsets = lt.offsets.slice(from, to);
+  offsets.push(lt.offsets[Math.min(to, lt.offsets.length - 1)]!);
+  return { text, base: offsetAt(lt, from), offsets };
 }
 
 /** Trims whitespace at both ends. */

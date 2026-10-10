@@ -71,31 +71,63 @@ export function hiddenRanges(overlays: Overlays): Span[] {
     spans.push(r.openTag);
     if (r.closeTag) spans.push(r.closeTag);
   }
-  return spans.sort((a, b) => a.start - b.start);
+  spans.sort((a, b) => a.start - b.start);
+  // Merge overlaps (a revision tag inside a boneyard) so the ranges are disjoint and sorted by end too.
+  const merged: Span[] = [];
+  for (const sp of spans) {
+    const last = merged.at(-1);
+    if (last && sp.start <= last.end) last.end = Math.max(last.end, sp.end);
+    else merged.push({ start: sp.start, end: sp.end });
+  }
+  return merged;
 }
 
-/** Text of `span` with hidden ranges removed, plus each output character's source offset. */
+/**
+ * Text of `span` with hidden ranges removed, plus each output character's source offset. Read
+ * offsets with `offsetAt`: when nothing is hidden, `offsets` is null and offset k is `base + k`.
+ */
 export interface LogicalText {
   text: string;
+  base: number;
   /** `offsets[k]` is the source offset of `text[k]`; `offsets[text.length]` is the source end. */
-  offsets: number[];
+  offsets: number[] | null;
+}
+
+/** Source offset of logical character k (k = text.length gives the source end). */
+export function offsetAt(lt: LogicalText, k: number): number {
+  return lt.offsets === null ? lt.base + k : lt.offsets[k]!;
 }
 
 export function logicalText(source: string, span: Span, hidden: Span[]): LogicalText {
-  let text = "";
+  // First hidden range that ends after the span starts (binary search; ranges are sorted and disjoint).
+  let lo = 0;
+  let hi = hidden.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (hidden[mid]!.end <= span.start) lo = mid + 1;
+    else hi = mid;
+  }
+  let h = lo;
+  if (h >= hidden.length || hidden[h]!.start >= span.end) {
+    // Fast path: nothing hidden in this span.
+    return { text: source.slice(span.start, span.end), base: span.start, offsets: null };
+  }
   const offsets: number[] = [];
-  let h = 0;
+  let text = "";
+  let runStart = span.start;
   for (let i = span.start; i < span.end; ) {
     while (h < hidden.length && hidden[h]!.end <= i) h++;
     const range = hidden[h];
     if (range && range.start <= i) {
-      i = range.end;
+      text += source.slice(runStart, i);
+      i = Math.min(range.end, span.end);
+      runStart = i;
       continue;
     }
-    text += source[i];
     offsets.push(i);
     i++;
   }
+  text += source.slice(runStart, span.end);
   offsets.push(span.end);
-  return { text, offsets };
+  return { text, base: span.start, offsets };
 }

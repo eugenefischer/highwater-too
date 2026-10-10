@@ -1,4 +1,5 @@
 import type { BlankNode, BoneyardNode, Document, Element, Line, Mode, TextNode, TopNode } from "./ast.ts";
+import { collectDirectives } from "./directives.ts";
 import { isBlank, lineText, splitLines } from "./lines.ts";
 import { classifyFountain } from "./fountain.ts";
 import { classifyMarkdown, classifyPlain } from "./markdown.ts";
@@ -18,22 +19,35 @@ export function modeFromFileName(name: string): Mode {
 }
 
 /**
- * Parses a document. Step 1 of M2: overlays, title page, and the line structure
- * (blank runs, whole-line boneyards, runs of text lines). Later steps classify text nodes.
+ * Parses a document: overlays, title page and line structure, then elements (Fountain, Markdown
+ * or plain text), inline content and directives.
  */
 export function parse(source: string, options: ParseOptions): Document {
   const { overlays, diagnostics } = findOverlays(source);
   const lines = splitLines(source);
   const nodes: TopNode[] = [];
 
-  // Lines lying entirely inside a boneyard (from their first to their last character).
-  const insideBoneyard = (line: Line): boolean =>
-    overlays.boneyard.some((b) => b.span.start <= line.content.start && line.content.end <= b.span.end && line.content.end > line.content.start) ||
-    overlays.boneyard.some((b) => b.span.start < line.span.start && line.span.end <= b.span.end);
+  // Per line: lies entirely inside a boneyard (from its first to its last character, or it is an
+  // empty line strictly within one), and is blank. One sweep over the sorted boneyards.
+  const inBone: boolean[] = new Array(lines.length);
+  const blank: boolean[] = new Array(lines.length);
+  let b = 0;
+  for (let k = 0; k < lines.length; k++) {
+    const line = lines[k]!;
+    while (b < overlays.boneyard.length && overlays.boneyard[b]!.span.end <= line.span.start) b++;
+    const by = overlays.boneyard[b];
+    inBone[k] =
+      by !== undefined &&
+      ((line.content.end > line.content.start && by.span.start <= line.content.start && line.content.end <= by.span.end) ||
+        (by.span.start < line.span.start && line.span.end <= by.span.end));
+    blank[k] = isBlank(lineText(source, line));
+  }
+  const insideBoneyard = (k: number): boolean => inBone[k]!;
+  const isBlankLine = (k: number): boolean => blank[k]! && !inBone[k]!;
 
   let i = 0;
   // Leading blank lines, then an optional title page.
-  const leading = takeWhile(lines, i, (l) => isBlank(lineText(source, l)) && !insideBoneyard(l));
+  const leading = takeWhile(lines, i, isBlankLine);
   if (leading > i) {
     nodes.push(group("blank", lines, i, leading));
     i = leading;
@@ -47,18 +61,16 @@ export function parse(source: string, options: ParseOptions): Document {
   }
 
   while (i < lines.length) {
-    const line = lines[i]!;
-    // A final empty line after a trailing newline is part of nothing visible; keep coverage by grouping it as blank.
-    if (insideBoneyard(line)) {
+    if (insideBoneyard(i)) {
       const end = takeWhile(lines, i, insideBoneyard);
       nodes.push(group("boneyard", lines, i, end));
       i = end;
-    } else if (isBlank(lineText(source, line))) {
-      const end = takeWhile(lines, i, (l) => isBlank(lineText(source, l)) && !insideBoneyard(l));
+    } else if (blank[i]) {
+      const end = takeWhile(lines, i, isBlankLine);
       nodes.push(group("blank", lines, i, end));
       i = end;
     } else {
-      const end = takeWhile(lines, i, (l) => !isBlank(lineText(source, l)) && !insideBoneyard(l));
+      const end = takeWhile(lines, i, (k) => !blank[k] && !inBone[k]);
       nodes.push(group("text", lines, i, end));
       i = end;
     }
@@ -76,12 +88,20 @@ export function parse(source: string, options: ParseOptions): Document {
         ? classifyMarkdown(source, textNodes, hidden)
         : classifyPlain(source, textNodes, hidden);
 
-  return { mode: options.mode, source, nodes, titlePage, overlays, elements, diagnostics };
+  const directives = collectDirectives(elements);
+  for (const d of directives) {
+    const warn = (message: string) => diagnostics.push({ severity: "warning", message, span: d.span });
+    if (d.directive.kind === "pageNumber" && d.directive.value === null) warn("PAGENUMBER needs a whole number, e.g. {{PAGENUMBER: 10}}");
+    if (d.directive.kind === "include" && d.inline) warn("INCLUDE only works on a line of its own");
+    if (d.directive.kind === "include" && d.directive.path === "") warn("INCLUDE needs a file path");
+  }
+
+  return { mode: options.mode, source, nodes, titlePage, overlays, elements, directives, diagnostics };
 }
 
-function takeWhile(lines: Line[], from: number, test: (line: Line) => boolean): number {
+function takeWhile(lines: Line[], from: number, test: (index: number) => boolean): number {
   let i = from;
-  while (i < lines.length && test(lines[i]!)) i++;
+  while (i < lines.length && test(i)) i++;
   return i;
 }
 

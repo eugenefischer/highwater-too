@@ -1,3 +1,5 @@
+import { directivesInLine } from "./directives.ts";
+import { offsetAt } from "./overlays.ts";
 import type { Element, Span, Table, TextNode } from "./ast.ts";
 import { CENTERED, DIRECTIVES_ONLY, PAGE_BREAK, RIGHT_ALIGNED, SYNOPSIS } from "./fountain.ts";
 import { inlineText, parseInline } from "./inline.ts";
@@ -12,6 +14,8 @@ const LIST_ITEM = /^(\s*)([*-]|\d+[.)])\s+/;
 const TERM = /^(.+?)\s*::\s*(.*)$/;
 const LINK_DEFINITION = /^\[([^\]]+)\]:\s*(\S+)/;
 const TABLE_SEPARATOR = /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
+
+const isTerm = (t: string): boolean => t.includes("::") && TERM.test(t);
 
 /** Pass 3 (Markdown): classifies lines into manuscript elements. Every prose line is its own paragraph. */
 export function classifyMarkdown(source: string, nodes: TextNode[], hidden: Span[]): Element[] {
@@ -47,7 +51,7 @@ function classifyNode(lines: L[], out: Element[]): void {
       out.push({ kind: "pageBreak", ...base });
       i++;
     } else if (DIRECTIVES_ONLY.test(t)) {
-      out.push({ kind: "directiveLine", text: t, ...base });
+      out.push({ kind: "directiveLine", text: t, directives: directivesInLine(l.lt), ...base });
       i++;
     } else if (SYNOPSIS.test(t)) {
       const inline = parseInline(stripStart(l.lt, /=\s*/));
@@ -92,9 +96,9 @@ function classifyNode(lines: L[], out: Element[]): void {
         span: spanOf(block),
         lines: block.map((b) => b.line),
       });
-    } else if (TERM.test(t)) {
+    } else if (isTerm(t)) {
       const start = i;
-      while (i < lines.length && TERM.test(lines[i]!.text)) i++;
+      while (i < lines.length && isTerm(lines[i]!.text)) i++;
       const block = lines.slice(start, i);
       out.push({
         kind: "termList",
@@ -108,7 +112,7 @@ function classifyNode(lines: L[], out: Element[]): void {
         span: spanOf(block),
         lines: block.map((b) => b.line),
       });
-    } else if (RIGHT_ALIGNED.test(t)) {
+    } else if (t.endsWith(">") && RIGHT_ALIGNED.test(t)) {
       const inline = parseInline(stripEnd(l.lt, /\s*>/));
       out.push({ kind: "rightAligned", text: inlineText(inline), inline, ...base });
       i++;
@@ -130,7 +134,7 @@ function blockQuote(block: L[]): Element {
       const inline = parseInline(lt);
       const prev = paragraphs.at(-1);
       if (prev && current.indexOf(lt) > 0) {
-        prev.inline.push({ kind: "text", text: " ", span: { start: lt.offsets[0]!, end: lt.offsets[0]! } }, ...inline);
+        prev.inline.push({ kind: "text", text: " ", span: { start: offsetAt(lt, 0), end: offsetAt(lt, 0) } }, ...inline);
         prev.text = inlineText(prev.inline);
       } else paragraphs.push({ text: inlineText(inline), inline });
     }
@@ -180,5 +184,5 @@ function table(block: L[]): Table {
 }
 
 function spanOfLogical(lt: LogicalText): Span {
-  return { start: lt.offsets[0]!, end: lt.offsets.at(-1)! };
+  return { start: offsetAt(lt, 0), end: offsetAt(lt, lt.text.length) };
 }

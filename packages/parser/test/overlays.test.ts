@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hiddenRanges, logicalText, parse } from "../src/index.ts";
+import { hiddenRanges, logicalText, offsetAt, parse } from "../src/index.ts";
 import { expectTiling } from "./helpers.ts";
 
 const slice = (s: string, span: { start: number; end: number }) => s.slice(span.start, span.end);
@@ -56,8 +56,8 @@ describe("revision tags", () => {
     const second = doc.nodes.at(-1)!;
     const lt = logicalText(src, second.span, hidden);
     expect(lt.text).toBe("here is another revision");
-    expect(src[lt.offsets[0]!]).toBe("h");
-    expect(lt.offsets[0]).toBe(src.indexOf("here is another"));
+    expect(src[offsetAt(lt, 0)]).toBe("h");
+    expect(offsetAt(lt, 0)).toBe(src.indexOf("here is another"));
   });
 
   it("warns about a stray close tag and an unclosed revision", () => {

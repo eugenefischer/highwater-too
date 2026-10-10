@@ -1,5 +1,6 @@
 import type { Inline, InlineStyle, Span } from "./ast.ts";
-import type { LogicalText } from "./overlays.ts";
+import { parseDirective } from "./directives.ts";
+import { offsetAt, type LogicalText } from "./overlays.ts";
 
 const DELIMITERS: { open: string; style: InlineStyle }[] = [
   { open: "***", style: "boldItalic" },
@@ -12,14 +13,18 @@ const DELIMITERS: { open: string; style: InlineStyle }[] = [
 
 const PUNCT = /[\s\p{P}\p{S}]/u;
 
+/** Characters that can start inline markup; every other character is skipped without trying a match. */
+const NEXT_CANDIDATE = /[[{!*_~+\\]/g;
+const ESCAPABLE = new Set(["*", "_", "+", "~", "\\", "[", "]", "{", "}", "#", ">", "!"]);
+
 /** Parses the inline content of an element's lines, inserting line breaks between lines. */
 export function parseInlineLines(lines: LogicalText[]): Inline[] {
   const out: Inline[] = [];
   lines.forEach((lt, k) => {
     if (k > 0) {
       const prev = lines[k - 1]!;
-      const at = prev.offsets.at(-1)!;
-      out.push({ kind: "lineBreak", span: { start: at, end: lt.offsets[0] ?? at } });
+      const at = offsetAt(prev, prev.text.length);
+      out.push({ kind: "lineBreak", span: { start: at, end: offsetAt(lt, 0) } });
     }
     out.push(...parseInline(lt));
   });
@@ -52,7 +57,7 @@ export function inlineText(nodes: Inline[]): string {
 }
 
 function span(lt: LogicalText, a: number, b: number): Span {
-  return { start: lt.offsets[a]!, end: b > a ? lt.offsets[b - 1]! + 1 : lt.offsets[a]! };
+  return { start: offsetAt(lt, a), end: b > a ? offsetAt(lt, b - 1) + 1 : offsetAt(lt, a) };
 }
 
 function parseRange(lt: LogicalText, from: number, to: number): Inline[] {
@@ -71,9 +76,17 @@ function parseRange(lt: LogicalText, from: number, to: number): Inline[] {
   };
   let i = from;
   while (i < to) {
+    NEXT_CANDIDATE.lastIndex = i;
+    const next = NEXT_CANDIDATE.exec(s);
+    if (!next || next.index >= to) break;
+    i = next.index;
     const c = s[i]!;
-    if (c === "\\" && i + 1 < to && /[*_+~\\[\]{}#>!]/.test(s[i + 1]!)) {
+    if (c === "\\" && i + 1 < to && ESCAPABLE.has(s[i + 1]!)) {
       i += 2; // escaped: stays in the text run, the backslash is removed by unescape()
+      continue;
+    }
+    if (c === "\\") {
+      i++;
       continue;
     }
     const node = matchAt(lt, i, to);
@@ -100,7 +113,10 @@ function matchAt(lt: LogicalText, i: number, to: number): { inline: Inline; end:
   // {{directive}}
   if (s.startsWith("{{", i)) {
     const close = s.indexOf("}}", i + 2);
-    if (close >= 0 && close + 2 <= to) return { inline: { kind: "directive", text: s.slice(i, close + 2), span: span(lt, i, close + 2) }, end: close + 2 };
+    if (close >= 0 && close + 2 <= to) {
+      const text = s.slice(i, close + 2);
+      return { inline: { kind: "directive", text, directive: parseDirective(text), span: span(lt, i, close + 2) }, end: close + 2 };
+    }
   }
   // ![alt](src)
   if (s.startsWith("![", i)) {
@@ -151,5 +167,6 @@ function findCloser(s: string, delim: string, from: number, to: number): number 
 }
 
 function unescape(text: string): string {
+  if (!text.includes("\\")) return text;
   return text.replace(/\\([*_+~\\[\]{}#>!])/g, "$1");
 }

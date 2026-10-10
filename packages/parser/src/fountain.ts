@@ -1,3 +1,5 @@
+import { directivesInLine } from "./directives.ts";
+import { offsetAt } from "./overlays.ts";
 import type { Dialogue, DialoguePart, Element, Span, TextNode } from "./ast.ts";
 import { inlineText, parseInline, parseInlineLines } from "./inline.ts";
 import { lineInfos, spanOf, trimmed, type L } from "./lineinfo.ts";
@@ -87,7 +89,7 @@ function classifySingle(l: L, atStart: boolean, next: L | undefined): Element | 
   const base = { span: l.line.content, lines: [l.line] };
   if (t.startsWith("!")) return null;
   if (PAGE_BREAK.test(t)) return { kind: "pageBreak", ...base };
-  if (DIRECTIVES_ONLY.test(t)) return { kind: "directiveLine", text: t, ...base };
+  if (DIRECTIVES_ONLY.test(t)) return { kind: "directiveLine", text: t, directives: directivesInLine(l.lt), ...base };
   let m = SECTION.exec(t);
   if (m) {
     const inline = parseInline(stripStart(l.lt, /#+\s*/));
@@ -112,7 +114,7 @@ function classifySingle(l: L, atStart: boolean, next: L | undefined): Element | 
     const inline = parseInline(trimmed(l));
     return { kind: "transition", text: t, inline, forced: false, ...base };
   }
-  if (RIGHT_ALIGNED.test(t) && !t.startsWith(">")) {
+  if (t.endsWith(">") && RIGHT_ALIGNED.test(t) && !t.startsWith(">")) {
     const inline = parseInline(stripEnd(l.lt, /\s*>/));
     return { kind: "rightAligned", text: inlineText(inline), inline, ...base };
   }
@@ -125,7 +127,7 @@ function sceneHeading(l: L, forced: boolean): Element {
   let sceneNumber: { text: string; span: Span } | null = null;
   if (m) {
     const hashAt = lt.text.lastIndexOf(`#${m[1]}#`);
-    sceneNumber = { text: m[1]!, span: { start: lt.offsets[hashAt]!, end: lt.offsets[hashAt + m[1]!.length + 1]! + 1 } };
+    sceneNumber = { text: m[1]!, span: { start: offsetAt(lt, hashAt), end: offsetAt(lt, hashAt + m[1]!.length + 1) + 1 } };
     lt = trimLogical(sliceLogical(lt, 0, m.index));
   }
   const inline = parseInline(lt);
