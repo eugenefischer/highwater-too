@@ -1,0 +1,17 @@
+{
+  "name": "@highwater/pdf-compare",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Compares a PDF against a Highland reference PDF: line text and positions, plus an optional pixel diff",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  }
+}

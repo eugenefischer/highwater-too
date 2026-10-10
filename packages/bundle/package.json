@@ -1,0 +1,9 @@
+{
+  "name": "@highwater/bundle",
+  "version": "0.0.0",
+  "private": true,
+  "description": ".highland ZIP read/write with unknown-entry passthrough (milestone M1)",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" }
+}

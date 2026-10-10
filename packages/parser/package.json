@@ -1,0 +1,9 @@
+{
+  "name": "@highwater/parser",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fountain + Markdown + Highland directives parser with exact source spans (milestone M2)",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" }
+}

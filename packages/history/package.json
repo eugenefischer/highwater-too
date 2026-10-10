@@ -1,0 +1,9 @@
+{
+  "name": "@highwater/history",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Per-document git writing history (milestone M7)",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" }
+}

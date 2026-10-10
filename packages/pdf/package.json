@@ -1,0 +1,9 @@
+{
+  "name": "@highwater/pdf",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PDF layout: forked Better Fountain screenplay engine + manuscript layout (milestones M4, M5)",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" }
+}

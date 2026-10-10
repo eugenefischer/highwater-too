@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+*.vsix
+.vscode-test/
+coverage/
+.DS_Store
+# Comparison output
+tools/pdf-compare/output/
