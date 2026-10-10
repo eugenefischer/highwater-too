@@ -62,6 +62,11 @@ export class BundleStore {
     return [...seen].map(([name, isDirectory]) => ({ name, isDirectory }));
   }
 
+  /** Fountain, Markdown or plain text, from the bundle's text file. */
+  async mode(path: string): Promise<"fountain" | "markdown" | "plain"> {
+    return (await this.#current(path)).bundle.mode;
+  }
+
   /** Text of the file as it is on disk now, ignoring the cache (for Compare). */
   async readFromDisk(path: string, entry = ""): Promise<Uint8Array> {
     const { bundle } = await readBundle(path);

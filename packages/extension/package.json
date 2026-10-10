@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -21,7 +21,7 @@
     "commands": [
       {
         "command": "highwater.open",
-        "title": "Open Highland Document\u2026",
+        "title": "Open Highland Document…",
         "category": "Highwater Too"
       },
       {
@@ -51,6 +51,532 @@
           "scope": "application",
           "markdownDescription": "Folder for writing history and session backups. Until it is set, backups of the last 10 sessions per document go to the extension's own storage."
         }
+      }
+    },
+    "languages": [
+      {
+        "id": "highland-fountain",
+        "aliases": [
+          "Highland Fountain",
+          "fountain"
+        ],
+        "extensions": [
+          ".fountain",
+          ".spmd"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "highland-markdown",
+        "aliases": [
+          "Highland Markdown"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "highland-plain",
+        "aliases": [
+          "Highland Plain Text"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "semanticTokenTypes": [
+      {
+        "id": "sceneHeading",
+        "description": "Scene heading"
+      },
+      {
+        "id": "sceneNumber",
+        "description": "Scene number"
+      },
+      {
+        "id": "character",
+        "description": "Character cue"
+      },
+      {
+        "id": "parenthetical",
+        "description": "Parenthetical"
+      },
+      {
+        "id": "transition",
+        "description": "Transition"
+      },
+      {
+        "id": "centered",
+        "description": "Centred or right-aligned text"
+      },
+      {
+        "id": "lyric",
+        "description": "Lyric"
+      },
+      {
+        "id": "section",
+        "description": "Section"
+      },
+      {
+        "id": "synopsis",
+        "description": "Synopsis"
+      },
+      {
+        "id": "pageBreak",
+        "description": "Page or scene break"
+      },
+      {
+        "id": "heading",
+        "description": "Heading"
+      },
+      {
+        "id": "quote",
+        "description": "Block quote"
+      },
+      {
+        "id": "listMarker",
+        "description": "List marker"
+      },
+      {
+        "id": "term",
+        "description": "Term"
+      },
+      {
+        "id": "tableHeader",
+        "description": "Table header"
+      },
+      {
+        "id": "linkDefinition",
+        "description": "Link definition"
+      },
+      {
+        "id": "titleKey",
+        "description": "Title page key"
+      },
+      {
+        "id": "titleValue",
+        "description": "Title page value"
+      },
+      {
+        "id": "bold",
+        "description": "Bold"
+      },
+      {
+        "id": "italic",
+        "description": "Italic"
+      },
+      {
+        "id": "boldItalic",
+        "description": "Bold italic"
+      },
+      {
+        "id": "underline",
+        "description": "Underline"
+      },
+      {
+        "id": "strike",
+        "description": "Strikethrough"
+      },
+      {
+        "id": "highlight",
+        "description": "Highlight"
+      },
+      {
+        "id": "link",
+        "description": "Link or image"
+      },
+      {
+        "id": "note",
+        "description": "Note"
+      },
+      {
+        "id": "directive",
+        "description": "Directive"
+      },
+      {
+        "id": "markup",
+        "description": "Markup characters"
+      },
+      {
+        "id": "revisionTag",
+        "description": "Revision tag"
+      },
+      {
+        "id": "boneyard",
+        "description": "Boneyard (omitted text)"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "highland-fountain",
+        "scopes": {
+          "sceneHeading": [
+            "markup.heading.highland",
+            "entity.name.section"
+          ],
+          "sceneNumber": [
+            "constant.numeric"
+          ],
+          "character": [
+            "entity.name.type",
+            "entity.name.class"
+          ],
+          "parenthetical": [
+            "variable.parameter",
+            "string"
+          ],
+          "transition": [
+            "keyword.control"
+          ],
+          "centered": [
+            "string.quoted"
+          ],
+          "lyric": [
+            "markup.italic"
+          ],
+          "section": [
+            "markup.heading",
+            "entity.name.section"
+          ],
+          "synopsis": [
+            "comment.line"
+          ],
+          "pageBreak": [
+            "meta.separator",
+            "keyword.operator"
+          ],
+          "heading": [
+            "markup.heading",
+            "entity.name.section"
+          ],
+          "quote": [
+            "markup.quote"
+          ],
+          "listMarker": [
+            "punctuation.definition.list.begin.markdown",
+            "markup.list"
+          ],
+          "term": [
+            "markup.bold"
+          ],
+          "tableHeader": [
+            "markup.bold"
+          ],
+          "linkDefinition": [
+            "markup.underline.link",
+            "comment"
+          ],
+          "titleKey": [
+            "entity.other.attribute-name",
+            "keyword"
+          ],
+          "titleValue": [
+            "string"
+          ],
+          "bold": [
+            "markup.bold"
+          ],
+          "italic": [
+            "markup.italic"
+          ],
+          "boldItalic": [
+            "markup.bold",
+            "markup.italic"
+          ],
+          "underline": [
+            "markup.underline"
+          ],
+          "strike": [
+            "markup.strikethrough"
+          ],
+          "highlight": [
+            "markup.inserted",
+            "markup.highlight"
+          ],
+          "link": [
+            "markup.underline.link"
+          ],
+          "note": [
+            "comment.block"
+          ],
+          "directive": [
+            "meta.preprocessor",
+            "comment"
+          ],
+          "markup": [
+            "punctuation.definition.markdown",
+            "comment"
+          ],
+          "revisionTag": [
+            "comment"
+          ],
+          "boneyard": [
+            "comment.block"
+          ]
+        }
+      },
+      {
+        "language": "highland-markdown",
+        "scopes": {
+          "sceneHeading": [
+            "markup.heading.highland",
+            "entity.name.section"
+          ],
+          "sceneNumber": [
+            "constant.numeric"
+          ],
+          "character": [
+            "entity.name.type",
+            "entity.name.class"
+          ],
+          "parenthetical": [
+            "variable.parameter",
+            "string"
+          ],
+          "transition": [
+            "keyword.control"
+          ],
+          "centered": [
+            "string.quoted"
+          ],
+          "lyric": [
+            "markup.italic"
+          ],
+          "section": [
+            "markup.heading",
+            "entity.name.section"
+          ],
+          "synopsis": [
+            "comment.line"
+          ],
+          "pageBreak": [
+            "meta.separator",
+            "keyword.operator"
+          ],
+          "heading": [
+            "markup.heading",
+            "entity.name.section"
+          ],
+          "quote": [
+            "markup.quote"
+          ],
+          "listMarker": [
+            "punctuation.definition.list.begin.markdown",
+            "markup.list"
+          ],
+          "term": [
+            "markup.bold"
+          ],
+          "tableHeader": [
+            "markup.bold"
+          ],
+          "linkDefinition": [
+            "markup.underline.link",
+            "comment"
+          ],
+          "titleKey": [
+            "entity.other.attribute-name",
+            "keyword"
+          ],
+          "titleValue": [
+            "string"
+          ],
+          "bold": [
+            "markup.bold"
+          ],
+          "italic": [
+            "markup.italic"
+          ],
+          "boldItalic": [
+            "markup.bold",
+            "markup.italic"
+          ],
+          "underline": [
+            "markup.underline"
+          ],
+          "strike": [
+            "markup.strikethrough"
+          ],
+          "highlight": [
+            "markup.inserted",
+            "markup.highlight"
+          ],
+          "link": [
+            "markup.underline.link"
+          ],
+          "note": [
+            "comment.block"
+          ],
+          "directive": [
+            "meta.preprocessor",
+            "comment"
+          ],
+          "markup": [
+            "punctuation.definition.markdown",
+            "comment"
+          ],
+          "revisionTag": [
+            "comment"
+          ],
+          "boneyard": [
+            "comment.block"
+          ]
+        }
+      },
+      {
+        "language": "highland-plain",
+        "scopes": {
+          "sceneHeading": [
+            "markup.heading.highland",
+            "entity.name.section"
+          ],
+          "sceneNumber": [
+            "constant.numeric"
+          ],
+          "character": [
+            "entity.name.type",
+            "entity.name.class"
+          ],
+          "parenthetical": [
+            "variable.parameter",
+            "string"
+          ],
+          "transition": [
+            "keyword.control"
+          ],
+          "centered": [
+            "string.quoted"
+          ],
+          "lyric": [
+            "markup.italic"
+          ],
+          "section": [
+            "markup.heading",
+            "entity.name.section"
+          ],
+          "synopsis": [
+            "comment.line"
+          ],
+          "pageBreak": [
+            "meta.separator",
+            "keyword.operator"
+          ],
+          "heading": [
+            "markup.heading",
+            "entity.name.section"
+          ],
+          "quote": [
+            "markup.quote"
+          ],
+          "listMarker": [
+            "punctuation.definition.list.begin.markdown",
+            "markup.list"
+          ],
+          "term": [
+            "markup.bold"
+          ],
+          "tableHeader": [
+            "markup.bold"
+          ],
+          "linkDefinition": [
+            "markup.underline.link",
+            "comment"
+          ],
+          "titleKey": [
+            "entity.other.attribute-name",
+            "keyword"
+          ],
+          "titleValue": [
+            "string"
+          ],
+          "bold": [
+            "markup.bold"
+          ],
+          "italic": [
+            "markup.italic"
+          ],
+          "boldItalic": [
+            "markup.bold",
+            "markup.italic"
+          ],
+          "underline": [
+            "markup.underline"
+          ],
+          "strike": [
+            "markup.strikethrough"
+          ],
+          "highlight": [
+            "markup.inserted",
+            "markup.highlight"
+          ],
+          "link": [
+            "markup.underline.link"
+          ],
+          "note": [
+            "comment.block"
+          ],
+          "directive": [
+            "meta.preprocessor",
+            "comment"
+          ],
+          "markup": [
+            "punctuation.definition.markdown",
+            "comment"
+          ],
+          "revisionTag": [
+            "comment"
+          ],
+          "boneyard": [
+            "comment.block"
+          ]
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "[highland-fountain]": {
+        "editor.wordWrap": "on",
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": {
+          "other": false,
+          "comments": false,
+          "strings": false
+        },
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggestOnTriggerCharacters": false,
+        "editor.unicodeHighlight.ambiguousCharacters": false,
+        "editor.unicodeHighlight.invisibleCharacters": false,
+        "editor.renderWhitespace": "none",
+        "editor.guides.indentation": false,
+        "editor.stickyScroll.enabled": true
+      },
+      "[highland-markdown]": {
+        "editor.wordWrap": "on",
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": {
+          "other": false,
+          "comments": false,
+          "strings": false
+        },
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggestOnTriggerCharacters": false,
+        "editor.unicodeHighlight.ambiguousCharacters": false,
+        "editor.unicodeHighlight.invisibleCharacters": false,
+        "editor.renderWhitespace": "none",
+        "editor.guides.indentation": false,
+        "editor.stickyScroll.enabled": true
+      },
+      "[highland-plain]": {
+        "editor.wordWrap": "on",
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": {
+          "other": false,
+          "comments": false,
+          "strings": false
+        },
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggestOnTriggerCharacters": false,
+        "editor.unicodeHighlight.ambiguousCharacters": false,
+        "editor.unicodeHighlight.invisibleCharacters": false,
+        "editor.renderWhitespace": "none",
+        "editor.guides.indentation": false,
+        "editor.stickyScroll.enabled": true
       }
     }
   },
