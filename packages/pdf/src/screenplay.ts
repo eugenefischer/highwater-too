@@ -45,6 +45,8 @@ interface OpenPage {
   section: string;
   number: number;
   started: boolean;
+  /** A hidden paragraph landed here, so a page break after it still starts a new page. */
+  touched: boolean;
   /** Something printable is on the page (blank lines before the next block apply). */
   content: boolean;
 }
@@ -77,6 +79,15 @@ interface Block {
   /** Rows without text (directive paragraphs); `content` says whether they count as content. */
   filler?: boolean;
   content?: boolean;
+  /**
+   * Rows Highland counts when deciding whether the block fits, if not its own: a dual dialogue
+   * counts both columns (FirstLineTests case O: 48 lines that fit beside two were moved).
+   */
+  fitRows?: number;
+  /** False when Highland will not let the block end on the page's last line (SpeechFitTests). */
+  lastLineOk?: boolean;
+  /** Takes no lines but, like any paragraph, needs room for the blank line before it (notes, synopses). */
+  ghost?: boolean;
   /** Splits the block so its first part fits in `available` rows; null where Highland would not split. */
   split?: (available: number) => { head: Row[]; tail: Block } | null;
 }
@@ -103,7 +114,7 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
   const newPage = (): OpenPage => {
     // The page being left gets the footer in effect at its end (FirstLineTests case K).
     if (page !== null) (page as OpenPage).footer = footer;
-    const p: OpenPage = { rows: [], header, footer, section, number: nextNumber++, started: false, content: false };
+    const p: OpenPage = { rows: [], header, footer, section, number: nextNumber++, started: false, touched: false, content: false };
     page = p;
     body.push(p);
     return p;
@@ -144,10 +155,20 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
   for (let i = 0; i < blocks.length; i++) {
     let b = blocks[i]!;
     if (b.pageBreak) {
-      if (page !== null && (page as OpenPage).rows.length > 0) newPage();
+      // "===" is a paragraph too: after a full page it first spills onto an empty page (SpeechFitTests).
+      const p = page as OpenPage | null;
+      if (p !== null && p.content && p.rows.length + 1 > capacity(p)) newPage().touched = true;
+      const q = page as OpenPage | null;
+      if (q !== null && (q.rows.length > 0 || q.touched)) newPage();
       continue;
     }
     apply(b);
+    if (b.ghost) {
+      // SpeechFitTests: a note after a full page starts a new (empty) page.
+      const p = page as OpenPage | null;
+      if (p !== null && p.content && p.rows.length + 1 > capacity(p)) newPage().touched = true;
+      continue;
+    }
     if (b.rows.length === 0) continue;
     if (b.filler && !(b.content ?? false)) {
       const p = current();
@@ -158,18 +179,20 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
       let p = current();
       const space = p.content ? b.space : 0;
       const available = capacity(p) - p.rows.length - space;
-      let need = b.rows.length;
+      let need = p.content ? (b.fitRows ?? b.rows.length) : b.rows.length;
       if (b.keepWithNext) {
         const next = blocks.slice(i + 1).find((n) => n.rows.length > 0 && !n.pageBreak && !n.filler);
         if (next) need += next.space + minHead(next);
       }
       // A transition never sits on the last line (Highland moves it to the next page).
       if (b.kind === "transition") need += 1;
-      if (need <= available) {
+      const lastLine = need === available && b.lastLineOk === false;
+      if (need <= available && !lastLine) {
         push(p, b.rows, space, true);
         break;
       }
-      const split = p.content && available > 0 ? b.split?.(available) : null;
+      const room = lastLine ? available - 1 : available;
+      const split = p.content && room > 0 ? b.split?.(room) : null;
       if (split) {
         push(p, split.head, space, true);
         newPage();
@@ -212,6 +235,8 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
       if (!d || d.off) continue;
       items.push(...pageText(d.slots, fill, pos));
     }
+    // Without a {{HEADER}}, Highland numbers pages "2." onwards at the top right (SpeechFitTests).
+    if (p.header === null && p.number >= 2) items.push(...pageText({ left: null, center: null, right: [{ kind: "text", text: `${p.number}.` }] }, fill, S.header));
     pages.push({ number: p.number, items });
   }
   return { width: S.width, height: S.height, pages };
@@ -250,9 +275,22 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
   const at = (x: number, runs: Run[]): Row => ({ items: [{ x, runs }] });
   const wrapAt = (x: number, runs: Run[], width: number): Row[] => wrapRuns(runs, width).map((r) => at(x, r));
   let printed = false;
+  let nextIndex = 0;
 
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i]!;
+    const before = out.length;
+    addElement(e, i);
+    // Each extra empty source line before an element is an empty paragraph to Highland: one line
+    // plus its own blank (Astounding: two empty lines before ">**END**<" print as three).
+    const added = out[before];
+    if (added && added.rows.length > 0 && !added.filler && e.span.start <= source.length) added.space += 2 * extraBlankLines(source, e.span.start);
+    i = nextIndex;
+  }
+  return out;
+
+  function addElement(e: Element, i: number): void {
+    nextIndex = i;
     switch (e.kind) {
       case "sceneHeading": {
         const runs = toRuns(e.inline, ctx, { bold: true });
@@ -272,7 +310,11 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       }
       case "action": {
         const runs = toRuns(e.inline, ctx);
-        if (plain(runs).trim() === "") break; // only notes or directives
+        if (plain(runs).trim() === "") {
+          // Only notes (or inline directives): prints nothing, but still a paragraph to Highland.
+          if (printed) out.push({ kind: e.kind, rows: [], space: 1, ghost: true });
+          break;
+        }
         out.push(actionBlock(runs, 1));
         printed = true;
         break;
@@ -310,8 +352,9 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       case "dialogue": {
         const next = elements[i + 1];
         if (e.dual === "left" && next?.kind === "dialogue" && next.dual === "right") {
-          out.push({ kind: "dialogue", rows: dualRows(e, next, ctx), space: 1 });
-          i++;
+          const rows = dualRows(e, next, ctx);
+          out.push({ kind: "dialogue", rows, space: 1, fitRows: rows.sumOfColumns });
+          nextIndex = i + 1;
         } else out.push(dialogueBlock(cueText(e), e.parts.map((p) => ({ kind: p.kind, runs: p.kind === "empty" ? [] : toRuns(p.inline, ctx, p.kind === "lyric" ? { italic: true } : {}) })), 1));
         printed = true;
         break;
@@ -337,30 +380,55 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       case "section":
         out.push({ kind: "directives", rows: [], space: 0, section: e.text });
         break;
+      case "synopsis":
+        if (printed) out.push({ kind: e.kind, rows: [], space: 1, ghost: true });
+        break;
       default:
-        break; // synopses, notes, link definitions: not printed
+        break; // link definitions: not printed
     }
   }
-  return out;
+}
+
+/** Empty source lines directly before `offset`, beyond the usual one. */
+function extraBlankLines(source: string, offset: number): number {
+  let i = offset;
+  let n = 0;
+  for (;;) {
+    let j = i - 1;
+    if (j >= 0 && source[j] === "\n") j--;
+    if (j >= 0 && source[j] === "\r") j--;
+    // j is now the last character of the previous line (or -1).
+    let start = j;
+    while (start >= 0 && source[start] !== "\n" && source[start] !== "\r") start--;
+    const line = source.slice(start + 1, j + 1);
+    if (j < 0 || line.trim() !== "" || i === 0) break;
+    n++;
+    i = start + 1;
+  }
+  return Math.max(0, n - 1);
 }
 
 /** An action paragraph; Highland splits it across pages only after a sentence. */
 function actionBlock(runs: Run[], space: number): Block {
   const S = SCREENPLAY;
   const rows = wrapRuns(runs, S.action.width).map((r) => ({ items: [{ x: S.action.x, runs: r }] }));
+  const text = plain(runs);
   return {
     kind: "action",
     rows,
     space,
+    // SpeechFitTests: two lines may end on the page's last line, three may not.
+    lastLineOk: rows.length <= 2,
     split: (available) => {
-      // Like Better Fountain: blocks of fewer than four lines never split, and each page keeps two lines or more.
-      if (rows.length < 4) return null;
+      // At a sentence, like Better Fountain: only blocks of four lines or more, keeping two lines on each
+      // page. At a hard line break (separate source lines): anywhere (SpeechFitTests).
       let best: Run[][] | null = null;
       let cut = 0;
-      for (const end of sentenceEnds(plain(runs))) {
+      for (const end of sentenceEnds(text)) {
         const head = wrapRuns(sliceRuns(runs, 0, end), S.action.width);
         if (head.length > available) break;
-        if (head.length >= 2 && wrapRuns(trimStartRuns(sliceRuns(runs, end)), S.action.width).length >= 2) {
+        const hard = text[end] === "\n";
+        if (hard || (rows.length >= 4 && head.length >= 2 && wrapRuns(trimStartRuns(sliceRuns(runs, end)), S.action.width).length >= 2)) {
           best = head;
           cut = end;
         }
@@ -383,9 +451,14 @@ interface Part {
 function dialogueBlock(cue: string, parts: Part[], space: number): Block {
   const S = SCREENPLAY;
   const rows = [{ items: [{ x: S.cue.x, runs: [{ text: cue, style: {} }] }] }, ...partRows(parts, null)];
+  // SpeechFitTests and Astounding: a speech may end on the page's last line only if its text starts
+  // there, or a sentence ends somewhere on the line above.
+  const above = rows.at(-2)!;
+  const lastLineOk = rows.length === 2 || above.items.some((it) => SENTENCE_END.test(plain(it.runs)));
   return {
     kind: "dialogue",
     rows,
+    lastLineOk,
     space,
     split: (available) => {
       let best: { head: Row[]; tail: Part[] } | null = null;
@@ -398,6 +471,8 @@ function dialogueBlock(cue: string, parts: Part[], space: number): Block {
           const tail = [...(plain(rest).trim() ? [{ kind: part.kind, runs: rest }] : []), ...parts.slice(k + 1)];
           if (!tail.some((p) => p.kind !== "empty")) continue;
           if (!head.some((p) => p.kind === "line" || p.kind === "lyric")) continue;
+          // A parenthetical goes with the line after it, never just before (MORE).
+          if (head.at(-1)!.kind === "parenthetical" || head.at(-1)!.kind === "empty") continue;
           const headRows = partRows(head, null);
           if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0) };
           best = { head: [rows[0]!, ...headRows, { items: [{ x: S.more.x, runs: [{ text: "(MORE)", style: {} }] }] }], tail };
@@ -407,6 +482,8 @@ function dialogueBlock(cue: string, parts: Part[], space: number): Block {
     },
   };
 }
+
+const SENTENCE_END = /[.?!]+[’”'")\]]*(\s|$)/;
 
 function contd(cue: string): string {
   return /\(CONT['’]D\)/i.test(cue) ? cue : `${cue} (CONT’D)`;
@@ -438,7 +515,7 @@ function cueText(e: Extract<Element, { kind: "dialogue" }>): string {
   return [e.character, ...e.extensions].join(" ");
 }
 
-function dualRows(left: Extract<Element, { kind: "dialogue" }>, right: Extract<Element, { kind: "dialogue" }>, ctx: InlineContext): Row[] {
+function dualRows(left: Extract<Element, { kind: "dialogue" }>, right: Extract<Element, { kind: "dialogue" }>, ctx: InlineContext): Row[] & { sumOfColumns: number } {
   const S = SCREENPLAY;
   const side = (e: typeof left, s: "left" | "right"): Row[] => [
     { items: [{ x: S.dual[s].cue, runs: [{ text: cueText(e), style: {} }] }] },
@@ -449,7 +526,7 @@ function dualRows(left: Extract<Element, { kind: "dialogue" }>, right: Extract<E
   const n = Math.max(l.length, r.length);
   const rows: Row[] = [];
   for (let k = 0; k < n; k++) rows.push({ items: [...(l[k]?.items ?? []), ...(r[k]?.items ?? [])] });
-  return rows;
+  return Object.assign(rows, { sumOfColumns: l.length + r.length });
 }
 
 // ---------------------------------------------------------------------------------------------

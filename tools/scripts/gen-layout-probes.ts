@@ -42,3 +42,24 @@ const body = "{{HEADER: %p}}\n\nINT. FIRST SCENE - DAY\n\nThe first action.";
 await write("StartTest1-LeadingBlankLine", "\n" + plainTitle + "\n\n" + body);
 await write("StartTest2-TabBlankLines", tabTitle + "\n\n" + body);
 await write("StartTest3-Both", "\n" + tabTitle + "\n\n" + body);
+
+// SpeechFitTests (M4): which speeches may end on the page's last line (55). Each page fills lines
+// 1..(cue - 2) with one action paragraph, leaves a blank, then a speech of k lines whose last line
+// lands on line 55 (or 54 for the controls). Single sentence vs one sentence per line.
+const words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima", "mike", "november", "oscar", "papa"];
+/** One sentence: k lines of words, a full stop only at the end (each line under 34 characters). */
+const oneSentence = (k: number) => Array.from({ length: k }, (_, i) => `${words[(i * 5) % 16]} ${words[(i * 5 + 1) % 16]} ${words[(i * 5 + 2) % 16]} ${words[(i * 5 + 3) % 16]}`).join(" and ") + ".";
+/** k sentences of exactly 30 characters, so each wraps onto its own line. */
+const sentences = (k: number) => Array.from({ length: k }, (_, i) => `Sentence number ${["one", "two", "six", "ten"][i % 4]} ends here.`).join(" ");
+const fill = (lines: number) => Array.from({ length: lines }, (_, i) => `Filler line ${i + 1}.`).join("\n");
+const fitCases: string[] = [];
+for (const [k, end] of [[1, 55], [2, 55], [3, 55], [4, 55], [5, 55], [6, 55], [2, 54], [3, 54]] as const) {
+  const cue = end - k;
+  for (const [kind, text] of [["one sentence", oneSentence(k)], ["one sentence per line", sentences(k)]] as const) {
+    if (k === 1 && kind === "one sentence per line") continue;
+    fitCases.push(`${fill(cue - 2)}\n\nBOB\n${text}\n\n[[Case: ${k} lines, ${kind}, cue on line ${cue}, last line on ${end}]]`);
+  }
+}
+fitCases.push(`${fill(52)}\n\nAction of two lines.\nSecond line on fifty-five.`);
+fitCases.push(`${fill(51)}\n\nAction of three lines.\nSecond line.\nThird line on fifty-five.`);
+await write("SpeechFitTests", "Title: Speech Fit Tests\nAuthor: Claude\n\n" + fitCases.join("\n\n===\n\n"));

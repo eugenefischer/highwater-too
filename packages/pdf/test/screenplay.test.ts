@@ -94,6 +94,7 @@ describe("screenplay layout", () => {
       [249, row(1), "BOB (CONT’D)"],
       [179, row(2), "Another sentence follows it. And a"],
       [179, row(3), "third one ends the speech."],
+      [540 - 2 * 7.2, 51, "2."], // Highland's default page number when there is no {{HEADER}}
     ]);
   });
 
@@ -131,29 +132,19 @@ describe("rendered PDFs match Highland's", () => {
     expect(r.ok).toBe(true);
   });
 
-  // The last case, a 47-line dual dialogue, is left out: Highland moves it to a new page although it fits.
-  it("FirstLineTests: the first-line, directive, parenthetical and dual-dialogue probes match", async () => {
-    const expected = await extractPages(join(generated, "FirstLineTests.pdf"));
-    const actual = await renderHighland(join(generated, "FirstLineTests.highland"));
-    const r = comparePages(expected.slice(0, 16), actual.slice(0, 16));
-    expect(r.diffs, formatReport(r)).toEqual([]);
-  });
-
-  it.each(["StartTest1-LeadingBlankLine", "StartTest2-TabBlankLines", "StartTest3-Both"])("%s matches", async (name) => {
+  it.each(["FirstLineTests", "SpeechFitTests", "StartTest1-LeadingBlankLine", "StartTest2-TabBlankLines", "StartTest3-Both"])("%s matches line for line", async (name) => {
     const r = comparePages(await extractPages(join(generated, `${name}.pdf`)), await renderHighland(join(generated, `${name}.highland`)));
     expect(r.diffs, formatReport(r)).toEqual([]);
     expect(r.ok).toBe(true);
   });
 
-  // The 2024 export's title page has 15 pt blank lines (2026 exports: 14), hence the 3 pt tolerance there.
-  // Page 19 differs: Highland moved a speech that fits; open question in the spec.
-  it.runIf(priv)("Astounding: the title page and the first 18 pages match line for line", async () => {
-    const dir = join(priv!, "Files with exports");
-    const expected = await extractPages(join(dir, "Astounding_2024_02_19 copy.pdf"));
-    const actual = await renderHighland(join(dir, "Astounding_date_EJ draft 2 copy.highland"));
-    const title = comparePages(expected.slice(0, 1), actual.slice(0, 1), { tolerance: 3 });
-    expect(title.diffs, formatReport(title)).toEqual([]);
-    const body = comparePages(expected.slice(1, 19), actual.slice(1, 19));
-    expect(body.diffs, formatReport(body)).toEqual([]);
+  // Astounding_fresh.pdf: exported by EJ with Highland 2 in October 2026 (the February 2024 export
+  // in "Files with exports" comes from an older Highland).
+  it.runIf(priv)("Astounding: all 57 pages match line for line", async () => {
+    const expected = await extractPages(join(priv!, "AI Generated Test Files", "Astounding_fresh.pdf"));
+    const actual = await renderHighland(join(priv!, "Files with exports", "Astounding_date_EJ draft 2 copy.highland"));
+    const r = comparePages(expected, actual);
+    expect(r.diffs, formatReport(r)).toEqual([]);
+    expect(r.ok).toBe(true);
   });
 });

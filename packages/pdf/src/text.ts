@@ -100,11 +100,16 @@ export function wrapRuns(runs: Run[], width: number, restWidth = width): Run[][]
       // Last break opportunity within width: a space at or before lineStart+width, or just after a hyphen.
       let brk = -1;
       for (let i = lineStart + width; i > lineStart; i--) {
-        if (text[i] === " " && !betweenQuotes(text, i)) {
+        if (text[i] === " ") {
           brk = i;
           break;
         }
         if (text[i - 1] === "-" && i - 1 > lineStart && text[i] !== "-") {
+          brk = i;
+          break;
+        }
+        // Apple also breaks after "!" or "?" run into the next word ("availability!Come", Astounding).
+        if ((text[i - 1] === "!" || text[i - 1] === "?") && i - 1 > lineStart && /[\p{L}\p{N}]/u.test(text[i]!)) {
           brk = i;
           break;
         }
@@ -118,20 +123,6 @@ export function wrapRuns(runs: Run[], width: number, restWidth = width): Run[][]
     if (start === end) lines.push([start, end]);
   }
   return lines.map(([a, b]) => slice(runs, owner, text, a, b));
-}
-
-const QUOTES = new Set(["“", "”", "‘", "’", '"', "'"]);
-
-/**
- * Apple's line breaking (which Highland uses) keeps a closing quote and a following opening quote
- * together: "Welles’ “War" does not break at the space (seen in Astounding).
- */
-function betweenQuotes(text: string, space: number): boolean {
-  let a = space - 1;
-  while (a >= 0 && text[a] === " ") a--;
-  let b = space + 1;
-  while (b < text.length && text[b] === " ") b++;
-  return a >= 0 && b < text.length && QUOTES.has(text[a]!) && QUOTES.has(text[b]!);
 }
 
 function slice(runs: Run[], owner: number[], text: string, a: number, b: number): Run[] {

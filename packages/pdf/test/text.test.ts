@@ -12,8 +12,8 @@ describe("wrapping (Highland's rules)", () => {
     expect(wrap("a blood-chilling tale", 12)).toEqual(["a blood-", "chilling", "tale"]);
   });
 
-  it("keeps a closing quote and the next opening quote together", () => {
-    expect(wrap("you thought about Orson Welles’ “War of the Worlds” show.", 34)).toEqual(["you thought about Orson", "Welles’ “War of the Worlds” show."]);
+  it("breaks between quotes like any other space (current Highland; the 2024 export did not)", () => {
+    expect(wrap("you thought about Orson Welles’ “War of the Worlds” show.", 34)).toEqual(["you thought about Orson Welles’", "“War of the Worlds” show."]);
   });
 
   it("splits a word longer than the line, and honours hard line breaks", () => {
