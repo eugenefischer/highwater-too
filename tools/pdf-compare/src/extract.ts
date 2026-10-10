@@ -11,6 +11,8 @@ export interface PdfLine {
   text: string;
   /** Font of the first item (pdf.js internal name). */
   font: string;
+  /** Runs of the line separated by a gap of more than two spaces, e.g. the two columns of dual dialogue. */
+  segments: { x: number; text: string }[];
 }
 
 export interface PdfPage {
@@ -29,6 +31,8 @@ interface Item {
 }
 
 const BASELINE_EPSILON = 0.5;
+/** Gaps wider than about two Courier characters (7.2 pt each) start a new segment. */
+const SEGMENT_GAP = 15;
 
 /** Extracts every non-blank printed line of a PDF, top to bottom, left to right. */
 export async function extractPages(path: string): Promise<PdfPage[]> {
@@ -75,6 +79,16 @@ function groupLines(page: number, items: Item[]): PdfLine[] {
       end = item.x + item.width;
     }
     const first = row[0]!;
-    return { page, x: first.x, y: first.y, text: text.trim(), font: first.font };
+    const segments: { x: number; text: string }[] = [];
+    let segEnd = Number.NEGATIVE_INFINITY;
+    for (const item of row) {
+      const last = segments.at(-1);
+      const gap = item.x - segEnd;
+      if (last && gap <= SEGMENT_GAP) last.text += (gap > 1 && !last.text.endsWith(" ") && !item.str.startsWith(" ") ? " " : "") + item.str;
+      else segments.push({ x: item.x, text: item.str });
+      segEnd = item.x + item.width;
+    }
+    for (const seg of segments) seg.text = seg.text.trim();
+    return { page, x: first.x, y: first.y, text: text.trim(), font: first.font, segments: segments.filter((s) => s.text !== "") };
   });
 }

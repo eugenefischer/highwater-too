@@ -98,5 +98,104 @@ export interface Document {
   nodes: TopNode[];
   titlePage: TitlePageNode | null;
   overlays: Overlays;
+  /** Classified content in reading order (Fountain from step 2; Markdown from step 3). */
+  elements: Element[];
   diagnostics: Diagnostic[];
 }
+
+// ---------------------------------------------------------------------------------------------
+// Elements (step 2: Fountain). Text fields are logical text: boneyards and revision tags removed,
+// forcing characters and scene numbers stripped. `span` covers the element's lines in the source.
+
+export interface ElementBase {
+  span: Span;
+  lines: Line[];
+}
+
+export interface SceneHeading extends ElementBase {
+  kind: "sceneHeading";
+  text: string;
+  forced: boolean;
+  sceneNumber: { text: string; span: Span } | null;
+}
+
+export interface Action extends ElementBase {
+  kind: "action";
+  text: string;
+  forced: boolean;
+}
+
+export interface Transition extends ElementBase {
+  kind: "transition";
+  text: string;
+  forced: boolean;
+}
+
+export interface Centered extends ElementBase {
+  kind: "centered";
+  text: string;
+}
+
+/** Highland: a line ending in ">" (without a leading ">") prints right-aligned. */
+export interface RightAligned extends ElementBase {
+  kind: "rightAligned";
+  text: string;
+}
+
+export interface Lyric extends ElementBase {
+  kind: "lyric";
+  text: string;
+}
+
+export interface Section extends ElementBase {
+  kind: "section";
+  level: number;
+  text: string;
+}
+
+export interface Synopsis extends ElementBase {
+  kind: "synopsis";
+  text: string;
+}
+
+export interface PageBreak extends ElementBase {
+  kind: "pageBreak";
+}
+
+/** A line holding only `{{…}}` directives, e.g. {{HEADER: %p}}. Parsed in step 4. */
+export interface DirectiveLine extends ElementBase {
+  kind: "directiveLine";
+  text: string;
+}
+
+export type DialoguePart =
+  | { kind: "parenthetical"; text: string; line: Line }
+  | { kind: "line"; text: string; line: Line }
+  | { kind: "lyric"; text: string; line: Line }
+  /** Fountain's two-space line: an intentional empty line inside dialogue. */
+  | { kind: "empty"; line: Line };
+
+export interface Dialogue extends ElementBase {
+  kind: "dialogue";
+  /** The cue without extensions, forcing "@" or dual "^", e.g. "BOB". */
+  character: string;
+  /** Parenthesised extensions on the cue line, e.g. ["(V.O.)", "(CONT'D)"]. */
+  extensions: string[];
+  forced: boolean;
+  /** Set on both halves of a dual-dialogue pair. */
+  dual: "left" | "right" | null;
+  parts: DialoguePart[];
+}
+
+export type Element =
+  | SceneHeading
+  | Action
+  | Transition
+  | Centered
+  | RightAligned
+  | Lyric
+  | Section
+  | Synopsis
+  | PageBreak
+  | DirectiveLine
+  | Dialogue;

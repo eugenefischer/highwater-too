@@ -1,6 +1,7 @@
-import type { BlankNode, BoneyardNode, Document, Line, Mode, TextNode, TopNode } from "./ast.ts";
+import type { BlankNode, BoneyardNode, Document, Element, Line, Mode, TextNode, TopNode } from "./ast.ts";
 import { isBlank, lineText, splitLines } from "./lines.ts";
-import { findOverlays } from "./overlays.ts";
+import { classifyFountain } from "./fountain.ts";
+import { findOverlays, hiddenRanges } from "./overlays.ts";
 import { readTitlePage } from "./title-page.ts";
 
 export interface ParseOptions {
@@ -65,7 +66,10 @@ export function parse(source: string, options: ParseOptions): Document {
   const tail = nodes.at(-1);
   if (tail && tail.span.start === tail.span.end && nodes.length > 1) nodes.pop();
 
-  return { mode: options.mode, source, nodes, titlePage, overlays, diagnostics };
+  const textNodes = nodes.filter((n): n is TextNode => n.kind === "text");
+  const elements: Element[] = options.mode === "fountain" ? classifyFountain(source, textNodes, hiddenRanges(overlays)) : [];
+
+  return { mode: options.mode, source, nodes, titlePage, overlays, elements, diagnostics };
 }
 
 function takeWhile(lines: Line[], from: number, test: (line: Line) => boolean): number {
