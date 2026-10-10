@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -22,6 +22,71 @@
       {
         "command": "highwater.open",
         "title": "Open Highland Document…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.newScreenplay",
+        "title": "New Screenplay",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.newManuscript",
+        "title": "New Manuscript",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.export",
+        "title": "Export Text (.fountain / .md)…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.convertToHighland",
+        "title": "Save as Highland Document…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.bold",
+        "title": "Bold",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.italic",
+        "title": "Italic",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.underline",
+        "title": "Underline",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.strikethrough",
+        "title": "Strikethrough",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.highlight",
+        "title": "Highlight",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.note",
+        "title": "Insert Note",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.centre",
+        "title": "Centre",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.omit",
+        "title": "Omit (Boneyard)",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.toggleInvisibles",
+        "title": "Show Invisibles",
         "category": "Highwater Too"
       },
       {
@@ -50,6 +115,11 @@
           "default": "",
           "scope": "application",
           "markdownDescription": "Folder for writing history and session backups. Until it is set, backups of the last 10 sessions per document go to the extension's own storage."
+        },
+        "highwater.highlandShortcuts": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar) and ⌘1–⌘5 (panels) their Highland meanings instead of VS Code's. Preview, Live Margins and the panels arrive in a later version; ⌘0 works now."
         }
       }
     },
@@ -578,7 +648,121 @@
         "editor.guides.indentation": false,
         "editor.stickyScroll.enabled": true
       }
-    }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "highwater.export",
+          "when": "resourceScheme == highland"
+        },
+        {
+          "command": "highwater.convertToHighland",
+          "when": "resourceExtname =~ /^\\.(fountain|spmd|md|markdown)$/"
+        },
+        {
+          "command": "highwater.bold",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.italic",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.underline",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.strikethrough",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.highlight",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.note",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.centre",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.omit",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.toggleInvisibles",
+          "when": "editorLangId =~ /^highland-/"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "highwater.convertToHighland",
+          "when": "resourceExtname =~ /^\\.(fountain|spmd|md|markdown)$/",
+          "group": "7_modification"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "highwater.bold",
+        "key": "ctrl+b",
+        "mac": "cmd+b",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.italic",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.underline",
+        "key": "ctrl+u",
+        "mac": "cmd+u",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.highlight",
+        "key": "ctrl+shift+=",
+        "mac": "ctrl+shift+=",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.centre",
+        "key": "ctrl+shift+.",
+        "mac": "cmd+shift+.",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.omit",
+        "mac": "cmd+y",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.note",
+        "key": "ctrl+/",
+        "mac": "cmd+/",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "editor.action.transformToUppercase",
+        "mac": "ctrl+u",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "editor.action.transformToLowercase",
+        "mac": "ctrl+shift+u",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "workbench.action.toggleSidebarVisibility",
+        "key": "ctrl+0",
+        "mac": "cmd+0",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      }
+    ]
   },
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --sourcemap --outfile=dist/extension.cjs",

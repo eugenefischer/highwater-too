@@ -3,7 +3,9 @@ import * as vscode from "vscode";
 import { DISK_SCHEME, DiskVersionProvider, handleExternalChange } from "./conflicts.ts";
 import { HighlandFileSystem, SCHEME } from "./fs-provider.ts";
 import { OPEN_VIEW_TYPE, OpenRedirect, openHighland } from "./open.ts";
+import { registerCommands } from "./commands.ts";
 import { registerLanguageFeatures } from "./language.ts";
+import { registerStatusBar } from "./status.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 
 /** VS Code glue only; all format, parsing and layout logic lives in the other packages. */
@@ -18,7 +20,9 @@ export function activate(context: vscode.ExtensionContext): void {
     if (p && !watching.has(doc.uri.toString())) watching.set(doc.uri.toString(), store.watch(p.bundle));
   };
   vscode.workspace.textDocuments.forEach(track);
-  registerLanguageFeatures(context, store);
+  const cache = registerLanguageFeatures(context, store);
+  registerStatusBar(context, cache);
+  registerCommands(context);
 
   context.subscriptions.push(
     { dispose: () => store.dispose() },

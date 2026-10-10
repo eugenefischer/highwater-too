@@ -102,6 +102,23 @@ const tests: [string, () => Promise<void>][] = [
       assert.equal(doc.languageId, "highland-fountain");
     },
   ],
+  [
+    "formats the selection with Highland's commands",
+    async () => {
+      const path = await copyOf("Format");
+      const editor = await openScript(path);
+      const line = editor.document.lineAt(editor.document.lineCount - 1);
+      await editor.edit((e) => e.insert(line.range.end, "\n\nShe runs home."));
+      const last = editor.document.lineAt(editor.document.lineCount - 1);
+      const at = last.text.indexOf("runs");
+      editor.selection = new vscode.Selection(last.lineNumber, at, last.lineNumber, at + 4);
+      await vscode.commands.executeCommand("highwater.bold");
+      assert.equal(editor.document.lineAt(last.lineNumber).text, "She **runs** home.");
+      await vscode.commands.executeCommand("highwater.bold");
+      assert.equal(editor.document.lineAt(last.lineNumber).text, "She runs home.");
+      await vscode.commands.executeCommand("workbench.action.files.revert");
+    },
+  ],
 ];
 
 export async function run(): Promise<void> {

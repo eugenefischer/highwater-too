@@ -6,13 +6,13 @@ import { highlightRanges, TOKEN_TYPES } from "./syntax/highlight.ts";
 import { outline, type OutlineNode } from "./syntax/structure.ts";
 
 export const LANGUAGES: Record<Mode, string> = { fountain: "highland-fountain", markdown: "highland-markdown", plain: "highland-plain" };
-const MODES = new Map<string, Mode>(Object.entries(LANGUAGES).map(([mode, id]) => [id, mode as Mode]));
+export const MODES = new Map<string, Mode>(Object.entries(LANGUAGES).map(([mode, id]) => [id, mode as Mode]));
 const SELECTOR: vscode.DocumentSelector = Object.values(LANGUAGES).map((language) => ({ language }));
 
 export const LEGEND = new vscode.SemanticTokensLegend([...TOKEN_TYPES], []);
 
 /** One parse per document version, shared by highlighting, outline and folding. */
-class ParseCache {
+export class ParseCache {
   readonly #docs = new Map<string, { version: number; doc: Document }>();
   get(document: vscode.TextDocument): Document {
     const key = document.uri.toString();
@@ -27,7 +27,7 @@ class ParseCache {
   }
 }
 
-export function registerLanguageFeatures(context: vscode.ExtensionContext, store: BundleStore): void {
+export function registerLanguageFeatures(context: vscode.ExtensionContext, store: BundleStore): ParseCache {
   const cache = new ParseCache();
 
   context.subscriptions.push(
@@ -38,6 +38,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext, store
     vscode.languages.registerFoldingRangeProvider(SELECTOR, { provideFoldingRanges: (d) => folding(d, cache.get(d)) }),
   );
   for (const d of vscode.workspace.textDocuments) void assignLanguage(d, store);
+  return cache;
 }
 
 /** A .highland script opens as plain text; give it the language its text file implies. */
