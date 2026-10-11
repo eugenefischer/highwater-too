@@ -114,6 +114,43 @@ describe("Mirror", () => {
     expect(await b.exclusive(() => new Mirror(b, remote).pull())).toEqual({ ok: true, updated: [] });
   });
 
+  it("records the whole document and gives it back on another computer, for a work it does not have", async () => {
+    const remote = join(await temp(), "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", remote]);
+    const a = new History(await temp());
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1, 2, 255, 254, 10, 13, 0]);
+    const doc = await a.resolve({ id: "doc-9", path: "/desk/Novel.highland", text: script });
+    const files = {
+      scriptName: "text.md",
+      script: "# One\n\nText.\n",
+      bin: ["cut", "kept"],
+      scratchpad: "notes",
+      others: [
+        { path: "info.json", data: new TextEncoder().encode('{"version":2}') },
+        { path: "assets/pics/cover.png", data: png },
+        { path: "assets/map.png", data: png },
+      ],
+    };
+    await a.commit(doc.id, files, "save");
+    await new Mirror(a, remote).push();
+
+    const b = new History(await temp());
+    await b.exclusive(() => new Mirror(b, remote).pull());
+    const works = await b.works();
+    const work = works.find((w) => w.branch === doc.branch)!;
+    expect(work).toMatchObject({ id: "doc-9", title: "Novel", paths: [] });
+    const back = await b.filesAt(work.latest!.hash);
+    expect(back).toMatchObject({ scriptName: "text.md", script: files.script, bin: ["cut", "kept"], scratchpad: "notes" });
+    const byPath = Object.fromEntries(back.others!.map((o) => [o.path, o.data]));
+    expect(Object.keys(byPath).sort()).toEqual(["assets/map.png", "assets/pics/cover.png", "info.json"]);
+    expect(Buffer.from(byPath["assets/pics/cover.png"]!).equals(Buffer.from(png))).toBe(true);
+
+    // Restored at a path on b: claimed under its own ID, and later saves continue its branch.
+    expect(await b.claim(work, "/laptop/Novel.highland")).toBe("doc-9");
+    expect(await b.resolve({ id: "doc-9", path: "/laptop/Novel.highland", text: files.script })).toMatchObject({ branch: doc.branch, created: false });
+    expect((await b.works()).find((w) => w.branch === doc.branch)!.paths).toEqual(["/laptop/Novel.highland"]);
+  });
+
   it("bundles one work's history alone", async () => {
     const h = new History(await temp());
     const doc = await h.resolve({ id: "doc-2", path: "/w/A.highland", text: script });

@@ -2,7 +2,11 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
-import { CommitBatcher, defaultHistoryFolder, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type SaveKind } from "@highwater/history";
+import { CommitBatcher, defaultHistoryFolder, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type SaveKind, type WorkInfo } from "@highwater/history";
+import { createDocument, HighlandBundle, writeBundle, type DocumentMode } from "@highwater/bundle";
+import { writeFile } from "node:fs/promises";
+import { openHighland } from "./open.ts";
+import { LANGUAGES } from "./language.ts";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { exportHistory, HistoryMirror } from "./mirror.ts";
@@ -55,7 +59,9 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const b = await store.snapshot(key);
       const info = b.info[INFO_KEY] as { documentId?: unknown } | undefined;
       const id = typeof info?.documentId === "string" ? info.documentId : null;
-      return { id, files: { scriptName: b.textPath.split("/").pop()!, script: b.text, bin: b.binItems, ...(b.scratchpad !== undefined ? { scratchpad: b.scratchpad } : {}) } };
+      // Everything else in the file too (settings, assets, …), so the history can rebuild it whole.
+      const others = b.paths.filter((p) => p !== b.textPath && p !== "scratchpad.txt" && !/^bin\/\d+\.txt$/.test(p)).map((p) => ({ path: p, data: b.get(p)! }));
+      return { id, files: { scriptName: b.textPath.split("/").pop()!, script: b.text, bin: b.binItems, ...(b.scratchpad !== undefined ? { scratchpad: b.scratchpad } : {}), others } };
     }
     const ext = extname(key).toLowerCase();
     const scriptName = ext === ".fountain" || ext === ".spmd" ? "text.fountain" : ext === ".txt" ? "text.txt" : "text.md";
@@ -298,9 +304,96 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       }
       await exportHistory(history(), found.id, key);
     }),
+    vscode.commands.registerCommand("highwater.openWorkFromHistory", () => openWork()),
     vscode.commands.registerCommand("highwater.openHistoryFolder", () => vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(historyRoot()))),
   );
   void updateStatus();
+
+  /**
+   * Open Work from History…: any work in the history (pulled from another computer too), at any
+   * save, written out as a .highland or plain file that continues the same history.
+   */
+  async function openWork(): Promise<void> {
+    const h = history();
+    if (mirror.url) await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: "Bringing in the writing history…" }, () => pulled(mirror.pull()));
+    const works = await h.works();
+    if (!works.length) {
+      void vscode.window.showInformationMessage(mirror.url ? "The writing history has no works yet." : "The writing history has no works yet. To bring in works saved on another computer, set up the history mirror there and here.");
+      return;
+    }
+    const work = await vscode.window.showQuickPick(
+      works.map((w) => ({
+        label: w.title,
+        description: w.paths.length ? basename(w.paths.at(-1)!) : "not on this computer",
+        detail: `Last saved ${w.latest!.date.toLocaleString()} · ${w.latest!.message.replace(/^\S+ \S+ \S+, /, "")}`,
+        work: w,
+      })),
+      { title: "Open Work from History", placeHolder: "Choose a work", matchOnDescription: true },
+    );
+    if (!work) return;
+    const w = work.work;
+    // Already here: open it, or restore a save anyway (say, an older one) as another file.
+    const here = w.paths.slice().reverse().find((p) => existsSync(p));
+    if (here) {
+      const choice = await vscode.window.showInformationMessage(
+        `${w.title} is already on this computer at ${here}.`,
+        { modal: true, detail: "A restored file continues the same writing history." },
+        "Open It",
+        "Restore a Save…",
+      );
+      if (!choice) return;
+      if (choice === "Open It") return void (await openFile(here));
+    }
+    const saves = await h.branchLog(w.branch);
+    const save = await vscode.window.showQuickPick(
+      saves.map((c, i) => ({ label: c.message.split(",")[0]!, description: i === 0 ? "latest" : "", detail: c.message.replace(/^[^,]*, /, ""), commit: c })),
+      { title: `${w.title}: which save?`, placeHolder: "The latest is first" },
+    );
+    if (!save) return;
+    const files = await h.filesAt(save.commit.hash);
+    const plainExt = files.scriptName.replace(/^text\./, "");
+    const kinds = [
+      { label: ".highland file", description: files.others?.length ? "with its settings, Bin, Scratchpad and assets" : "with its Bin and Scratchpad", ext: "highland" },
+      { label: `.${plainExt} file`, description: "the text only", ext: plainExt },
+    ];
+    const kind = await vscode.window.showQuickPick(kinds, { title: `${w.title}: save as` });
+    if (!kind) return;
+    const target = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? homedir(), `${w.title}${here ? " (restored)" : ""}.${kind.ext}`)),
+      filters: { [kind.ext === "highland" ? ".highland files" : `.${kind.ext} files`]: [kind.ext] },
+      title: `Save ${w.title}`,
+    });
+    if (!target) return;
+    const path = target.fsPath;
+    // The new file continues the work's history.
+    const id = await h.claim(w, path);
+    if (kind.ext === "highland") {
+      const mode: DocumentMode = files.scriptName.endsWith(".fountain") ? "fountain" : files.scriptName.endsWith(".txt") ? "plain" : "markdown";
+      let b: HighlandBundle;
+      if (files.others?.length) b = HighlandBundle.fromEntries("Untitled.textbundle", [...files.others.map((o): [string, Uint8Array] => [o.path, o.data]), [files.scriptName, files.script]]);
+      else b = createDocument({ mode, template: mode === "fountain" ? "Screenplay" : mode === "markdown" ? "Manuscript" : "Plain Text", text: files.script });
+      if (files.bin?.length) b.setBinItems(files.bin);
+      if (files.scratchpad !== undefined) b.scratchpad = files.scratchpad;
+      const info = { ...b.info };
+      const ours = { ...((info[INFO_KEY] as object | undefined) ?? {}) } as Record<string, unknown>;
+      ours.documentId = id;
+      b.setInfo({ ...info, [INFO_KEY]: ours });
+      await writeBundle(path, b);
+    } else await writeFile(path, files.script);
+    await openFile(path);
+    view.refresh();
+    void updateStatus();
+  }
+
+  async function openFile(path: string): Promise<void> {
+    if (path.toLowerCase().endsWith(".highland")) {
+      await openHighland(vscode.Uri.file(path));
+      return;
+    }
+    let doc = await vscode.workspace.openTextDocument(path);
+    if (/\.(md|markdown)$/i.test(path) && doc.languageId === "markdown") doc = await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown);
+    await vscode.window.showTextDocument(doc, { preview: false });
+  }
 
   /** After a pull: show what came in. */
   async function pulled(work: Promise<string[]>): Promise<void> {

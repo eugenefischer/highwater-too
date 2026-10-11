@@ -7,6 +7,7 @@
 - Navigator: drag scenes, sections and headings to reorder the text.
 - Syntax Cheat Sheet, from the Navigator's title bar or the Command Palette.
 - Writing history mirror now pulls as well as pushes: other computers' saves come in on start-up, when a document is opened (at most once a minute) and every ten minutes; histories are matched to documents by ID, then by text. **Sync Writing History Now** replaces Push Writing History Now.
+- Each save also records the rest of the `.highland` file (settings, assets). **Open Work from History…** rebuilds any work at any save, from this computer or another one, as a `.highland` or plain file that continues its history.
 
 ## 0.1.2
 

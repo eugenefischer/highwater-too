@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { git } from "./git.ts";
+import { git, gitBytes } from "./git.ts";
 
 /**
  * The writing history (M7): one git repository in the history folder, with one branch per
@@ -22,6 +22,23 @@ export interface DocumentFiles {
   script: string;
   bin?: string[];
   scratchpad?: string;
+  /**
+   * The rest of a .highland file (info.json, assets, characters.json, …), by path inside it, so a
+   * document can be rebuilt whole from its history. Stored under "document/".
+   */
+  others?: { path: string; data: Uint8Array }[];
+}
+
+/** A work in the history: indexed on this computer, or pulled from another one. */
+export interface WorkInfo {
+  /** The document ID: from the index, or named by the branch's latest commit; null if unknown. */
+  id: string | null;
+  branch: string;
+  title: string;
+  /** Its latest save. */
+  latest: CommitInfo | null;
+  /** Paths it was saved at on this computer (none for works only pulled). */
+  paths: string[];
 }
 
 export interface IndexEntry {
@@ -138,7 +155,12 @@ export class History {
   async log(id: string, limit = 200): Promise<CommitInfo[]> {
     const entry = existsSync(this.repo) ? (await this.#load()).documents[id] : undefined;
     if (!entry) return [];
-    const out = await git(this.repo, ["log", `-${limit}`, "--format=%H%x00%aI%x00%s", `refs/heads/${entry.branch}`, "--"]).catch(() => "");
+    return this.#branchLog(entry.branch, limit);
+  }
+
+  async #branchLog(branch: string, limit: number): Promise<CommitInfo[]> {
+    if (!existsSync(this.repo)) return [];
+    const out = await git(this.repo, ["log", `-${limit}`, "--format=%H%x00%aI%x00%s", `refs/heads/${branch}`, "--"]).catch(() => "");
     return out
       .split("\n")
       .filter(Boolean)
@@ -164,6 +186,59 @@ export class History {
     return this.#serial(async () => {
       await this.#init();
       return work();
+    });
+  }
+
+  /** Every work in the history, most recently saved first. */
+  works(): Promise<WorkInfo[]> {
+    return this.#serial(async () => {
+      if (!existsSync(this.repo)) return [];
+      const index = await this.#load();
+      const out: WorkInfo[] = [];
+      for (const [id, e] of Object.entries(index.documents)) out.push({ id, branch: e.branch, title: e.title, latest: null, paths: e.paths });
+      for (const o of await this.#unindexed(index)) out.push({ id: o.id, branch: o.branch, title: branchTitle(o.branch), latest: null, paths: [] });
+      for (const w of out) w.latest = (await this.#branchLog(w.branch, 1))[0] ?? null;
+      return out.filter((w) => w.latest).sort((a, b) => b.latest!.date.getTime() - a.latest!.date.getTime());
+    });
+  }
+
+  /** A work's saves by branch, newest first (for works not yet in the index). */
+  branchLog(branch: string, limit = 200): Promise<CommitInfo[]> {
+    return this.#branchLog(branch, limit);
+  }
+
+  /** Everything a save recorded: the script, Bin, Scratchpad and (from 0.1.3) the rest of the file. */
+  async filesAt(hash: string): Promise<DocumentFiles> {
+    const scriptName = (await this.#scriptName(hash)) ?? "text.md";
+    const listing = await git(this.repo, ["ls-tree", "-r", "-z", "--name-only", hash]);
+    const names = listing.split("\0").filter(Boolean);
+    const bin = names
+      .map((n) => /^bin\/(\d+)\.txt$/.exec(n))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .sort((a, b) => Number(a[1]) - Number(b[1]));
+    const files: DocumentFiles = { scriptName, script: await this.#read(hash, scriptName), bin: await Promise.all(bin.map((m) => this.#read(hash, m[0]))) };
+    if (names.includes("scratchpad.txt")) files.scratchpad = await this.#read(hash, "scratchpad.txt");
+    const others = names.filter((n) => n.startsWith("document/"));
+    if (others.length) files.others = await Promise.all(others.map(async (n) => ({ path: n.slice("document/".length), data: await gitBytes(this.repo, ["cat-file", "blob", `${hash}:${n}`]) })));
+    return files;
+  }
+
+  /**
+   * Takes a work as this computer's document at `path` (after restoring it there): records the
+   * path, adds a pulled work to the index, and returns the ID to store in the document.
+   */
+  claim(work: WorkInfo, path: string): Promise<string> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      let id = Object.entries(index.documents).find(([, e]) => e.branch === work.branch)?.[0];
+      if (!id) {
+        id = work.id && !index.documents[work.id] ? work.id : randomUUID();
+        index.documents[id] = { branch: work.branch, title: branchTitle(work.branch), paths: [] };
+      }
+      const entry = index.documents[id]!;
+      entry.paths = [...entry.paths.filter((p) => p !== path), path];
+      await this.#save(index);
+      return id;
     });
   }
 
@@ -299,10 +374,27 @@ export class History {
       entries.push(["040000", "tree", await this.#mktree(items), "bin"]);
     }
     if (files.scratchpad) entries.push(["100644", "blob", await this.#blob(files.scratchpad), "scratchpad.txt"]);
+    if (files.others?.length) entries.push(["040000", "tree", await this.#folder(files.others), "document"]);
     return this.#mktree(entries);
   }
 
-  async #blob(text: string): Promise<string> {
+  /** A tree of files by path ("assets/a.png"), with a subtree per folder. */
+  async #folder(files: { path: string; data: Uint8Array }[]): Promise<string> {
+    const here: [string, string, string, string][] = [];
+    const folders = new Map<string, { path: string; data: Uint8Array }[]>();
+    for (const f of files) {
+      const slash = f.path.indexOf("/");
+      if (slash < 0) here.push(["100644", "blob", await this.#blob(f.data), f.path]);
+      else {
+        const name = f.path.slice(0, slash);
+        folders.set(name, [...(folders.get(name) ?? []), { path: f.path.slice(slash + 1), data: f.data }]);
+      }
+    }
+    for (const [name, inner] of folders) here.push(["040000", "tree", await this.#folder(inner), name]);
+    return this.#mktree(here);
+  }
+
+  async #blob(text: string | Uint8Array): Promise<string> {
     return (await git(this.repo, ["hash-object", "-w", "--stdin"], { input: text })).trim();
   }
 
@@ -375,10 +467,15 @@ function branchShortId(branch: string): string | null {
   return /-([A-Za-z0-9]{8})(?:-\d+)?$/.exec(branch)?.[1] ?? null;
 }
 
+/** "works/The-Purity-Variations-1a2b3c4d" → "The Purity Variations". */
+function branchTitle(branch: string): string {
+  // The last part is always the ID (and a number, when two works shared a name).
+  return branch.replace(/^works\//, "").replace(/-[A-Za-z0-9]+(?:-\d+)?$/, "").replace(/-/g, " ") || "Untitled";
+}
+
 /** Puts a pulled branch in the index under `id` (in memory; resolve saves it). */
 function adopt(index: Index, id: string, branch: string): string {
-  const title = branch.replace(/^works\//, "").replace(/-[A-Za-z0-9]{8}(?:-\d+)?$/, "").replace(/-/g, " ") || "Untitled";
-  index.documents[id] = { branch, title, paths: [] };
+  index.documents[id] = { branch, title: branchTitle(branch), paths: [] };
   return id;
 }
 

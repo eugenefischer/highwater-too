@@ -279,6 +279,12 @@
         "category": "Highwater Too"
       },
       {
+        "command": "highwater.openWorkFromHistory",
+        "title": "Open Work from History…",
+        "category": "Highwater Too",
+        "icon": "$(repo-pull)"
+      },
+      {
         "command": "highwater.exportHistory",
         "title": "Export Writing History…",
         "category": "Highwater Too",
@@ -1103,6 +1109,11 @@
           "group": "1_settings"
         },
         {
+          "command": "highwater.openWorkFromHistory",
+          "when": "view == highwater.history",
+          "group": "navigation@2"
+        },
+        {
           "command": "highwater.exportHistory",
           "when": "view == highwater.history",
           "group": "navigation@3"
@@ -1370,7 +1381,7 @@
       },
       {
         "view": "highwater.history",
-        "contents": "Each save of a document is recorded here: one git repository for all your writing, with a branch per script. Open a script to see its saves.\n[Change Location…](command:highwater.changeHistoryLocation)",
+        "contents": "Each save of a document is recorded here: one git repository for all your writing, with a branch per script. Open a script to see its saves, or open any work in the history, including ones saved on another computer.\n[Open Work from History…](command:highwater.openWorkFromHistory)\n[Change Location…](command:highwater.changeHistoryLocation)",
         "when": "config.highwater.writingHistory"
       },
       {
