@@ -156,3 +156,24 @@ describe("screenplay source offsets", () => {
     expect(l.pages[0]!.items.map((it) => it.source)).toEqual([0, src.indexOf("BOB"), src.indexOf("BOB") + Math.floor(("BOB\nHello there.".length * 1) / 2), src.indexOf("She")]);
   });
 });
+
+describe("markers", () => {
+  it("print nothing, the text laid out as if they were not there (Highland's line breaks at markers are not copied)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { HighlandBundle } = await import("@highwater/bundle");
+    const { parse } = await import("@highwater/parser");
+    const { layoutScreenplay, runsText } = await import("../src/index.ts");
+    const text = HighlandBundle.fromZip(new Uint8Array(readFileSync(new URL("../../../fixtures/generated/MarkerTest.highland", import.meta.url)))).text;
+    const page = layoutScreenplay(parse(text, { mode: "fountain" })).pages[1]!;
+    const lines = page.items.map((it) => [it.y, runsText(it.runs)]);
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        [201, "A marker inside dialogue in the"],
+        [213, "middle of a line."],
+        [237, "An action line with a marker at its end."],
+        [261, "INSERT A MARKER WITH CONTROL-M ON THE EMPTY LINE BELOW, LABEL"],
+      ]),
+    );
+    expect(lines.some(([, t]) => String(t).includes("{{"))).toBe(false);
+  });
+});

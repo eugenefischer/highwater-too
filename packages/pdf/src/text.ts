@@ -24,11 +24,15 @@ export function toRuns(nodes: Inline[], ctx: InlineContext, style: TextStyle = {
     if (last && sameStyle(last.style, s)) last.text += text;
     else out.push({ text, style: s });
   };
+  /** After a marker with a space before it: the space after it goes too, as if it were never there. */
+  let dropSpace = false;
   const walk = (ns: Inline[], s: TextStyle): void => {
     for (const n of ns) {
+      if (n.kind !== "text" && n.kind !== "directive") dropSpace = false;
       switch (n.kind) {
         case "text":
-          push(n.text, s);
+          push(dropSpace ? n.text.replace(/^[ \t]/, "") : n.text, s);
+          dropSpace = false;
           break;
         case "lineBreak":
           push("\n", s);
@@ -43,8 +47,11 @@ export function toRuns(nodes: Inline[], ctx: InlineContext, style: TextStyle = {
           } else walk(n.children, s);
           break;
         case "directive":
+          dropSpace = false;
           if (n.directive.kind === "series") push(String(ctx.series(n.directive)), s);
           else if (n.directive.kind === "timestamp") push(formatTimestamp(ctx.date), s);
+          // Markers print nothing (Highland breaks the line at one: a bug, not copied).
+          else if (n.directive.kind === "marker") dropSpace = out.length === 0 || /[ \t]$/.test(out.at(-1)!.text);
           break;
         default:
           break;
