@@ -53,13 +53,29 @@ export function parseRemote(url: string): RemoteInfo {
   return { url: u, kind, host, login, port, path, owner, name };
 }
 
+/** Why a push or pull failed: the remote is missing, needs a login (or refused it), can't be reached, or something else. */
+export type FailureKind = "missing" | "auth" | "unreachable" | "other";
+
 export type PushResult =
   | { ok: true; pushed: number }
-  | { ok: false; missing: boolean; message: string };
+  | { ok: false; kind: FailureKind; missing: boolean; message: string };
 
 export type PullResult =
   | { ok: true; updated: string[] }
-  | { ok: false; missing: boolean; message: string };
+  | { ok: false; kind: FailureKind; missing: boolean; message: string };
+
+/** Sorts a git failure by what the writer can do about it. */
+export function failureKind(message: string): FailureKind {
+  if (/could not read (username|password)|terminal prompts disabled|authentication failed|authentication required|invalid credentials|\b401\b|\b403\b|permission denied|access denied|unauthori[sz]ed/i.test(message)) return "auth";
+  if (/could not resolve host|couldn't resolve|failed to connect|connection (refused|timed out|reset)|operation timed out|network is unreachable|no route to host|ssl|certificate/i.test(message)) return "unreachable";
+  if (/not found|does not appear to be a git repository|repository .* does not exist|could not read from remote|no such file or directory|not a git repository/i.test(message)) return "missing";
+  return "other";
+}
+
+function failure(message: string): { ok: false; kind: FailureKind; missing: boolean; message: string } {
+  const kind = failureKind(message);
+  return { ok: false, kind, missing: kind === "missing", message: shorten(message) };
+}
 
 const REMOTE = "mirror";
 
@@ -100,9 +116,7 @@ export class Mirror {
       if (rejected.length) await this.#git(["push", "--porcelain", REMOTE, ...rejected.map((b) => `refs/heads/${b}:refs/heads/${b}`)]);
       return { ok: true, pushed: branches.length };
     } catch (error) {
-      const message = (error as Error).message;
-      const missing = /not found|does not appear to be a git repository|repository .* does not exist|could not read from remote|no such file or directory|not a git repository/i.test(message);
-      return { ok: false, missing, message: shorten(message) };
+      return failure((error as Error).message);
     }
   }
 
@@ -125,8 +139,7 @@ export class Mirror {
       const message = (error as Error).message;
       // A remote with nothing pushed yet has no branches to fetch: nothing to pull.
       if (/couldn't find remote ref|no matching remote head/i.test(message)) return { ok: true, updated: [] };
-      const missing = /not found|does not appear to be a git repository|repository .* does not exist|could not read from remote|no such file or directory|not a git repository/i.test(message);
-      return { ok: false, missing, message: shorten(message) };
+      return failure(message);
     }
   }
 

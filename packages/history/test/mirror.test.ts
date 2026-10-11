@@ -21,6 +21,19 @@ describe("parseRemote", () => {
   });
 });
 
+describe("failureKind", () => {
+  it("sorts git's failures by what the writer can do", async () => {
+    const { failureKind } = await import("../src/index.ts");
+    expect(failureKind("git push: fatal: could not read Username for 'https://gitea.example.net': terminal prompts disabled")).toBe("auth");
+    expect(failureKind("remote: Unauthorized\nfatal: Authentication failed for 'https://host/x.git/'")).toBe("auth");
+    expect(failureKind("The requested URL returned error: 403")).toBe("auth");
+    expect(failureKind("git@host: Permission denied (publickey).\nfatal: Could not read from remote repository.")).toBe("auth");
+    expect(failureKind("fatal: unable to access 'https://x/': Could not resolve host: x")).toBe("unreachable");
+    expect(failureKind("fatal: repository 'https://host/me/h.git/' not found")).toBe("missing");
+    expect(failureKind("fatal: '/tmp/nope.git' does not appear to be a git repository")).toBe("missing");
+  });
+});
+
 describe("Mirror", () => {
   it("pushes every branch, says when the remote is missing, and never force-pushes", async () => {
     const remote = join(await temp(), "remote.git");

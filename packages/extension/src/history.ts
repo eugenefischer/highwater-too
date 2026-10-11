@@ -123,6 +123,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       return;
     }
     const failed = failures.get(key);
+    status.command = "highwater.showHistory";
     if (failed) {
       status.text = "$(warning) History";
       status.tooltip = `The last save was not added to the writing history: ${failed}. It will be tried again on the next save.`;
@@ -130,8 +131,16 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const last = lastCommit.get(key) ?? (await latest(key))?.date;
       status.text = last ? `$(history) ${when(last)}` : "$(history)";
       status.tooltip = last ? `Writing history: last save recorded ${last.toLocaleString()}. Click to see the saves.` : "Writing history: starts with the next save.";
-      if (mirror.url) status.tooltip += mirror.state.error ? `\nNot mirrored yet: ${mirror.state.error}. Tried again after the next save.` : mirror.state.at ? `\nMirrored to ${mirror.url} at ${mirror.state.at.toLocaleTimeString()}.` : `\nMirrored to ${mirror.url}.`;
-      if (mirror.url && mirror.state.error) status.text = status.text.replace("$(history)", "$(history)$(cloud-upload)");
+      if (mirror.url) {
+        if (mirror.state.signIn) {
+          status.tooltip += `\nNot mirrored: ${mirror.url} needs you to sign in. Click to sign in.`;
+          status.text = status.text.replace("$(history)", "$(history)$(warning)");
+          status.command = "highwater.signInHistoryMirror";
+        } else if (mirror.state.error) {
+          status.tooltip += `\nNot mirrored yet: ${mirror.state.error}. Tried again in ten minutes and after the next save.`;
+          status.text = status.text.replace("$(history)", "$(history)$(cloud-upload)");
+        } else status.tooltip += mirror.state.at ? `\nMirrored to ${mirror.url} at ${mirror.state.at.toLocaleTimeString()}.` : `\nMirrored to ${mirror.url}.`;
+      }
     }
     status.show();
   }
@@ -290,6 +299,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.commands.registerCommand("highwater.toggleDocumentHistory", () => togglePause()),
     mirror,
     vscode.commands.registerCommand("highwater.setUpHistoryMirror", () => mirror.setUp()),
+    vscode.commands.registerCommand("highwater.signInHistoryMirror", async () => {
+      await mirror.signIn();
+      view.refresh();
+      void updateStatus();
+    }),
+    vscode.commands.registerCommand("highwater.forgetHistoryMirrorSignIn", () => mirror.forgetSignIn()),
     vscode.commands.registerCommand("highwater.pushHistoryNow", () => pulled(mirror.sync(true))),
     vscode.commands.registerCommand("highwater.exportHistory", async () => {
       const key = keyOf(vscode.window.activeTextEditor?.document);

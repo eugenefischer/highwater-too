@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -276,6 +276,16 @@
       {
         "command": "highwater.pushHistoryNow",
         "title": "Sync Writing History Now",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.signInHistoryMirror",
+        "title": "Sign In to History Mirror…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.forgetHistoryMirrorSignIn",
+        "title": "Forget History Mirror Sign-In",
         "category": "Highwater Too"
       },
       {
@@ -1128,6 +1138,16 @@
         },
         {
           "command": "highwater.pushHistoryNow",
+          "when": "view == highwater.history && config.highwater.historyRemote",
+          "group": "1_settings"
+        },
+        {
+          "command": "highwater.signInHistoryMirror",
+          "when": "view == highwater.history && config.highwater.historyRemote",
+          "group": "1_settings"
+        },
+        {
+          "command": "highwater.forgetHistoryMirrorSignIn",
           "when": "view == highwater.history && config.highwater.historyRemote",
           "group": "1_settings"
         },
