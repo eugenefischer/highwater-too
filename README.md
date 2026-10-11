@@ -13,6 +13,19 @@ A VS Code extension that replaces the discontinued Highland 2: it opens, edits a
 
 Plain files get the Navigator, preview, PDF export, Live Margins, the Title Page Builder and the writing history. The Bin, Scratchpad and Assets live inside `.highland` files, so plain files do not have them.
 
+## Writing history (new; Highland 2 had nothing like it)
+
+Every save is recorded in a git repository, as a record of how each work was written. It is on by default and needs nothing set up beyond git itself (on a Mac, the Xcode command-line tools).
+
+- **What is kept:** the text of each save (revision marks included), plus the Bin and Scratchpad of `.highland` documents. Images and settings are not; session backups cover those.
+- **When:** each ⌘S at once; autosaves at most every five minutes, and once more when the document closes. Each commit says when it was made and how many words it added or removed. A failed commit never blocks a save.
+- **Where:** one repository for all your writing, in your system's folder for application data (`~/Library/Application Support/Highwater Too/History` on a Mac, `~/.local/share/highwater-too/history` on Linux, `%LOCALAPPDATA%\Highwater Too\History` on Windows). **Change Writing History Location…** moves it; folders kept in sync by Dropbox, iCloud and the like are best avoided, as syncing can damage git repositories.
+- **One branch per work**, with no history shared between them, so one work's history can be shared or deleted without touching the others or rewriting anything. **Export Writing History…** writes a single work to a git bundle that anyone can open with `git clone`.
+- **Moving and renaming:** a `.highland` document carries an ID that ties it to its history (put back if Highland 2 drops it on save); other files are found by their path or their text.
+- **Seeing it:** the **Writing History** panel in the sidebar lists the current document's saves; click one to compare it with the text as it is now. The status bar shows when the last save was recorded.
+- **Mirror (optional):** **Set Up History Mirror…** pushes the repository to any git remote after saves: GitHub, GitLab, Gitea or Forgejo, an SSH server, or another disk. It never force-pushes, joins saves made on another computer instead of overwriting them, and can create the remote repository for you. A remote you do not control also gives your timestamps an independent witness.
+- **Turning it off:** for one document from the panel, or everywhere with the **Writing History** setting.
+
 ## Layout
 
 ```
