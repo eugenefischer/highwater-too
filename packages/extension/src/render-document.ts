@@ -31,19 +31,61 @@ export async function templateOf(context: vscode.ExtensionContext, store: Bundle
   return null;
 }
 
+const templateChanged = new vscode.EventEmitter<vscode.TextDocument>();
+/** Fires when a document's template is changed (from the preview or the status bar). */
+export const onDidChangeTemplate = templateChanged.event;
+
 /** Saves the template choice: in info.json for .highland files (as Highland does), else in the workspace. */
 export async function setTemplate(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template: Template): Promise<void> {
   const bundle = bundleOf(doc);
-  if (!bundle) {
-    await context.workspaceState.update(`template:${doc.uri.toString()}`, template);
-    return;
-  }
-  await store.update(bundle, (b) => {
-    const settings = b.highlandSettings;
-    if (settings.templateName === template) return [];
-    b.setHighlandSettings({ ...settings, templateName: template });
-    return ["info.json"];
-  });
+  if (!bundle) await context.workspaceState.update(`template:${doc.uri.toString()}`, template);
+  else
+    await store.update(bundle, (b) => {
+      const settings = b.highlandSettings;
+      if (settings.templateName === template) return [];
+      b.setHighlandSettings({ ...settings, templateName: template });
+      return ["info.json"];
+    });
+  templateChanged.fire(doc);
+}
+
+/**
+ * The active print template in the status bar (what Export PDF and the preview will use); click to
+ * change it.
+ */
+export function registerTemplateStatus(context: vscode.ExtensionContext, store: BundleStore): void {
+  const item = vscode.window.createStatusBarItem("highwater.template", vscode.StatusBarAlignment.Right, 99);
+  item.name = "Highwater Too: print template";
+  item.command = "highwater.chooseTemplate";
+  const update = async (): Promise<void> => {
+    const doc = vscode.window.activeTextEditor?.document;
+    const template = doc && doc.languageId.startsWith("highland-") ? await templateOf(context, store, doc) : null;
+    if (!doc || doc !== vscode.window.activeTextEditor?.document) return;
+    if (!template) {
+      item.hide();
+      return;
+    }
+    item.text = `$(file-pdf) ${template}`;
+    item.tooltip = `Print template: ${template}. Export PDF and the preview use it. Click to change.`;
+    item.show();
+  };
+  context.subscriptions.push(
+    item,
+    vscode.window.onDidChangeActiveTextEditor(() => void update()),
+    vscode.workspace.onDidOpenTextDocument(() => void update()),
+    onDidChangeTemplate(() => void update()),
+    vscode.commands.registerCommand("highwater.chooseTemplate", async () => {
+      const doc = vscode.window.activeTextEditor?.document;
+      if (!doc || !doc.languageId.startsWith("highland-")) return;
+      const current = await templateOf(context, store, doc);
+      const picked = await vscode.window.showQuickPick(
+        TEMPLATES.map((t) => ({ label: t, description: t === current ? "current" : "", picked: t === current })),
+        { title: "Print template for Export PDF and the preview" },
+      );
+      if (picked && picked.label !== current) await setTemplate(context, store, doc, picked.label as Template);
+    }),
+  );
+  void update();
 }
 
 /** Lays out and renders the editor's text (unsaved edits included) with the document's template. */

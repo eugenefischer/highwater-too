@@ -7,6 +7,7 @@ import { registerCommands } from "./commands.ts";
 import { registerLanguageFeatures } from "./language.ts";
 import { registerPanels } from "./panels.ts";
 import { registerPreview } from "./preview.ts";
+import { registerTemplateStatus } from "./render-document.ts";
 import { historyRoot, registerHistory } from "./history.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerStatusBar } from "./status.ts";
@@ -55,6 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ["sidebar panels", () => registerPanels(context, store, fs, cache)],
     ["Live Margins and Title Page Builder", () => registerWorkspaceTools(context, cache)],
     ["preview", () => registerPreview(context, store)],
+    ["template indicator", () => registerTemplateStatus(context, store)],
     ["writing history", () => registerHistory(context, store)],
   ];
   for (const [name, start] of features) {

@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.19",
+  "version": "0.0.21",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -43,7 +43,8 @@
       {
         "command": "highwater.export",
         "title": "Export Text (.fountain / .md)…",
-        "category": "Highwater Too"
+        "category": "Highwater Too",
+        "icon": "$(file-text)"
       },
       {
         "command": "highwater.convertToHighland",
@@ -245,6 +246,11 @@
         "title": "Export Writing History…",
         "category": "Highwater Too",
         "icon": "$(export)"
+      },
+      {
+        "command": "highwater.chooseTemplate",
+        "title": "Choose Print Template…",
+        "category": "Highwater Too"
       }
     ],
     "customEditors": [
@@ -268,10 +274,10 @@
           "scope": "application",
           "markdownDescription": "Folder for the writing history (one git repository, a branch per document) and session backups. Empty: the system's place for application data (on a Mac, `~/Library/Application Support/Highwater Too/History`; on Linux, `~/.local/share/highwater-too/history`; on Windows, `%LOCALAPPDATA%\\Highwater Too\\History`). Use the **Change Writing History Location** command to move it."
         },
-        "highwater.writingShortcuts": {
+        "highwater.highlandShortcuts": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "In documents, use ⌘E for Preview, ⌘L for Live Margins, ⌘0 for the sidebar, ⌘1 for the Navigator, ⌘2 for the Bin, ⌘4 for Assets and ⌘5 for the Scratchpad, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
+          "markdownDescription": "Highland 2's shortcuts in documents: ⌘E for Preview, ⌘L for Live Margins, ⌘0 for the sidebar, ⌘1 for the Navigator, ⌘2 for the Bin, ⌘4 for Assets and ⌘5 for the Scratchpad, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
         },
         "highwater.showSidebarOnOpen": {
           "type": "boolean",
@@ -942,6 +948,10 @@
         {
           "command": "highwater.exportHistory",
           "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.chooseTemplate",
+          "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
         }
       ],
       "explorer/context": [
@@ -955,12 +965,17 @@
         {
           "command": "highwater.preview",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "highwater.exportPdf",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "highwater.export",
+          "when": "resourceScheme == highland && editorLangId =~ /^highland-/",
+          "group": "navigation@3"
         }
       ],
       "view/title": [
@@ -1126,7 +1141,7 @@
         "command": "workbench.action.toggleSidebarVisibility",
         "key": "ctrl+0",
         "mac": "cmd+0",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.writingShortcuts"
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.cutToBin",
@@ -1144,49 +1159,49 @@
         "command": "highwater.navigator.focus",
         "mac": "cmd+1",
         "key": "ctrl+1",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.writingShortcuts"
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.bin.focus",
         "mac": "cmd+2",
         "key": "ctrl+2",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.writingShortcuts"
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.assets.focus",
         "mac": "cmd+4",
         "key": "ctrl+4",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.writingShortcuts"
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.openScratchpad",
         "mac": "cmd+5",
         "key": "ctrl+5",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.writingShortcuts"
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.toggleLiveMargins",
         "mac": "cmd+l",
         "key": "ctrl+l",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.writingShortcuts"
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.toggleLiveMargins",
         "mac": "ctrl+alt+l",
         "key": "ctrl+alt+l",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.writingShortcuts"
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.preview",
         "mac": "cmd+e",
         "key": "ctrl+e",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.writingShortcuts"
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.preview",
         "mac": "ctrl+alt+p",
         "key": "ctrl+alt+p",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.writingShortcuts"
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
       }
     ],
     "viewsContainers": {

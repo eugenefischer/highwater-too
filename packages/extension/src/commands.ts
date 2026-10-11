@@ -157,7 +157,7 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
     (await vscode.window.showSaveDialog({
       defaultUri: vscode.Uri.file(path.replace(/\.(highland|fountain|spmd|md|markdown)$/i, "") + ".pdf"),
       filters: { PDF: ["pdf"] },
-      title: "Export PDF",
+      title: `Export PDF (${template} template)`,
     }));
   if (!out) return;
   if (out.scheme !== "file" || !/\.pdf$/i.test(out.fsPath)) {
@@ -169,7 +169,7 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
     await vscode.workspace.fs.writeFile(out, result.pdf);
     for (const problem of result.problems) void vscode.window.showWarningMessage(problem);
     if (!target) {
-      void vscode.window.showInformationMessage(`Exported ${basename(out.fsPath)} (${result.pages} pages).`, "Open", "Reveal in Finder").then((choice) => {
+      void vscode.window.showInformationMessage(`Exported ${basename(out.fsPath)} (${template} template, ${result.pages} pages).`, "Open", "Reveal in Finder").then((choice) => {
         if (choice === "Open") void vscode.env.openExternal(out);
         if (choice === "Reveal in Finder") void vscode.commands.executeCommand("revealFileInOS", out);
       });

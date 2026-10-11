@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
-import { bundleOf, renderDocument, setTemplate, TEMPLATES, type Template } from "./render-document.ts";
+import { bundleOf, onDidChangeTemplate, renderDocument, setTemplate, TEMPLATES, type Template } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 
 /**
@@ -27,6 +27,7 @@ export function registerPreview(context: vscode.ExtensionContext, store: BundleS
     vscode.window.onDidChangeTextEditorVisibleRanges((e) => preview?.editorScrolled(e.textEditor)),
     vscode.workspace.onDidSaveTextDocument((d) => preview?.changed(d, true)),
     { dispose: store.onExternalChange((bundle) => preview?.bundleChanged(bundle)) },
+    onDidChangeTemplate((doc) => preview?.changed(doc, true)),
     { dispose: () => preview?.dispose() },
   );
 }
@@ -69,10 +70,7 @@ class Preview {
         void this.#update();
       } else if (msg.type === "template" && this.#doc && TEMPLATES.includes(msg.template as Template)) {
         const doc = this.#doc;
-        void setTemplate(this.context, this.store, doc, msg.template as Template).then(
-          () => this.#update(),
-          (e: unknown) => void vscode.window.showErrorMessage(`Could not save the template: ${(e as Error).message}`),
-        );
+        void setTemplate(this.context, this.store, doc, msg.template as Template).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the template: ${(e as Error).message}`));
       } else if (msg.type === "reveal" && typeof msg.offset === "number") void this.#reveal(msg.offset, false);
       else if (msg.type === "jump" && typeof msg.offset === "number") void this.#reveal(msg.offset, true);
       else if (msg.type === "export" && this.#doc) void vscode.commands.executeCommand("highwater.exportPdf", this.#doc.uri);
