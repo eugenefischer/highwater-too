@@ -82,11 +82,12 @@ const tests: [string, () => Promise<void>][] = [
     "completes character names and jumps between markers in a screenplay",
     async () => {
       const path = join(dir, "Complete.fountain");
+      // Line 5 is "BO", after an empty line: the cue being typed.
       await writeFile(path, "INT. KITCHEN - DAY\n\nBOB\nHi. {{%m: here}}\n\nBO");
       const doc = await vscode.workspace.openTextDocument(path);
       const editor = await vscode.window.showTextDocument(doc);
       await waitFor("Fountain", () => editor.document.languageId === "highland-fountain");
-      const list = await vscode.commands.executeCommand<vscode.CompletionList>("vscode.executeCompletionItemProvider", doc.uri, new vscode.Position(4, 2));
+      const list = await vscode.commands.executeCommand<vscode.CompletionList>("vscode.executeCompletionItemProvider", doc.uri, new vscode.Position(5, 2));
       assert.ok(list.items.some((i) => (typeof i.label === "string" ? i.label : i.label.label) === "BOB"), "BOB is offered");
       editor.selection = new vscode.Selection(0, 0, 0, 0);
       await vscode.commands.executeCommand("highwater.nextMarker");
