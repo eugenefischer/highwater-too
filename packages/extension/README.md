@@ -6,8 +6,8 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 
 ## Getting started
 
-- **Open a document:** open a `.highland` file from the Explorer or with **Highwater Too: Open .highland File…**. The script text opens in an ordinary editor tab; saving writes it back into the `.highland` file, keeping everything else in it (settings, Bin, Scratchpad, images). Before the first save of each session the original file is backed up.
-- **New documents:** **New Screenplay** and **New Manuscript** create `.highland` files.
+- **Open a document:** open a `.highland` file from the Explorer or with **Highwater Too: Open Document…**, which also opens `.fountain` and `.md` files. The script text opens in an ordinary editor tab; saving writes it back into the `.highland` file, keeping everything else in it (settings, Bin, Scratchpad, images). Before the first save of each session the original file is backed up.
+- **New documents:** **New Document…**, in the Navigator's title bar or on the empty sidebar, makes a blank screenplay or manuscript as a `.highland` file, or as a plain `.fountain` or `.md` file. **New Screenplay** and **New Manuscript** make `.highland` files directly.
 - **Plain files:** `.fountain` files open as **Highwater Fountain**. For a `.md` or `.txt` file, click the language name in the status bar and choose **Highwater Markdown** or **Highwater Plain Text**, or run **Open .md Files with Highwater Too…** to open every `.md` file that way. **Save as .highland File…** turns a plain file into a `.highland` document.
 - **Changes made elsewhere:** if Highland 2 (or anything else) changes the file while it is open, unchanged documents reload; edited ones offer Revert, Save, Save As or Compare.
 

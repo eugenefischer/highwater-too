@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import * as vscode from "vscode";
+import { LANGUAGES } from "./language.ts";
 import { DISK_SCHEME, DiskVersionProvider, handleExternalChange } from "./conflicts.ts";
 import { HighlandFileSystem, SCHEME } from "./fs-provider.ts";
 import { OPEN_VIEW_TYPE, OpenRedirect, openHighland } from "./open.ts";
@@ -39,8 +40,19 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerCustomEditorProvider(OPEN_VIEW_TYPE, new OpenRedirect()),
     { dispose: store.onExternalChange((bundle, entries) => void handleExternalChange(fs, bundle, entries)) },
     vscode.commands.registerCommand("highwater.open", async () => {
-      const picked = await vscode.window.showOpenDialog({ canSelectMany: true, filters: { ".highland files": ["highland"] } });
-      for (const uri of picked ?? []) await openHighland(uri);
+      const picked = await vscode.window.showOpenDialog({
+        canSelectMany: true,
+        title: "Open Document",
+        filters: { Documents: ["highland", "fountain", "md", "markdown"], ".highland files": ["highland"], Fountain: ["fountain"], Markdown: ["md", "markdown"] },
+      });
+      for (const uri of picked ?? []) {
+        if (/\.highland$/i.test(uri.fsPath)) await openHighland(uri);
+        else {
+          const doc = await vscode.workspace.openTextDocument(uri);
+          const md = /\.(md|markdown)$/i.test(uri.fsPath) && doc.languageId === "markdown";
+          await vscode.window.showTextDocument(md ? await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown) : doc, { preview: false });
+        }
+      }
     }),
     vscode.commands.registerCommand("highwater.hello", () => {
       const version = String(context.extension.packageJSON.version ?? "unknown");

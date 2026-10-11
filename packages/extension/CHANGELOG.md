@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- **New Document…** in the sidebar (on the empty Navigator and as a button in its title bar) and the Command Palette: a blank screenplay or manuscript, as a `.highland` file or a plain `.fountain` or `.md` file.
+- **Open Document…** opens `.fountain` and `.md` files as well as `.highland` files.
+
 ## 0.1.0 — first release
 
 - Open, edit and save `.highland` files safely: the script as an editor tab, everything else in the file kept; backups before the first save of each session; changes made elsewhere reload or offer Revert, Save, Save As or Compare.

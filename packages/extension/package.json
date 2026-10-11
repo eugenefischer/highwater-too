@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -46,7 +46,7 @@
     "commands": [
       {
         "command": "highwater.open",
-        "title": "Open .highland File…",
+        "title": "Open Document…",
         "category": "Highwater Too"
       },
       {
@@ -58,6 +58,12 @@
         "command": "highwater.newManuscript",
         "title": "New Manuscript",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.newDocument",
+        "title": "New Document…",
+        "category": "Highwater Too",
+        "icon": "$(new-file)"
       },
       {
         "command": "highwater.exportPdf",
@@ -1015,6 +1021,11 @@
       ],
       "view/title": [
         {
+          "command": "highwater.newDocument",
+          "when": "view == highwater.navigator",
+          "group": "navigation@0"
+        },
+        {
           "command": "highwater.navigator.filter",
           "when": "view == highwater.navigator",
           "group": "navigation"
@@ -1275,7 +1286,7 @@
     "viewsWelcome": [
       {
         "view": "highwater.navigator",
-        "contents": "Open a .highland, .fountain or .md document to see its scenes, sections and notes.",
+        "contents": "Open a .highland, .fountain or .md document to see its scenes, sections and notes, or start a new one.\n[New Document…](command:highwater.newDocument)\n[Open Document…](command:highwater.open)",
         "when": "!highwater.hasDocument"
       },
       {

@@ -59,6 +59,26 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "New Document makes each kind of blank document and opens it",
+    async () => {
+      for (const [kind, name, language] of [
+        ["screenplay", "New.highland", "highland-fountain"],
+        ["manuscript", "NewManuscript.highland", "highland-markdown"],
+        ["fountain", "New.fountain", "highland-fountain"],
+        ["markdown", "New.md", "highland-markdown"],
+      ] as const) {
+        const file = vscode.Uri.file(join(dir, name));
+        await vscode.commands.executeCommand("highwater.newDocument", kind, file);
+        const want = name.endsWith(".highland") ? highland(file.fsPath).toString() : file.toString();
+        await waitFor(`${name} open as ${language}`, () => {
+          const doc = vscode.window.activeTextEditor?.document;
+          return doc?.uri.toString() === want && doc.languageId === language;
+        });
+        assert.equal(vscode.window.activeTextEditor!.document.getText(), "", name);
+      }
+    },
+  ],
+  [
     "opening a .highland file from the Explorer opens its script",
     async () => {
       const path = await copyOf("Explorer");

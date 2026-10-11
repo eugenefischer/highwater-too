@@ -28,6 +28,7 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     vscode.commands.registerCommand("highwater.toggleInvisibles", toggleInvisibles),
     vscode.commands.registerCommand("highwater.newScreenplay", () => newDocument("screenplay")),
     vscode.commands.registerCommand("highwater.newManuscript", () => newDocument("manuscript")),
+    vscode.commands.registerCommand("highwater.newDocument", (kind?: NewKind, target?: vscode.Uri) => newAnyDocument(kind, target)),
     vscode.commands.registerCommand("highwater.export", exportText),
     vscode.commands.registerCommand("highwater.convertToHighland", convertToHighland),
     vscode.commands.registerCommand("highwater.useForMarkdown", useForMarkdown),
@@ -72,17 +73,58 @@ async function toggleInvisibles(): Promise<void> {
   await config.update("renderWhitespace", current === "all" ? "none" : "all", vscode.ConfigurationTarget.Global, true);
 }
 
-async function newDocument(kind: "screenplay" | "manuscript"): Promise<void> {
+async function newDocument(kind: "screenplay" | "manuscript", chosen?: vscode.Uri): Promise<void> {
   const spec = NEW[kind]!;
-  const folder = defaultFolder();
-  const target = await vscode.window.showSaveDialog({
-    defaultUri: vscode.Uri.file(join(folder, `${spec.name}.highland`)),
-    filters: { ".highland files": ["highland"] },
-    title: `New ${spec.template}`,
-  });
+  const target =
+    chosen ??
+    (await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(join(defaultFolder(), `${spec.name}.highland`)),
+      filters: { ".highland files": ["highland"] },
+      title: `New ${spec.template}`,
+    }));
   if (!target) return;
   await writeBundle(target.fsPath, createDocument({ mode: spec.mode, template: spec.template }));
   await openHighland(target);
+}
+
+type NewKind = "screenplay" | "manuscript" | "fountain" | "markdown";
+
+const PLAIN: Record<"fountain" | "markdown", { ext: string; name: string; filter: string; language: string }> = {
+  fountain: { ext: "fountain", name: "Untitled Screenplay", filter: "Fountain", language: LANGUAGES.fountain },
+  markdown: { ext: "md", name: "Untitled Manuscript", filter: "Markdown", language: LANGUAGES.markdown },
+};
+
+/** New Document…: any kind the extension edits, chosen from a list (or given, for tests and links). */
+async function newAnyDocument(kind?: NewKind, target?: vscode.Uri): Promise<void> {
+  if (!kind) {
+    const picked = await vscode.window.showQuickPick<vscode.QuickPickItem & { value?: NewKind }>(
+      [
+        { label: ".highland files", kind: vscode.QuickPickItemKind.Separator },
+        { label: "$(book) Screenplay", description: ".highland", detail: "Fountain, printed with the Screenplay template; Bin, Scratchpad and Assets kept in the file", value: "screenplay" },
+        { label: "$(book) Manuscript", description: ".highland", detail: "Markdown, printed with the Manuscript template; Bin, Scratchpad and Assets kept in the file", value: "manuscript" },
+        { label: "Plain files", kind: vscode.QuickPickItemKind.Separator },
+        { label: "$(file) Fountain screenplay", description: ".fountain", detail: "A plain text file other apps can open; no Bin, Scratchpad or Assets", value: "fountain" },
+        { label: "$(file) Markdown manuscript", description: ".md", detail: "A plain text file other apps can open; no Bin, Scratchpad or Assets", value: "markdown" },
+      ],
+      { title: "New Document", placeHolder: "Choose the kind of document" },
+    );
+    if (!picked?.value) return;
+    kind = picked.value;
+  }
+  if (kind === "screenplay" || kind === "manuscript") return newDocument(kind, target);
+  const spec = PLAIN[kind];
+  const file =
+    target ??
+    (await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(join(defaultFolder(), `${spec.name}.${spec.ext}`)),
+      filters: { [spec.filter]: [spec.ext] },
+      title: `New ${spec.filter} Document`,
+    }));
+  if (!file) return;
+  await vscode.workspace.fs.writeFile(file, new Uint8Array());
+  // .md files stay Markdown unless the writer chose otherwise, so set this one's language directly.
+  const doc = await vscode.languages.setTextDocumentLanguage(await vscode.workspace.openTextDocument(file), spec.language);
+  await vscode.window.showTextDocument(doc, { preview: false });
 }
 
 /** Export the script as .fountain / .md / .txt, without revision tags. */
