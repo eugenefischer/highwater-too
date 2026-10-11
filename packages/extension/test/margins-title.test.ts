@@ -41,3 +41,10 @@ describe("title page builder", () => {
     expect(apply(added, titlePageEdit(parse(added, { mode: "fountain" }), empty))).toBe("INT. HOUSE - DAY");
   });
 });
+
+describe("Live Margins lyrics", () => {
+  it("indents a lyric to the dialogue column, as Highland shows it", () => {
+    const src = "INT. A - DAY\n\n~A lyric line.\n";
+    expect(liveMargins(parse(src, { mode: "fountain" }))).toEqual([{ at: src.indexOf("~"), indent: 11 }]);
+  });
+});

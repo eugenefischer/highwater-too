@@ -10,7 +10,12 @@ export interface MarginIndent {
   indent: number;
 }
 
-/** Indents in characters from the action margin, as Highland shows them (approximate, from screenshots). */
+/**
+ * Indents in characters from the action margin, as Highland shows them. Measured from screenshots
+ * of LiveMarginsTest (2026-10-12): cue 21.1, parenthetical 15.4, dialogue 11.5, transitions ending
+ * at 63; Highland's indents are not whole characters, so dialogue and parentheticals round down.
+ * Lyrics sit at the dialogue indent.
+ */
 export const MARGINS = { cue: 21, parenthetical: 15, dialogue: 11, width: 63, paragraph: 5, manuscriptWidth: 65 } as const;
 
 export function liveMargins(doc: Document): MarginIndent[] {
@@ -26,6 +31,9 @@ export function liveMargins(doc: Document): MarginIndent[] {
         for (const p of e.parts) out.push({ at: p.line.span.start, indent: p.kind === "parenthetical" ? MARGINS.parenthetical : MARGINS.dialogue });
         break;
       }
+      case "lyric":
+        for (const l of e.lines) out.push({ at: l.span.start, indent: MARGINS.dialogue });
+        break;
       case "transition":
       case "centered":
       case "rightAligned":
