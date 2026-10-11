@@ -1,7 +1,7 @@
 import { seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
 import { extraBlankLines, pageText, sameParagraph, styledValue } from "./screenplay.ts";
 import { plain, toRuns, wrapRuns, type InlineContext } from "./text.ts";
-import { CHAR, type Graphic, type Layout, type Page, type PlacedText, type Run } from "./types.ts";
+import { assignSources, CHAR, type Graphic, type Layout, type Page, type PlacedText, type Run, type SourceRange } from "./types.ts";
 
 /**
  * Highland 2's Manuscript template on US Letter, measured from its PDFs (Sweet Betty, The Purity
@@ -54,6 +54,8 @@ export const MANUSCRIPT = {
 export interface ManuscriptOptions {
   /** Elements to print (after includes are merged); default: the document's own. */
   elements?: Element[];
+  /** Where an element sits in the script being edited (included elements: their include line); default: its span. */
+  sourceOf?: (e: Element) => SourceRange;
   /** For {{TIMESTAMP}}; default: now. */
   date?: Date;
   /** Print the title page (Highland's print option, on by default). */
@@ -71,6 +73,8 @@ type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
 
 /** One line box of the flow. */
 interface Line {
+  /** The script text it was printed from. */
+  range?: SourceRange;
   items: { x: number; runs: Run[] }[];
   /** Box height in points; slots used = height / pitch. */
   height: number;
@@ -116,7 +120,11 @@ export function layoutManuscript(doc: Document, options: ManuscriptOptions = {})
   for (const p of first.body) for (const { line } of p.lines) if (line.heading) pagesOf.set(line.heading.id, p.number);
   const second = run(doc, options, pagesOf);
   const pages: Page[] = [];
-  if (doc.titlePage && options.titlePage !== false) pages.push(titlePage(doc.titlePage.fields, second.ctx));
+  if (doc.titlePage && options.titlePage !== false) {
+    const title = titlePage(doc.titlePage.fields, second.ctx);
+    for (const it of title.items) it.source = 0;
+    pages.push(title);
+  }
   pages.push(...second.pages);
   return { width: MANUSCRIPT.width, height: MANUSCRIPT.height, pages };
 }
@@ -128,7 +136,7 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
   // with two and print one; ManuscriptStart2 starts with one and prints none).
   const leading = Math.max(0, (/^(?:[ \t]*\r?\n)*/.exec(doc.source)![0].match(/\n/g) ?? []).length - 1);
   const units: Unit[] = Array.from({ length: leading }, () => ({ kind: "line" as const, line: { items: [], height: M.pitch, ascent: M.ascent, opens: true, empty: true } }));
-  units.push(...toUnits(options.elements ?? doc.elements, doc.source, ctx, { hasTitle: doc.titlePage !== null, printedBefore: leading > 0, image: options.image, tocPages, quoteChars: options.highlandQuirks ? MANUSCRIPT.chars : MANUSCRIPT.quote.chars }));
+  units.push(...toUnits(options.elements ?? doc.elements, doc.source, ctx, { hasTitle: doc.titlePage !== null, printedBefore: leading > 0, image: options.image, sourceOf: options.sourceOf ?? ((e) => e.span), tocPages, quoteChars: options.highlandQuirks ? MANUSCRIPT.chars : MANUSCRIPT.quote.chars }));
 
   let header: PageTextDirective | null = null;
   let footer: PageTextDirective | null = null;
@@ -222,11 +230,15 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
   }
 
   const last = options.highlandQuirks ? body.length : (body.at(-1)?.number ?? 0);
+  const printed: { range: SourceRange | undefined; items: PlacedText[] }[] = [];
   const pages: Page[] = body.map((p) => {
     const items: PlacedText[] = [];
     const graphics: Graphic[] = [];
     for (const { line, top } of p.lines) {
-      for (const it of line.items) if (it.runs.length) items.push({ x: it.x, y: round(top + line.ascent), runs: it.runs, highlightBox: M.highlight });
+      const placed: PlacedText[] = [];
+      for (const it of line.items) if (it.runs.length) placed.push({ x: it.x, y: round(top + line.ascent), runs: it.runs, highlightBox: M.highlight });
+      if (placed.length) printed.push({ range: line.range, items: placed });
+      items.push(...placed);
       if (line.graphics) graphics.push(...line.graphics(top));
     }
     const fill = (section: string) => (parts: PageTextPart[] | null) =>
@@ -237,6 +249,7 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
     if (p.footer && !p.footer.off) items.push(...pageText(p.footer.slots, fill(p.sectionEnd), M.footer));
     return { number: p.number, items, ...(graphics.length ? { graphics } : {}) };
   });
+  assignSources(printed);
   return { body, pages, ctx };
 }
 
@@ -250,6 +263,7 @@ interface UnitOptions {
   /** Empty lines already opened the first page. */
   printedBefore: boolean;
   image: ((src: string) => Uint8Array | null) | undefined;
+  sourceOf: (e: Element) => SourceRange;
   tocPages: Map<number, number>;
   quoteChars: number;
 }
@@ -440,6 +454,8 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         break; // notes, synopses, link definitions: not printed
     }
     if (out.slice(before).some((u) => u.kind === "line")) afterBreak = false;
+    const range = o.sourceOf(e);
+    for (const u of out.slice(before)) if (u.kind === "line") u.line.range = range;
     // Images: a paragraph holding only an image prints the image, centred, 1 pt per pixel.
     if (e.kind === "paragraph") {
       const img = e.inline.length === 1 && e.inline[0]!.kind === "image" ? e.inline[0] : null;

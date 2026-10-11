@@ -21,6 +21,8 @@ export interface PlacedText {
   x: number;
   y: number;
   runs: Run[];
+  /** Offset in the script's source this line was printed from (for scroll sync and click-to-jump). */
+  source?: number;
   /** Highlight box relative to the baseline: top offset and height (default: the screenplay's -9.5, 12.5). */
   highlightBox?: { top: number; height: number; color: string };
 }
@@ -49,4 +51,30 @@ export const CHAR = 7.2;
 
 export function runsText(runs: Run[]): string {
   return runs.map((r) => r.text).join("");
+}
+
+/** Where in the script a block of printed lines comes from. */
+export interface SourceRange {
+  start: number;
+  end: number;
+}
+
+/**
+ * Gives every printed line a source offset: consecutive lines from the same range (one element,
+ * maybe split across pages) share it out by line, so a long paragraph's middle maps to its middle.
+ */
+export function assignSources(lines: { range: SourceRange | undefined; items: PlacedText[] }[]): void {
+  for (let i = 0; i < lines.length; ) {
+    const range = lines[i]!.range;
+    let j = i + 1;
+    while (j < lines.length && lines[j]!.range === range) j++;
+    if (range) {
+      const n = j - i;
+      for (let k = 0; k < n; k++) {
+        const offset = range.start + Math.floor(((range.end - range.start) * k) / n);
+        for (const it of lines[i + k]!.items) it.source = offset;
+      }
+    }
+    i = j;
+  }
 }

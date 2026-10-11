@@ -24,6 +24,7 @@ export function registerPreview(context: vscode.ExtensionContext, store: BundleS
       if (preview && doc) preview.follow(doc);
     }),
     vscode.workspace.onDidChangeTextDocument((e) => preview?.changed(e.document, false)),
+    vscode.window.onDidChangeTextEditorVisibleRanges((e) => preview?.editorScrolled(e.textEditor)),
     vscode.workspace.onDidSaveTextDocument((d) => preview?.changed(d, true)),
     { dispose: store.onExternalChange((bundle) => preview?.bundleChanged(bundle)) },
     { dispose: () => preview?.dispose() },
@@ -43,6 +44,9 @@ class Preview {
   #timer: NodeJS.Timeout | undefined;
   #version = 0;
   #ready = false;
+  #posted: vscode.TextDocument | undefined;
+  /** Until this time, editor scrolling is the preview's own doing and is not sent back. */
+  #quietUntil = 0;
   readonly #disposed = new vscode.EventEmitter<void>();
   readonly onDispose = this.#disposed.event;
 
@@ -59,7 +63,7 @@ class Preview {
       clearTimeout(this.#timer);
       this.#disposed.fire();
     });
-    this.#panel.webview.onDidReceiveMessage((msg: { type: string; template?: string; message?: string }) => {
+    this.#panel.webview.onDidReceiveMessage((msg: { type: string; template?: string; message?: string; offset?: number }) => {
       if (msg.type === "ready") {
         this.#ready = true;
         void this.#update();
@@ -69,7 +73,9 @@ class Preview {
           () => this.#update(),
           (e: unknown) => void vscode.window.showErrorMessage(`Could not save the template: ${(e as Error).message}`),
         );
-      } else if (msg.type === "export" && this.#doc) void vscode.commands.executeCommand("highwater.exportPdf", this.#doc.uri);
+      } else if (msg.type === "reveal" && typeof msg.offset === "number") void this.#reveal(msg.offset, false);
+      else if (msg.type === "jump" && typeof msg.offset === "number") void this.#reveal(msg.offset, true);
+      else if (msg.type === "export" && this.#doc) void vscode.commands.executeCommand("highwater.exportPdf", this.#doc.uri);
       else if (msg.type === "error") void vscode.window.showErrorMessage(`Preview: ${msg.message}`);
     });
   }
@@ -94,6 +100,26 @@ class Preview {
     this.#timer = setTimeout(() => void this.#update(), saved ? 0 : 1000);
   }
 
+  /** Editor scrolled: move the preview to the same place (the webview ignores it when sync is off). */
+  editorScrolled(editor: vscode.TextEditor): void {
+    if (editor.document !== this.#doc || Date.now() < this.#quietUntil) return;
+    const top = editor.visibleRanges[0];
+    if (top) void this.#panel.webview.postMessage({ type: "scrollTo", offset: editor.document.offsetAt(top.start) });
+  }
+
+  /** Preview scrolled or clicked: scroll the editor there, or (jump) put the cursor there too. */
+  async #reveal(offset: number, jump: boolean): Promise<void> {
+    const doc = this.#doc;
+    if (!doc) return;
+    const pos = doc.positionAt(offset);
+    let editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
+    if (jump) editor = await vscode.window.showTextDocument(doc, { ...(editor?.viewColumn ? { viewColumn: editor.viewColumn } : {}), preserveFocus: false });
+    if (!editor) return;
+    if (jump) editor.selection = new vscode.Selection(pos, pos);
+    this.#quietUntil = Date.now() + 400;
+    editor.revealRange(new vscode.Range(pos, pos), jump ? vscode.TextEditorRevealType.InCenterIfOutsideViewport : vscode.TextEditorRevealType.AtTop);
+  }
+
   bundleChanged(bundle: string): void {
     if (this.#doc && bundleOf(this.#doc) === bundle) this.changed(this.#doc, true);
   }
@@ -114,7 +140,11 @@ class Preview {
         void this.#panel.webview.postMessage({ type: "empty", message: "Plain-text documents have no print template to preview." });
         return;
       }
-      void this.#panel.webview.postMessage({ type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, pages: rendered.pages, problems: rendered.problems });
+      const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
+      const top = editor?.visibleRanges[0];
+      const at = top ? doc.offsetAt(top.start) : null;
+      void this.#panel.webview.postMessage({ type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, pages: rendered.pages, problems: rendered.problems, anchors: rendered.anchors, at, fresh: this.#posted !== doc });
+      this.#posted = doc;
     } catch (error) {
       if (version === this.#version) void this.#panel.webview.postMessage({ type: "empty", message: `Could not lay out the document: ${(error as Error).message}` });
     }
@@ -134,7 +164,7 @@ body { display: flex; flex-direction: column; background: var(--vscode-editorWid
 #bar button { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); border: none; padding: 3px 10px; cursor: pointer; }
 #status { margin-left: auto; color: var(--vscode-descriptionForeground); }
 #pages { flex: 1; overflow: auto; padding: 16px 0; }
-.page { margin: 0 auto 16px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,.4); position: relative; }
+.page { margin: 0 auto 16px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,.4); position: relative; cursor: text; }
 .page canvas { display: block; width: 100%; height: 100%; }
 #message { padding: 24px; color: var(--vscode-descriptionForeground); }
 </style></head>
@@ -142,6 +172,7 @@ body { display: flex; flex-direction: column; background: var(--vscode-editorWid
 <div id="bar">
   <label>Template <select id="template"></select></label>
   <select id="zoom"><option value="fit">Fit width</option><option value="1">100%</option><option value="1.5">150%</option><option value="0.75">75%</option></select>
+  <label title="Keep the preview and the editor at the same place"><input type="checkbox" id="sync" checked> Sync</label>
   <button id="export">Export PDF…</button>
   <span id="status">Loading…</span>
 </div>

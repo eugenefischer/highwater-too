@@ -3,17 +3,14 @@ import { dirname, join, resolve } from "node:path";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
-import { exportManuscript, exportScreenplay, loadImages } from "./pdf-export.ts";
+import { exportManuscript, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
 export const TEMPLATES = ["Screenplay", "Manuscript"] as const;
 export type Template = (typeof TEMPLATES)[number];
 
-export interface Rendered {
-  pdf: Uint8Array;
-  pages: number;
-  problems: string[];
+export interface Rendered extends ExportResult {
   template: Template;
 }
 

@@ -1,6 +1,6 @@
 import { parseInline, seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
 import { plain, sentenceEnds, sliceRuns, toRuns, trimStartRuns, wrapRuns, type InlineContext } from "./text.ts";
-import { CHAR, type Layout, type Page, type PlacedText, type Run } from "./types.ts";
+import { assignSources, CHAR, type Layout, type Page, type PlacedText, type Run, type SourceRange } from "./types.ts";
 
 /**
  * Highland 2's Screenplay template on US Letter, measured from its PDFs (see the spec's
@@ -54,6 +54,8 @@ interface OpenPage {
 export interface ScreenplayOptions {
   /** Elements to print (after includes are merged); default: the document's own. */
   elements?: Element[];
+  /** Where an element sits in the script being edited (included elements: their include line); default: its span. */
+  sourceOf?: (e: Element) => SourceRange;
   /** For {{TIMESTAMP}}; default: now. */
   date?: Date;
   /** Print the title page (Highland's print option, on by default). */
@@ -62,12 +64,15 @@ export interface ScreenplayOptions {
 
 /** One line slot on the page: text items at their x positions. */
 interface Row {
+  /** The script text it was printed from. */
+  range?: SourceRange | undefined;
   items: { x: number; runs: Run[] }[];
 }
 
 /** A unit of the flow: an element's rows plus how it joins the page. */
 interface Block {
   kind: Element["kind"] | "directives";
+  range?: SourceRange | undefined;
   rows: Row[];
   /** Blank lines before it, unless it starts a page. */
   space: number;
@@ -98,7 +103,7 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
   // Measured (StartTest1 vs StartTest2): when the text starts with an empty line, directive lines
   // at the top of the first page print as an empty line instead of vanishing.
   const leadingBlank = /^[ \t]*\r?\n/.test(doc.source);
-  const blocks = toBlocks(options.elements ?? doc.elements, doc.source, ctx, leadingBlank);
+  const blocks = toBlocks(options.elements ?? doc.elements, doc.source, ctx, leadingBlank, options.sourceOf ?? ((e) => e.span));
   const pages: Page[] = [];
 
   if (doc.titlePage && options.titlePage !== false) pages.push(titlePage(doc.titlePage.fields, ctx));
@@ -176,6 +181,7 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
       continue;
     }
     for (;;) {
+      tag(b.rows, b.range);
       let p = current();
       const space = p.content ? b.space : 0;
       const available = capacity(p) - p.rows.length - space;
@@ -194,8 +200,9 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
       const room = lastLine ? available - 1 : available;
       const split = p.content && room > 0 ? b.split?.(room) : null;
       if (split) {
-        push(p, split.head, space, true);
+        push(p, tag(split.head, b.range), space, true);
         newPage();
+        split.tail.range = b.range;
         b = split.tail;
         continue;
       }
@@ -206,8 +213,9 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
       // Taller than an empty page: split anywhere it can, else cut at the page end.
       const forced = b.split?.(available);
       if (forced) {
-        push(p, forced.head, 0, true);
+        push(p, tag(forced.head, b.range), 0, true);
         newPage();
+        forced.tail.range = b.range;
         b = forced.tail;
         continue;
       }
@@ -221,11 +229,15 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
 
   if (page !== null) (page as OpenPage).footer = footer;
   const last = body.at(-1)?.number ?? 0;
+  const printed: { range: SourceRange | undefined; items: PlacedText[] }[] = [];
   for (const p of body) {
     const items: PlacedText[] = [];
     p.rows.forEach((row, k) => {
       if (!row) return;
-      for (const it of row.items) if (it.runs.length) items.push({ x: it.x, y: S.firstLineY + k * S.lineHeight, runs: it.runs });
+      const line: PlacedText[] = [];
+      for (const it of row.items) if (it.runs.length) line.push({ x: it.x, y: S.firstLineY + k * S.lineHeight, runs: it.runs });
+      if (line.length) printed.push({ range: row.range, items: line });
+      items.push(...line);
     });
     const fill = (parts: PageTextPart[] | null) => (parts ? parts.map((t) => (t.kind === "text" ? t.text : t.kind === "page" ? String(p.number) : t.kind === "pageCount" ? String(last) : p.section)).join("") : "");
     for (const [d, pos] of [
@@ -239,7 +251,14 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
     if (p.header === null && p.number >= 2) items.push(...pageText({ left: null, center: null, right: [{ kind: "text", text: `${p.number}.` }] }, fill, S.header));
     pages.push({ number: p.number, items });
   }
+  assignSources(printed);
+  for (const it of pages[0]?.number === null ? pages[0].items : []) it.source = 0;
   return { width: S.width, height: S.height, pages };
+}
+
+function tag(rows: Row[], range: SourceRange | undefined): Row[] {
+  for (const r of rows) r.range ??= range;
+  return rows;
 }
 
 /** The fewest rows a block needs on a page: all of it, or its smallest allowed first part. */
@@ -269,7 +288,7 @@ export function pageText(slots: PageTextSlots, fill: (p: PageTextPart[] | null) 
 // ---------------------------------------------------------------------------------------------
 // Elements to blocks
 
-function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadingBlank: boolean): Block[] {
+function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadingBlank: boolean, sourceOf: (e: Element) => SourceRange): Block[] {
   const S = SCREENPLAY;
   const out: Block[] = [];
   const at = (x: number, runs: Run[]): Row => ({ items: [{ x, runs }] });
@@ -285,6 +304,9 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
     // plus its own blank (Astounding: two empty lines before ">**END**<" print as three).
     const added = out[before];
     if (added && added.rows.length > 0 && !added.filler && e.span.start <= source.length) added.space += 2 * extraBlankLines(source, e.span.start);
+    const first = sourceOf(e);
+    const range = nextIndex > i ? { start: first.start, end: sourceOf(elements[nextIndex]!).end } : first;
+    for (const b of out.slice(before)) b.range = range;
     i = nextIndex;
   }
   return out;

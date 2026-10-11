@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutScreenplay, renderPdf } from "@highwater/pdf";
+import { layoutManuscript, layoutScreenplay, renderPdf, type Layout, type SourceRange } from "@highwater/pdf";
+import type { Element, MergedElement } from "@highwater/parser";
 
 export interface ExportOptions {
   /** The script text (the editor's, so unsaved edits are included). */
@@ -31,27 +32,29 @@ export const includeLoader: IncludeLoader = async (path, from) => {
 };
 
 /** Lays out and renders a screenplay, with {{INCLUDE}} files merged in. */
-export async function exportScreenplay(options: ExportOptions): Promise<{ pdf: Uint8Array; pages: number; problems: string[] }> {
+export async function exportScreenplay(options: ExportOptions): Promise<ExportResult> {
   const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
   const merged = await resolveIncludes(root, "fountain", includeLoader);
   const doc = parse(options.text, { mode: "fountain" });
   const layout = layoutScreenplay(doc, {
     elements: merged.elements.map((m) => m.element),
+    sourceOf: sourceMap(merged.elements, root),
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
-  return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message) };
+  return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
 }
 
 /** Lays out and renders a manuscript, with {{INCLUDE}} files merged in. */
-export async function exportManuscript(options: ManuscriptExportOptions): Promise<{ pdf: Uint8Array; pages: number; problems: string[] }> {
+export async function exportManuscript(options: ManuscriptExportOptions): Promise<ExportResult> {
   const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
   const merged = await resolveIncludes(root, "markdown", includeLoader);
   const doc = parse(options.text, { mode: "markdown" });
   const layout = layoutManuscript(doc, {
     elements: merged.elements.map((m) => m.element),
+    sourceOf: sourceMap(merged.elements, root),
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     ...(options.image ? { image: options.image } : {}),
@@ -59,7 +62,7 @@ export async function exportManuscript(options: ManuscriptExportOptions): Promis
   const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");
   const title = cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
-  return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message) };
+  return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
 }
 
 /** Reads every image a manuscript names, so layout (which is synchronous) can look them up. */
@@ -70,4 +73,36 @@ export async function loadImages(text: string, read: (src: string) => Promise<Ui
     if (!found.has(src)) found.set(src, await read(src).catch(() => null));
   }
   return (src) => found.get(src) ?? null;
+}
+
+export interface ExportResult {
+  pdf: Uint8Array;
+  pages: number;
+  problems: string[];
+  /** Printed lines as [page index, baseline y, source offset] triples, in print order. */
+  anchors: number[];
+}
+
+/** Elements from included files map to the include line in the script that pulled them in. */
+function sourceMap(elements: MergedElement[], root: IncludeFile): (e: Element) => SourceRange {
+  const map = new Map<Element, SourceRange>();
+  let last: SourceRange = { start: 0, end: 0 };
+  for (const m of elements) {
+    if (m.file === root || m.file.id === root.id) last = m.element.span;
+    map.set(m.element, m.file === root || m.file.id === root.id ? m.element.span : { start: last.start, end: last.start });
+  }
+  return (e) => map.get(e) ?? e.span;
+}
+
+function anchors(layout: Layout): number[] {
+  const out: number[] = [];
+  layout.pages.forEach((p, i) => {
+    let lastY = -1;
+    for (const it of p.items) {
+      if (it.source === undefined || it.y === lastY) continue;
+      out.push(i, it.y, it.source);
+      lastY = it.y;
+    }
+  });
+  return out;
 }

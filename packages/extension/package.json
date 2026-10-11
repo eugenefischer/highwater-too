@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
