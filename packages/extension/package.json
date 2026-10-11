@@ -1,11 +1,20 @@
 {
   "name": "highwater-too",
   "displayName": "Highwater Too",
-  "description": "Edit .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.22",
+  "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
+  "version": "0.1.0",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eugenefischer/highwater-too"
+  },
+  "bugs": {
+    "url": "https://github.com/eugenefischer/highwater-too/issues"
+  },
+  "homepage": "https://github.com/eugenefischer/highwater-too#readme",
   "type": "module",
   "engines": {
     "vscode": "^1.100.0"
@@ -13,10 +22,26 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "highland",
+    "highland 2",
+    "fountain",
+    "screenplay",
+    "screenwriting",
+    "manuscript",
+    "writing",
+    "pdf"
+  ],
   "main": "./dist/extension.cjs",
   "activationEvents": [
     "onFileSystem:highland"
   ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "package": "npm run build && node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\" && vsce package --no-dependencies --out ../../highwater-too.vsix",
+    "build:e2e": "node scripts/build.mjs --e2e",
+    "test:e2e": "npm run build:e2e && node --experimental-strip-types --no-warnings e2e/run.ts"
+  },
   "contributes": {
     "commands": [
       {
@@ -1285,12 +1310,6 @@
       }
     ]
   },
-  "scripts": {
-    "build": "node scripts/build.mjs",
-    "package": "npm run build && vsce package --no-dependencies --skip-license --out ../../highwater-too.vsix",
-    "build:e2e": "node scripts/build.mjs --e2e",
-    "test:e2e": "npm run build:e2e && node --experimental-strip-types --no-warnings e2e/run.ts"
-  },
   "devDependencies": {
     "@types/vscode": "^1.100.0",
     "@vscode/test-electron": "^3.1.0",
@@ -1302,10 +1321,6 @@
     "@highwater/parser": "*",
     "@highwater/pdf": "*",
     "@highwater/history": "*"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/eugenefischer/highwater-too"
   },
   "imports": {
     "#standard-fonts/*": "./dist/standard-fonts/*.cjs"

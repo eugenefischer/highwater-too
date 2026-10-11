@@ -2,7 +2,7 @@
 
 A VS Code extension that replaces the discontinued Highland 2: it opens, edits and saves `.highland` files safely, gives screenplays and manuscripts a Highland-style workspace, exports PDFs that match Highland's, and keeps a git writing history as a record of authorship.
 
-**Status:** M0–M6 done (bundle I/O, parser, editing, screenplay and manuscript PDF, workspace); M7 (writing history) built and in testing; M8 (release) next. See the spec for decisions and the build plan.
+**Status:** version 0.1.0, the MVP release (M8): M0–M7 built; the writing history is in real-world testing. See the spec for decisions and the build plan.
 
 ## Plain .fountain, .md and .txt files
 
@@ -53,7 +53,10 @@ HIGHWATER_PRIVATE_FIXTURES=… npm test   # also runs the tests on the private H
 npm run test:e2e -w highwater-too       # end-to-end tests in a downloaded VS Code
 npm run package -w highwater-too        # builds highwater-too.vsix
 npm run pdf-compare -- expected.pdf actual.pdf [--tolerance 1] [--pixels]
+node --experimental-strip-types tools/scripts/check-documents.ts <folder>   # release check: every .highland file opens, saves unchanged and lays out
 ```
+
+**Releasing:** set the version in `packages/extension/package.json`, add it to `packages/extension/CHANGELOG.md`, commit, then tag and push (`git tag v0.1.0 && git push origin v0.1.0`). The Release workflow tests, builds the `.vsix` and attaches it to a GitHub Release. The extension's own page text is `packages/extension/README.md`.
 
 The pixel comparison needs poppler's `pdftoppm` (`brew install poppler`); its tests are skipped without it.
 

@@ -1,0 +1,33 @@
+name: Release
+
+# Pushing a version tag (v0.1.0, …) builds the .vsix and attaches it to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Check the tag matches the extension's version
+        run: |
+          version=$(node -p "require('./packages/extension/package.json').version")
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
+      - run: npm run package -w highwater-too
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv highwater-too.vsix "highwater-too-${GITHUB_REF_NAME#v}.vsix"
+          gh release create "$GITHUB_REF_NAME" "highwater-too-${GITHUB_REF_NAME#v}.vsix" --title "Highwater Too ${GITHUB_REF_NAME#v}" --notes-file packages/extension/CHANGELOG.md

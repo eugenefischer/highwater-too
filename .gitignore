@@ -7,3 +7,5 @@ coverage/
 .DS_Store
 # Comparison output
 tools/pdf-compare/output/
+# Copied from the repository root when packaging
+packages/extension/LICENSE
