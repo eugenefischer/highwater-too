@@ -125,7 +125,9 @@ export class History {
       if (parent && (await this.#revParse(`${parent}^{tree}`)) === tree) return null;
       const before = parent ? await this.#read(parent, files.scriptName) : "";
       const message = commitMessage(kind, date, before, files.script);
-      const hash = await this.#commitTree(tree, parent, message, date);
+      // The document's ID rides along as a trailer, so another computer that pulls this branch
+      // can tell which document it belongs to.
+      const hash = await this.#commitTree(tree, parent, `${message}\n\n${ID_TRAILER}: ${id}`, date);
       // Compare-and-swap: fails rather than losing a commit if the branch moved meanwhile.
       await git(this.repo, ["update-ref", ref, hash, parent ?? "0".repeat(40)]);
       return { hash, date, message };
@@ -198,14 +200,43 @@ export class History {
     const entries = Object.entries(index.documents);
     const byPath = entries.find(([, e]) => e.paths.at(-1) === doc.path) ?? entries.find(([, e]) => e.paths.includes(doc.path));
     if (byPath) return byPath[0];
-    let best: { id: string; score: number } | null = null;
+    // Branches pulled from another computer, not yet in this computer's index.
+    const others = await this.#unindexed(index);
+    if (doc.id) {
+      const short = shortId(doc.id);
+      const mine = others.find((o) => o.id === doc.id) ?? others.find((o) => !o.id && branchShortId(o.branch) === short);
+      if (mine) return adopt(index, doc.id, mine.branch);
+    }
+    let best: { id: string | null; branch: string | null; score: number } | null = null;
     for (const [id, e] of entries) {
       const head = await this.#revParse(`refs/heads/${e.branch}`);
       if (!head) continue;
       const score = similarity(doc.text, await this.scriptAt(head));
-      if (score >= MATCH_THRESHOLD && (!best || score > best.score)) best = { id, score };
+      if (score >= MATCH_THRESHOLD && (!best || score > best.score)) best = { id, branch: null, score };
     }
-    return best?.id ?? null;
+    for (const o of others) {
+      const score = similarity(doc.text, await this.scriptAt(`refs/heads/${o.branch}`));
+      if (score >= MATCH_THRESHOLD && (!best || score > best.score)) best = { id: null, branch: o.branch, score };
+    }
+    if (!best) return null;
+    if (best.branch === null) return best.id;
+    const pulled = others.find((o) => o.branch === best.branch)!;
+    return adopt(index, pulled.id ?? doc.id ?? randomUUID(), best.branch);
+  }
+
+  /** Work branches with no index entry (pulled from a mirror), with the ID their latest commit names. */
+  async #unindexed(index: Index): Promise<{ branch: string; id: string | null }[]> {
+    if (!existsSync(this.repo)) return [];
+    const known = new Set(Object.values(index.documents).map((e) => e.branch));
+    const out = await git(this.repo, ["for-each-ref", `--format=%(refname)%00%(trailers:key=${ID_TRAILER},valueonly,separator=)`, "refs/heads/works/"]).catch(() => "");
+    return out
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => {
+        const [branch, id] = l.split("\0");
+        return { branch: branch!.replace(/^refs\/heads\//, ""), id: id?.trim() || null };
+      })
+      .filter((o) => !known.has(o.branch));
   }
 
   /** Creates the repository (with a README on main) and moves any per-document repos into it. */
@@ -284,8 +315,8 @@ export class History {
     const stamp = date.toISOString();
     // commit-tree ignores commit.gpgSign (it is plumbing): honour the user's choice ourselves.
     const sign = (await git(this.repo, ["config", "--bool", "commit.gpgsign"]).catch(() => "")).trim() === "true";
-    const args = ["commit-tree", tree, ...(parent ? ["-p", parent] : []), ...(sign ? ["-S"] : []), "-m", message];
-    return (await git(this.repo, args, { env: { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp } })).trim();
+    const args = ["commit-tree", tree, ...(parent ? ["-p", parent] : []), ...(sign ? ["-S"] : []), "-F", "-"];
+    return (await git(this.repo, args, { input: message, env: { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp } })).trim();
   }
 
   async #revParse(rev: string): Promise<string | null> {
@@ -332,6 +363,25 @@ function fileTitle(path: string): string {
   return name.replace(/\.(highland|fountain|spmd|md|markdown|txt)$/i, "") || "Untitled";
 }
 
+/** The commit trailer naming the document a work branch belongs to. */
+export const ID_TRAILER = "Highwater-Document";
+
+function shortId(id: string): string {
+  return id.replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "doc";
+}
+
+/** The ID part of "works/<name>-<id8>" or "works/<name>-<id8>-<n>". */
+function branchShortId(branch: string): string | null {
+  return /-([A-Za-z0-9]{8})(?:-\d+)?$/.exec(branch)?.[1] ?? null;
+}
+
+/** Puts a pulled branch in the index under `id` (in memory; resolve saves it). */
+function adopt(index: Index, id: string, branch: string): string {
+  const title = branch.replace(/^works\//, "").replace(/-[A-Za-z0-9]{8}(?:-\d+)?$/, "").replace(/-/g, " ") || "Untitled";
+  index.documents[id] = { branch, title, paths: [] };
+  return id;
+}
+
 /** "works/<name>-<first 8 of the ID>": readable, unique, and never renamed afterwards. */
 function branchName(title: string, id: string, index: Index): string {
   const slug =
@@ -341,7 +391,7 @@ function branchName(title: string, id: string, index: Index): string {
       .replace(/[^A-Za-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 40) || "untitled";
-  const short = id.replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "doc";
+  const short = shortId(id);
   const taken = new Set(Object.values(index.documents).map((e) => e.branch));
   let name = `works/${slug}-${short}`;
   for (let n = 2; taken.has(name); n++) name = `works/${slug}-${short}-${n}`;

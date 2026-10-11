@@ -6,6 +6,7 @@
 - Markers: Insert Marker (⌃M) and Go to Next Marker (⌃⌥M).
 - Navigator: drag scenes, sections and headings to reorder the text.
 - Syntax Cheat Sheet, from the Navigator's title bar or the Command Palette.
+- Writing history mirror now pulls as well as pushes: other computers' saves come in on start-up, when a document is opened (at most once a minute) and every ten minutes; histories are matched to documents by ID, then by text. **Sync Writing History Now** replaces Push Writing History Now.
 
 ## 0.1.2
 

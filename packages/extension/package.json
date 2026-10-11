@@ -275,7 +275,7 @@
       },
       {
         "command": "highwater.pushHistoryNow",
-        "title": "Push Writing History Now",
+        "title": "Sync Writing History Now",
         "category": "Highwater Too"
       },
       {

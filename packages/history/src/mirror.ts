@@ -57,6 +57,10 @@ export type PushResult =
   | { ok: true; pushed: number }
   | { ok: false; missing: boolean; message: string };
 
+export type PullResult =
+  | { ok: true; updated: string[] }
+  | { ok: false; missing: boolean; message: string };
+
 const REMOTE = "mirror";
 
 /**
@@ -102,6 +106,30 @@ export class Mirror {
     }
   }
 
+  /**
+   * Brings in what other computers pushed: every branch on the remote is fetched; a branch this
+   * computer lacks is created, one it is behind on moves forward, and one that both have moved is
+   * joined with a merge commit (keeping this computer's text). Nothing local is ever lost.
+   * Returns the branches that changed here.
+   */
+  async pull(): Promise<PullResult> {
+    const repo = this.history.repo;
+    try {
+      await this.#remote();
+      await this.#git(["fetch", "-q", "--prune", REMOTE, "+refs/heads/*:refs/mirror/*"]);
+      const remote = (await git(repo, ["for-each-ref", "--format=%(refname)", "refs/mirror/"])).split("\n").filter(Boolean).map((r) => r.replace(/^refs\/mirror\//, ""));
+      const updated: string[] = [];
+      for (const branch of remote) if (await this.#join(branch)) updated.push(branch);
+      return { ok: true, updated };
+    } catch (error) {
+      const message = (error as Error).message;
+      // A remote with nothing pushed yet has no branches to fetch: nothing to pull.
+      if (/couldn't find remote ref|no matching remote head/i.test(message)) return { ok: true, updated: [] };
+      const missing = /not found|does not appear to be a git repository|repository .* does not exist|could not read from remote|no such file or directory|not a git repository/i.test(message);
+      return { ok: false, missing, message: shorten(message) };
+    }
+  }
+
   /** Creates the remote repository over SSH (`git init --bare`), for servers without an API. */
   async createOverSsh(): Promise<void> {
     const r = parseRemote(this.url);
@@ -119,21 +147,38 @@ export class Mirror {
 
   /** Joins a branch that moved on the remote: a merge commit whose text is this computer's. */
   async #mergeRemote(branch: string): Promise<void> {
-    const repo = this.history.repo;
     await this.#git(["fetch", "-q", REMOTE, `+refs/heads/${branch}:refs/mirror/${branch}`]);
-    const local = (await git(repo, ["rev-parse", `refs/heads/${branch}`])).trim();
+    await this.#join(branch);
+  }
+
+  /** Brings the fetched refs/mirror/<branch> into refs/heads/<branch>; true when that changed it. */
+  async #join(branch: string): Promise<boolean> {
+    const repo = this.history.repo;
     const remote = (await git(repo, ["rev-parse", `refs/mirror/${branch}`])).trim();
+    const local = (await git(repo, ["rev-parse", "--verify", "-q", `refs/heads/${branch}`]).catch(() => "")).trim();
+    if (!local) {
+      // Saved only on another computer so far: take it as it is.
+      await git(repo, ["update-ref", `refs/heads/${branch}`, remote, "0".repeat(40)]);
+      return true;
+    }
+    if (local === remote) return false;
     const base = (await git(repo, ["merge-base", local, remote]).catch(() => "")).trim();
-    if (base === remote) return; // we are ahead after all
+    if (base === remote) return false; // we are ahead
     if (base === local) {
       // The remote is simply ahead (saved on another computer): take it, nothing of ours is lost.
       await git(repo, ["update-ref", `refs/heads/${branch}`, remote, local]);
-      return;
+      return true;
+    }
+    // main on a new computer: only the README commit, unrelated to the remote's: take the remote's.
+    if (branch === "main" && !base && !(await git(repo, ["rev-parse", "--verify", "-q", `${local}^`]).catch(() => "")).trim()) {
+      await git(repo, ["update-ref", `refs/heads/${branch}`, remote, local]);
+      return true;
     }
     const tree = (await git(repo, ["rev-parse", `${local}^{tree}`])).trim();
     const stamp = new Date().toISOString();
     const merge = (await git(repo, ["commit-tree", tree, "-p", local, "-p", remote, "-m", "Join the history saved on another computer"], { env: { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp } })).trim();
     await git(repo, ["update-ref", `refs/heads/${branch}`, merge, local]);
+    return true;
   }
 
   async #git(args: string[]): Promise<string> {

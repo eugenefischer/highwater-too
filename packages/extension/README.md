@@ -47,7 +47,7 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 - One repository for all your writing, in your system's application-data folder (on a Mac, `~/Library/Application Support/Highwater Too/History`); one branch per work, so one work's history can be shared without the others. **Change Writing History Location…** moves it.
 - ⌘S records at once; autosaves at most every five minutes. Each record says how many words changed.
 - **Writing History** panel: click a save to compare it with the text now. **Export Writing History…** writes one work's history to a file anyone can open with `git clone`.
-- **Set Up History Mirror…** (optional) pushes the history to any git remote after saves, never overwriting it.
+- **Set Up History Mirror…** (optional) keeps the history in step with any git remote: it pushes after saves, and pulls other computers' saves when VS Code starts, when you open a document (at most once a minute) and every ten minutes, so on a second computer the Writing History panel shows a work's earlier saves before you save it there. Nothing is ever overwritten: when two computers both saved a work, the histories are joined. Use the same mirror address on each computer. **Sync Writing History Now** (in the Writing History panel's menu) pulls and pushes at once.
 
 ## Settings
 

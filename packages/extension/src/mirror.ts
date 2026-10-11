@@ -57,6 +57,31 @@ export class HistoryMirror implements vscode.Disposable {
     return result.ok;
   }
 
+  /**
+   * Brings in what other computers pushed (their saves of shared works, and works only they have),
+   * so the Writing History panel shows them before this computer saves. Returns the branches that
+   * changed. Quiet on failure: offline is normal, and pushing reports problems.
+   */
+  async pull(): Promise<string[]> {
+    const url = this.url;
+    if (!url) return [];
+    const h = this.history();
+    const result = await h.exclusive(() => new Mirror(h, url, () => this.#auth(url)).pull());
+    this.lastPull = Date.now();
+    if (!result.ok) return [];
+    return result.updated;
+  }
+
+  /** When the last pull ran (ms), to space them out. */
+  lastPull = 0;
+
+  /** Pull, then push: what "Sync Writing History Now" does. */
+  async sync(interactive = false): Promise<string[]> {
+    const updated = await this.pull();
+    await this.push(interactive);
+    return updated;
+  }
+
   /** Asks for the remote address, saves it and pushes. */
   async setUp(): Promise<void> {
     const url = await vscode.window.showInputBox({

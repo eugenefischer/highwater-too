@@ -252,9 +252,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
         void updateStatus();
       }
     }),
-    vscode.window.onDidChangeActiveTextEditor(() => {
+    vscode.window.onDidChangeActiveTextEditor((e) => {
       void updateStatus();
       view.refresh();
+      // Opening a document: bring in other computers' saves, at most once a minute.
+      if (enabled() && mirror.url && keyOf(e?.document) && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
     }),
     vscode.workspace.onWillSaveTextDocument((e) => {
       if (keyOf(e.document)) reasons.set(e.document.uri.toString(), e.reason);
@@ -282,7 +284,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.commands.registerCommand("highwater.toggleDocumentHistory", () => togglePause()),
     mirror,
     vscode.commands.registerCommand("highwater.setUpHistoryMirror", () => mirror.setUp()),
-    vscode.commands.registerCommand("highwater.pushHistoryNow", () => mirror.push(true)),
+    vscode.commands.registerCommand("highwater.pushHistoryNow", () => pulled(mirror.sync(true))),
     vscode.commands.registerCommand("highwater.exportHistory", async () => {
       const key = keyOf(vscode.window.activeTextEditor?.document);
       if (!key) {
@@ -299,8 +301,24 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.commands.registerCommand("highwater.openHistoryFolder", () => vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(historyRoot()))),
   );
   void updateStatus();
-  // Catch up on pushes that could not be made last time (offline, say).
-  setTimeout(() => void mirror.push(), 15_000);
+
+  /** After a pull: show what came in. */
+  async function pulled(work: Promise<string[]>): Promise<void> {
+    const updated = await work.catch(() => [] as string[]);
+    if (updated.length) {
+      view.refresh();
+      void updateStatus();
+    }
+  }
+  // On start-up: bring in other computers' saves, then push what could not be pushed last time
+  // (offline, say); and every ten minutes, pull again.
+  setTimeout(() => {
+    if (enabled() && mirror.url) void pulled(mirror.sync());
+  }, 15_000);
+  const timer = setInterval(() => {
+    if (enabled() && mirror.url) void pulled(mirror.pull());
+  }, 10 * 60_000);
+  context.subscriptions.push({ dispose: () => clearInterval(timer) });
 }
 
 /** "14:03" today, else "11 Oct". */
