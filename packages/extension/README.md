@@ -33,6 +33,7 @@ Click the Highwater Too icon in the activity bar (it opens by itself when you op
 
 - **Preview** (⌘E, or the button in the editor's title bar): the PDF exactly as it will export, beside the editor, updated as you type; it scrolls with the editor, and clicking a line takes you to it.
 - **Export PDF** and **Export Text** (title bar buttons): the PDF, or the text as `.fountain` or `.md` without revision marks.
+- **Export Word Document** (manuscripts; title bar button): a `.docx` laid out like the PDF, built from ordinary Word styles, a real header with page numbers, lists and tables, so it can be edited and resubmitted. Word does its own page breaks, so the page count can differ slightly from the PDF. The **Docx Font** setting (`highwater.docxFont`) chooses Courier New (the default; on every computer) or the PDF's Courier Prime, embedded in the file (shown by Word and LibreOffice, not by Pages or Google Docs).
 - **Templates:** Screenplay and Manuscript, measured against Highland 2's own PDFs; the active one is shown in the status bar (click to change it) and saved in the document as Highland 2 does. `{{HEADER}}`, `{{FOOTER}}`, `{{PAGENUMBER}}`, `{{SERIES}}`, `{{TIMESTAMP}}`, `{{TOC}}` and `{{INCLUDE}}` work. A few of Highland 2's layout quirks are fixed rather than copied: a footer's middle part is centred, `%pp` counts pages after `{{PAGENUMBER}}`, text never runs over the footer, block quotes wrap at the margin and there is no blank last page.
 
 ## Writing history
@@ -50,6 +51,7 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 |---|---|---|
 | `highwater.highlandShortcuts` | on | Highland 2's shortcuts in documents (⌘E Preview, ⌘L Live Margins, ⌘0 sidebar, ⌘1/⌘2/⌘4/⌘5 panels) instead of VS Code's. Off: Preview is ⌃⌥P and Live Margins ⌃⌥L. |
 | `highwater.showSidebarOnOpen` | on | Switch to the Highwater Too sidebar when a document is opened. |
+| `highwater.docxFont` | Courier New | Font for Export Word Document: Courier New, double-spaced, or Courier Prime embedded in the file, as in the PDF. |
 | `highwater.writingHistory` | on | Record saves in the writing history. |
 | `highwater.historyFolder` | (system default) | Where the writing history and session backups are kept. |
 | `highwater.historyRemote` | (none) | A git remote to mirror the writing history to. |

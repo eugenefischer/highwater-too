@@ -7,6 +7,8 @@ export interface InlineContext {
   date: Date;
   /** Print links blue and underlined (manuscripts); screenplays print them as plain text. */
   links?: boolean;
+  /** Addresses of reference links (`[text][name]`), by lower-case name. */
+  linkDefinitions?: Map<string, string>;
 }
 
 /**
@@ -35,7 +37,10 @@ export function toRuns(nodes: Inline[], ctx: InlineContext, style: TextStyle = {
           walk(n.children, { ...s, ...STYLE[n.style] });
           break;
         case "link":
-          walk(n.children, ctx.links ? { ...s, link: true } : s);
+          if (ctx.links) {
+            const href = n.url ?? (n.reference !== null ? ctx.linkDefinitions?.get(n.reference.toLowerCase()) : undefined);
+            walk(n.children, { ...s, link: true, ...(href ? { href } : {}) });
+          } else walk(n.children, s);
           break;
         case "directive":
           if (n.directive.kind === "series") push(String(ctx.series(n.directive)), s);
@@ -60,7 +65,7 @@ const STYLE: Record<string, TextStyle> = {
 };
 
 function sameStyle(a: TextStyle, b: TextStyle): boolean {
-  return !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.underline === !!b.underline && !!a.strike === !!b.strike && !!a.highlight === !!b.highlight && !!a.link === !!b.link;
+  return !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.underline === !!b.underline && !!a.strike === !!b.strike && !!a.highlight === !!b.highlight && !!a.link === !!b.link && a.href === b.href;
 }
 
 export function plain(runs: Run[]): string {

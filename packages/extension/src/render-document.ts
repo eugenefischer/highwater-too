@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
-import { exportManuscript, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
+import { exportManuscript, exportManuscriptDocx, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
@@ -89,9 +89,15 @@ export function registerTemplateStatus(context: vscode.ExtensionContext, store: 
 }
 
 /** Lays out and renders the editor's text (unsaved edits included) with the document's template. */
-export async function renderDocument(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template?: Template): Promise<Rendered | null> {
-  const chosen = template ?? (await templateOf(context, store, doc));
-  if (!chosen) return null;
+/** The manuscript as a Word document, laid out like its Manuscript-template PDF. */
+export async function renderDocx(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument): Promise<{ docx: Uint8Array; problems: string[] }> {
+  const { base, read } = await sources(context, store, doc);
+  const font = vscode.workspace.getConfiguration("highwater").get<string>("docxFont") === "Courier Prime" ? "Courier Prime" : "Courier New";
+  return exportManuscriptDocx({ ...base, image: await loadImages(base.text, read), font });
+}
+
+/** The text, its path, the title-page setting and an image reader, shared by the exports. */
+async function sources(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument) {
   const bundle = bundleOf(doc);
   const path = bundle ?? doc.uri.fsPath;
   let titlePage = true;
@@ -100,13 +106,20 @@ export async function renderDocument(context: vscode.ExtensionContext, store: Bu
     titlePage = settings.printOptions?.printTitlePage !== false;
   }
   const base = { text: doc.getText(), path, fontDir: join(context.extensionPath, "dist", "fonts"), titlePage };
-  if (chosen === "Screenplay") return { ...(await exportScreenplay(base)), template: chosen };
   // Images: the bundle's assets, or files next to a Markdown file.
   const read = async (src: string): Promise<Uint8Array | null> => {
     const name = safeDecode(src);
     if (bundle) return store.read(bundle, name).catch(() => null);
     return readFile(resolve(dirname(path), name)).catch(() => null);
   };
+  return { base, read };
+}
+
+export async function renderDocument(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template?: Template): Promise<Rendered | null> {
+  const chosen = template ?? (await templateOf(context, store, doc));
+  if (!chosen) return null;
+  const { base, read } = await sources(context, store, doc);
+  if (chosen === "Screenplay") return { ...(await exportScreenplay(base)), template: chosen };
   return { ...(await exportManuscript({ ...base, image: await loadImages(base.text, read) })), template: chosen };
 }
 

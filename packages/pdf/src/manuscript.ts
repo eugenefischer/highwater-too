@@ -129,6 +129,14 @@ export function layoutManuscript(doc: Document, options: ManuscriptOptions = {})
   return { width: MANUSCRIPT.width, height: MANUSCRIPT.height, pages };
 }
 
+/** The body page each heading prints on, in document order (for a {{TOC}} outside the PDF). */
+export function manuscriptHeadingPages(doc: Document, options: ManuscriptOptions = {}): number[] {
+  const { body } = run(doc, options, new Map());
+  const pages: number[] = [];
+  for (const p of body) for (const { line } of p.lines) if (line.heading) pages[line.heading.id] = p.number;
+  return pages;
+}
+
 function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, number>) {
   const M = MANUSCRIPT;
   const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true };

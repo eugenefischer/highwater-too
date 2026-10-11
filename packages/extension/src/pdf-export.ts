@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutScreenplay, renderPdf, type Layout, type SourceRange } from "@highwater/pdf";
+import { layoutManuscript, layoutScreenplay, manuscriptDocx, renderPdf, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
 import type { Element, MergedElement } from "@highwater/parser";
 
 export interface ExportOptions {
@@ -63,6 +63,24 @@ export async function exportManuscript(options: ManuscriptExportOptions): Promis
   const title = cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
   return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
+}
+
+/** A Word document of a manuscript, with {{INCLUDE}} files merged in. */
+export async function exportManuscriptDocx(options: ManuscriptExportOptions & { font: DocxFont }): Promise<{ docx: Uint8Array; problems: string[] }> {
+  const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
+  const merged = await resolveIncludes(root, "markdown", includeLoader);
+  const doc = parse(options.text, { mode: "markdown" });
+  const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");
+  const docx = manuscriptDocx(doc, {
+    elements: merged.elements.map((m) => m.element),
+    font: options.font,
+    fontDir: options.fontDir,
+    title: cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "",
+    ...(options.date ? { date: options.date } : {}),
+    ...(options.titlePage === false ? { titlePage: false } : {}),
+    ...(options.image ? { image: options.image } : {}),
+  });
+  return { docx, problems: merged.problems.map((p) => p.message) };
 }
 
 /** Reads every image a manuscript names, so layout (which is synchronous) can look them up. */

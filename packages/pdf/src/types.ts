@@ -8,6 +8,8 @@ export interface TextStyle {
   highlight?: boolean;
   /** Printed blue and underlined (manuscripts). */
   link?: boolean;
+  /** The link's address, when known (used by the .docx export; the PDF prints only the text). */
+  href?: string;
 }
 
 /** A piece of text in one style. */

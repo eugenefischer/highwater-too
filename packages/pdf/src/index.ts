@@ -8,4 +8,5 @@ export * from "./types.ts";
 export { SCREENPLAY, layoutScreenplay, type ScreenplayOptions } from "./screenplay.ts";
 export { defaultFontDir, renderPdf, type RenderOptions } from "./render.ts";
 export { plain, toRuns, wrapRuns, type InlineContext } from "./text.ts";
-export { MANUSCRIPT, imageSize, layoutManuscript, type ManuscriptOptions } from "./manuscript.ts";
+export { MANUSCRIPT, imageSize, layoutManuscript, manuscriptHeadingPages, type ManuscriptOptions } from "./manuscript.ts";
+export { manuscriptDocx, DOCX_FONTS, type DocxFont, type DocxOptions } from "./docx.ts";

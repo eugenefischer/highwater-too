@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
-import { bundleOf, renderDocument, templateOf } from "./render-document.ts";
+import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
 
@@ -36,6 +36,9 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     // Menus (the editor title button) pass the document's URI; only an explicit option sets where to save.
     vscode.commands.registerCommand("highwater.exportPdf", (resource?: unknown, options?: { target?: vscode.Uri }) =>
       exportPdf(context, store, resource instanceof vscode.Uri ? resource : undefined, options?.target),
+    ),
+    vscode.commands.registerCommand("highwater.exportDocx", (resource?: unknown, options?: { target?: vscode.Uri }) =>
+      exportDocx(context, store, resource instanceof vscode.Uri ? resource : undefined, options?.target),
     ),
   );
 }
@@ -214,6 +217,43 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
     for (const problem of result.problems) void vscode.window.showWarningMessage(problem);
     if (!target) {
       void vscode.window.showInformationMessage(`Exported ${basename(out.fsPath)} (${template} template, ${result.pages} pages).`, "Open", "Reveal in Finder").then((choice) => {
+        if (choice === "Open") void vscode.env.openExternal(out);
+        if (choice === "Reveal in Finder") void vscode.commands.executeCommand("revealFileInOS", out);
+      });
+    }
+  });
+}
+
+/** Export Word Document: manuscripts only, laid out like their PDF. */
+async function exportDocx(context: vscode.ExtensionContext, store: BundleStore, resource?: vscode.Uri, target?: vscode.Uri): Promise<void> {
+  const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? vscode.window.activeTextEditor?.document;
+  if (!doc || !doc.languageId.startsWith("highland-")) {
+    void vscode.window.showInformationMessage("Open a manuscript to export it as a Word document.");
+    return;
+  }
+  if ((await templateOf(context, store, doc)) !== "Manuscript") {
+    void vscode.window.showInformationMessage("Word export is for documents printed with the Manuscript template.");
+    return;
+  }
+  const path = bundleOf(doc) ?? doc.uri.fsPath;
+  const out =
+    target ??
+    (await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.file(path.replace(/\.(highland|md|markdown)$/i, "") + ".docx"),
+      filters: { "Word document": ["docx"] },
+      title: "Export Word Document",
+    }));
+  if (!out) return;
+  if (out.scheme !== "file" || !/\.docx$/i.test(out.fsPath)) {
+    void vscode.window.showErrorMessage(`Not exporting: ${out.toString()} is not a .docx file on disk.`);
+    return;
+  }
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Exporting ${basename(out.fsPath)}…` }, async () => {
+    const result = await renderDocx(context, store, doc);
+    await vscode.workspace.fs.writeFile(out, result.docx);
+    for (const problem of result.problems) void vscode.window.showWarningMessage(problem);
+    if (!target) {
+      void vscode.window.showInformationMessage(`Exported ${basename(out.fsPath)}.`, "Open", "Reveal in Finder").then((choice) => {
         if (choice === "Open") void vscode.env.openExternal(out);
         if (choice === "Reveal in Finder") void vscode.commands.executeCommand("revealFileInOS", out);
       });

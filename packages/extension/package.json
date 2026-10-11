@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -70,6 +70,12 @@
         "title": "Export PDF…",
         "category": "Highwater Too",
         "icon": "$(file-pdf)"
+      },
+      {
+        "command": "highwater.exportDocx",
+        "title": "Export Word Document (.docx)…",
+        "category": "Highwater Too",
+        "icon": "$(export)"
       },
       {
         "command": "highwater.export",
@@ -324,6 +330,19 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened."
+        },
+        "highwater.docxFont": {
+          "type": "string",
+          "enum": [
+            "Courier New",
+            "Courier Prime"
+          ],
+          "enumDescriptions": [
+            "On every computer; double-spaced, so pages hold a line or two more than in the PDF.",
+            "The PDF's font, embedded in the file so Word and LibreOffice show it without installing it (Pages and Google Docs do not)."
+          ],
+          "default": "Courier New",
+          "markdownDescription": "Font for **Export Word Document**."
         },
         "highwater.writingHistory": {
           "type": "boolean",
@@ -993,6 +1012,10 @@
         {
           "command": "highwater.chooseTemplate",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
+        },
+        {
+          "command": "highwater.exportDocx",
+          "when": "editorLangId == highland-markdown"
         }
       ],
       "explorer/context": [
@@ -1014,9 +1037,14 @@
           "group": "navigation@2"
         },
         {
+          "command": "highwater.exportDocx",
+          "when": "editorLangId == highland-markdown",
+          "group": "navigation@3"
+        },
+        {
           "command": "highwater.export",
           "when": "resourceScheme == highland && editorLangId =~ /^highland-/",
-          "group": "navigation@3"
+          "group": "navigation@4"
         }
       ],
       "view/title": [

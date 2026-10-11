@@ -251,6 +251,19 @@ const tests: [string, () => Promise<void>][] = [
       assert.ok(new TextDecoder("latin1").decode(bytes).includes("/Subtype /Image"), "the image is in the PDF");
     },
   ],
+  [
+    "exports a manuscript as a Word document",
+    async () => {
+      const path = join(dir, "DocxExport.highland");
+      await copyFile(join(dirname(fixture), "ManuscriptEdgeCases.highland"), path);
+      const editor = await openScript(path, "highland-markdown");
+      const out = vscode.Uri.file(join(dir, "DocxExport.docx"));
+      await vscode.commands.executeCommand("highwater.exportDocx", editor.document.uri, { target: out });
+      const bytes = await readFile(out.fsPath);
+      assert.equal(new TextDecoder().decode(bytes.slice(0, 2)), "PK");
+      assert.ok(new TextDecoder("latin1").decode(bytes).includes("word/document.xml"));
+    },
+  ],
 ];
 
 export async function run(): Promise<void> {
