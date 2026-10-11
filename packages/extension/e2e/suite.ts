@@ -199,8 +199,22 @@ const tests: [string, () => Promise<void>][] = [
         }, 20_000);
         const info = (await readBundle(path)).bundle.info as { highwaterToo?: { documentId?: string } };
         assert.ok(info.highwaterToo?.documentId, "the document ID is stored in info.json");
+        // Mirroring to a remote (a local bare repository here) pushes after the next save.
+        const remote = join(dir, "remote.git");
+        execFileSync("git", ["init", "-q", "--bare", remote]);
+        await vscode.workspace.getConfiguration("highwater").update("historyRemote", remote, vscode.ConfigurationTarget.Global);
+        await editor.edit((e) => e.insert(editor.document.lineAt(editor.document.lineCount - 1).range.end, "\n\nAnd sends it away."));
+        await vscode.commands.executeCommand("workbench.action.files.save");
+        await waitFor("the branch on the mirror", () => {
+          try {
+            return execFileSync("git", ["for-each-ref", "refs/heads/works/"], { cwd: remote, encoding: "utf8" }).trim() !== "";
+          } catch {
+            return false;
+          }
+        }, 30_000);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+        await vscode.workspace.getConfiguration("highwater").update("historyRemote", undefined, vscode.ConfigurationTarget.Global);
       }
     },
   ],

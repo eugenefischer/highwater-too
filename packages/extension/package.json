@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -228,6 +228,23 @@
         "command": "highwater.history.compare",
         "title": "Compare with Now",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.setUpHistoryMirror",
+        "title": "Set Up History Mirror…",
+        "category": "Highwater Too",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "highwater.pushHistoryNow",
+        "title": "Push Writing History Now",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.exportHistory",
+        "title": "Export Writing History…",
+        "category": "Highwater Too",
+        "icon": "$(export)"
       }
     ],
     "customEditors": [
@@ -266,6 +283,12 @@
           "default": true,
           "scope": "application",
           "markdownDescription": "Record each save in the writing history (a git repository in the history folder, one branch per document). Needs git (on a Mac, the Xcode command-line tools)."
+        },
+        "highwater.historyRemote": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "markdownDescription": "Mirror the writing history to this git remote: one repository holding every work, pushed to after saves and never force-pushed. Any host: for example `https://github.com/you/writing-history.git`, `git@gitlab.com:you/history.git` or `ssh://you@server/srv/git/history.git`. Empty: no mirror. Use **Set Up History Mirror…** to set it and create the repository."
         }
       }
     },
@@ -915,6 +938,10 @@
         {
           "command": "highwater.toggleDocumentHistory",
           "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.exportHistory",
+          "when": "editorLangId =~ /^highland-/"
         }
       ],
       "explorer/context": [
@@ -970,6 +997,21 @@
         {
           "command": "highwater.changeHistoryLocation",
           "when": "view == highwater.history",
+          "group": "1_settings"
+        },
+        {
+          "command": "highwater.exportHistory",
+          "when": "view == highwater.history",
+          "group": "navigation@3"
+        },
+        {
+          "command": "highwater.setUpHistoryMirror",
+          "when": "view == highwater.history",
+          "group": "1_settings"
+        },
+        {
+          "command": "highwater.pushHistoryNow",
+          "when": "view == highwater.history && config.highwater.historyRemote",
           "group": "1_settings"
         }
       ],

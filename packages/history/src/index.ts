@@ -7,3 +7,4 @@ export { CommitBatcher } from "./batch.ts";
 export { git, GitError } from "./git.ts";
 export { commitMessage, History, moveHistory, MATCH_THRESHOLD, REPO_NAME, similarity, wordCount, type CommitInfo, type DocumentFiles, type IndexEntry, type SaveKind } from "./history.ts";
 export { defaultHistoryFolder, syncedFolder } from "./location.ts";
+export { Mirror, parseRemote, type PushResult, type RemoteInfo } from "./mirror.ts";

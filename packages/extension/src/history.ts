@@ -5,6 +5,7 @@ import { basename, extname, join } from "node:path";
 import { CommitBatcher, defaultHistoryFolder, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type SaveKind } from "@highwater/history";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
+import { exportHistory, HistoryMirror } from "./mirror.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
@@ -74,13 +75,18 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     return { ...resolved, files };
   }
 
+  const mirror = new HistoryMirror(context, () => history());
+  mirror.onDidChange(() => void updateStatus());
   const batcher = new CommitBatcher(async (key, kind) => {
     try {
       const r = await resolve(key);
       if (r.paused) return;
       const c = await history().commit(r.id, r.files, kind);
       failures.delete(key);
-      if (c) lastCommit.set(key, c.date);
+      if (c) {
+        lastCommit.set(key, c.date);
+        mirror.schedule();
+      }
       void showNotice();
       view.refresh();
     } catch (error) {
@@ -118,6 +124,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const last = lastCommit.get(key) ?? (await latest(key))?.date;
       status.text = last ? `$(history) ${when(last)}` : "$(history)";
       status.tooltip = last ? `Writing history: last save recorded ${last.toLocaleString()}. Click to see the saves.` : "Writing history: starts with the next save.";
+      if (mirror.url) status.tooltip += mirror.state.error ? `\nNot mirrored yet: ${mirror.state.error}. Tried again after the next save.` : mirror.state.at ? `\nMirrored to ${mirror.url} at ${mirror.state.at.toLocaleTimeString()}.` : `\nMirrored to ${mirror.url}.`;
+      if (mirror.url && mirror.state.error) status.text = status.text.replace("$(history)", "$(history)$(cloud-upload)");
     }
     status.show();
   }
@@ -272,9 +280,27 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.commands.registerCommand("highwater.history.compare", (item: HistoryItem) => compare(item.doc, item.key, item.commit)),
     vscode.commands.registerCommand("highwater.changeHistoryLocation", () => changeLocation()),
     vscode.commands.registerCommand("highwater.toggleDocumentHistory", () => togglePause()),
+    mirror,
+    vscode.commands.registerCommand("highwater.setUpHistoryMirror", () => mirror.setUp()),
+    vscode.commands.registerCommand("highwater.pushHistoryNow", () => mirror.push(true)),
+    vscode.commands.registerCommand("highwater.exportHistory", async () => {
+      const key = keyOf(vscode.window.activeTextEditor?.document);
+      if (!key) {
+        void vscode.window.showInformationMessage("Open a Highland script to export its writing history.");
+        return;
+      }
+      const found = await lookup(key);
+      if (!found) {
+        void vscode.window.showInformationMessage("This script has no writing history yet: it starts with the next save.");
+        return;
+      }
+      await exportHistory(history(), found.id, key);
+    }),
     vscode.commands.registerCommand("highwater.openHistoryFolder", () => vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(historyRoot()))),
   );
   void updateStatus();
+  // Catch up on pushes that could not be made last time (offline, say).
+  setTimeout(() => void mirror.push(), 15_000);
 }
 
 /** "14:03" today, else "11 Oct". */

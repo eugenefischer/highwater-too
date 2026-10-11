@@ -8,16 +8,20 @@ export class CommitBatcher {
   #last = new Map<string, number>();
   #pending = new Map<string, ReturnType<typeof setTimeout>>();
 
-  constructor(
-    private readonly commit: (key: string, kind: SaveKind) => Promise<void>,
-    private readonly interval = 5 * 60_000,
-    private readonly now: () => number = Date.now,
-  ) {}
+  readonly #commit: (key: string, kind: SaveKind) => Promise<void>;
+  readonly #interval: number;
+  readonly #now: () => number;
+
+  constructor(commit: (key: string, kind: SaveKind) => Promise<void>, interval = 5 * 60_000, now: () => number = Date.now) {
+    this.#commit = commit;
+    this.#interval = interval;
+    this.#now = now;
+  }
 
   saved(key: string, kind: SaveKind): Promise<void> | null {
     if (kind === "autosave") {
       const last = this.#last.get(key);
-      const wait = last === undefined ? 0 : last + this.interval - this.now();
+      const wait = last === undefined ? 0 : last + this.#interval - this.#now();
       if (wait <= 0) return this.#run(key, "autosave");
       if (!this.#pending.has(key)) this.#pending.set(key, setTimeout(() => void this.#run(key, "autosave"), wait));
       return null;
@@ -34,7 +38,7 @@ export class CommitBatcher {
   #run(key: string, kind: SaveKind): Promise<void> {
     clearTimeout(this.#pending.get(key));
     this.#pending.delete(key);
-    this.#last.set(key, this.now());
-    return this.commit(key, kind);
+    this.#last.set(key, this.#now());
+    return this.#commit(key, kind);
   }
 }

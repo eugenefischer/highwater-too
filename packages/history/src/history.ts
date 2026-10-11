@@ -72,8 +72,10 @@ export class History {
   #queue: Promise<unknown> = Promise.resolve();
   #ready = false;
   readonly repo: string;
+  readonly folder: string;
 
-  constructor(readonly folder: string) {
+  constructor(folder: string) {
+    this.folder = folder;
     this.repo = join(folder, REPO_NAME);
   }
 
@@ -153,6 +155,23 @@ export class History {
   /** A file as it was at a commit. */
   show(hash: string, file: string): Promise<string> {
     return git(this.repo, ["show", `${hash}:${file}`]);
+  }
+
+  /** Runs `work` after everything queued so far, and before anything queued later. */
+  exclusive<T>(work: () => Promise<T>): Promise<T> {
+    return this.#serial(async () => {
+      await this.#init();
+      return work();
+    });
+  }
+
+  /** Writes one work's history (its branch) to a git bundle file anyone can clone. */
+  bundle(id: string, file: string): Promise<void> {
+    return this.#serial(async () => {
+      const entry = (await this.#load()).documents[id];
+      if (!entry) throw new Error("This document has no history yet.");
+      await git(this.repo, ["bundle", "create", "-q", file, `refs/heads/${entry.branch}`]);
+    });
   }
 
   /** Resolves when the work queued so far (resolves, commits) is done. */
