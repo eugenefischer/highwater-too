@@ -1,5 +1,6 @@
 /** Runs inside VS Code's extension host (see run.ts). A minimal runner: no test framework needed. */
 import * as assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { readBundle, writeBundle } from "@highwater/bundle";
@@ -171,6 +172,33 @@ const tests: [string, () => Promise<void>][] = [
       await openScript(path);
       await vscode.commands.executeCommand("highwater.preview");
       await waitFor("preview panel", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label === "Preview: Preview.highland")));
+    },
+  ],
+  [
+    "records a save in the writing history",
+    async () => {
+      const historyDir = join(dir, "history");
+      await vscode.workspace.getConfiguration("highwater").update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
+      try {
+        const path = await copyOf("History");
+        const editor = await openScript(path);
+        await editor.edit((e) => e.insert(editor.document.lineAt(editor.document.lineCount - 1).range.end, "\n\nShe writes it down."));
+        await vscode.commands.executeCommand("workbench.action.files.save");
+        let repo = "";
+        await waitFor("history repo with a commit", () => {
+          try {
+            const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { repo: string }> };
+            repo = Object.values(index.documents)[0]?.repo ?? "";
+            return repo !== "" && readFileSync(join(historyDir, repo, "text.fountain"), "utf8").includes("She writes it down.");
+          } catch {
+            return false;
+          }
+        }, 20_000);
+        const info = (await readBundle(path)).bundle.info as { highwaterToo?: { documentId?: string } };
+        assert.ok(info.highwaterToo?.documentId, "the document ID is stored in info.json");
+      } finally {
+        await vscode.workspace.getConfiguration("highwater").update("historyFolder", undefined, vscode.ConfigurationTarget.Global);
+      }
     },
   ],
   [

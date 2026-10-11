@@ -7,6 +7,7 @@ import { registerCommands } from "./commands.ts";
 import { registerLanguageFeatures } from "./language.ts";
 import { registerPanels } from "./panels.ts";
 import { registerPreview } from "./preview.ts";
+import { registerHistory } from "./history.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerStatusBar } from "./status.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
@@ -29,6 +30,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerPanels(context, store, fs, cache);
   registerWorkspaceTools(context, cache);
   registerPreview(context, store);
+  registerHistory(context, store);
 
   context.subscriptions.push(
     { dispose: () => store.dispose() },

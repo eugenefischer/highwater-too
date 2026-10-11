@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -200,6 +200,17 @@
         "title": "Preview",
         "category": "Highwater Too",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "highwater.showHistory",
+        "title": "Show Writing History…",
+        "category": "Highwater Too",
+        "icon": "$(history)"
+      },
+      {
+        "command": "highwater.openHistoryFolder",
+        "title": "Open Writing History Folder",
+        "category": "Highwater Too"
       }
     ],
     "customEditors": [
@@ -221,7 +232,7 @@
           "type": "string",
           "default": "",
           "scope": "application",
-          "markdownDescription": "Folder for writing history and session backups. Until it is set, backups of the last 10 sessions per document go to the extension's own storage."
+          "markdownDescription": "Folder for the writing history (one git repository per document) and session backups. You are asked for it the first time a script is saved."
         },
         "highwater.highlandShortcuts": {
           "type": "boolean",
@@ -232,6 +243,12 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a Highland script is opened."
+        },
+        "highwater.writingHistory": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "Record each save in the document's writing history (a git repository in the history folder). Needs git (on a Mac, the Xcode command-line tools)."
         }
       }
     },
@@ -869,6 +886,10 @@
         {
           "command": "highwater.preview",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
+        },
+        {
+          "command": "highwater.showHistory",
+          "when": "editorLangId =~ /^highland-/"
         }
       ],
       "explorer/context": [
@@ -1157,7 +1178,8 @@
   "dependencies": {
     "@highwater/bundle": "*",
     "@highwater/parser": "*",
-    "@highwater/pdf": "*"
+    "@highwater/pdf": "*",
+    "@highwater/history": "*"
   },
   "repository": {
     "type": "git",
