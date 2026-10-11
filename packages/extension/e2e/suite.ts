@@ -154,6 +154,17 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "toggles Live Margins and opens the Title Page Builder",
+    async () => {
+      const path = await copyOf("Tools");
+      await openScript(path);
+      await vscode.commands.executeCommand("highwater.toggleLiveMargins");
+      await vscode.commands.executeCommand("highwater.toggleLiveMargins");
+      await vscode.commands.executeCommand("highwater.titlePageBuilder");
+      await waitFor("title page panel", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label === "Title Page")));
+    },
+  ],
+  [
     "exports a manuscript, with its image, as a PDF",
     async () => {
       const path = join(dir, "ManuscriptExport.highland");

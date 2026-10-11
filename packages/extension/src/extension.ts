@@ -6,6 +6,7 @@ import { OPEN_VIEW_TYPE, OpenRedirect, openHighland } from "./open.ts";
 import { registerCommands } from "./commands.ts";
 import { registerLanguageFeatures } from "./language.ts";
 import { registerPanels } from "./panels.ts";
+import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerStatusBar } from "./status.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 
@@ -25,6 +26,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerStatusBar(context, cache);
   registerCommands(context, store);
   registerPanels(context, store, fs, cache);
+  registerWorkspaceTools(context, cache);
 
   context.subscriptions.push(
     { dispose: () => store.dispose() },

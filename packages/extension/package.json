@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.10",
+  "version": "0.0.12",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -184,6 +184,16 @@
         "title": "Open Scratchpad",
         "category": "Highwater Too",
         "icon": "$(notebook)"
+      },
+      {
+        "command": "highwater.toggleLiveMargins",
+        "title": "Toggle Live Margins",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.titlePageBuilder",
+        "title": "Title Page Builder…",
+        "category": "Highwater Too"
       }
     ],
     "customEditors": [
@@ -210,7 +220,7 @@
         "highwater.highlandShortcuts": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar), ⌘1 (Navigator), ⌘2 (Bin), ⌘4 (Assets) and ⌘5 (Scratchpad) their Highland meanings instead of VS Code's. Preview, Live Margins and Stats (⌘3) arrive later in this version series."
+          "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar), ⌘1 (Navigator), ⌘2 (Bin), ⌘4 (Assets) and ⌘5 (Scratchpad) their Highland meanings instead of VS Code's. With it off, Live Margins is ⌃⌥L. Preview and Stats (⌘3) arrive later."
         },
         "highwater.showSidebarOnOpen": {
           "type": "boolean",
@@ -710,7 +720,8 @@
         "editor.unicodeHighlight.invisibleCharacters": false,
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
-        "editor.stickyScroll.enabled": true
+        "editor.stickyScroll.enabled": true,
+        "editor.inlayHints.enabled": "on"
       },
       "[highland-markdown]": {
         "editor.wordWrap": "on",
@@ -726,7 +737,8 @@
         "editor.unicodeHighlight.invisibleCharacters": false,
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
-        "editor.stickyScroll.enabled": true
+        "editor.stickyScroll.enabled": true,
+        "editor.inlayHints.enabled": "on"
       },
       "[highland-plain]": {
         "editor.wordWrap": "on",
@@ -742,7 +754,8 @@
         "editor.unicodeHighlight.invisibleCharacters": false,
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
-        "editor.stickyScroll.enabled": true
+        "editor.stickyScroll.enabled": true,
+        "editor.inlayHints.enabled": "on"
       }
     },
     "menus": {
@@ -838,6 +851,14 @@
         {
           "command": "highwater.cutToBin",
           "when": "editorLangId =~ /^highland-/ && resourceScheme == highland"
+        },
+        {
+          "command": "highwater.toggleLiveMargins",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.titlePageBuilder",
+          "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
         }
       ],
       "explorer/context": [
@@ -1024,6 +1045,18 @@
         "mac": "cmd+5",
         "key": "ctrl+5",
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.toggleLiveMargins",
+        "mac": "cmd+l",
+        "key": "ctrl+l",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.toggleLiveMargins",
+        "mac": "ctrl+alt+l",
+        "key": "ctrl+alt+l",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
       }
     ],
     "viewsContainers": {
