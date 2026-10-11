@@ -70,3 +70,23 @@ describe("navigator drag to reorder", async () => {
     expect(moveBlock(script, act1, at("INT. B"))).toBe(null);
   });
 });
+
+describe("markers, against a file Highland saved", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { HighlandBundle } = await import("@highwater/bundle");
+  const { parse } = await import("@highwater/parser");
+  const { navigatorItems } = await import("../src/syntax/navigator.ts");
+  const { markerText, markerOffsets } = await import("../src/syntax/completion.ts");
+  const text = HighlandBundle.fromZip(new Uint8Array(readFileSync(new URL("../../../fixtures/generated/MarkerTest.highland", import.meta.url)))).text;
+  it("writes markers as Highland does", () => {
+    expect(text).toContain(markerText("From Highland"));
+  });
+  it("finds every marker Highland's Navigator lists, in order", () => {
+    const labels = navigatorItems(parse(text, { mode: "fountain" }))
+      .flatMap(function all(i): typeof i[] { return [i, ...i.children.flatMap(all)]; })
+      .filter((i) => i.type === "markers")
+      .map((i) => i.label);
+    expect(labels).toEqual(["Marker A with space", "Marker B no space", "(untitled)", "Marker C inline", "Marker D end of line", "From Highland"]);
+    expect(markerOffsets(text)).toHaveLength(6);
+  });
+});
