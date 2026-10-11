@@ -19,7 +19,7 @@ export class OpenRedirect implements vscode.CustomReadonlyEditorProvider {
       panel.dispose();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      panel.webview.html = `<p style="font-family: sans-serif; padding: 1em">Could not open this file as a Highland document: ${escapeHtml(message)}</p>`;
+      panel.webview.html = `<p style="font-family: sans-serif; padding: 1em">Could not open this file as a .highland document: ${escapeHtml(message)}</p>`;
     }
   }
 }

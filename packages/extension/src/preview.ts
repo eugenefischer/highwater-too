@@ -83,7 +83,7 @@ class Preview {
   show(doc: vscode.TextDocument | undefined): void {
     this.#panel.reveal(undefined, true);
     if (doc) this.follow(doc);
-    else if (!this.#doc) void this.#panel.webview.postMessage({ type: "empty", message: "Open a Highland screenplay or manuscript to preview it." });
+    else if (!this.#doc) void this.#panel.webview.postMessage({ type: "empty", message: "Open a screenplay or manuscript to preview it." });
   }
 
   follow(doc: vscode.TextDocument): void {

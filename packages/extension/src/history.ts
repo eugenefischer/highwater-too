@@ -200,7 +200,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     const doc = vscode.window.activeTextEditor?.document;
     const key = keyOf(doc);
     if (!doc || !key) {
-      void vscode.window.showInformationMessage("Open a Highland script to see its writing history.");
+      void vscode.window.showInformationMessage("Open a document to see its writing history.");
       return;
     }
     const found = await lookup(key);
@@ -286,7 +286,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.commands.registerCommand("highwater.exportHistory", async () => {
       const key = keyOf(vscode.window.activeTextEditor?.document);
       if (!key) {
-        void vscode.window.showInformationMessage("Open a Highland script to export its writing history.");
+        void vscode.window.showInformationMessage("Open a document to export its writing history.");
         return;
       }
       const found = await lookup(key);

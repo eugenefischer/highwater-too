@@ -45,7 +45,7 @@ export function registerWorkspaceTools(context: vscode.ExtensionContext, cache: 
 async function openBuilder(context: vscode.ExtensionContext, cache: ParseCache): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor || !editor.document.languageId.startsWith("highland-")) {
-    void vscode.window.showInformationMessage("Open a Highland script to build its title page.");
+    void vscode.window.showInformationMessage("Open a document to build its title page.");
     return;
   }
   const document = editor.document;

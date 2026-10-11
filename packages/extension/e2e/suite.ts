@@ -80,7 +80,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "gives scripts the Highland Fountain language, an outline, highlighting and folding",
+    "gives scripts the Highwater Fountain language, an outline, highlighting and folding",
     async () => {
       const path = await copyOf("Language");
       const doc = (await openScript(path)).document;
@@ -96,7 +96,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "opens .fountain files as Highland Fountain",
+    "opens .fountain files as Highwater Fountain",
     async () => {
       const path = join(dir, "Plain.fountain");
       await writeFile(path, "INT. KITCHEN - DAY\n\nBOB\nHi.\n");

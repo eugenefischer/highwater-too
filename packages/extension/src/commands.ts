@@ -75,7 +75,7 @@ async function newDocument(kind: "screenplay" | "manuscript"): Promise<void> {
   const folder = defaultFolder();
   const target = await vscode.window.showSaveDialog({
     defaultUri: vscode.Uri.file(join(folder, `${spec.name}.highland`)),
-    filters: { "Highland document": ["highland"] },
+    filters: { ".highland files": ["highland"] },
     title: `New ${spec.template}`,
   });
   if (!target) return;
@@ -87,7 +87,7 @@ async function newDocument(kind: "screenplay" | "manuscript"): Promise<void> {
 async function exportText(): Promise<void> {
   const doc = vscode.window.activeTextEditor?.document;
   if (!doc || doc.uri.scheme !== SCHEME) {
-    void vscode.window.showInformationMessage("Open a Highland document to export it.");
+    void vscode.window.showInformationMessage("Open a document to export it.");
     return;
   }
   const p = splitBundlePath(doc.uri.fsPath);
@@ -118,8 +118,8 @@ async function convertToHighland(uri?: vscode.Uri): Promise<void> {
   const text = open ? open.getText() : new TextDecoder().decode(await vscode.workspace.fs.readFile(source));
   const target = await vscode.window.showSaveDialog({
     defaultUri: vscode.Uri.file(join(dirname(source.fsPath), `${basename(source.fsPath, extname(source.fsPath))}.highland`)),
-    filters: { "Highland document": ["highland"] },
-    title: "Save as Highland Document",
+    filters: { ".highland files": ["highland"] },
+    title: "Save as .highland File",
   });
   if (!target) return;
   await writeBundle(target.fsPath, createDocument({ mode, template, text }));
@@ -143,7 +143,7 @@ function defaultFolder(): string {
 async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, resource?: vscode.Uri, target?: vscode.Uri): Promise<void> {
   const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? vscode.window.activeTextEditor?.document;
   if (!doc || !doc.languageId.startsWith("highland-")) {
-    void vscode.window.showInformationMessage("Open a Highland screenplay or manuscript to export it as a PDF.");
+    void vscode.window.showInformationMessage("Open a screenplay or manuscript to export it as a PDF.");
     return;
   }
   const template = await templateOf(context, store, doc);

@@ -53,7 +53,7 @@ async function askAboutConflict(fs: HighlandFileSystem, doc: vscode.TextDocument
     } else if (choice === "Save As…") {
       const target = await vscode.window.showSaveDialog({
         defaultUri: vscode.Uri.file(p.bundle.replace(/\.highland$/i, " copy.highland")),
-        filters: { "Highland document": ["highland"] },
+        filters: { ".highland files": ["highland"] },
       });
       if (!target) continue;
       await fs.store.writeCopy(p.bundle, p.entry, new TextEncoder().encode(doc.getText()), target.fsPath);

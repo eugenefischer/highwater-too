@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerCustomEditorProvider(OPEN_VIEW_TYPE, new OpenRedirect()),
     { dispose: store.onExternalChange((bundle, entries) => void handleExternalChange(fs, bundle, entries)) },
     vscode.commands.registerCommand("highwater.open", async () => {
-      const picked = await vscode.window.showOpenDialog({ canSelectMany: true, filters: { "Highland document": ["highland"] } });
+      const picked = await vscode.window.showOpenDialog({ canSelectMany: true, filters: { ".highland files": ["highland"] } });
       for (const uri of picked ?? []) await openHighland(uri);
     }),
     vscode.commands.registerCommand("highwater.hello", () => {
