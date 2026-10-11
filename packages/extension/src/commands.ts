@@ -1,11 +1,12 @@
 import { homedir } from "node:os";
-import { basename, dirname, extname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { createDocument, writeBundle, type DocumentMode } from "@highwater/bundle";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
-import { exportScreenplay } from "./pdf-export.ts";
+import { exportManuscript, exportScreenplay, loadImages } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
 
@@ -143,11 +144,12 @@ function defaultFolder(): string {
 async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, resource?: vscode.Uri, target?: vscode.Uri): Promise<void> {
   const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? vscode.window.activeTextEditor?.document;
   if (!doc || !doc.languageId.startsWith("highland-")) {
-    void vscode.window.showInformationMessage("Open a Highland screenplay to export it as a PDF.");
+    void vscode.window.showInformationMessage("Open a Highland screenplay or manuscript to export it as a PDF.");
     return;
   }
-  if (doc.languageId !== LANGUAGES.fountain) {
-    void vscode.window.showInformationMessage("PDF export for manuscripts arrives in the next milestone; screenplays export now.");
+  const manuscript = doc.languageId === LANGUAGES.markdown;
+  if (!manuscript && doc.languageId !== LANGUAGES.fountain) {
+    void vscode.window.showInformationMessage("PDF export works for screenplays and manuscripts; plain-text documents export as text.");
     return;
   }
   const bundle = doc.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath)?.bundle : undefined;
@@ -160,7 +162,7 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
   const out =
     target ??
     (await vscode.window.showSaveDialog({
-      defaultUri: vscode.Uri.file(path.replace(/\.(highland|fountain|spmd)$/i, "") + ".pdf"),
+      defaultUri: vscode.Uri.file(path.replace(/\.(highland|fountain|spmd|md|markdown)$/i, "") + ".pdf"),
       filters: { PDF: ["pdf"] },
       title: "Export PDF",
     }));
@@ -170,7 +172,17 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
     return;
   }
   await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Exporting ${basename(out.fsPath)}…` }, async () => {
-    const result = await exportScreenplay({ text: doc.getText(), path, fontDir: join(context.extensionPath, "dist", "fonts"), titlePage });
+    const base = { text: doc.getText(), path, fontDir: join(context.extensionPath, "dist", "fonts"), titlePage };
+    let result: { pdf: Uint8Array; pages: number; problems: string[] };
+    if (manuscript) {
+      // Images: the bundle's assets, or files next to a Markdown file.
+      const read = async (src: string): Promise<Uint8Array | null> => {
+        const name = safeDecode(src);
+        if (bundle) return store.read(bundle, name).catch(() => null);
+        return readFile(resolve(dirname(path), name)).catch(() => null);
+      };
+      result = await exportManuscript({ ...base, image: await loadImages(base.text, read) });
+    } else result = await exportScreenplay(base);
     await vscode.workspace.fs.writeFile(out, result.pdf);
     for (const problem of result.problems) void vscode.window.showWarningMessage(problem);
     if (!target) {
@@ -180,4 +192,12 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
       });
     }
   });
+}
+
+function safeDecode(src: string): string {
+  try {
+    return decodeURIComponent(src);
+  } catch {
+    return src;
+  }
 }

@@ -2,7 +2,7 @@
 
 A VS Code extension that replaces the discontinued Highland 2: it opens, edits and saves `.highland` files safely, gives screenplays and manuscripts a Highland-style workspace, exports PDFs that match Highland's, and keeps a git writing history as a record of authorship.
 
-**Status:** M0–M3 done (bundle I/O, parser, editing in VS Code); M4 (screenplay PDF) in progress. See the spec for decisions and the build plan.
+**Status:** M0–M4 done (bundle I/O, parser, editing in VS Code, screenplay PDF); M5 (manuscript PDF) in progress: Export PDF works for screenplays and manuscripts. See the spec for decisions and the build plan.
 
 ## Layout
 

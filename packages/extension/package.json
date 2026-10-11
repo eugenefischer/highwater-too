@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -716,7 +716,7 @@
       "editor/title": [
         {
           "command": "highwater.exportPdf",
-          "when": "editorLangId == highland-fountain",
+          "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
           "group": "navigation"
         }
       ]

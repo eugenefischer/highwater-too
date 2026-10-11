@@ -1,7 +1,7 @@
 /** Runs inside VS Code's extension host (see run.ts). A minimal runner: no test framework needed. */
 import * as assert from "node:assert/strict";
 import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { readBundle, writeBundle } from "@highwater/bundle";
 import * as vscode from "vscode";
 
@@ -132,6 +132,19 @@ const tests: [string, () => Promise<void>][] = [
       const bytes = await readFile(out.fsPath);
       assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
       assert.ok(bytes.length > 5000, `PDF of ${bytes.length} bytes`);
+    },
+  ],
+  [
+    "exports a manuscript, with its image, as a PDF",
+    async () => {
+      const path = join(dir, "ManuscriptExport.highland");
+      await copyFile(join(dirname(fixture), "ManuscriptEdgeCases.highland"), path);
+      const editor = await openScript(path, "highland-markdown");
+      const out = vscode.Uri.file(join(dir, "ManuscriptExport.pdf"));
+      await vscode.commands.executeCommand("highwater.exportPdf", editor.document.uri, { target: out });
+      const bytes = await readFile(out.fsPath);
+      assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
+      assert.ok(new TextDecoder("latin1").decode(bytes).includes("/Subtype /Image"), "the image is in the PDF");
     },
   ],
 ];

@@ -6,6 +6,8 @@ export interface TextStyle {
   underline?: boolean;
   strike?: boolean;
   highlight?: boolean;
+  /** Printed blue and underlined (manuscripts). */
+  link?: boolean;
 }
 
 /** A piece of text in one style. */
@@ -19,12 +21,20 @@ export interface PlacedText {
   x: number;
   y: number;
   runs: Run[];
+  /** Highlight box relative to the baseline: top offset and height (default: the screenplay's -9.5, 12.5). */
+  highlightBox?: { top: number; height: number; color: string };
 }
+
+/** A filled rectangle (table rules) or an image; y is the top edge. */
+export type Graphic =
+  | { kind: "rect"; x: number; y: number; width: number; height: number; gray: number }
+  | { kind: "image"; x: number; y: number; width: number; height: number; data: Uint8Array };
 
 export interface Page {
   /** The page number to show (title page: null). */
   number: number | null;
   items: PlacedText[];
+  graphics?: Graphic[];
 }
 
 export interface Layout {

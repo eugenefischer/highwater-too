@@ -252,7 +252,7 @@ function minHead(b: Block): number {
   return b.rows.length;
 }
 
-function pageText(slots: PageTextSlots, fill: (p: PageTextPart[] | null) => string, pos: { y: number; left: number; centre: number; right: number }): PlacedText[] {
+export function pageText(slots: PageTextSlots, fill: (p: PageTextPart[] | null) => string, pos: { y: number; left: number; centre: number; right: number }): PlacedText[] {
   const out: PlacedText[] = [];
   const add = (text: string, x: number) => {
     if (text.trim()) out.push({ x, y: pos.y, runs: [{ text, style: {} }] });
@@ -390,7 +390,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
 }
 
 /** Empty source lines directly before `offset`, beyond the usual one. */
-function extraBlankLines(source: string, offset: number): number {
+export function extraBlankLines(source: string, offset: number): number {
   let i = offset;
   let n = 0;
   for (;;) {
@@ -506,7 +506,7 @@ function partRows(parts: Part[], side: "left" | "right" | null): Row[] {
 }
 
 /** No blank line between two elements in the source (only true for elements of the same file). */
-function sameParagraph(source: string, a: Element, b: Element): boolean {
+export function sameParagraph(source: string, a: Element, b: Element): boolean {
   if (b.span.start < a.span.end) return false;
   return !/\n[ \t]*(\r?\n|\r)/.test(source.slice(a.span.end, b.span.start));
 }
@@ -573,6 +573,6 @@ function titlePage(fields: TitleField[], ctx: InlineContext): Page {
 }
 
 /** Title page values take inline emphasis like body text. */
-function styledValue(text: string, ctx: InlineContext): Run[] {
+export function styledValue(text: string, ctx: InlineContext): Run[] {
   return toRuns(parseInline({ text, base: 0, offsets: null }), ctx);
 }

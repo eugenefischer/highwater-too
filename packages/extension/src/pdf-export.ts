@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutScreenplay, renderPdf } from "@highwater/pdf";
+import { layoutManuscript, layoutScreenplay, renderPdf } from "@highwater/pdf";
 
 export interface ExportOptions {
   /** The script text (the editor's, so unsaved edits are included). */
@@ -12,6 +12,11 @@ export interface ExportOptions {
   fontDir: string;
   titlePage?: boolean;
   date?: Date;
+}
+
+export interface ManuscriptExportOptions extends ExportOptions {
+  /** Image bytes for `![alt](src)`: the bundle's assets, or files next to a plain Markdown file. */
+  image?: (src: string) => Uint8Array | null;
 }
 
 /** Reads an included file by path relative to the including one; .highland files give their script text. */
@@ -38,4 +43,31 @@ export async function exportScreenplay(options: ExportOptions): Promise<{ pdf: U
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
   return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message) };
+}
+
+/** Lays out and renders a manuscript, with {{INCLUDE}} files merged in. */
+export async function exportManuscript(options: ManuscriptExportOptions): Promise<{ pdf: Uint8Array; pages: number; problems: string[] }> {
+  const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
+  const merged = await resolveIncludes(root, "markdown", includeLoader);
+  const doc = parse(options.text, { mode: "markdown" });
+  const layout = layoutManuscript(doc, {
+    elements: merged.elements.map((m) => m.element),
+    ...(options.date ? { date: options.date } : {}),
+    ...(options.titlePage === false ? { titlePage: false } : {}),
+    ...(options.image ? { image: options.image } : {}),
+  });
+  const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");
+  const title = cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "";
+  const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
+  return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message) };
+}
+
+/** Reads every image a manuscript names, so layout (which is synchronous) can look them up. */
+export async function loadImages(text: string, read: (src: string) => Promise<Uint8Array | null>): Promise<(src: string) => Uint8Array | null> {
+  const found = new Map<string, Uint8Array | null>();
+  for (const m of text.matchAll(/!\[[^\]]*\]\(([^)\s]+)[^)]*\)/g)) {
+    const src = m[1]!;
+    if (!found.has(src)) found.set(src, await read(src).catch(() => null));
+  }
+  return (src) => found.get(src) ?? null;
 }

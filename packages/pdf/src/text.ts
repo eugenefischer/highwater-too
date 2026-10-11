@@ -5,6 +5,8 @@ export interface InlineContext {
   /** Numbers each {{SERIES}} in print order. */
   series: (d: Extract<Directive, { kind: "series" }>) => number;
   date: Date;
+  /** Print links blue and underlined (manuscripts); screenplays print them as plain text. */
+  links?: boolean;
 }
 
 /**
@@ -33,7 +35,7 @@ export function toRuns(nodes: Inline[], ctx: InlineContext, style: TextStyle = {
           walk(n.children, { ...s, ...STYLE[n.style] });
           break;
         case "link":
-          walk(n.children, s);
+          walk(n.children, ctx.links ? { ...s, link: true } : s);
           break;
         case "directive":
           if (n.directive.kind === "series") push(String(ctx.series(n.directive)), s);
@@ -58,7 +60,7 @@ const STYLE: Record<string, TextStyle> = {
 };
 
 function sameStyle(a: TextStyle, b: TextStyle): boolean {
-  return !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.underline === !!b.underline && !!a.strike === !!b.strike && !!a.highlight === !!b.highlight;
+  return !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.underline === !!b.underline && !!a.strike === !!b.strike && !!a.highlight === !!b.highlight && !!a.link === !!b.link;
 }
 
 export function plain(runs: Run[]): string {
@@ -104,7 +106,7 @@ export function wrapRuns(runs: Run[], width: number, restWidth = width): Run[][]
           brk = i;
           break;
         }
-        if (text[i - 1] === "-" && i - 1 > lineStart && text[i] !== "-") {
+        if ((text[i - 1] === "-" || text[i - 1] === "—") && i - 1 > lineStart && text[i] !== "-") {
           brk = i;
           break;
         }

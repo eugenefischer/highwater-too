@@ -45,19 +45,24 @@ export function renderPdf(layout: Layout, options: RenderOptions = {}): Promise<
 
   for (const page of layout.pages) {
     doc.addPage({ size: [layout.width, layout.height], margin: 0 });
+    for (const g of page.graphics ?? []) {
+      if (g.kind === "rect") doc.save().rect(g.x, g.y, g.width, g.height).fillColor([g.gray * 255, g.gray * 255, g.gray * 255]).fill().restore();
+      else doc.image(Buffer.from(g.data), g.x, g.y, { width: g.width, height: g.height });
+    }
     for (const item of page.items) {
       let x = item.x;
       for (const run of item.runs) {
         const w = run.text.length * CHAR;
         if (run.style.highlight) {
-          doc.save().rect(x, item.y - 9.5, w, 12.5).fill("#FFF59D").restore();
+          const box = item.highlightBox ?? { top: -9.5, height: 12.5, color: "#FFF59D" };
+          doc.save().rect(x, item.y + box.top, w, box.height).fill(box.color).restore();
         }
-        doc.font(fontFor(run.style)).fillColor("black");
+        doc.font(fontFor(run.style)).fillColor(run.style.link ? LINK : "black");
         doc.text(run.text, x, item.y, { lineBreak: false, baseline: "alphabetic" });
         // Drawn here rather than by PDFKit, which places lines from the top of the text box (we
         // give baselines). Underline as in Highland's PDFs: 1 pt, 2.1 pt below the baseline.
         const ink = run.text.trimEnd().length * CHAR;
-        if (run.style.underline) line(x, item.y + UNDERLINE_OFFSET, ink);
+        if (run.style.underline || run.style.link) line(x, item.y + UNDERLINE_OFFSET, ink, run.style.link ? LINK : "black");
         if (run.style.strike) line(x, item.y - STRIKE_RISE, ink);
         x += w;
       }
@@ -66,12 +71,14 @@ export function renderPdf(layout: Layout, options: RenderOptions = {}): Promise<
   doc.end();
   return done;
 
-  function line(x: number, y: number, width: number): void {
+  function line(x: number, y: number, width: number, color = "black"): void {
     if (width <= 0) return;
-    doc.save().lineWidth(1).strokeColor("black").moveTo(x, y).lineTo(x + width, y).stroke().restore();
+    doc.save().lineWidth(1).strokeColor(color).moveTo(x, y).lineTo(x + width, y).stroke().restore();
   }
 }
 
+/** Links in Highland's manuscript PDFs. */
+const LINK = "#0000FF";
 /** Measured in Highland's Astounding title page: underline 2.1 pt below the baseline, 1 pt thick. */
 const UNDERLINE_OFFSET = 2.1;
 /** Strikethrough through the middle of lower-case letters (Courier Prime x-height 5.4 pt at 12 pt). */
