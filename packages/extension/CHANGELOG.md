@@ -5,6 +5,7 @@
 - Completion in screenplays: character names, scene-heading prefixes, the script's locations, times of day and transitions.
 - Markers: Insert Marker (⌃M) and Go to Next Marker (⌃⌥M), written as Highland 2 writes them. Markers never print: the text lays out as if they were not there (Highland 2 breaks the line at a marker; that is not copied).
 - Live Margins: lyrics at the dialogue indent.
+- Line numbers are off in documents by default (turn them back on with VS Code's Line Numbers setting).
 - Navigator: drag scenes, sections and headings to reorder the text.
 - Syntax Cheat Sheet, from the Navigator's title bar or the Command Palette.
 - Writing history mirror now pulls as well as pushes: other computers' saves come in on start-up, when a document is opened (at most once a minute) and every ten minutes; histories are matched to documents by ID, then by text. **Sync Writing History Now** replaces Push Writing History Now.

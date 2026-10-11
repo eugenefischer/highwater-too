@@ -872,7 +872,8 @@
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
         "editor.stickyScroll.enabled": true,
-        "editor.inlayHints.enabled": "on"
+        "editor.inlayHints.enabled": "on",
+        "editor.lineNumbers": "off"
       },
       "[highland-markdown]": {
         "editor.wordWrap": "on",
@@ -889,7 +890,8 @@
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
         "editor.stickyScroll.enabled": true,
-        "editor.inlayHints.enabled": "on"
+        "editor.inlayHints.enabled": "on",
+        "editor.lineNumbers": "off"
       },
       "[highland-plain]": {
         "editor.wordWrap": "on",
@@ -906,7 +908,8 @@
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
         "editor.stickyScroll.enabled": true,
-        "editor.inlayHints.enabled": "on"
+        "editor.inlayHints.enabled": "on",
+        "editor.lineNumbers": "off"
       }
     },
     "menus": {
