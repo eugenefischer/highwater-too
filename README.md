@@ -2,7 +2,16 @@
 
 A VS Code extension that replaces the discontinued Highland 2: it opens, edits and saves `.highland` files safely, gives screenplays and manuscripts a Highland-style workspace, exports PDFs that match Highland's, and keeps a git writing history as a record of authorship.
 
-**Status:** M0–M4 done (bundle I/O, parser, editing in VS Code, screenplay PDF); M5 (manuscript PDF) in progress: Export PDF works for screenplays and manuscripts. See the spec for decisions and the build plan.
+**Status:** M0–M6 done (bundle I/O, parser, editing, screenplay and manuscript PDF, workspace); M7 (writing history) built and in testing; M8 (release) next. See the spec for decisions and the build plan.
+
+## Plain .fountain, .md and .txt files
+
+`.highland` files always open with Highwater Too, and `.fountain` files open as **Highwater Fountain**. Other plain files keep their usual language unless you choose otherwise:
+
+- **One file:** click the language name in the status bar (for example "Markdown") and choose **Highwater Fountain**, **Highwater Markdown** or **Highwater Plain Text**. VS Code remembers the choice for that file.
+- **Every .md file:** run **Highwater Too: Open .md Files with Highwater Too…** and choose everywhere or this workspace (it sets `files.associations`). **Open .md Files as Ordinary Markdown Again** undoes it. VS Code's own Markdown preview and Markdown extensions do not apply to files opened this way, and Highland's Markdown dialect differs from standard Markdown in places (every line is a paragraph, `===` is a page break).
+
+Plain files get the Navigator, preview, PDF export, Live Margins, the Title Page Builder and the writing history. The Bin, Scratchpad and Assets live inside `.highland` files, so plain files do not have them.
 
 ## Layout
 

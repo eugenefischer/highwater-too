@@ -30,6 +30,8 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     vscode.commands.registerCommand("highwater.newManuscript", () => newDocument("manuscript")),
     vscode.commands.registerCommand("highwater.export", exportText),
     vscode.commands.registerCommand("highwater.convertToHighland", convertToHighland),
+    vscode.commands.registerCommand("highwater.useForMarkdown", useForMarkdown),
+    vscode.commands.registerCommand("highwater.stopUsingForMarkdown", stopUsingForMarkdown),
     // Menus (the editor title button) pass the document's URI; only an explicit option sets where to save.
     vscode.commands.registerCommand("highwater.exportPdf", (resource?: unknown, options?: { target?: vscode.Uri }) =>
       exportPdf(context, store, resource instanceof vscode.Uri ? resource : undefined, options?.target),
@@ -177,3 +179,43 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
   });
 }
 
+
+const MD_PATTERNS = ["*.md", "*.markdown"];
+
+/** Opens .md files as Highwater Markdown, everywhere or in this workspace, through files.associations. */
+async function useForMarkdown(): Promise<void> {
+  const choices = [
+    { label: "Everywhere", description: "user settings", target: vscode.ConfigurationTarget.Global },
+    ...(vscode.workspace.workspaceFolders?.length ? [{ label: "This workspace", description: "workspace settings", target: vscode.ConfigurationTarget.Workspace }] : []),
+  ];
+  const picked = await vscode.window.showQuickPick(choices, {
+    title: "Open .md files with Highwater Too",
+    placeHolder: "VS Code's Markdown preview and Markdown extensions will not apply to them",
+  });
+  if (!picked) return;
+  const config = vscode.workspace.getConfiguration("files");
+  const inspect = config.inspect<Record<string, string>>("associations");
+  const current = (picked.target === vscode.ConfigurationTarget.Global ? inspect?.globalValue : inspect?.workspaceValue) ?? {};
+  const next = { ...current };
+  for (const p of MD_PATTERNS) next[p] = LANGUAGES.markdown;
+  await config.update("associations", next, picked.target);
+  void vscode.window.showInformationMessage(`.md files now open as Highwater Markdown (${picked.label.toLowerCase()}). Files already open change when reopened.`);
+}
+
+/** Undoes useForMarkdown in every settings scope where it was set. */
+async function stopUsingForMarkdown(): Promise<void> {
+  const config = vscode.workspace.getConfiguration("files");
+  const inspect = config.inspect<Record<string, string>>("associations");
+  let changed = false;
+  for (const [value, target] of [
+    [inspect?.globalValue, vscode.ConfigurationTarget.Global],
+    [inspect?.workspaceValue, vscode.ConfigurationTarget.Workspace],
+  ] as const) {
+    if (!value || !MD_PATTERNS.some((p) => value[p] === LANGUAGES.markdown)) continue;
+    const next = { ...value };
+    for (const p of MD_PATTERNS) if (next[p] === LANGUAGES.markdown) delete next[p];
+    await config.update("associations", Object.keys(next).length ? next : undefined, target);
+    changed = true;
+  }
+  void vscode.window.showInformationMessage(changed ? ".md files open as ordinary Markdown again." : ".md files were not set to open with Highwater Too.");
+}

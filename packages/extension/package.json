@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -250,6 +250,16 @@
       {
         "command": "highwater.chooseTemplate",
         "title": "Choose Print Template…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.useForMarkdown",
+        "title": "Open .md Files with Highwater Too…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.stopUsingForMarkdown",
+        "title": "Open .md Files as Ordinary Markdown Again",
         "category": "Highwater Too"
       }
     ],
