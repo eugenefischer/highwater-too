@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { git } from "./git.ts";
 
 /**
- * The writing history (M7): one git repo per document in a central history folder, holding the
- * script text (revision tags kept), Bin items and Scratchpad. An index maps document IDs to repos
- * and remembers each document's paths, so a moved or renamed file finds its history again even
- * when Highland has dropped the ID from info.json.
+ * The writing history (M7): one git repository in the history folder, with one branch per
+ * document ("works/<name>-<id>"), holding the script text (revision tags kept), Bin items and
+ * Scratchpad. Branches are independent (no shared ancestry), so one work's history can be shared
+ * or deleted on its own without rewriting anything, while the whole history needs only one remote.
+ * Commits are made with git's plumbing commands: nothing is ever checked out.
+ *
+ * An index (index.json, beside the repository) maps document IDs to branches and remembers each
+ * document's paths, so a moved or renamed file finds its history again even when Highland has
+ * dropped the ID from info.json.
  */
 
 export interface DocumentFiles {
@@ -20,14 +25,18 @@ export interface DocumentFiles {
 }
 
 export interface IndexEntry {
-  /** Repo folder name inside the history folder. */
-  repo: string;
+  /** The document's branch, e.g. "works/Astounding-1a2b3c4d". Never renamed. */
+  branch: string;
+  /** The file name it was first saved under (for people reading the repository). */
+  title: string;
   /** Every path the document has been saved at, most recent last. */
   paths: string[];
+  /** History turned off for this document. */
+  paused?: boolean;
 }
 
 interface Index {
-  version: 1;
+  version: 2;
   documents: Record<string, IndexEntry>;
 }
 
@@ -42,58 +51,90 @@ export interface CommitInfo {
 /** Below this similarity a document with no ID and an unknown path starts a new history. */
 export const MATCH_THRESHOLD = 0.6;
 
+/** The repository's folder name inside the history folder. */
+export const REPO_NAME = "history.git";
+
+const README = `# Writing history
+
+Kept by Highwater Too. Each work has its own branch under \`works/\`, named after the file it was
+first saved as; every commit is one save of the script text (revision tags kept), its Bin items
+(\`bin/\`) and Scratchpad. The branches share no history, so one work can be shared without the
+others:
+
+    git push <remote> works/<name>          # just that work
+    git bundle create work.bundle works/<name>
+
+\`index.json\`, beside this repository, lists each work's branch and the paths it was saved at.
+`;
+
 export class History {
   #index: Index | null = null;
   #queue: Promise<unknown> = Promise.resolve();
+  #ready = false;
+  readonly repo: string;
 
-  constructor(readonly folder: string) {}
+  constructor(readonly folder: string) {
+    this.repo = join(folder, REPO_NAME);
+  }
 
   /**
-   * Finds the document's history: by ID, then by path, then by text similarity to each repo's
-   * latest script. Creates a new one if nothing matches. Returns the ID to store in the document.
+   * Finds the document's history: by ID, then by path, then by text similarity to each work's
+   * latest script. Starts a new one if nothing matches. Returns the ID to store in the document.
    */
-  resolve(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; repo: string; created: boolean }> {
+  resolve(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; created: boolean; paused: boolean }> {
     return this.#serial(async () => {
+      await this.#init();
       const index = await this.#load();
-      let id = doc.id && index.documents[doc.id] ? doc.id : null;
-      id ??= Object.entries(index.documents).find(([, e]) => e.paths.at(-1) === doc.path)?.[0] ?? null;
-      id ??= Object.entries(index.documents).find(([, e]) => e.paths.includes(doc.path))?.[0] ?? null;
-      if (!id) id = await this.#bestMatch(index, doc.text);
+      let id = await this.#match(index, doc);
       let created = false;
       if (!id) {
         id = doc.id ?? randomUUID();
-        index.documents[id] = { repo: await this.#repoName(index, doc.path), paths: [] };
+        const title = fileTitle(doc.path);
+        index.documents[id] = { branch: branchName(title, id, index), title, paths: [] };
         created = true;
       }
       const entry = index.documents[id]!;
       if (entry.paths.at(-1) !== doc.path) entry.paths = [...entry.paths.filter((p) => p !== doc.path), doc.path];
       await this.#save(index);
-      const repo = join(this.folder, entry.repo);
-      if (!existsSync(join(repo, ".git"))) await initRepo(repo);
-      return { id, repo, created };
+      return { id, branch: entry.branch, created, paused: entry.paused === true };
     });
   }
 
-  /** Writes the document's files into its repo and commits them; returns null when nothing changed. */
-  commit(repo: string, files: DocumentFiles, kind: SaveKind, date = new Date()): Promise<CommitInfo | null> {
+  /** Like `resolve`, but only looks: creates nothing and writes nothing. */
+  find(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; paused: boolean } | null> {
     return this.#serial(async () => {
-      const before = await readFile(join(repo, files.scriptName), "utf8").catch(() => "");
-      await writeFiles(repo, files);
-      await git(repo, ["add", "-A"]);
-      const status = await git(repo, ["status", "--porcelain"]);
-      if (!status.trim()) return null;
+      if (!existsSync(this.repo)) return null;
+      const index = await this.#load();
+      const id = await this.#match(index, doc);
+      const entry = id ? index.documents[id] : undefined;
+      return id && entry ? { id, branch: entry.branch, paused: entry.paused === true } : null;
+    });
+  }
+
+  /** Commits the document's files to its branch; returns null when nothing changed. */
+  commit(id: string, files: DocumentFiles, kind: SaveKind, date = new Date()): Promise<CommitInfo | null> {
+    return this.#serial(async () => {
+      await this.#init();
+      const entry = (await this.#load()).documents[id];
+      if (!entry) throw new Error(`No history for document ${id}`);
+      const ref = `refs/heads/${entry.branch}`;
+      const parent = await this.#revParse(ref);
+      const tree = await this.#tree(files);
+      if (parent && (await this.#revParse(`${parent}^{tree}`)) === tree) return null;
+      const before = parent ? await this.#read(parent, files.scriptName) : "";
       const message = commitMessage(kind, date, before, files.script);
-      const stamp = date.toISOString();
-      await git(repo, ["-c", "core.quotepath=false", "commit", "-q", "-m", message, "--date", stamp]);
-      const hash = (await git(repo, ["rev-parse", "HEAD"])).trim();
+      const hash = await this.#commitTree(tree, parent, message, date);
+      // Compare-and-swap: fails rather than losing a commit if the branch moved meanwhile.
+      await git(this.repo, ["update-ref", ref, hash, parent ?? "0".repeat(40)]);
       return { hash, date, message };
     });
   }
 
-  /** The repo's commits, newest first. */
-  async log(repo: string, limit = 200): Promise<CommitInfo[]> {
-    if (!existsSync(join(repo, ".git"))) return [];
-    const out = await git(repo, ["log", `-${limit}`, "--format=%H%x00%aI%x00%s"]).catch(() => "");
+  /** A document's commits, newest first. */
+  async log(id: string, limit = 200): Promise<CommitInfo[]> {
+    const entry = existsSync(this.repo) ? (await this.#load()).documents[id] : undefined;
+    if (!entry) return [];
+    const out = await git(this.repo, ["log", `-${limit}`, "--format=%H%x00%aI%x00%s", `refs/heads/${entry.branch}`, "--"]).catch(() => "");
     return out
       .split("\n")
       .filter(Boolean)
@@ -103,39 +144,152 @@ export class History {
       });
   }
 
-  /** A file as it was at a commit. */
-  show(repo: string, hash: string, file: string): Promise<string> {
-    return git(repo, ["show", `${hash}:${file}`]);
+  /** The script as it was at a commit (whichever text.* file it held). */
+  async scriptAt(hash: string): Promise<string> {
+    const name = await this.#scriptName(hash);
+    return name ? this.#read(hash, name) : "";
   }
 
-  async #bestMatch(index: Index, text: string): Promise<string | null> {
+  /** A file as it was at a commit. */
+  show(hash: string, file: string): Promise<string> {
+    return git(this.repo, ["show", `${hash}:${file}`]);
+  }
+
+  /** Resolves when the work queued so far (resolves, commits) is done. */
+  idle(): Promise<void> {
+    return this.#serial(async () => {});
+  }
+
+  /** Turns history off (or back on) for one document. */
+  setPaused(id: string, paused: boolean): Promise<void> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      const entry = index.documents[id];
+      if (!entry) return;
+      if (paused) entry.paused = true;
+      else delete entry.paused;
+      await this.#save(index);
+    });
+  }
+
+  // ---------------------------------------------------------------------------------------------
+
+  async #match(index: Index, doc: { id: string | null; path: string; text: string }): Promise<string | null> {
+    if (doc.id && index.documents[doc.id]) return doc.id;
+    const entries = Object.entries(index.documents);
+    const byPath = entries.find(([, e]) => e.paths.at(-1) === doc.path) ?? entries.find(([, e]) => e.paths.includes(doc.path));
+    if (byPath) return byPath[0];
     let best: { id: string; score: number } | null = null;
-    for (const [id, e] of Object.entries(index.documents)) {
-      const repo = join(this.folder, e.repo);
-      const names = await readdir(repo).catch(() => [] as string[]);
-      const script = names.find((n) => /^text\.[^/]+$/.test(n));
-      if (!script) continue;
-      const score = similarity(text, await readFile(join(repo, script), "utf8"));
+    for (const [id, e] of entries) {
+      const head = await this.#revParse(`refs/heads/${e.branch}`);
+      if (!head) continue;
+      const score = similarity(doc.text, await this.scriptAt(head));
       if (score >= MATCH_THRESHOLD && (!best || score > best.score)) best = { id, score };
     }
     return best?.id ?? null;
   }
 
-  async #repoName(index: Index, path: string): Promise<string> {
-    const stem = basename(path).replace(/\.(highland|fountain|spmd|md|markdown|txt)$/i, "").replace(/[^\p{L}\p{N} ._-]+/gu, "_").trim() || "Untitled";
-    const taken = new Set(Object.values(index.documents).map((e) => e.repo));
-    let name = stem;
-    for (let n = 2; taken.has(name) || existsSync(join(this.folder, name)); n++) name = `${stem} ${n}`;
-    return name;
+  /** Creates the repository (with a README on main) and moves any per-document repos into it. */
+  async #init(): Promise<void> {
+    if (this.#ready) return;
+    if (!existsSync(join(this.repo, "HEAD"))) {
+      await mkdir(this.repo, { recursive: true });
+      await git(this.repo, ["init", "-q", "--bare"]);
+      await git(this.repo, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+      const email = (await git(this.repo, ["config", "user.email"]).catch(() => "")).trim();
+      if (!email) {
+        // Commits need an author: the user's git identity, or a local one if none is set.
+        const user = process.env.USER || process.env.USERNAME || "writer";
+        await git(this.repo, ["config", "user.name", user]);
+        await git(this.repo, ["config", "user.email", `${user}@localhost`]);
+      }
+      const tree = await this.#mktree([["100644", "blob", await this.#blob(README), "README.md"]]);
+      const hash = await this.#commitTree(tree, null, "Writing history kept by Highwater Too", new Date());
+      await git(this.repo, ["update-ref", "refs/heads/main", hash, "0".repeat(40)]);
+    }
+    await this.#migrate();
+    this.#ready = true;
+  }
+
+  /** 0.0.15–0.0.16 kept one repository per document: bring each in as a branch, commits unchanged. */
+  async #migrate(): Promise<void> {
+    let raw: { version?: number; documents?: Record<string, { repo?: string; paths?: string[]; paused?: boolean }> };
+    try {
+      raw = JSON.parse(await readFile(join(this.folder, "index.json"), "utf8"));
+    } catch {
+      return;
+    }
+    if (raw.version !== 1 || !raw.documents) return;
+    const index: Index = { version: 2, documents: {} };
+    for (const [id, old] of Object.entries(raw.documents)) {
+      const title = old.repo ?? fileTitle(old.paths?.at(-1) ?? "Untitled");
+      const branch = branchName(title, id, index);
+      const dir = old.repo ? join(this.folder, old.repo) : null;
+      if (dir && existsSync(join(dir, ".git"))) {
+        const head = (await git(dir, ["rev-parse", "--verify", "-q", "HEAD"]).catch(() => "")).trim();
+        if (head) await git(this.repo, ["fetch", "-q", dir, `+${head}:refs/heads/${branch}`]);
+      }
+      index.documents[id] = { branch, title, paths: old.paths ?? [], ...(old.paused ? { paused: true } : {}) };
+    }
+    await this.#save(index);
+    this.#index = index;
+    // The old repositories are now branches; keep them aside rather than delete.
+    const aside = join(this.folder, "old-repositories");
+    for (const old of Object.values(raw.documents)) {
+      if (!old.repo || !existsSync(join(this.folder, old.repo))) continue;
+      await mkdir(aside, { recursive: true });
+      await rename(join(this.folder, old.repo), join(aside, old.repo));
+    }
+  }
+
+  async #tree(files: DocumentFiles): Promise<string> {
+    const entries: [string, string, string, string][] = [["100644", "blob", await this.#blob(files.script), files.scriptName]];
+    if (files.bin?.length) {
+      const items = await Promise.all(files.bin.map(async (t, i): Promise<[string, string, string, string]> => ["100644", "blob", await this.#blob(t), `${i}.txt`]));
+      entries.push(["040000", "tree", await this.#mktree(items), "bin"]);
+    }
+    if (files.scratchpad) entries.push(["100644", "blob", await this.#blob(files.scratchpad), "scratchpad.txt"]);
+    return this.#mktree(entries);
+  }
+
+  async #blob(text: string): Promise<string> {
+    return (await git(this.repo, ["hash-object", "-w", "--stdin"], { input: text })).trim();
+  }
+
+  async #mktree(entries: [string, string, string, string][]): Promise<string> {
+    const sorted = entries.slice().sort((a, b) => (a[3] < b[3] ? -1 : 1));
+    return (await git(this.repo, ["mktree"], { input: sorted.map(([mode, type, hash, name]) => `${mode} ${type} ${hash}\t${name}\n`).join("") })).trim();
+  }
+
+  async #commitTree(tree: string, parent: string | null, message: string, date: Date): Promise<string> {
+    const stamp = date.toISOString();
+    // commit-tree ignores commit.gpgSign (it is plumbing): honour the user's choice ourselves.
+    const sign = (await git(this.repo, ["config", "--bool", "commit.gpgsign"]).catch(() => "")).trim() === "true";
+    const args = ["commit-tree", tree, ...(parent ? ["-p", parent] : []), ...(sign ? ["-S"] : []), "-m", message];
+    return (await git(this.repo, args, { env: { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp } })).trim();
+  }
+
+  async #revParse(rev: string): Promise<string | null> {
+    const out = await git(this.repo, ["rev-parse", "--verify", "-q", rev]).catch(() => "");
+    return out.trim() || null;
+  }
+
+  async #scriptName(rev: string): Promise<string | null> {
+    const names = await git(this.repo, ["ls-tree", "--name-only", rev]).catch(() => "");
+    return names.split("\n").find((n) => /^text\.[^/]+$/.test(n)) ?? null;
+  }
+
+  async #read(rev: string, file: string): Promise<string> {
+    return git(this.repo, ["show", `${rev}:${file}`]).catch(() => "");
   }
 
   async #load(): Promise<Index> {
     if (this.#index) return this.#index;
     try {
       const data = JSON.parse(await readFile(join(this.folder, "index.json"), "utf8")) as Index;
-      this.#index = data.version === 1 && data.documents ? data : { version: 1, documents: {} };
+      this.#index = data.version === 2 && data.documents ? data : { version: 2, documents: {} };
     } catch {
-      this.#index = { version: 1, documents: {} };
+      this.#index = { version: 2, documents: {} };
     }
     return this.#index;
   }
@@ -154,33 +308,39 @@ export class History {
   }
 }
 
-async function initRepo(repo: string): Promise<void> {
-  await mkdir(repo, { recursive: true });
-  await git(repo, ["init", "-q"]);
-  await git(repo, ["symbolic-ref", "HEAD", "refs/heads/main"]);
-  // Commits need an author: use the user's git identity, or a local one if none is set.
-  const email = (await git(repo, ["config", "user.email"]).catch(() => "")).trim();
-  if (!email) {
-    const user = process.env.USER || process.env.USERNAME || "writer";
-    await git(repo, ["config", "user.name", user]);
-    await git(repo, ["config", "user.email", `${user}@localhost`]);
-  }
-  await writeFile(join(repo, "README.md"), "Writing history kept by Highwater Too: the script text, Bin items and Scratchpad, committed on each save.\n");
+function fileTitle(path: string): string {
+  const name = path.split(/[\\/]/).pop() ?? "";
+  return name.replace(/\.(highland|fountain|spmd|md|markdown|txt)$/i, "") || "Untitled";
 }
 
-async function writeFiles(repo: string, files: DocumentFiles): Promise<void> {
-  // One script file: remove others (the document may have changed mode).
-  for (const n of await readdir(repo)) if (/^text\.[^/]+$/.test(n) && n !== files.scriptName) await rm(join(repo, n));
-  await writeFile(join(repo, files.scriptName), files.script);
-  const binDir = join(repo, "bin");
-  await rm(binDir, { recursive: true, force: true });
-  if (files.bin?.length) {
-    await mkdir(binDir, { recursive: true });
-    await Promise.all(files.bin.map((t, i) => writeFile(join(binDir, `${i}.txt`), t)));
+/** "works/<name>-<first 8 of the ID>": readable, unique, and never renamed afterwards. */
+function branchName(title: string, id: string, index: Index): string {
+  const slug =
+    title
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^A-Za-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "untitled";
+  const short = id.replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "doc";
+  const taken = new Set(Object.values(index.documents).map((e) => e.branch));
+  let name = `works/${slug}-${short}`;
+  for (let n = 2; taken.has(name); n++) name = `works/${slug}-${short}-${n}`;
+  return name;
+}
+
+/**
+ * Moves a history folder (repository, index and backups) to `to`, which must be empty or missing:
+ * copies everything, then removes the original. Nothing is removed if the copy fails.
+ */
+export async function moveHistory(from: string, to: string): Promise<void> {
+  if (existsSync(to) && (await readdir(to)).length > 0) throw new Error(`${to} is not empty`);
+  if (!existsSync(from)) {
+    await mkdir(to, { recursive: true });
+    return;
   }
-  const pad = join(repo, "scratchpad.txt");
-  if (files.scratchpad !== undefined && files.scratchpad !== "") await writeFile(pad, files.scratchpad);
-  else await rm(pad, { force: true });
+  await cp(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true });
+  await rm(from, { recursive: true, force: true });
 }
 
 export function wordCount(text: string): number {

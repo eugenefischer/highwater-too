@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.15",
+  "version": "0.0.17",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -209,7 +209,24 @@
       },
       {
         "command": "highwater.openHistoryFolder",
-        "title": "Open Writing History Folder",
+        "title": "Reveal Writing History Folder",
+        "category": "Highwater Too",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "highwater.changeHistoryLocation",
+        "title": "Change Writing History Location…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.toggleDocumentHistory",
+        "title": "Turn Writing History Off or On for This Document",
+        "category": "Highwater Too",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "highwater.history.compare",
+        "title": "Compare with Now",
         "category": "Highwater Too"
       }
     ],
@@ -232,7 +249,7 @@
           "type": "string",
           "default": "",
           "scope": "application",
-          "markdownDescription": "Folder for the writing history (one git repository per document) and session backups. You are asked for it the first time a script is saved."
+          "markdownDescription": "Folder for the writing history (one git repository, a branch per document) and session backups. Empty: the system's place for application data (on a Mac, `~/Library/Application Support/Highwater Too/History`; on Linux, `~/.local/share/highwater-too/history`; on Windows, `%LOCALAPPDATA%\\Highwater Too\\History`). Use the **Change Writing History Location** command to move it."
         },
         "highwater.highlandShortcuts": {
           "type": "boolean",
@@ -248,7 +265,7 @@
           "type": "boolean",
           "default": true,
           "scope": "application",
-          "markdownDescription": "Record each save in the document's writing history (a git repository in the history folder). Needs git (on a Mac, the Xcode command-line tools)."
+          "markdownDescription": "Record each save in the writing history (a git repository in the history folder, one branch per document). Needs git (on a Mac, the Xcode command-line tools)."
         }
       }
     },
@@ -890,6 +907,14 @@
         {
           "command": "highwater.showHistory",
           "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.history.compare",
+          "when": "false"
+        },
+        {
+          "command": "highwater.toggleDocumentHistory",
+          "when": "editorLangId =~ /^highland-/"
         }
       ],
       "explorer/context": [
@@ -931,6 +956,21 @@
           "command": "highwater.assets.add",
           "when": "view == highwater.assets && highwater.inBundle",
           "group": "navigation"
+        },
+        {
+          "command": "highwater.openHistoryFolder",
+          "when": "view == highwater.history",
+          "group": "navigation@1"
+        },
+        {
+          "command": "highwater.toggleDocumentHistory",
+          "when": "view == highwater.history",
+          "group": "navigation@2"
+        },
+        {
+          "command": "highwater.changeHistoryLocation",
+          "when": "view == highwater.history",
+          "group": "1_settings"
         }
       ],
       "view/item/context": [
@@ -1132,6 +1172,11 @@
           "id": "highwater.assets",
           "name": "Assets",
           "icon": "media/highwater.svg"
+        },
+        {
+          "id": "highwater.history",
+          "name": "Writing History",
+          "icon": "media/highwater.svg"
         }
       ]
     },
@@ -1160,6 +1205,16 @@
         "view": "highwater.assets",
         "contents": "Assets are kept inside .highland files. Open one to add images.",
         "when": "!highwater.inBundle"
+      },
+      {
+        "view": "highwater.history",
+        "contents": "Each save of a Highland script is recorded here: one git repository for all your writing, with a branch per script. Open a script to see its saves.\n[Change Location…](command:highwater.changeHistoryLocation)",
+        "when": "config.highwater.writingHistory"
+      },
+      {
+        "view": "highwater.history",
+        "contents": "Writing history is off.\n[Turn On](command:workbench.action.openSettings?%5B%22highwater.writingHistory%22%5D)",
+        "when": "!config.highwater.writingHistory"
       }
     ]
   },

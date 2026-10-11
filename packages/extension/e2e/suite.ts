@@ -1,5 +1,6 @@
 /** Runs inside VS Code's extension host (see run.ts). A minimal runner: no test framework needed. */
 import * as assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -179,17 +180,19 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const historyDir = join(dir, "history");
       await vscode.workspace.getConfiguration("highwater").update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
       try {
         const path = await copyOf("History");
         const editor = await openScript(path);
         await editor.edit((e) => e.insert(editor.document.lineAt(editor.document.lineCount - 1).range.end, "\n\nShe writes it down."));
         await vscode.commands.executeCommand("workbench.action.files.save");
-        let repo = "";
-        await waitFor("history repo with a commit", () => {
+        await waitFor("a commit on the document's branch", () => {
           try {
-            const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { repo: string }> };
-            repo = Object.values(index.documents)[0]?.repo ?? "";
-            return repo !== "" && readFileSync(join(historyDir, repo, "text.fountain"), "utf8").includes("She writes it down.");
+            const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { branch: string }> };
+            const branch = Object.values(index.documents)[0]?.branch;
+            if (!branch) return false;
+            const text = execFileSync("git", ["show", `${branch}:text.fountain`], { cwd: join(historyDir, "history.git"), encoding: "utf8" });
+            return text.includes("She writes it down.");
           } catch {
             return false;
           }
@@ -197,7 +200,7 @@ const tests: [string, () => Promise<void>][] = [
         const info = (await readBundle(path)).bundle.info as { highwaterToo?: { documentId?: string } };
         assert.ok(info.highwaterToo?.documentId, "the document ID is stored in info.json");
       } finally {
-        await vscode.workspace.getConfiguration("highwater").update("historyFolder", undefined, vscode.ConfigurationTarget.Global);
+        await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
       }
     },
   ],
@@ -217,6 +220,8 @@ const tests: [string, () => Promise<void>][] = [
 ];
 
 export async function run(): Promise<void> {
+  // Writing history only in its own test: its info.json write would race the other tests' checks.
+  await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
   const failed: string[] = [];
   for (const [name, test] of tests) {
     try {

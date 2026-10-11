@@ -7,7 +7,7 @@ import { registerCommands } from "./commands.ts";
 import { registerLanguageFeatures } from "./language.ts";
 import { registerPanels } from "./panels.ts";
 import { registerPreview } from "./preview.ts";
-import { registerHistory } from "./history.ts";
+import { historyRoot, registerHistory } from "./history.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerStatusBar } from "./status.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
@@ -25,12 +25,6 @@ export function activate(context: vscode.ExtensionContext): void {
   };
   vscode.workspace.textDocuments.forEach(track);
   const cache = registerLanguageFeatures(context, store);
-  registerStatusBar(context, cache);
-  registerCommands(context, store);
-  registerPanels(context, store, fs, cache);
-  registerWorkspaceTools(context, cache);
-  registerPreview(context, store);
-  registerHistory(context, store);
 
   context.subscriptions.push(
     { dispose: () => store.dispose() },
@@ -52,12 +46,29 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.showInformationMessage(`Highwater Too ${version}`);
     }),
   );
+
+  // Features, each on its own: one failing to start (say, a panel VS Code has not registered yet
+  // after an update without a reload) must not take the others, or file access, down with it.
+  const features: [string, () => void][] = [
+    ["status bar", () => registerStatusBar(context, cache)],
+    ["commands", () => registerCommands(context, store)],
+    ["sidebar panels", () => registerPanels(context, store, fs, cache)],
+    ["Live Margins and Title Page Builder", () => registerWorkspaceTools(context, cache)],
+    ["preview", () => registerPreview(context, store)],
+    ["writing history", () => registerHistory(context, store)],
+  ];
+  for (const [name, start] of features) {
+    try {
+      start();
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Highwater Too: the ${name} could not start (${(error as Error).message}). Reloading the window usually fixes this after an update.`);
+    }
+  }
 }
 
-/** Session backups: <history folder>/backups once one is set, else the extension's own storage. */
-function backupFolder(context: vscode.ExtensionContext): string {
-  const history = vscode.workspace.getConfiguration("highwater").get<string>("historyFolder", "").trim();
-  return history ? join(history, "backups") : join(context.globalStorageUri.fsPath, "backups");
+/** Session backups: in the writing history folder (the writer's choice, or the system default). */
+function backupFolder(_context: vscode.ExtensionContext): string {
+  return join(historyRoot(), "backups");
 }
 
 export function deactivate(): void {}
