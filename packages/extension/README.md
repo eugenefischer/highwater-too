@@ -16,6 +16,9 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 - Highlighting of scene headings, characters, dialogue, transitions, notes, boneyard, directives and Markdown; outline and folding by section and scene, or heading.
 - Highland's writing keys: ⌘B, ⌘I, ⌘U, ⌃+ (highlight), ⌘/ (note), ⌘Y (omit), ⌘⇧. (centre), ⌃U and ⌃⇧U (upper and lower case).
 - **Live Margins** (⌘L): cues, parentheticals and dialogue indented and transitions right-aligned, as on the page.
+- **Completion** in screenplays: start a line after an empty one in capitals and the characters who already speak are offered (most frequent first), with scene-heading prefixes and transitions; after `INT.` or `EXT.`, the script's locations; after ` - `, times of day.
+- **Markers:** ⌃M inserts one (with an optional label, listed in the Navigator); ⌃⌥M jumps to the next.
+- **Syntax Cheat Sheet** (the ? button in the Navigator's title bar): the markup for screenplays, manuscripts and both.
 - **Title Page Builder:** a form for the title page fields.
 - The status bar shows words (or selected words), an estimate of pages and screen or reading time, and the print template.
 
@@ -23,7 +26,7 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 
 Click the Highwater Too icon in the activity bar (it opens by itself when you open a document):
 
-- **Navigator** (⌘1): scenes, sections, synopses, notes, images, links, includes and markers; click to jump; filter by type.
+- **Navigator** (⌘1): scenes, sections, synopses, notes, images, links, includes and markers; click to jump; filter by type. Drag a scene, section or heading onto another to move its text there (with everything under it); drop it on the empty space below the list to move it to the end.
 - **Bin** (⌘2): text cut or copied with ⌥⌘X or ⌥⌘C to use later; open, reorder, insert or drag back.
 - **Assets** (⌘4): images kept in the document; drag one into the text.
 - **Scratchpad** (⌘5): notes kept in the document, in their own tab.

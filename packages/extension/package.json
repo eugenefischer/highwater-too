@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -298,6 +298,22 @@
         "command": "highwater.stopUsingForMarkdown",
         "title": "Open .md Files as Ordinary Markdown Again",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.insertMarker",
+        "title": "Insert Marker…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.nextMarker",
+        "title": "Go to Next Marker",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.cheatSheet",
+        "title": "Syntax Cheat Sheet",
+        "category": "Highwater Too",
+        "icon": "$(question)"
       }
     ],
     "customEditors": [
@@ -839,12 +855,12 @@
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
-          "other": false,
+          "other": true,
           "comments": false,
           "strings": false
         },
         "editor.wordBasedSuggestions": "off",
-        "editor.suggestOnTriggerCharacters": false,
+        "editor.suggestOnTriggerCharacters": true,
         "editor.unicodeHighlight.ambiguousCharacters": false,
         "editor.unicodeHighlight.invisibleCharacters": false,
         "editor.renderWhitespace": "none",
@@ -1016,6 +1032,14 @@
         {
           "command": "highwater.exportDocx",
           "when": "editorLangId == highland-markdown"
+        },
+        {
+          "command": "highwater.insertMarker",
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.nextMarker",
+          "when": "editorLangId =~ /^highland-/"
         }
       ],
       "explorer/context": [
@@ -1092,6 +1116,11 @@
           "command": "highwater.pushHistoryNow",
           "when": "view == highwater.history && config.highwater.historyRemote",
           "group": "1_settings"
+        },
+        {
+          "command": "highwater.cheatSheet",
+          "when": "view == highwater.navigator",
+          "group": "navigation@9"
         }
       ],
       "view/item/context": [
@@ -1266,6 +1295,18 @@
         "mac": "ctrl+alt+p",
         "key": "ctrl+alt+p",
         "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.insertMarker",
+        "key": "ctrl+m",
+        "mac": "ctrl+m",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.nextMarker",
+        "key": "ctrl+alt+m",
+        "mac": "ctrl+alt+m",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/"
       }
     ],
     "viewsContainers": {

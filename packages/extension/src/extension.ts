@@ -11,6 +11,7 @@ import { registerPreview } from "./preview.ts";
 import { registerTemplateStatus } from "./render-document.ts";
 import { historyRoot, registerHistory } from "./history.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
+import { registerWritingTools } from "./writing-tools.ts";
 import { registerStatusBar } from "./status.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 
@@ -67,6 +68,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ["commands", () => registerCommands(context, store)],
     ["sidebar panels", () => registerPanels(context, store, fs, cache)],
     ["Live Margins and Title Page Builder", () => registerWorkspaceTools(context, cache)],
+    ["completion, markers and cheat sheet", () => registerWritingTools(context, cache)],
     ["preview", () => registerPreview(context, store)],
     ["template indicator", () => registerTemplateStatus(context, store)],
     ["writing history", () => registerHistory(context, store)],

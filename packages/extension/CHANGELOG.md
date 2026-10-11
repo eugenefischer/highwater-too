@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+- Completion in screenplays: character names, scene-heading prefixes, the script's locations, times of day and transitions.
+- Markers: Insert Marker (⌃M) and Go to Next Marker (⌃⌥M).
+- Navigator: drag scenes, sections and headings to reorder the text.
+- Syntax Cheat Sheet, from the Navigator's title bar or the Command Palette.
+
 ## 0.1.2
 
 - **Export Word Document (.docx)** for manuscripts: the PDF's layout in ordinary Word formatting (styles, header and footer with page-number fields, title page, real lists, tables, table of contents, links, images). Font setting: Courier New, double-spaced (default), or Courier Prime embedded in the file.

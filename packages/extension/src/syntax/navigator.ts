@@ -128,3 +128,37 @@ function inlineOf(e: Element): Inline[][] {
       return "inline" in e ? [e.inline] : [];
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Drag to reorder: a scene runs to the next scene, section or heading; a section or heading runs
+// to the next one at its level or above.
+
+type Block = { start: number; end: number };
+
+/** The text a scene, section or heading starting at `start` covers, or null if none starts there. */
+export function blockAt(doc: Document, start: number): Block | null {
+  const i = doc.elements.findIndex((e) => e.span.start === start && (e.kind === "sceneHeading" || e.kind === "section" || e.kind === "heading"));
+  if (i < 0) return null;
+  const head = doc.elements[i]!;
+  const level = head.kind === "sceneHeading" ? Infinity : (head as { level: number }).level;
+  for (const e of doc.elements.slice(i + 1)) {
+    if (e.kind === "sceneHeading" && level === Infinity) return { start, end: e.span.start };
+    if ((e.kind === "section" || e.kind === "heading") && e.level <= (level === Infinity ? Infinity : level)) return { start, end: e.span.start };
+  }
+  return { start, end: doc.source.length };
+}
+
+/**
+ * Edits that move a block to just before `to` (or to the end of the text when `to` is null), as
+ * a delete and an insert in the original text's offsets. Null when the move changes nothing.
+ */
+export function moveBlock(source: string, block: Block, to: number | null): { delete: Block; insert: { at: number; text: string } } | null {
+  const at = to ?? source.length;
+  if (at >= block.start && at <= block.end) return null;
+  let text = source.slice(block.start, block.end);
+  // Every moved block ends with an empty line, as blocks between headings do.
+  if (!text.endsWith("\n\n")) text = text.replace(/\n?$/, "\n\n");
+  // Moving to the end: keep an empty line between the last text and the block.
+  const prefix = to === null && !/\n\n$/.test(source) ? (source.endsWith("\n") ? "\n" : "\n\n") : "";
+  return { delete: block, insert: { at, text: prefix + text } };
+}

@@ -37,3 +37,36 @@ describe("navigator", () => {
     expect(parseFilters("not json")).toEqual(DEFAULT_FILTERS);
   });
 });
+
+describe("navigator drag to reorder", async () => {
+  const { blockAt, moveBlock } = await import("../src/syntax/navigator.ts");
+  const { parse } = await import("@highwater/parser");
+  const apply = (src: string, m: NonNullable<ReturnType<typeof moveBlock>>) => {
+    // Apply the later edit first so the earlier offsets stay valid.
+    const edits = [{ start: m.delete.start, end: m.delete.end, text: "" }, { start: m.insert.at, end: m.insert.at, text: m.insert.text }].sort((a, b) => b.start - a.start);
+    return edits.reduce((s, e) => s.slice(0, e.start) + e.text + s.slice(e.end), src);
+  };
+  const script = "# Act One\n\nINT. A - DAY\n\nOne.\n\nINT. B - DAY\n\nTwo.\n\n# Act Two\n\nINT. C - DAY\n\nThree.\n";
+  const doc = parse(script, { mode: "fountain" });
+  const at = (text: string) => script.indexOf(text);
+
+  it("finds a scene's text, up to the next scene", () => {
+    expect(script.slice(at("INT. B"), blockAt(doc, at("INT. B"))!.end)).toBe("INT. B - DAY\n\nTwo.\n\n");
+  });
+  it("finds a section's text, scenes included, up to the next section at its level", () => {
+    expect(script.slice(at("# Act One"), blockAt(doc, at("# Act One"))!.end)).toBe("# Act One\n\nINT. A - DAY\n\nOne.\n\nINT. B - DAY\n\nTwo.\n\n");
+  });
+  it("moves a scene before another", () => {
+    const m = moveBlock(script, blockAt(doc, at("INT. B"))!, at("INT. A"))!;
+    expect(apply(script, m)).toBe("# Act One\n\nINT. B - DAY\n\nTwo.\n\nINT. A - DAY\n\nOne.\n\n# Act Two\n\nINT. C - DAY\n\nThree.\n");
+  });
+  it("moves the last scene, adding the empty line it lacked", () => {
+    const m = moveBlock(script, blockAt(doc, at("INT. C"))!, at("INT. A"))!;
+    expect(apply(script, m)).toBe("# Act One\n\nINT. C - DAY\n\nThree.\n\nINT. A - DAY\n\nOne.\n\nINT. B - DAY\n\nTwo.\n\n# Act Two\n\n");
+  });
+  it("moves a section to the end, and does nothing when dropped inside itself", () => {
+    const act1 = blockAt(doc, at("# Act One"))!;
+    expect(apply(script, moveBlock(script, act1, null)!)).toBe("# Act Two\n\nINT. C - DAY\n\nThree.\n\n# Act One\n\nINT. A - DAY\n\nOne.\n\nINT. B - DAY\n\nTwo.\n\n");
+    expect(moveBlock(script, act1, at("INT. B"))).toBe(null);
+  });
+});

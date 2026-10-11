@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import type { ParseCache } from "./language.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
-import { NAVIGATOR_LABELS, NAVIGATOR_TYPES, navigatorItems, parseFilters, type NavigatorFilters, type NavigatorItem, type NavigatorType } from "./syntax/navigator.ts";
+import { blockAt, moveBlock, NAVIGATOR_LABELS, NAVIGATOR_TYPES, navigatorItems, parseFilters, type NavigatorFilters, type NavigatorItem, type NavigatorType } from "./syntax/navigator.ts";
 import { assetMarkdown, binLabel, move, uniqueName } from "./syntax/workspace.ts";
 
 /**
@@ -19,7 +19,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
 
   const binTree = vscode.window.createTreeView("highwater.bin", { treeDataProvider: bin, dragAndDropController: bin, canSelectMany: false });
   const assetTree = vscode.window.createTreeView("highwater.assets", { treeDataProvider: assets, dragAndDropController: assets });
-  const navTree = vscode.window.createTreeView("highwater.navigator", { treeDataProvider: navigator, showCollapseAll: true });
+  const navTree = vscode.window.createTreeView("highwater.navigator", { treeDataProvider: navigator, dragAndDropController: navigator, showCollapseAll: true });
 
   const refreshAll = () => {
     navigator.refresh();
@@ -163,7 +163,11 @@ const ICONS: Record<NavigatorType, string> = {
   markers: "bookmark",
 };
 
-class NavigatorView implements vscode.TreeDataProvider<NavigatorItem> {
+const NAV_MIME = "application/vnd.code.tree.highwater.navigator";
+
+class NavigatorView implements vscode.TreeDataProvider<NavigatorItem>, vscode.TreeDragAndDropController<NavigatorItem> {
+  readonly dragMimeTypes = [NAV_MIME];
+  readonly dropMimeTypes = [NAV_MIME];
   readonly #changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.#changed.event;
   #filters: NavigatorFilters = parseFilters(undefined);
@@ -192,6 +196,27 @@ class NavigatorView implements vscode.TreeDataProvider<NavigatorItem> {
     if (item) return item.children;
     const doc = this.current.script;
     return doc ? navigatorItems(this.cache.get(doc), this.#filters) : [];
+  }
+
+  /** Scenes, sections and headings drag to a new place: dropped on another, they move before it. */
+  handleDrag(items: readonly NavigatorItem[], data: vscode.DataTransfer): void {
+    const item = items.find((i) => i.type === "sceneHeaders" || i.type === "sectionHeaders");
+    if (item) data.set(NAV_MIME, new vscode.DataTransferItem(item.span.start));
+  }
+
+  async handleDrop(target: NavigatorItem | undefined, data: vscode.DataTransfer): Promise<void> {
+    const doc = this.current.script;
+    const from = data.get(NAV_MIME)?.value as number | undefined;
+    if (!doc || from === undefined) return;
+    if (target && target.type !== "sceneHeaders" && target.type !== "sectionHeaders") return;
+    const parsed = this.cache.get(doc);
+    const block = blockAt(parsed, from);
+    const move = block && moveBlock(parsed.source, block, target ? target.span.start : null);
+    if (!move) return;
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(doc.uri, doc.positionAt(move.insert.at), move.insert.text);
+    edit.delete(doc.uri, new vscode.Range(doc.positionAt(move.delete.start), doc.positionAt(move.delete.end)));
+    await vscode.workspace.applyEdit(edit);
   }
 
   /** Highland's per-document type toggles: from navigatorFilters.json, changed here per document. */
