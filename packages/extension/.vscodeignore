@@ -6,3 +6,4 @@ dist/e2e/**
 .vscode-test/**
 tsconfig*.json
 scripts/**
+media/icon.svg
