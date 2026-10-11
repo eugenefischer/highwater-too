@@ -165,6 +165,15 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "opens the PDF preview beside the script",
+    async () => {
+      const path = await copyOf("Preview");
+      await openScript(path);
+      await vscode.commands.executeCommand("highwater.preview");
+      await waitFor("preview panel", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label === "Preview: Preview.highland")));
+    },
+  ],
+  [
     "exports a manuscript, with its image, as a PDF",
     async () => {
       const path = join(dir, "ManuscriptExport.highland");

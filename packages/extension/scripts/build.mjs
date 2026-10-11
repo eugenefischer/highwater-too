@@ -29,3 +29,8 @@ if (e2e) await build({ ...common, entryPoints: [join(root, "e2e/suite.ts")], out
 cpSync(join(root, "../pdf/fonts"), join(root, "dist/fonts"), { recursive: true });
 const metrics = join(dirname(require.resolve("pdfkit")), "standard-fonts"); // pdfkit/js/pdfkit.js -> pdfkit/js/standard-fonts
 cpSync(metrics, join(root, "dist/standard-fonts"), { recursive: true, filter: (src) => !src.endsWith(".mjs") });
+
+// pdf.js for the preview webview.
+// The legacy build: the modern one needs newer JavaScript than the Chromium inside VS Code may have.
+const pdfjs = join(dirname(require.resolve("pdfjs-dist/package.json")), "legacy", "build");
+for (const f of ["pdf.min.mjs", "pdf.worker.min.mjs"]) cpSync(join(pdfjs, f), join(root, "dist/pdfjs", f));

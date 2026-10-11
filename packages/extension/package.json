@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -194,6 +194,12 @@
         "command": "highwater.titlePageBuilder",
         "title": "Title Page Builder…",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.preview",
+        "title": "Preview",
+        "category": "Highwater Too",
+        "icon": "$(open-preview)"
       }
     ],
     "customEditors": [
@@ -220,7 +226,7 @@
         "highwater.highlandShortcuts": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar), ⌘1 (Navigator), ⌘2 (Bin), ⌘4 (Assets) and ⌘5 (Scratchpad) their Highland meanings instead of VS Code's. With it off, Live Margins is ⌃⌥L. Preview and Stats (⌘3) arrive later."
+          "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar), ⌘1 (Navigator), ⌘2 (Bin), ⌘4 (Assets) and ⌘5 (Scratchpad) their Highland meanings instead of VS Code's. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
         },
         "highwater.showSidebarOnOpen": {
           "type": "boolean",
@@ -859,6 +865,10 @@
         {
           "command": "highwater.titlePageBuilder",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
+        },
+        {
+          "command": "highwater.preview",
+          "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
         }
       ],
       "explorer/context": [
@@ -869,6 +879,11 @@
         }
       ],
       "editor/title": [
+        {
+          "command": "highwater.preview",
+          "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
+          "group": "navigation"
+        },
         {
           "command": "highwater.exportPdf",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
@@ -1057,6 +1072,18 @@
         "mac": "ctrl+alt+l",
         "key": "ctrl+alt+l",
         "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.preview",
+        "mac": "cmd+e",
+        "key": "ctrl+e",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.preview",
+        "mac": "ctrl+alt+p",
+        "key": "ctrl+alt+p",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
       }
     ],
     "viewsContainers": {
@@ -1124,7 +1151,8 @@
   "devDependencies": {
     "@types/vscode": "^1.100.0",
     "@vscode/test-electron": "^3.1.0",
-    "@vscode/vsce": "^4.0.0"
+    "@vscode/vsce": "^4.0.0",
+    "pdfjs-dist": "^6.4.299"
   },
   "dependencies": {
     "@highwater/bundle": "*",
