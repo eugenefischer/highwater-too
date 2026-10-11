@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -99,6 +99,91 @@
         "command": "highwater.hello",
         "title": "Show Version",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.navigator.filter",
+        "title": "Show or Hide Item Types…",
+        "category": "Highwater Too",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "highwater.navigator.reveal",
+        "title": "Go to Item",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.copyToBin",
+        "title": "Copy to Bin",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.cutToBin",
+        "title": "Cut to Bin",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.bin.new",
+        "title": "New Bin Item",
+        "category": "Highwater Too",
+        "icon": "$(add)"
+      },
+      {
+        "command": "highwater.bin.open",
+        "title": "Open Bin Item",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.bin.insert",
+        "title": "Insert into Script",
+        "category": "Highwater Too",
+        "icon": "$(insert)"
+      },
+      {
+        "command": "highwater.bin.moveUp",
+        "title": "Move Up",
+        "category": "Highwater Too",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "highwater.bin.moveDown",
+        "title": "Move Down",
+        "category": "Highwater Too",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "highwater.bin.delete",
+        "title": "Delete",
+        "category": "Highwater Too",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "highwater.assets.add",
+        "title": "Add Image…",
+        "category": "Highwater Too",
+        "icon": "$(add)"
+      },
+      {
+        "command": "highwater.assets.insert",
+        "title": "Insert into Script",
+        "category": "Highwater Too",
+        "icon": "$(insert)"
+      },
+      {
+        "command": "highwater.assets.open",
+        "title": "Open Image",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.assets.delete",
+        "title": "Delete",
+        "category": "Highwater Too",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "highwater.openScratchpad",
+        "title": "Open Scratchpad",
+        "category": "Highwater Too",
+        "icon": "$(notebook)"
       }
     ],
     "customEditors": [
@@ -125,7 +210,7 @@
         "highwater.highlandShortcuts": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar) and ⌘1–⌘5 (panels) their Highland meanings instead of VS Code's. Preview, Live Margins and the panels arrive in a later version; ⌘0 works now."
+          "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar), ⌘1 (Navigator), ⌘2 (Bin), ⌘4 (Assets) and ⌘5 (Scratchpad) their Highland meanings instead of VS Code's. Preview, Live Margins and Stats (⌘3) arrive later in this version series."
         }
       }
     },
@@ -704,6 +789,50 @@
         {
           "command": "highwater.exportPdf",
           "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.navigator.reveal",
+          "when": "false"
+        },
+        {
+          "command": "highwater.bin.open",
+          "when": "false"
+        },
+        {
+          "command": "highwater.bin.insert",
+          "when": "false"
+        },
+        {
+          "command": "highwater.bin.moveUp",
+          "when": "false"
+        },
+        {
+          "command": "highwater.bin.moveDown",
+          "when": "false"
+        },
+        {
+          "command": "highwater.bin.delete",
+          "when": "false"
+        },
+        {
+          "command": "highwater.assets.insert",
+          "when": "false"
+        },
+        {
+          "command": "highwater.assets.open",
+          "when": "false"
+        },
+        {
+          "command": "highwater.assets.delete",
+          "when": "false"
+        },
+        {
+          "command": "highwater.copyToBin",
+          "when": "editorLangId =~ /^highland-/ && resourceScheme == highland"
+        },
+        {
+          "command": "highwater.cutToBin",
+          "when": "editorLangId =~ /^highland-/ && resourceScheme == highland"
         }
       ],
       "explorer/context": [
@@ -718,6 +847,82 @@
           "command": "highwater.exportPdf",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "highwater.navigator.filter",
+          "when": "view == highwater.navigator",
+          "group": "navigation"
+        },
+        {
+          "command": "highwater.bin.new",
+          "when": "view == highwater.bin && highwater.inBundle",
+          "group": "navigation@1"
+        },
+        {
+          "command": "highwater.openScratchpad",
+          "when": "view == highwater.bin && highwater.inBundle",
+          "group": "navigation@2"
+        },
+        {
+          "command": "highwater.assets.add",
+          "when": "view == highwater.assets && highwater.inBundle",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "highwater.bin.insert",
+          "when": "view == highwater.bin && viewItem == binItem",
+          "group": "inline@1"
+        },
+        {
+          "command": "highwater.bin.moveUp",
+          "when": "view == highwater.bin && viewItem == binItem",
+          "group": "1_move@1"
+        },
+        {
+          "command": "highwater.bin.moveDown",
+          "when": "view == highwater.bin && viewItem == binItem",
+          "group": "1_move@2"
+        },
+        {
+          "command": "highwater.bin.insert",
+          "when": "view == highwater.bin && viewItem == binItem",
+          "group": "0_use"
+        },
+        {
+          "command": "highwater.bin.delete",
+          "when": "view == highwater.bin && viewItem == binItem",
+          "group": "9_delete"
+        },
+        {
+          "command": "highwater.assets.insert",
+          "when": "view == highwater.assets && viewItem == asset",
+          "group": "inline@1"
+        },
+        {
+          "command": "highwater.assets.insert",
+          "when": "view == highwater.assets && viewItem == asset",
+          "group": "0_use"
+        },
+        {
+          "command": "highwater.assets.delete",
+          "when": "view == highwater.assets && viewItem == asset",
+          "group": "9_delete"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "highwater.cutToBin",
+          "when": "editorHasSelection && resourceScheme == highland && editorLangId =~ /^highland-(fountain|markdown|plain)$/",
+          "group": "9_cutcopypaste@10"
+        },
+        {
+          "command": "highwater.copyToBin",
+          "when": "editorHasSelection && resourceScheme == highland && editorLangId =~ /^highland-(fountain|markdown|plain)$/",
+          "group": "9_cutcopypaste@11"
         }
       ]
     },
@@ -778,6 +983,97 @@
         "key": "ctrl+0",
         "mac": "cmd+0",
         "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.cutToBin",
+        "mac": "alt+cmd+x",
+        "key": "ctrl+alt+x",
+        "when": "editorTextFocus && editorHasSelection && resourceScheme == highland"
+      },
+      {
+        "command": "highwater.copyToBin",
+        "mac": "alt+cmd+c",
+        "key": "ctrl+alt+c",
+        "when": "editorTextFocus && editorHasSelection && resourceScheme == highland"
+      },
+      {
+        "command": "highwater.navigator.focus",
+        "mac": "cmd+1",
+        "key": "ctrl+1",
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.bin.focus",
+        "mac": "cmd+2",
+        "key": "ctrl+2",
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.assets.focus",
+        "mac": "cmd+4",
+        "key": "ctrl+4",
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.openScratchpad",
+        "mac": "cmd+5",
+        "key": "ctrl+5",
+        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "highwater",
+          "title": "Highwater Too",
+          "icon": "media/highwater.svg"
+        }
+      ]
+    },
+    "views": {
+      "highwater": [
+        {
+          "id": "highwater.navigator",
+          "name": "Navigator",
+          "icon": "media/highwater.svg"
+        },
+        {
+          "id": "highwater.bin",
+          "name": "Bin",
+          "icon": "media/highwater.svg"
+        },
+        {
+          "id": "highwater.assets",
+          "name": "Assets",
+          "icon": "media/highwater.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "highwater.navigator",
+        "contents": "Open a Highland document, .fountain or .md file to see its scenes, sections and notes.",
+        "when": "!highwater.hasDocument"
+      },
+      {
+        "view": "highwater.bin",
+        "contents": "The Bin holds text cut or copied from the script (⌥⌘X, ⌥⌘C) to use later. It is kept inside the .highland file.\n[New Bin Item](command:highwater.bin.new)\n[Open Scratchpad](command:highwater.openScratchpad)",
+        "when": "highwater.inBundle"
+      },
+      {
+        "view": "highwater.bin",
+        "contents": "The Bin and Scratchpad are kept inside .highland files. Open one to use them.",
+        "when": "!highwater.inBundle"
+      },
+      {
+        "view": "highwater.assets",
+        "contents": "Images kept inside this .highland file. Drag one into the text to show it in the manuscript.\n[Add Image…](command:highwater.assets.add)",
+        "when": "highwater.inBundle"
+      },
+      {
+        "view": "highwater.assets",
+        "contents": "Assets are kept inside .highland files. Open one to add images.",
+        "when": "!highwater.inBundle"
       }
     ]
   },

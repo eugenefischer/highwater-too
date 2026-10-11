@@ -135,6 +135,25 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "copies a selection to the Bin and opens the Scratchpad",
+    async () => {
+      const path = await copyOf("Panels");
+      const editor = await openScript(path);
+      let n = editor.document.lineCount - 1;
+      while (n > 0 && editor.document.lineAt(n).isEmptyOrWhitespace) n--;
+      const line = editor.document.lineAt(n);
+      editor.selection = new vscode.Selection(line.range.start, line.range.end);
+      await vscode.commands.executeCommand("highwater.copyToBin");
+      const bundle = (await readBundle(path)).bundle;
+      assert.deepEqual(bundle.binItems, [line.text]);
+      assert.equal(bundle.text, editor.document.getText(), "the script is untouched");
+      await vscode.commands.executeCommand("highwater.openScratchpad");
+      await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.path.endsWith("/scratchpad.txt") === true);
+      assert.equal((await readBundle(path)).bundle.scratchpad, "");
+      await vscode.commands.executeCommand("highwater.navigator.focus");
+    },
+  ],
+  [
     "exports a manuscript, with its image, as a PDF",
     async () => {
       const path = join(dir, "ManuscriptExport.highland");

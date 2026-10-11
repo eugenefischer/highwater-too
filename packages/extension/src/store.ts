@@ -63,6 +63,11 @@ export class BundleStore {
   }
 
   /** Highland's settings block from info.json (print options and so on). */
+  /** The bundle as last read (refreshed when the file changes). Read only: change it with `update`. */
+  async snapshot(path: string): Promise<HighlandBundle> {
+    return (await this.#current(path)).bundle;
+  }
+
   async highlandSettings(path: string): Promise<Record<string, unknown>> {
     return (await this.#current(path)).bundle.highlandSettings;
   }
@@ -85,6 +90,18 @@ export class BundleStore {
    * Before the first save of a bundle in this session, the original file is backed up.
    */
   write(path: string, entry: string, data: Uint8Array): Promise<void> {
+    return this.update(path, (bundle) => {
+      const key = entry === "" ? bundle.textPath : entry;
+      bundle.set(key, data);
+      return [key];
+    }).then(() => {});
+  }
+
+  /**
+   * Changes a bundle's entries and saves it, with the same queueing, disk check and backup as
+   * `write`. `change` edits the bundle as read from disk and returns the entries it touched.
+   */
+  update(path: string, change: (bundle: HighlandBundle) => string[]): Promise<string[]> {
     const state = this.#state(path);
     const run = state.queue.then(async () => {
       state.writing = true;
@@ -96,21 +113,25 @@ export class BundleStore {
           state.backedUp = true;
         }
         const { bundle } = current;
-        const key = entry === "" ? bundle.textPath : entry;
-        bundle.set(key, data);
+        let touched: string[];
         try {
+          touched = change(bundle);
           await writeBundle(path, bundle, { expected: current.fingerprint });
-          const saved = await this.#load(path, current);
-          saved.times.set(key, saved.fingerprint.mtimeMs);
         } catch (error) {
-          state.loaded = undefined; // the cached bundle holds unsaved data now; reload on next read
+          state.loaded = undefined; // the cached bundle may hold unsaved changes now; reload on next read
           throw error;
         }
+        const saved = await this.#load(path, current);
+        for (const key of touched) saved.times.set(key, saved.fingerprint.mtimeMs);
+        return touched;
       } finally {
         state.writing = false;
       }
     });
-    state.queue = run.catch(() => {});
+    state.queue = run.then(
+      () => {},
+      () => {},
+    );
     return run;
   }
 
