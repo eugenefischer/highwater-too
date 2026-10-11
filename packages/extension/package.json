@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Edit Highland 2 .highland screenplays and manuscripts in VS Code.",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -211,6 +211,11 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "In Highland documents, give ⌘E (Preview), ⌘L (Live Margins), ⌘0 (sidebar), ⌘1 (Navigator), ⌘2 (Bin), ⌘4 (Assets) and ⌘5 (Scratchpad) their Highland meanings instead of VS Code's. Preview, Live Margins and Stats (⌘3) arrive later in this version series."
+        },
+        "highwater.showSidebarOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a Highland script is opened."
         }
       }
     },

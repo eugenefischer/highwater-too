@@ -30,18 +30,26 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
   current.onDidChange(refreshAll);
 
   let timer: NodeJS.Timeout | undefined;
+  /** Scripts the sidebar has been shown for since they were opened. */
+  const shown = new Set<string>();
   context.subscriptions.push(
     binTree,
     assetTree,
     navTree,
     current,
-    vscode.window.onDidChangeActiveTextEditor((e) => current.follow(e?.document)),
+    vscode.window.onDidChangeActiveTextEditor((e) => {
+      current.follow(e?.document);
+      void showSidebar(e);
+    }),
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document !== current.script) return;
       clearTimeout(timer);
       timer = setTimeout(() => navigator.refresh(), 250);
     }),
-    vscode.workspace.onDidCloseTextDocument((d) => current.closed(d)),
+    vscode.workspace.onDidCloseTextDocument((d) => {
+      current.closed(d);
+      shown.delete(d.uri.toString());
+    }),
     { dispose: store.onExternalChange((path) => (path === current.bundle ? refreshAll() : undefined)) },
 
     vscode.commands.registerCommand("highwater.navigator.reveal", (uri: vscode.Uri, offset: number) => reveal(uri, offset)),
@@ -64,6 +72,24 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     vscode.commands.registerCommand("highwater.openScratchpad", () => openScratchpad(store, current)),
   );
   for (const e of [vscode.window.activeTextEditor, ...vscode.window.visibleTextEditors]) if (e) current.follow(e.document);
+  void showSidebar(vscode.window.activeTextEditor);
+
+  /**
+   * Opening a Highland script switches the sidebar to Highwater Too, once per opening, then hands
+   * the keyboard back to the editor. Setting highwater.showSidebarOnOpen turns this off.
+   */
+  async function showSidebar(editor: vscode.TextEditor | undefined): Promise<void> {
+    const doc = editor?.document;
+    if (!doc || !doc.languageId.startsWith("highland-")) return;
+    const parts = doc.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
+    if (parts && parts.entry !== "") return; // Bin items and the Scratchpad
+    const key = doc.uri.toString();
+    if (shown.has(key)) return;
+    shown.add(key);
+    if (!vscode.workspace.getConfiguration("highwater").get<boolean>("showSidebarOnOpen", true)) return;
+    await vscode.commands.executeCommand("workbench.view.extension.highwater");
+    await vscode.window.showTextDocument(doc, { ...(editor.viewColumn ? { viewColumn: editor.viewColumn } : {}), preserveFocus: false });
+  }
 
   async function toBin(cut: boolean): Promise<void> {
     const editor = vscode.window.activeTextEditor;
