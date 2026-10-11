@@ -74,6 +74,7 @@ class Preview {
       } else if (msg.type === "reveal" && typeof msg.offset === "number") void this.#reveal(msg.offset, false);
       else if (msg.type === "jump" && typeof msg.offset === "number") void this.#reveal(msg.offset, true);
       else if (msg.type === "export" && this.#doc) void vscode.commands.executeCommand("highwater.exportPdf", this.#doc.uri);
+      else if (msg.type === "exportDocx" && this.#doc) void vscode.commands.executeCommand("highwater.exportDocx", this.#doc.uri);
       else if (msg.type === "error") void vscode.window.showErrorMessage(`Preview: ${msg.message}`);
     });
   }
@@ -159,6 +160,7 @@ html, body { margin: 0; height: 100%; }
 body { display: flex; flex-direction: column; background: var(--vscode-editorWidget-background, #444); color: var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
 #bar { display: flex; gap: 10px; align-items: center; padding: 6px 10px; background: var(--vscode-editor-background); border-bottom: 1px solid var(--vscode-panel-border, transparent); }
 #bar select, #bar button { font: inherit; color: var(--vscode-dropdown-foreground); background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border, transparent); padding: 2px 6px; }
+#bar button[hidden] { display: none; }
 #bar button { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); border: none; padding: 3px 10px; cursor: pointer; }
 #status { margin-left: auto; color: var(--vscode-descriptionForeground); }
 #pages { flex: 1; overflow: auto; padding: 16px 0; }
@@ -172,6 +174,7 @@ body { display: flex; flex-direction: column; background: var(--vscode-editorWid
   <select id="zoom"><option value="fit">Fit width</option><option value="1">100%</option><option value="1.5">150%</option><option value="0.75">75%</option></select>
   <label title="Keep the preview and the editor at the same place"><input type="checkbox" id="sync" checked> Sync</label>
   <button id="export">Export PDF…</button>
+  <button id="exportDocx" hidden>Export .docx…</button>
   <span id="status">Loading…</span>
 </div>
 <div id="pages"><div id="message"></div></div>

@@ -1032,19 +1032,9 @@
           "group": "navigation@1"
         },
         {
-          "command": "highwater.exportPdf",
-          "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
-          "group": "navigation@2"
-        },
-        {
-          "command": "highwater.exportDocx",
-          "when": "editorLangId == highland-markdown",
-          "group": "navigation@3"
-        },
-        {
           "command": "highwater.export",
           "when": "resourceScheme == highland && editorLangId =~ /^highland-/",
-          "group": "navigation@4"
+          "group": "navigation@2"
         }
       ],
       "view/title": [

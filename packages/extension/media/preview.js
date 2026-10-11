@@ -39,6 +39,7 @@ zoomEl.onchange = () => {
 };
 syncEl.onchange = () => save({ sync: syncEl.checked });
 $("export").onclick = () => vscode.postMessage({ type: "export" });
+$("exportDocx").onclick = () => vscode.postMessage({ type: "exportDocx" });
 window.addEventListener("resize", () => zoomEl.value === "fit" && layoutPages(true));
 
 const scale = () => (zoomEl.value === "fit" ? Math.max(0.3, (pagesEl.clientWidth - 40) / 612) : Number(zoomEl.value));
@@ -178,6 +179,7 @@ window.addEventListener("message", async ({ data: msg }) => {
   else if (msg.type === "scrollTo") {
     if (syncEl.checked) scrollToOffset(msg.offset);
   } else if (msg.type === "empty") {
+    $("exportDocx").hidden = true;
     pdf = null;
     sizes = [];
     anchors = [];
@@ -185,6 +187,8 @@ window.addEventListener("message", async ({ data: msg }) => {
     status.textContent = "";
   } else if (msg.type === "pdf") {
     templateEl.replaceChildren(...msg.templates.map((t) => new Option(t, t, false, t === msg.template)));
+    // Word export is for manuscripts only.
+    $("exportDocx").hidden = msg.template !== "Manuscript";
     try {
       const doc = await pdfjs.getDocument({ data: msg.data }).promise;
       const next = [];
