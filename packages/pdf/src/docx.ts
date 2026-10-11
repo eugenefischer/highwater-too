@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { strToU8, zipSync } from "fflate";
 import { seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
-import { imageSize, manuscriptHeadingPages, MANUSCRIPT, type ManuscriptOptions } from "./manuscript.ts";
+import { imageSize, layoutManuscript, manuscriptHeadingPages, MANUSCRIPT, type ManuscriptOptions } from "./manuscript.ts";
 import { extraBlankLines, styledValue } from "./screenplay.ts";
 import { plain, toRuns, type InlineContext } from "./text.ts";
 import type { Run } from "./types.ts";
@@ -71,6 +71,9 @@ export function manuscriptDocx(doc: Document, options: DocxOptions = {}): Uint8A
     ? manuscriptHeadingPages(doc, { ...options, ...(options.titlePage === false ? { titlePage: false } : {}) })
     : [];
 
+  // %pp's shown value until Word updates the field (LibreOffice keeps it): the PDF's last page number.
+  const usesPageCount = elements.some((e) => e.kind === "directiveLine" && e.directives.some(({ directive: d }) => (d.kind === "header" || d.kind === "footer") && [d.slots.left, d.slots.center, d.slots.right].some((x) => x?.some((t) => t.kind === "pageCount"))));
+  const pageCount = usesPageCount ? (layoutManuscript(doc, options).pages.at(-1)?.number ?? 1) : 1;
   let section: Section = { header: null, footer: null, first: true };
   let bodyStarted = false;
   let printed = false;
@@ -90,7 +93,9 @@ export function manuscriptDocx(doc: Document, options: DocxOptions = {}): Uint8A
       (pp.jc ? `<w:jc w:val="${pp.jc}"/>` : "");
     pageBreakNext = false;
     out.push(`<w:p><w:pPr>${pPr}</w:pPr>${content}</w:p>`);
-    bodyStarted = true;
+    // Empty lines before the first text do not start the body: a {{HEADER}} after them still
+    // belongs to the first section rather than starting a new one.
+    if (content !== "") bodyStarted = true;
     afterBreak = false;
   };
   const empty = () => para({ style: "Normal" }, "");
@@ -104,7 +109,7 @@ export function manuscriptDocx(doc: Document, options: DocxOptions = {}): Uint8A
     if (out.at(-1)!.startsWith("<w:tbl")) out.push(`<w:p><w:pPr><w:pStyle w:val="Normal"/></w:pPr></w:p>`);
     sections.push(section);
     const last = out.length - 1;
-    out[last] = out[last]!.replace("</w:pPr>", `${sectPr(parts, section, { continuous: !section.first, single: false })}</w:pPr>`);
+    out[last] = out[last]!.replace("</w:pPr>", `${sectPr(parts, section, { continuous: !section.first, single: false, pageCount })}</w:pPr>`);
     const { start: _start, ...rest } = section;
     section = { ...rest, first: false, ...change };
   };
@@ -239,7 +244,7 @@ export function manuscriptDocx(doc: Document, options: DocxOptions = {}): Uint8A
   body.push(...out);
   // A section's type says how it starts: the first after the title page on a new page, later ones
   // (a changed header, footer or page number) continuing the page they start on.
-  body.push(sectPr(parts, section, { single: singleBody, continuous: !section.first }));
+  body.push(sectPr(parts, section, { single: singleBody, continuous: !section.first, pageCount }));
   // A section's %pp: its page count when the body is one section, else the document's.
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document ${NS}><w:body>${body.join("")}</w:body></w:document>`;
@@ -353,7 +358,7 @@ function table(rows: { cells: Run[][]; head: boolean }[], parts: Parts): string 
   return `<w:tbl><w:tblPr><w:tblW w:w="${w * cols}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="115" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${Array.from({ length: cols }, () => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>${rows.map(tr).join("")}</w:tbl>`;
 }
 
-function sectPr(parts: Parts, s: Section, o: { empty?: boolean; continuous?: boolean; single?: boolean }): string {
+function sectPr(parts: Parts, s: Section, o: { empty?: boolean; continuous?: boolean; single?: boolean; pageCount?: number }): string {
   const refs: string[] = [];
   let titlePg = false;
   if (!o.empty) {
@@ -365,7 +370,7 @@ function sectPr(parts: Parts, s: Section, o: { empty?: boolean; continuous?: boo
             : t.kind === "page"
               ? field("PAGE", "1")
               : t.kind === "pageCount"
-                ? field(o.single ? "SECTIONPAGES" : "NUMPAGES", "1")
+                ? field(o.single ? "SECTIONPAGES" : "NUMPAGES", String(o.pageCount ?? 1))
                 : field(`STYLEREF "heading 1"`, ""),
         )
         .join("");

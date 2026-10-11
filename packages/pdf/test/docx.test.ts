@@ -81,6 +81,13 @@ describe("Word export", () => {
     expect(headers.some((h) => h.includes('w:instr=" PAGE "') && h.includes('w:instr=" STYLEREF &quot;heading 1&quot; "') && h.includes("Name / "))).toBe(true);
   });
 
+  it("applies a {{HEADER}} that follows empty lines at the top to the whole text, page 1 included", () => {
+    const doc = body("\n\n\n{{HEADER: Name / %p of %pp}}\n\n# One\n\nText.");
+    const sections = [...doc.matchAll(/<w:sectPr>(.*?)<\/w:sectPr>/g)];
+    expect(sections).toHaveLength(1);
+    expect(sections[0]![1]).not.toContain("<w:titlePg/>");
+  });
+
   it("starts a new page at ===, with the heading after it dropped", () => {
     const doc = body("Text.\n\n===\n\n# Two\n\nMore.");
     expect(doc).toMatch(/<w:pStyle w:val="Heading1"\/><w:pageBreakBefore\/><w:spacing w:before="3840"\/>/);
