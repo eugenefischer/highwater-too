@@ -142,3 +142,23 @@ describe("CommitBatcher", () => {
     vi.useRealTimers();
   });
 });
+
+describe("the README on main", () => {
+  it("explains the repository and lists its works, updating when a work is added", async () => {
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { execFileSync } = await import("node:child_process");
+    const { History } = await import("../src/index.ts");
+    const h = new History(await mkdtemp(join(tmpdir(), "readme-")));
+    const doc = await h.resolve({ id: "1a2b3c4d-0000", path: "/w/The Purity Variations.highland", text: "x" });
+    const text = execFileSync("git", ["show", "main:README.md"], { cwd: h.repo, encoding: "utf8" });
+    expect(text).toContain("Each work has its own branch");
+    expect(text).toContain(`| The Purity Variations | \`${doc.branch}\` |`);
+    expect(text).not.toContain("beside this repository");
+    // Nothing changed: no new commit on main.
+    const before = execFileSync("git", ["rev-parse", "main"], { cwd: h.repo, encoding: "utf8" });
+    await new History(h.folder).resolve({ id: "1a2b3c4d-0000", path: "/w/The Purity Variations.highland", text: "x" });
+    expect(execFileSync("git", ["rev-parse", "main"], { cwd: h.repo, encoding: "utf8" })).toBe(before);
+  });
+});

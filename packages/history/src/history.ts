@@ -71,18 +71,73 @@ export const MATCH_THRESHOLD = 0.6;
 /** The repository's folder name inside the history folder. */
 export const REPO_NAME = "history.git";
 
-const README = `# Writing history
+/** main's README.md: what this repository is and how to use it, with a list of its works. */
+export function readme(works: { title: string; branch: string }[]): string {
+  const list = works.length
+    ? works
+        .slice()
+        .sort((a, b) => a.title.localeCompare(b.title))
+        .map((w) => `| ${w.title.replace(/\|/g, "\\|")} | \`${w.branch}\` |`)
+        .join("\n")
+    : "| (none yet) | |";
+  return `# Writing history
 
-Kept by Highwater Too. Each work has its own branch under \`works/\`, named after the file it was
-first saved as; every commit is one save of the script text (revision tags kept), its Bin items
-(\`bin/\`) and Scratchpad. The branches share no history, so one work can be shared without the
-others:
+This repository is a writing history kept by Highwater Too, a
+VS Code extension for screenplays and manuscripts. Every time a document is saved, Highwater Too records it here as
+a git commit, so the history shows how each work was written, save by save. Nothing is ever deleted or rewritten:
+commits are only added.
 
-    git push <remote> works/<name>          # just that work
-    git bundle create work.bundle works/<name>
+## Where the works are
 
-\`index.json\`, beside this repository, lists each work's branch and the paths it was saved at.
+This \`main\` branch holds only this README. **Each work has its own branch** under \`works/\`, named after the file it
+was first saved as, followed by part of the work's ID (the name never changes, even if the file is renamed). To see a
+work, switch to its branch (in a web interface, use the branch menu).
+
+| Work | Branch |
+|---|---|
+${list}
+
+The branches share no history with each other, so one work can be shared, archived or deleted without touching the
+others.
+
+## What each commit holds
+
+One commit is one save. Its message says when, and how the word count changed, e.g.
+\`Save 2026-10-11 14:03, +120 words (4,567)\` (\`Autosave\` and \`Close\` mark automatic saves). Its files:
+
+| File | Contents |
+|---|---|
+| \`text.fountain\`, \`text.md\` or \`text.txt\` | The script or manuscript text, exactly as saved (revision marks included) |
+| \`bin/0.txt\`, \`bin/1.txt\`, … | The document's Bin items, in order |
+| \`scratchpad.txt\` | The Scratchpad |
+| \`document/…\` | Everything else in the \`.highland\` file: settings (\`info.json\`), images (\`assets/\`) and so on |
+
+Commits also carry a \`Highwater-Document:\` line naming the document's ID, which is how Highwater Too on another
+computer knows which document a branch belongs to. A commit titled *Join the history saved on another computer*
+joins saves made on two computers; its text is the later computer's.
+
+## Getting a work back
+
+- **In Highwater Too:** *Open Work from History…* (in the Writing History panel) lists every work here and writes any
+  save out as a \`.highland\` or plain text file that continues the same history.
+- **With git:** \`git clone <this repository's address>\`, then for example
+  \`git log works/<name>\` to list a work's saves and \`git show <commit>:text.fountain > script.fountain\` to get the text
+  of one save.
+
+## Sharing one work
+
+    git clone --single-branch --branch works/<name> <this repository's address>
+    git bundle create work.bundle works/<name>      # one file anyone can clone
+
+## Where this repository lives
+
+Highwater Too keeps the working copy on each computer, in its application-data folder (on a Mac,
+\`~/Library/Application Support/Highwater Too/History\`), and pushes it to this mirror after saves; other computers set
+up with the same mirror pull from it. Each computer also keeps a small \`index.json\` next to its copy, recording where
+each work's files are on that computer. It is not part of this repository, because those paths differ from computer to
+computer.
 `;
+}
 
 export class History {
   #index: Index | null = null;
@@ -115,6 +170,7 @@ export class History {
       const entry = index.documents[id]!;
       if (entry.paths.at(-1) !== doc.path) entry.paths = [...entry.paths.filter((p) => p !== doc.path), doc.path];
       await this.#save(index);
+      if (created) await this.#updateReadme();
       return { id, branch: entry.branch, created, paused: entry.paused === true };
     });
   }
@@ -328,12 +384,27 @@ export class History {
         await git(this.repo, ["config", "user.name", user]);
         await git(this.repo, ["config", "user.email", `${user}@localhost`]);
       }
-      const tree = await this.#mktree([["100644", "blob", await this.#blob(README), "README.md"]]);
+      const tree = await this.#mktree([["100644", "blob", await this.#blob(readme([])), "README.md"]]);
       const hash = await this.#commitTree(tree, null, "Writing history kept by Highwater Too", new Date());
       await git(this.repo, ["update-ref", "refs/heads/main", hash, "0".repeat(40)]);
     }
     await this.#migrate();
     this.#ready = true;
+    await this.#updateReadme();
+  }
+
+  /** Rewrites main's README when its text (or the list of works) changed: one commit on main. */
+  async #updateReadme(): Promise<void> {
+    const index = await this.#load();
+    // Titles from the branch names, so every computer writes the same README for the same works.
+    const works = Object.values(index.documents).map((e) => ({ title: branchTitle(e.branch), branch: e.branch }));
+    for (const o of await this.#unindexed(index)) works.push({ title: branchTitle(o.branch), branch: o.branch });
+    const text = readme(works);
+    const parent = await this.#revParse("refs/heads/main");
+    if (parent && (await this.#read(parent, "README.md")) === text) return;
+    const tree = await this.#mktree([["100644", "blob", await this.#blob(text), "README.md"]]);
+    const hash = await this.#commitTree(tree, parent, "Update the README", new Date());
+    await git(this.repo, ["update-ref", "refs/heads/main", hash, parent ?? "0".repeat(40)]);
   }
 
   /** 0.0.15–0.0.16 kept one repository per document: bring each in as a branch, commits unchanged. */
