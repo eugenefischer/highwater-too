@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -254,6 +254,11 @@
       {
         "command": "highwater.changeHistoryLocation",
         "title": "Change Writing History Location…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.linkHistoryToFile",
+        "title": "Link Writing History to This File",
         "category": "Highwater Too"
       },
       {
@@ -1041,6 +1046,10 @@
           "when": "editorLangId =~ /^highland-/"
         },
         {
+          "command": "highwater.linkHistoryToFile",
+          "when": "editorLangId =~ /^highland-/ && resourceScheme == file"
+        },
+        {
           "command": "highwater.exportHistory",
           "when": "editorLangId =~ /^highland-/"
         },
@@ -1093,17 +1102,17 @@
         },
         {
           "command": "highwater.bin.new",
-          "when": "view == highwater.bin && highwater.inBundle",
+          "when": "view == highwater.bin && highwater.hasExtras",
           "group": "navigation@1"
         },
         {
           "command": "highwater.openScratchpad",
-          "when": "view == highwater.bin && highwater.inBundle",
+          "when": "view == highwater.bin && highwater.hasExtras",
           "group": "navigation@2"
         },
         {
           "command": "highwater.assets.add",
-          "when": "view == highwater.assets && highwater.inBundle",
+          "when": "view == highwater.assets && highwater.hasExtras",
           "group": "navigation"
         },
         {
@@ -1389,8 +1398,13 @@
       },
       {
         "view": "highwater.bin",
-        "contents": "The Bin and Scratchpad are kept inside .highland files. Open one to use them.",
-        "when": "!highwater.inBundle"
+        "contents": "The Bin holds text cut or copied from the script (⌥⌘X, ⌥⌘C) to use later. For a plain .fountain or .md file, the Bin and Scratchpad are kept with the writing history, not in the file: only Highwater Too shows them. Save as a .highland file to keep them in the file.\n[New Bin Item](command:highwater.bin.new)\n[Open Scratchpad](command:highwater.openScratchpad)",
+        "when": "highwater.hasExtras && !highwater.inBundle"
+      },
+      {
+        "view": "highwater.bin",
+        "contents": "Open a document to use its Bin and Scratchpad.",
+        "when": "!highwater.hasExtras"
       },
       {
         "view": "highwater.assets",
@@ -1399,8 +1413,13 @@
       },
       {
         "view": "highwater.assets",
-        "contents": "Assets are kept inside .highland files. Open one to add images.",
-        "when": "!highwater.inBundle"
+        "contents": "Images for this document. For a plain .fountain or .md file they go in a folder next to the file, made when you add the first one. Drag one into the text to show it in the manuscript.\n[Add Image…](command:highwater.assets.add)",
+        "when": "highwater.hasExtras && !highwater.inBundle"
+      },
+      {
+        "view": "highwater.assets",
+        "contents": "Open a document to add images to it.",
+        "when": "!highwater.hasExtras"
       },
       {
         "view": "highwater.history",

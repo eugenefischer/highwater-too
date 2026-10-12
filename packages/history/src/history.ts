@@ -27,6 +27,11 @@ export interface DocumentFiles {
    * document can be rebuilt whole from its history. Stored under "document/".
    */
   others?: { path: string; data: Uint8Array }[];
+  /**
+   * A plain .fountain or .md file's own settings (print template, assets folder), which a .highland
+   * file keeps in info.json. Stored as "settings.json".
+   */
+  settings?: Record<string, unknown>;
 }
 
 /** A work in the history: indexed on this computer, or pulled from another one. */
@@ -55,6 +60,11 @@ export interface IndexEntry {
 interface Index {
   version: 2;
   documents: Record<string, IndexEntry>;
+  /**
+   * Paths whose work has moved on to another file (a plain file saved as a .highland file): a
+   * document at one of these paths starts a new history instead of joining the old one.
+   */
+  retired?: string[];
 }
 
 export type SaveKind = "save" | "autosave" | "close";
@@ -110,7 +120,8 @@ One commit is one save. Its message says when, and how the word count changed, e
 | \`text.fountain\`, \`text.md\` or \`text.txt\` | The script or manuscript text, exactly as saved (revision marks included) |
 | \`bin/0.txt\`, \`bin/1.txt\`, … | The document's Bin items, in order |
 | \`scratchpad.txt\` | The Scratchpad |
-| \`document/…\` | Everything else in the \`.highland\` file: settings (\`info.json\`), images (\`assets/\`) and so on |
+| \`document/…\` | Everything else in the \`.highland\` file: settings (\`info.json\`), images (\`assets/\`) and so on; for a plain \`.fountain\` or \`.md\` file, its images (\`assets/\`) |
+| \`settings.json\` | A plain \`.fountain\` or \`.md\` file's settings, such as its print template |
 
 Commits also carry a \`Highwater-Document:\` line naming the document's ID, which is how Highwater Too on another
 computer knows which document a branch belongs to. A commit titled *Join the history saved on another computer*
@@ -162,13 +173,14 @@ export class History {
       let id = await this.#match(index, doc);
       let created = false;
       if (!id) {
-        id = doc.id ?? randomUUID();
+        id = doc.id && !index.documents[doc.id] && !index.retired?.includes(doc.path) ? doc.id : randomUUID();
         const title = fileTitle(doc.path);
         index.documents[id] = { branch: branchName(title, id, index), title, paths: [] };
         created = true;
       }
       const entry = index.documents[id]!;
       if (entry.paths.at(-1) !== doc.path) entry.paths = [...entry.paths.filter((p) => p !== doc.path), doc.path];
+      if (index.retired?.includes(doc.path)) index.retired = index.retired.filter((p) => p !== doc.path);
       await this.#save(index);
       if (created) await this.#updateReadme();
       return { id, branch: entry.branch, created, paused: entry.paused === true };
@@ -263,7 +275,7 @@ export class History {
     return this.#branchLog(branch, limit);
   }
 
-  /** Everything a save recorded: the script, Bin, Scratchpad and (from 0.1.3) the rest of the file. */
+  /** Everything a save recorded: the script, Bin, Scratchpad, (from 0.1.3) the rest of the file and (from 0.1.5) a plain file's settings. */
   async filesAt(hash: string): Promise<DocumentFiles> {
     const scriptName = (await this.#scriptName(hash)) ?? "text.md";
     const listing = await git(this.repo, ["ls-tree", "-r", "-z", "--name-only", hash]);
@@ -274,6 +286,14 @@ export class History {
       .sort((a, b) => Number(a[1]) - Number(b[1]));
     const files: DocumentFiles = { scriptName, script: await this.#read(hash, scriptName), bin: await Promise.all(bin.map((m) => this.#read(hash, m[0]))) };
     if (names.includes("scratchpad.txt")) files.scratchpad = await this.#read(hash, "scratchpad.txt");
+    if (names.includes("settings.json")) {
+      try {
+        const settings = JSON.parse(await this.#read(hash, "settings.json")) as unknown;
+        if (settings && typeof settings === "object" && !Array.isArray(settings)) files.settings = settings as Record<string, unknown>;
+      } catch {
+        // unreadable settings: the rest of the save still comes back
+      }
+    }
     const others = names.filter((n) => n.startsWith("document/"));
     if (others.length) files.others = await Promise.all(others.map(async (n) => ({ path: n.slice("document/".length), data: await gitBytes(this.repo, ["cat-file", "blob", `${hash}:${n}`]) })));
     return files;
@@ -312,6 +332,20 @@ export class History {
     return this.#serial(async () => {});
   }
 
+  /**
+   * The document at `path` has moved on to another file (say, it was saved as a .highland file
+   * that continues its history): the file left at `path` no longer belongs to that history, and
+   * starts a new one if it is saved again.
+   */
+  retire(path: string): Promise<void> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      for (const e of Object.values(index.documents)) e.paths = e.paths.filter((p) => p !== path);
+      index.retired = [...(index.retired ?? []).filter((p) => p !== path), path];
+      await this.#save(index);
+    });
+  }
+
   /** Turns history off (or back on) for one document. */
   setPaused(id: string, paused: boolean): Promise<void> {
     return this.#serial(async () => {
@@ -327,6 +361,7 @@ export class History {
   // ---------------------------------------------------------------------------------------------
 
   async #match(index: Index, doc: { id: string | null; path: string; text: string }): Promise<string | null> {
+    if (index.retired?.includes(doc.path)) return null;
     if (doc.id && index.documents[doc.id]) return doc.id;
     const entries = Object.entries(index.documents);
     const byPath = entries.find(([, e]) => e.paths.at(-1) === doc.path) ?? entries.find(([, e]) => e.paths.includes(doc.path));
@@ -445,6 +480,7 @@ export class History {
       entries.push(["040000", "tree", await this.#mktree(items), "bin"]);
     }
     if (files.scratchpad) entries.push(["100644", "blob", await this.#blob(files.scratchpad), "scratchpad.txt"]);
+    if (files.settings && Object.keys(files.settings).length) entries.push(["100644", "blob", await this.#blob(`${JSON.stringify(files.settings, null, 2)}\n`), "settings.json"]);
     if (files.others?.length) entries.push(["040000", "tree", await this.#folder(files.others), "document"]);
     return this.#mktree(entries);
   }

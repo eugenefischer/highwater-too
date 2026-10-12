@@ -8,7 +8,7 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 
 - **Open a document:** open a `.highland` file from the Explorer or with **Highwater Too: Open Document…**, which also opens `.fountain` and `.md` files. The script text opens in an ordinary editor tab; saving writes it back into the `.highland` file, keeping everything else in it (settings, Bin, Scratchpad, images). Before the first save of each session the original file is backed up.
 - **New documents:** **New Document…**, in the Navigator's title bar or on the empty sidebar, makes a blank screenplay or manuscript as a `.highland` file, or as a plain `.fountain` or `.md` file. **New Screenplay** and **New Manuscript** make `.highland` files directly.
-- **Plain files:** `.fountain` files open as **Highwater Fountain**. For a `.md` or `.txt` file, click the language name in the status bar and choose **Highwater Markdown** or **Highwater Plain Text**, or run **Open .md Files with Highwater Too…** to open every `.md` file that way. **Save as .highland File…** turns a plain file into a `.highland` document.
+- **Plain files:** `.fountain` files open as **Highwater Fountain**. For a `.md` or `.txt` file, click the language name in the status bar and choose **Highwater Markdown** or **Highwater Plain Text**, or run **Open .md Files with Highwater Too…** to open every `.md` file that way. Plain files get the Bin, Scratchpad and Assets too: the Bin and Scratchpad are kept with the writing history rather than in the file (only Highwater Too shows them; you are told so the first time), and images go in a `<name> assets` folder beside the file, made when you add the first one. **Save as .highland File…** turns a plain file into a `.highland` document, bringing its Bin, Scratchpad, images and print template into it; the `.highland` file continues its writing history.
 - **Changes made elsewhere:** if Highland 2 (or anything else) changes the file while it is open, unchanged documents reload; edited ones offer Revert, Save, Save As or Compare.
 
 ## Writing
@@ -28,8 +28,9 @@ Click the Highwater Too icon in the activity bar (it opens by itself when you op
 
 - **Navigator** (⌘1): scenes, sections, synopses, notes, images, links, includes and markers; click to jump; filter by type. Drag a scene, section or heading onto another to move its text there (with everything under it); drop it on the empty space below the list to move it to the end.
 - **Bin** (⌘2): text cut or copied with ⌥⌘X or ⌥⌘C to use later; open, reorder, insert or drag back.
-- **Assets** (⌘4): images kept in the document; drag one into the text.
+- **Assets** (⌘4): images kept in the document (for a plain file, in the folder beside it); drag one into the text.
 - **Scratchpad** (⌘5): notes kept in the document, in their own tab.
+- For a plain `.fountain` or `.md` file, the Bin and Scratchpad are kept with the writing history (in its folder, under `extras`), not in the file.
 - **Writing History:** the document's saves (see below).
 
 ## Preview and export
@@ -46,7 +47,8 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 
 - One repository for all your writing, in your system's application-data folder (on a Mac, `~/Library/Application Support/Highwater Too/History`); one branch per work, so one work's history can be shared without the others. **Change Writing History Location…** moves it.
 - ⌘S records at once; autosaves at most every five minutes. Each record says how many words changed.
-- Each save records the script, Bin and Scratchpad, and the rest of the `.highland` file (settings, print template, assets).
+- Each save records the script, Bin and Scratchpad, and the rest of the `.highland` file (settings, print template, assets); for a plain file, its Bin, Scratchpad, print template and images. On another computer with the same mirror, a plain file's Bin and Scratchpad come in with its saves (unless they were changed there too, when that computer's stay).
+- A plain file is found in the history by its path, or by its text if it moves. **Link Writing History to This File** adds a note at its end naming its history (notes never print), so it is found even after a move and heavy rewriting.
 - **Open Work from History…** (Writing History panel): any work in the history, at any save, as a `.highland` or plain file, including works saved only on another computer and brought in through the mirror. The restored file continues the same history. Works last saved before 0.1.3 come back with their text, Bin and Scratchpad, and a template chosen from the text type.
 - **Writing History** panel: click a save to compare it with the text now. **Export Writing History…** writes one work's history to a file anyone can open with `git clone`.
 - **Set Up History Mirror…** (optional) keeps the history in step with any git remote: it pushes after saves, and pulls other computers' saves when VS Code starts, when you open a document (at most once a minute) and every ten minutes, so on a second computer the Writing History panel shows a work's earlier saves before you save it there. Nothing is ever overwritten: when two computers both saved a work, the histories are joined. Use the same mirror address on each computer. **Sync Writing History Now** (in the Writing History panel's menu) pulls and pushes at once. Signing in: github.com uses VS Code's GitHub sign-in; for other servers over HTTPS (Gitea, Forgejo, GitLab, …) you are asked for your username and an access token the first time the server wants them, kept in VS Code's secure storage and sent only to that server (if git already has a login for it, in the Mac keychain say, that is used without asking). **Sign In to History Mirror…** and **Forget History Mirror Sign-In** are in the panel's menu; when a sign-in is needed, the history item in the status bar shows a warning and clicking it signs in. SSH addresses use your SSH key.
@@ -68,7 +70,6 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 - Live Margins cannot indent the continuation of a wrapped line (VS Code's editor does not allow it).
 - `{{TOC: ##}}` with a level filter prints its entries; Highland 2 prints it oddly.
 - No Stats panel (⌘3), Sprint, Gender Analysis, Revision Mode or FDX yet; `.textbundle` files are not supported.
-- The history mirror pushes but does not yet bring saves made on another computer into this one.
 
 ## Licence
 

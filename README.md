@@ -11,13 +11,13 @@ A VS Code extension that replaces the discontinued Highland 2: it opens, edits a
 - **One file:** click the language name in the status bar (for example "Markdown") and choose **Highwater Fountain**, **Highwater Markdown** or **Highwater Plain Text**. VS Code remembers the choice for that file.
 - **Every .md file:** run **Highwater Too: Open .md Files with Highwater Too…** and choose everywhere or this workspace (it sets `files.associations`). **Open .md Files as Ordinary Markdown Again** undoes it. VS Code's own Markdown preview and Markdown extensions do not apply to files opened this way, and Highland's Markdown dialect differs from standard Markdown in places (every line is a paragraph, `===` is a page break).
 
-Plain files get the Navigator, preview, PDF export, Live Margins, the Title Page Builder and the writing history. The Bin, Scratchpad and Assets live inside `.highland` files, so plain files do not have them.
+Plain files get the Navigator, preview, PDF export, Live Margins, the Title Page Builder and the writing history, and the Bin, Scratchpad and Assets too. A plain file can't hold a Bin or Scratchpad, so those are kept with the writing history rather than in the file (only Highwater Too shows them, and a one-time warning says so), and images go in a `<name> assets` folder beside the file, made when the first one is added. **Save as .highland File…** gathers them all into one `.highland` file that continues the writing history.
 
 ## Writing history (new; Highland 2 had nothing like it)
 
 Every save is recorded in a git repository, as a record of how each work was written. It is on by default and needs nothing set up beyond git itself (on a Mac, the Xcode command-line tools).
 
-- **What is kept:** the text of each save (revision marks included), plus the Bin and Scratchpad of `.highland` documents. Images and settings are not; session backups cover those.
+- **What is kept:** the text of each save (revision marks included), the Bin and Scratchpad, and the rest of the document: a `.highland` file's settings and images, or a plain file's print template and images.
 - **When:** each ⌘S at once; autosaves at most every five minutes, and once more when the document closes. Each commit says when it was made and how many words it added or removed. A failed commit never blocks a save.
 - **Where:** one repository for all your writing, in your system's folder for application data (`~/Library/Application Support/Highwater Too/History` on a Mac, `~/.local/share/highwater-too/history` on Linux, `%LOCALAPPDATA%\Highwater Too\History` on Windows). **Change Writing History Location…** moves it; folders kept in sync by Dropbox, iCloud and the like are best avoided, as syncing can damage git repositories.
 - **One branch per work**, with no history shared between them, so one work's history can be shared or deleted without touching the others or rewriting anything. **Export Writing History…** writes a single work to a git bundle that anyone can open with `git clone`.

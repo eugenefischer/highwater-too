@@ -81,7 +81,10 @@ export function navigatorItems(doc: Document, filters: NavigatorFilters = DEFAUL
 
   function walk(nodes: Inline[]): void {
     for (const n of nodes) {
-      if (n.kind === "note") add("notes", n.text, n.span);
+      // The note tying a plain file to its writing history ("highwater: <ID>") is not the writer's.
+      if (n.kind === "note") {
+        if (!/^\s*highwater:\s*[0-9A-Za-z-]{8,}\s*$/.test(n.text)) add("notes", n.text, n.span);
+      }
       else if (n.kind === "image") add("images", n.alt || n.src, n.span);
       else if (n.kind === "link") {
         add(n.reference !== null ? "referenceLinks" : "links", `${textOf(n.children)}${n.url ? ` — ${n.url}` : ""}`, n.span);

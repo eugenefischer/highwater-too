@@ -162,3 +162,34 @@ describe("the README on main", () => {
     expect(execFileSync("git", ["rev-parse", "main"], { cwd: h.repo, encoding: "utf8" })).toBe(before);
   });
 });
+
+describe("plain files", () => {
+  it("records a plain file's settings, and brings them back", async () => {
+    const h = new History(await folder());
+    const { id, branch } = await h.resolve({ id: null, path: "/w/Script.fountain", text: script });
+    const c = await h.commit(id, { scriptName: "text.fountain", script, bin: ["b"], settings: { templateName: "Screenplay", assetsFolder: "Script assets" }, others: [{ path: "assets/a.png", data: new Uint8Array([1, 2]) }] }, "save");
+    expect(gitIn(h.repo, "ls-tree", "--name-only", branch).split("\n")).toEqual(["bin", "document", "settings.json", "text.fountain"]);
+    const files = await h.filesAt(c!.hash);
+    expect(files.settings).toEqual({ templateName: "Screenplay", assetsFolder: "Script assets" });
+    expect(files.others?.map((o) => o.path)).toEqual(["assets/a.png"]);
+    expect(await h.commit(id, { scriptName: "text.fountain", script, bin: ["b"], settings: {}, others: [{ path: "assets/a.png", data: new Uint8Array([1, 2]) }] }, "save")).not.toBeNull();
+    expect(gitIn(h.repo, "ls-tree", "--name-only", branch).split("\n")).not.toContain("settings.json");
+  });
+
+  it("retires a path whose work moved on: the file there starts a new history, even with the old ID", async () => {
+    const h = new History(await folder());
+    const plain = await h.resolve({ id: null, path: "/w/Script.fountain", text: script });
+    await h.commit(plain.id, { scriptName: "text.fountain", script }, "save");
+    const bundle = await h.resolve({ id: plain.id, path: "/w/Script.highland", text: script });
+    expect(bundle.id).toBe(plain.id);
+    await h.retire("/w/Script.fountain");
+    expect(await h.find({ id: null, path: "/w/Script.fountain", text: script })).toBeNull();
+    expect(await h.find({ id: plain.id, path: "/w/Script.fountain", text: script })).toBeNull();
+    const again = await h.resolve({ id: plain.id, path: "/w/Script.fountain", text: script });
+    expect(again.id).not.toBe(plain.id);
+    expect(again.created).toBe(true);
+    // Once it has a history of its own, it is found by its path again.
+    expect((await h.find({ id: null, path: "/w/Script.fountain", text: script }))?.id).toBe(again.id);
+    expect((await h.find({ id: plain.id, path: "/w/Script.highland", text: script }))?.id).toBe(plain.id);
+  });
+});

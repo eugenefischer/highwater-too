@@ -14,10 +14,13 @@ export function move<T>(items: T[], from: number, to: number): T[] {
   return out;
 }
 
-/** The Markdown that shows an asset: `![name](assets/name)`, spaces and parentheses escaped. */
-export function assetMarkdown(name: string): string {
+/**
+ * The Markdown that shows an asset: `![name](assets/name)`, spaces and parentheses escaped. A plain
+ * file's images are in a folder of their own beside it, e.g. "Script assets".
+ */
+export function assetMarkdown(name: string, folder = "assets"): string {
   const alt = name.replace(/\.[^.]+$/, "").replace(/[[\]]/g, "");
-  const path = `assets/${name}`.replace(/[ ()]/g, (c) => ({ " ": "%20", "(": "%28", ")": "%29" })[c]!);
+  const path = `${folder}/${name}`.replace(/[ ()]/g, (c) => ({ " ": "%20", "(": "%28", ")": "%29" })[c]!);
   return `![${alt}](${path})`;
 }
 

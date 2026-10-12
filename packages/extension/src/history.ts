@@ -1,16 +1,19 @@
 import { readFile } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { CommitBatcher, defaultHistoryFolder, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type SaveKind, type WorkInfo } from "@highwater/history";
-import { createDocument, HighlandBundle, writeBundle, type DocumentMode } from "@highwater/bundle";
-import { writeFile } from "node:fs/promises";
+import { writeBundle } from "@highwater/bundle";
+import { mkdir, writeFile } from "node:fs/promises";
 import { openHighland } from "./open.ts";
 import { LANGUAGES } from "./language.ts";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { exportHistory, HistoryMirror } from "./mirror.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
+import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
+import { ExtrasFolder, noteId, relinkAssets } from "./extras-folder.ts";
+import { toBundle } from "./to-bundle.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -23,6 +26,20 @@ export function historyRoot(): string {
   return chosen || defaultHistoryFolder(process.platform, process.env, homedir());
 }
 
+let histories = new Map<string, History>();
+
+/** The writing history in the current history folder, or null when it is turned off. */
+export function currentHistory(): History | null {
+  if (!vscode.workspace.getConfiguration("highwater").get<boolean>("writingHistory", true)) return null;
+  return historyAt(historyRoot());
+}
+
+function historyAt(dir: string): History {
+  let h = histories.get(dir);
+  if (!h) histories.set(dir, (h = new History(dir)));
+  return h;
+}
+
 /**
  * The writing history (M7): each save commits the script text, Bin and Scratchpad to the
  * document's branch in the history repository. Explicit saves commit at once; autosaves at most every
@@ -33,22 +50,21 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   const status = vscode.window.createStatusBarItem("highwater.history", vscode.StatusBarAlignment.Left, 0);
   status.name = "Highwater Too: writing history";
   status.command = "highwater.showHistory";
-  let histories = new Map<string, History>();
   const lastCommit = new Map<string, Date>();
   const failures = new Map<string, string>();
 
   const enabled = () => vscode.workspace.getConfiguration("highwater").get<boolean>("writingHistory", true);
-  const history = () => {
-    const dir = historyRoot();
-    let h = histories.get(dir);
-    if (!h) histories.set(dir, (h = new History(dir)));
-    return h;
-  };
+  const history = () => historyAt(historyRoot());
+  const extras = plainExtras();
 
-  /** The file a document's history belongs to: the .highland file, or a plain .fountain/.md file. */
+  /**
+   * The file a document's history belongs to: the .highland file, or a plain .fountain/.md file
+   * (also for that file's Bin items and Scratchpad).
+   */
   const keyOf = (doc: vscode.TextDocument | undefined): string | null => {
     if (!doc) return null;
     if (doc.uri.scheme === SCHEME) return splitBundlePath(doc.uri.fsPath)?.bundle ?? null;
+    if (doc.uri.scheme === EXTRAS_SCHEME) return extras.ownerOf(doc.uri) ?? null;
     if (doc.uri.scheme === "file" && doc.languageId.startsWith("highland-")) return doc.uri.fsPath;
     return null;
   };
@@ -65,7 +81,9 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     }
     const ext = extname(key).toLowerCase();
     const scriptName = ext === ".fountain" || ext === ".spmd" ? "text.fountain" : ext === ".txt" ? "text.txt" : "text.md";
-    return { id: null, files: { scriptName, script: await readFile(key, "utf8") } };
+    const script = await readFile(key, "utf8");
+    // Its Bin, Scratchpad, settings and images, kept outside the file.
+    return { id: noteId(script), files: { scriptName, script, ...(await extras.historyFiles(key)) } };
   }
 
   async function resolve(key: string) {
@@ -88,6 +106,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const r = await resolve(key);
       if (r.paused) return;
       const c = await history().commit(r.id, r.files, kind);
+      if (!key.toLowerCase().endsWith(".highland")) await extras.recorded(key, c?.hash ?? null);
       failures.delete(key);
       if (c) {
         lastCommit.set(key, c.date);
@@ -202,6 +221,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     }
     await vscode.workspace.getConfiguration("highwater").update("historyFolder", target === fallback ? undefined : target, vscode.ConfigurationTarget.Global);
     histories = new Map();
+    extras.forget();
     view.refresh();
     void updateStatus();
   }
@@ -263,6 +283,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("highwater.historyFolder") || e.affectsConfiguration("highwater.writingHistory")) {
         histories = new Map();
+        extras.forget();
         view.refresh();
         void updateStatus();
       }
@@ -367,9 +388,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     if (!save) return;
     const files = await h.filesAt(save.commit.hash);
     const plainExt = files.scriptName.replace(/^text\./, "");
+    const hasExtras = !!(files.bin?.length || files.scratchpad !== undefined);
+    const hasAssets = !!files.others?.some((o) => o.path.startsWith("assets/"));
+    const plainDescription = hasExtras || hasAssets ? `with its ${[hasExtras ? "Bin and Scratchpad (kept by Highwater Too)" : "", hasAssets ? "images (in a folder beside it)" : ""].filter(Boolean).join(" and ")}` : "the text";
     const kinds = [
       { label: ".highland file", description: files.others?.length ? "with its settings, Bin, Scratchpad and assets" : "with its Bin and Scratchpad", ext: "highland" },
-      { label: `.${plainExt} file`, description: "the text only", ext: plainExt },
+      { label: `.${plainExt} file`, description: plainDescription, ext: plainExt },
     ];
     const kind = await vscode.window.showQuickPick(kinds, { title: `${w.title}: save as` });
     if (!kind) return;
@@ -382,19 +406,29 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     const path = target.fsPath;
     // The new file continues the work's history.
     const id = await h.claim(w, path);
-    if (kind.ext === "highland") {
-      const mode: DocumentMode = files.scriptName.endsWith(".fountain") ? "fountain" : files.scriptName.endsWith(".txt") ? "plain" : "markdown";
-      let b: HighlandBundle;
-      if (files.others?.length) b = HighlandBundle.fromEntries("Untitled.textbundle", [...files.others.map((o): [string, Uint8Array] => [o.path, o.data]), [files.scriptName, files.script]]);
-      else b = createDocument({ mode, template: mode === "fountain" ? "Screenplay" : mode === "markdown" ? "Manuscript" : "Plain Text", text: files.script });
-      if (files.bin?.length) b.setBinItems(files.bin);
-      if (files.scratchpad !== undefined) b.scratchpad = files.scratchpad;
-      const info = { ...b.info };
-      const ours = { ...((info[INFO_KEY] as object | undefined) ?? {}) } as Record<string, unknown>;
-      ours.documentId = id;
-      b.setInfo({ ...info, [INFO_KEY]: ours });
-      await writeBundle(path, b);
-    } else await writeFile(path, files.script);
+    if (kind.ext === "highland") await writeBundle(path, toBundle(files, id));
+    else {
+      // A plain file: the text, its Bin, Scratchpad and settings back with Highwater Too, its
+      // images in a folder beside it (the text's image paths follow that folder's new name).
+      const assets = (files.others ?? []).filter((o) => o.path.startsWith("assets/"));
+      const settings = { ...(files.settings ?? {}) };
+      let text = files.script;
+      if (assets.length) {
+        const folder = `${basename(path, extname(path))} assets`;
+        const dir = join(dirname(path), folder);
+        text = relinkAssets(text, typeof settings.assetsFolder === "string" ? settings.assetsFolder : "assets", folder);
+        settings.assetsFolder = folder;
+        await mkdir(dir, { recursive: true });
+        for (const a of assets) await writeFile(join(dir, a.path.slice("assets/".length)), a.data);
+      }
+      await writeFile(path, text);
+      if (hasExtras || Object.keys(settings).length) {
+        const folder = new ExtrasFolder(join(historyRoot(), "extras", id));
+        await folder.replace({ bin: files.bin ?? [], ...(files.scratchpad !== undefined ? { scratchpad: files.scratchpad } : {}), settings });
+        await folder.setBase(save.commit.hash);
+      }
+      extras.forget();
+    }
     await openFile(path);
     view.refresh();
     void updateStatus();
@@ -410,10 +444,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     await vscode.window.showTextDocument(doc, { preview: false });
   }
 
-  /** After a pull: show what came in. */
+  /** After a pull: show what came in, and bring in open plain files' Bin and Scratchpad. */
   async function pulled(work: Promise<string[]>): Promise<void> {
     const updated = await work.catch(() => [] as string[]);
     if (updated.length) {
+      extras.forget();
+      for (const d of vscode.workspace.textDocuments) if (extras.isPlain(d)) await extras.bringIn(d.uri.fsPath).catch(() => false);
       view.refresh();
       void updateStatus();
     }

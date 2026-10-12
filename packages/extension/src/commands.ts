@@ -6,6 +6,11 @@ import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
 import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { plainExtras } from "./extras.ts";
+import { currentHistory } from "./history.ts";
+import { toBundle } from "./to-bundle.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
 
@@ -150,7 +155,11 @@ async function exportText(): Promise<void> {
   void vscode.window.showInformationMessage(`Exported ${basename(target.fsPath)}`);
 }
 
-/** Make a .highland document from a plain .fountain or .md file (the original is left as it is). */
+/**
+ * Make a .highland document from a plain .fountain or .md file, bringing its Bin, Scratchpad,
+ * images and settings into it. It continues the file's writing history; the original is left as it
+ * is, and starts a history of its own if it is saved again.
+ */
 async function convertToHighland(uri?: vscode.Uri): Promise<void> {
   const source = uri ?? vscode.window.activeTextEditor?.document.uri;
   if (!source || source.scheme !== "file") {
@@ -158,9 +167,7 @@ async function convertToHighland(uri?: vscode.Uri): Promise<void> {
     return;
   }
   const ext = extname(source.fsPath).toLowerCase();
-  const kind = ext === ".fountain" || ext === ".spmd" ? NEW.screenplay! : ext === ".md" || ext === ".markdown" ? NEW.manuscript! : null;
-  const mode: DocumentMode = kind?.mode ?? "plain";
-  const template = kind?.template ?? "Plain Text";
+  const scriptName = ext === ".fountain" || ext === ".spmd" ? "text.fountain" : ext === ".md" || ext === ".markdown" ? "text.md" : "text.txt";
   const open = vscode.workspace.textDocuments.find((d) => d.uri.toString() === source.toString());
   const text = open ? open.getText() : new TextDecoder().decode(await vscode.workspace.fs.readFile(source));
   const target = await vscode.window.showSaveDialog({
@@ -169,8 +176,31 @@ async function convertToHighland(uri?: vscode.Uri): Promise<void> {
     title: "Save as .highland File",
   });
   if (!target) return;
-  await writeBundle(target.fsPath, createDocument({ mode, template, text }));
+  const path = source.fsPath;
+  const extras = plainExtras();
+  const history = currentHistory();
+  const id = (history && (await extras.documentId(path))) || randomUUID();
+  const more = await extras.historyFiles(path);
+  const folder = await extras.folder(path);
+  await writeBundle(target.fsPath, toBundle({ scriptName, script: text, ...more }, id));
+  // The .highland file carries the work on: its history, Bin, Scratchpad and images.
+  if (history) await history.retire(path);
+  await folder?.remove();
+  extras.forget();
+  extras.changed(path);
   await openHighland(target);
+  const images = more.others?.length ? (await extras.assetsFolder(path)).dir : null;
+  const name = basename(path);
+  const moved = more.bin?.length || more.scratchpad !== undefined || images ? "its Bin, Scratchpad and images are in the .highland file now, and " : "";
+  const choice = await vscode.window.showInformationMessage(
+    `Saved ${basename(target.fsPath)}. ${name} is unchanged: ${moved}${history ? "the writing history continues with the .highland file" : "you can keep or remove it"}.`,
+    images && existsSync(images) ? `Move ${name} and “${basename(images)}” to the Trash` : `Move ${name} to the Trash`,
+  );
+  if (!choice) return;
+  for (const tab of vscode.window.tabGroups.all.flatMap((g) => g.tabs))
+    if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === source.toString()) await vscode.window.tabGroups.close(tab);
+  await vscode.workspace.fs.delete(source, { useTrash: true });
+  if (images && existsSync(images)) await vscode.workspace.fs.delete(vscode.Uri.file(images), { recursive: true, useTrash: true });
 }
 
 function defaultFolder(): string {

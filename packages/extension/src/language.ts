@@ -1,6 +1,7 @@
 import { parse, type Document, type Mode } from "@highwater/parser";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
+import { EXTRAS_SCHEME } from "./extras.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { highlightRanges, TOKEN_TYPES } from "./syntax/highlight.ts";
 import { outline, type OutlineNode } from "./syntax/structure.ts";
@@ -43,6 +44,11 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext, store
 
 /** A .highland script opens as plain text; give it the language its text file implies. */
 async function assignLanguage(doc: vscode.TextDocument, store: BundleStore): Promise<void> {
+  // A plain file's Bin items and Scratchpad.
+  if (doc.uri.scheme === EXTRAS_SCHEME) {
+    if (doc.uri.path.endsWith(".txt") && doc.languageId !== LANGUAGES.plain && !doc.isClosed) await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.plain);
+    return;
+  }
   if (doc.uri.scheme !== SCHEME) return;
   const p = splitBundlePath(doc.uri.fsPath);
   if (!p) return;

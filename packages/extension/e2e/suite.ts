@@ -255,6 +255,42 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "gives a plain .fountain file a Bin and Scratchpad, kept and recorded with the writing history",
+    async () => {
+      const historyDir = join(dir, "history");
+      await vscode.workspace.getConfiguration("highwater").update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
+      try {
+        const path = join(dir, "Plain.fountain");
+        await writeFile(path, "INT. KITCHEN - NIGHT\n\nA kettle boils.\n");
+        const doc = await vscode.workspace.openTextDocument(path);
+        await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
+        const editor = await vscode.window.showTextDocument(doc);
+        const line = editor.document.lineAt(2);
+        editor.selection = new vscode.Selection(line.range.start, line.range.end);
+        await vscode.commands.executeCommand("highwater.copyToBin");
+        const index = () => JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { branch: string; paths: string[] }> };
+        const [id, entry] = Object.entries(index().documents).find(([, e]) => e.paths.includes(path))!;
+        assert.equal(await readFile(join(historyDir, "extras", id, "bin", "0.txt"), "utf8"), "A kettle boils.");
+        assert.equal(await readFile(path, "utf8"), "INT. KITCHEN - NIGHT\n\nA kettle boils.\n", "the file is untouched");
+        await vscode.commands.executeCommand("highwater.openScratchpad");
+        await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.scheme === "highwater-extras");
+        await vscode.window.showTextDocument(doc);
+        await editor.edit((e) => e.insert(editor.document.lineAt(2).range.end, " It whistles."));
+        await vscode.commands.executeCommand("workbench.action.files.save");
+        await waitFor("the Bin in the commit", () => {
+          try {
+            return execFileSync("git", ["show", `${entry.branch}:bin/0.txt`], { cwd: join(historyDir, "history.git"), encoding: "utf8" }) === "A kettle boils.";
+          } catch {
+            return false;
+          }
+        }, 20_000);
+      } finally {
+        await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
+  [
     "exports a manuscript, with its image, as a PDF",
     async () => {
       const path = join(dir, "ManuscriptExport.highland");

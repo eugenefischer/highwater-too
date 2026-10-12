@@ -1,15 +1,19 @@
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import * as vscode from "vscode";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import type { ParseCache } from "./language.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
+import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
 import { blockAt, moveBlock, NAVIGATOR_LABELS, NAVIGATOR_TYPES, navigatorItems, parseFilters, type NavigatorFilters, type NavigatorItem, type NavigatorType } from "./syntax/navigator.ts";
 import { assetMarkdown, binLabel, move, uniqueName } from "./syntax/workspace.ts";
+import { idNote, noteId } from "./extras-folder.ts";
 
 /**
  * The Highland sidebar (M6): Navigator, Bin and Assets as tree views in a "Highwater Too" view
- * container, the Scratchpad as an editor tab. They follow the last active Highland editor.
+ * container, the Scratchpad as an editor tab. They follow the last active Highland editor. A
+ * .highland file keeps its Bin, Scratchpad and images inside it; a plain .fountain or .md file
+ * keeps them with the writing history and in a folder beside it (see PlainExtras).
  */
 export function registerPanels(context: vscode.ExtensionContext, store: BundleStore, fs: HighlandFileSystem, cache: ParseCache): void {
   const current = new CurrentDocument();
@@ -28,6 +32,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     navTree.description = current.script ? basename(current.label) : "";
   };
   current.onDidChange(refreshAll);
+  const extras = plainExtras();
 
   let timer: NodeJS.Timeout | undefined;
   /** Scripts the sidebar has been shown for since they were opened. */
@@ -51,6 +56,11 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
       shown.delete(d.uri.toString());
     }),
     { dispose: store.onExternalChange((path) => (path === current.bundle ? refreshAll() : undefined)) },
+    extras.onDidChange((path) => {
+      if (path !== current.plain) return;
+      bin.refresh();
+      assets.refresh();
+    }),
 
     vscode.commands.registerCommand("highwater.navigator.reveal", (uri: vscode.Uri, offset: number) => reveal(uri, offset)),
     vscode.commands.registerCommand("highwater.navigator.filter", () => navigator.chooseFilters()),
@@ -65,11 +75,12 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     vscode.commands.registerCommand("highwater.bin.delete", (item: BinItem) => bin.remove(item)),
 
     vscode.commands.registerCommand("highwater.assets.add", () => assets.add()),
-    vscode.commands.registerCommand("highwater.assets.insert", (item: AssetItem) => insertText(current, assetMarkdown(item.name))),
-    vscode.commands.registerCommand("highwater.assets.open", (item: AssetItem) => vscode.commands.executeCommand("vscode.open", toHighlandUri(item.bundle, `assets/${item.name}`))),
+    vscode.commands.registerCommand("highwater.assets.open", (item: AssetItem) => vscode.commands.executeCommand("vscode.open", assetUri(item))),
+    vscode.commands.registerCommand("highwater.assets.insert", (item: AssetItem) => insertText(current, assetMarkdown(item.name, item.folder))),
     vscode.commands.registerCommand("highwater.assets.delete", (item: AssetItem) => assets.remove(item)),
 
     vscode.commands.registerCommand("highwater.openScratchpad", () => openScratchpad(store, current)),
+    vscode.commands.registerCommand("highwater.linkHistoryToFile", () => linkHistoryToFile()),
   );
   for (const e of [vscode.window.activeTextEditor, ...vscode.window.visibleTextEditors]) if (e) current.follow(e.document);
   void showSidebar(vscode.window.activeTextEditor);
@@ -93,32 +104,69 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
 
   async function toBin(cut: boolean): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    const bundle = editor ? splitBundlePath(editor.document.uri.fsPath)?.bundle : undefined;
-    if (!editor || editor.document.uri.scheme !== SCHEME || !bundle) {
-      void vscode.window.showInformationMessage("The Bin is kept inside .highland files; open one to use it.");
+    const bundle = editor && editor.document.uri.scheme === SCHEME ? splitBundlePath(editor.document.uri.fsPath)?.bundle : undefined;
+    const plain = editor && extras.isPlain(editor.document) ? editor.document.uri.fsPath : undefined;
+    if (!editor || (!bundle && !plain)) {
+      void vscode.window.showInformationMessage("Open a document to use the Bin.");
       return;
     }
     const ranges = editor.selections.filter((s) => !s.isEmpty);
     if (!ranges.length) return;
     const text = ranges.map((r) => editor.document.getText(r)).join("\n\n");
-    await bin.add(text, bundle);
+    if (!(await bin.add(text, bundle ? { bundle } : { plain: plain! }))) return;
     if (cut) await editor.edit((e) => ranges.forEach((r) => e.delete(r)));
+  }
+
+  /** Writes the ID note into a plain file, so its history and extras follow it if it moves. */
+  async function linkHistoryToFile(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    const doc = editor?.document;
+    if (!editor || !doc || !extras.isPlain(doc)) {
+      void vscode.window.showInformationMessage("Open a .fountain or .md file to link it to its writing history. A .highland file is linked already.");
+      return;
+    }
+    if (noteId(doc.getText())) {
+      void vscode.window.showInformationMessage(`${basename(doc.uri.fsPath)} is linked to its writing history already.`);
+      return;
+    }
+    const id = await extras.documentId(doc.uri.fsPath);
+    if (!id) {
+      void vscode.window.showInformationMessage("Turn the writing history on to link a file to it.");
+      return;
+    }
+    const text = doc.getText();
+    const end = doc.positionAt(text.length);
+    const sep = text === "" ? "" : text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
+    await editor.edit((e) => e.insert(end, `${sep}${idNote(id)}\n`));
+    void vscode.window.showInformationMessage(
+      "Added a note at the end of the file naming its writing history, so its history, Bin and Scratchpad stay with it if it is moved or renamed. Notes never print.",
+    );
   }
 }
 
-/** The Highland script (and its bundle, if any) the panels show. */
+/** The Highland script (and its bundle, or its path for a plain file) the panels show. */
 class CurrentDocument implements vscode.Disposable {
   script: vscode.TextDocument | undefined;
   bundle: string | undefined;
+  /** A plain .fountain or .md file's path. */
+  plain: string | undefined;
   readonly #emitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.#emitter.event;
 
   get label(): string {
-    return this.bundle ?? this.script?.uri.fsPath ?? "";
+    return this.bundle ?? this.plain ?? this.script?.uri.fsPath ?? "";
   }
 
   follow(doc: vscode.TextDocument | undefined): void {
-    if (!doc || !doc.languageId.startsWith("highland-")) return;
+    if (!doc) return;
+    // A plain file's Bin item or Scratchpad keeps the file in view.
+    if (doc.uri.scheme === EXTRAS_SCHEME) {
+      const owner = plainExtras().ownerOf(doc.uri);
+      if (!owner || owner === this.plain) return;
+      this.set(vscode.workspace.textDocuments.find((d) => d.uri.scheme === "file" && d.uri.fsPath === owner), undefined, owner);
+      return;
+    }
+    if (!doc.languageId.startsWith("highland-")) return;
     const parts = doc.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
     // A Bin item or the Scratchpad keeps its bundle's script in view.
     if (parts && parts.entry !== "") {
@@ -128,17 +176,22 @@ class CurrentDocument implements vscode.Disposable {
       return;
     }
     if (doc === this.script) return;
-    this.set(doc, parts?.bundle);
+    const plain = parts ? undefined : doc.uri.scheme === "file" ? doc.uri.fsPath : undefined;
+    this.set(doc, parts?.bundle, plain);
+    // Bin and Scratchpad saved on another computer.
+    if (plain) void plainExtras().bringIn(plain).catch(() => false);
   }
 
   closed(doc: vscode.TextDocument): void {
-    if (doc === this.script) this.set(undefined, this.bundle);
+    if (doc === this.script) this.set(undefined, this.bundle, this.plain);
   }
 
-  private set(script: vscode.TextDocument | undefined, bundle: string | undefined): void {
+  private set(script: vscode.TextDocument | undefined, bundle: string | undefined, plain?: string): void {
     this.script = script;
     this.bundle = bundle;
+    this.plain = bundle ? undefined : plain;
     void vscode.commands.executeCommand("setContext", "highwater.inBundle", bundle !== undefined);
+    void vscode.commands.executeCommand("setContext", "highwater.hasExtras", bundle !== undefined || this.plain !== undefined);
     void vscode.commands.executeCommand("setContext", "highwater.hasDocument", script !== undefined || bundle !== undefined);
     this.#emitter.fire();
   }
@@ -257,11 +310,13 @@ async function reveal(uri: vscode.Uri, offset: number): Promise<void> {
 // ---------------------------------------------------------------------------------------------
 // Bin
 
-interface BinItem {
-  bundle: string;
+/** Whose Bin: a .highland file's, or a plain file's. */
+type Owner = { bundle: string; plain?: undefined } | { plain: string; bundle?: undefined };
+
+type BinItem = Owner & {
   index: number;
   text: string;
-}
+};
 
 const BIN_MIME = "application/vnd.code.tree.highwater.bin";
 
@@ -291,33 +346,55 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
   }
 
   async getChildren(item?: BinItem): Promise<BinItem[]> {
-    const bundle = this.current.bundle;
-    if (item || !bundle) return [];
-    const snap = await this.store.snapshot(bundle).catch(() => null);
-    return (snap?.binItems ?? []).map((text, index) => ({ bundle, index, text }));
+    if (item) return [];
+    const { bundle, plain } = this.current;
+    if (bundle) {
+      const snap = await this.store.snapshot(bundle).catch(() => null);
+      return (snap?.binItems ?? []).map((text, index) => ({ bundle, index, text }));
+    }
+    if (plain) {
+      const folder = await plainExtras().folder(plain).catch(() => null);
+      return ((await folder?.binItems()) ?? []).map((text, index) => ({ plain, index, text }));
+    }
+    return [];
   }
 
   async open(item: BinItem): Promise<void> {
-    const doc = await vscode.workspace.openTextDocument(toHighlandUri(item.bundle, `bin/${item.index}.txt`));
+    let uri: vscode.Uri;
+    if (item.bundle !== undefined) uri = toHighlandUri(item.bundle, `bin/${item.index}.txt`);
+    else {
+      const folder = await plainExtras().folder(item.plain);
+      if (!folder) return;
+      uri = plainExtras().uri(folder.binPath(item.index));
+    }
+    const doc = await vscode.workspace.openTextDocument(uri);
     await vscode.window.showTextDocument(doc, { preview: true });
   }
 
-  /** Adds a Bin item at the end (Highland's ⌥⌘C / ⌥⌘X). */
-  async add(text: string, bundle = this.current.bundle): Promise<void> {
-    if (!bundle) return;
-    await this.#change(bundle, (items) => [...items, text]);
+  #owner(): Owner | null {
+    if (this.current.bundle) return { bundle: this.current.bundle };
+    if (this.current.plain) return { plain: this.current.plain };
+    return null;
+  }
+
+  /** Adds a Bin item at the end (Highland's ⌥⌘C / ⌥⌘X). False if nothing was added. */
+  async add(text: string, owner = this.#owner()): Promise<boolean> {
+    if (!owner) return false;
+    if (owner.plain !== undefined && !(await plainExtras().confirm(owner.plain))) return false;
+    await this.#change(owner, (items) => [...items, text]);
+    return true;
   }
 
   async reorder(from: number, to: number): Promise<void> {
-    const bundle = this.current.bundle;
-    if (!bundle || to < 0) return;
-    await this.#change(bundle, (items) => (to >= items.length ? items : move(items, from, to)));
+    const owner = this.#owner();
+    if (!owner || to < 0) return;
+    await this.#change(owner, (items) => (to >= items.length ? items : move(items, from, to)));
   }
 
   async remove(item: BinItem): Promise<void> {
     const ok = await vscode.window.showWarningMessage(`Delete the Bin item “${binLabel(item.text, 40)}”?`, { modal: true }, "Delete");
     if (ok !== "Delete") return;
-    await this.#change(item.bundle, (items) => items.filter((_, i) => i !== item.index));
+    await this.#change(item, (items) => items.filter((_, i) => i !== item.index));
   }
 
   handleDrag(source: readonly BinItem[], data: vscode.DataTransfer): void {
@@ -340,7 +417,18 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
     if (text) await this.add(text);
   }
 
-  async #change(bundle: string, f: (items: string[]) => string[]): Promise<void> {
+  async #change(owner: Owner, f: (items: string[]) => string[]): Promise<void> {
+    if (owner.plain !== undefined) {
+      const extras = plainExtras();
+      const folder = await extras.folder(owner.plain, true);
+      if (!folder) return;
+      const items = f(await folder.binItems());
+      const before = await folder.setBinItems(items);
+      extras.fireChanged(Array.from({ length: Math.max(before, items.length) }, (_, i) => folder.binPath(i)));
+      extras.changed(owner.plain);
+      return;
+    }
+    const bundle = owner.bundle;
     const before = (await this.store.snapshot(bundle)).binItems.length;
     await this.store.update(bundle, (b) => {
       b.setBinItems(f(b.binItems));
@@ -356,9 +444,16 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
 // ---------------------------------------------------------------------------------------------
 // Assets
 
-interface AssetItem {
-  bundle: string;
+type AssetItem = Owner & {
   name: string;
+  /** The folder the text refers to it in: "assets", or a plain file's "<name> assets". */
+  folder: string;
+  /** A plain file's image, on disk. */
+  file?: string;
+};
+
+function assetUri(item: AssetItem): vscode.Uri {
+  return item.file ? vscode.Uri.file(item.file) : toHighlandUri(item.bundle!, `assets/${item.name}`);
 }
 
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "heic", "webp", "pdf"];
@@ -381,22 +476,30 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
   getTreeItem(item: AssetItem): vscode.TreeItem {
     const t = new vscode.TreeItem(item.name);
     t.contextValue = "asset";
-    t.resourceUri = toHighlandUri(item.bundle, `assets/${item.name}`);
+    t.resourceUri = assetUri(item);
     t.tooltip = `${item.name}\nDrag into the text, or right-click to insert.`;
     t.command = { command: "highwater.assets.open", title: "Open", arguments: [item] };
     return t;
   }
 
   async getChildren(item?: AssetItem): Promise<AssetItem[]> {
-    const bundle = this.current.bundle;
-    if (item || !bundle) return [];
-    const snap = await this.store.snapshot(bundle).catch(() => null);
-    const names = (snap?.paths ?? []).filter((p) => p.startsWith("assets/") && !p.endsWith("/")).map((p) => p.slice("assets/".length));
-    return names.sort((a, b) => a.localeCompare(b)).map((name) => ({ bundle, name }));
+    if (item) return [];
+    const { bundle, plain } = this.current;
+    if (bundle) {
+      const snap = await this.store.snapshot(bundle).catch(() => null);
+      const names = (snap?.paths ?? []).filter((p) => p.startsWith("assets/") && !p.endsWith("/")).map((p) => p.slice("assets/".length));
+      return names.sort((a, b) => a.localeCompare(b)).map((name) => ({ bundle, name, folder: "assets" }));
+    }
+    if (plain) {
+      const extras = plainExtras();
+      const { name: folder, dir } = await extras.assetsFolder(plain);
+      return (await extras.assets(plain)).map((name) => ({ plain, name, folder, file: join(dir, name) }));
+    }
+    return [];
   }
 
   handleDrag(source: readonly AssetItem[], data: vscode.DataTransfer): void {
-    data.set("text/plain", new vscode.DataTransferItem(source.map((a) => assetMarkdown(a.name)).join("\n\n")));
+    data.set("text/plain", new vscode.DataTransferItem(source.map((a) => assetMarkdown(a.name, a.folder)).join("\n\n")));
   }
 
   /** Files dropped from Finder or the Explorer are copied into the bundle. */
@@ -411,8 +514,8 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
   }
 
   async add(): Promise<void> {
-    if (!this.current.bundle) {
-      void vscode.window.showInformationMessage("Assets are kept inside .highland files; open one to add images.");
+    if (!this.current.bundle && !this.current.plain) {
+      void vscode.window.showInformationMessage("Open a document to add images to it.");
       return;
     }
     const uris = await vscode.window.showOpenDialog({ canSelectMany: true, filters: { Images: IMAGE_TYPES }, title: "Add to Assets" });
@@ -420,17 +523,25 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
   }
 
   async remove(item: AssetItem): Promise<void> {
-    const ok = await vscode.window.showWarningMessage(`Delete ${item.name} from this document's assets?`, { modal: true, detail: "Images in the text that use it will no longer print." }, "Delete");
+    const detail = item.file ? `It is moved to the Trash from the “${item.folder}” folder. Images in the text that use it will no longer print.` : "Images in the text that use it will no longer print.";
+    const ok = await vscode.window.showWarningMessage(`Delete ${item.name} from this document's assets?`, { modal: true, detail }, "Delete");
     if (ok !== "Delete") return;
-    await this.store.update(item.bundle, (b) => (b.delete(`assets/${item.name}`) ? [`assets/${item.name}`] : []));
+    if (item.file) await vscode.workspace.fs.delete(vscode.Uri.file(item.file), { useTrash: true });
+    else await this.store.update(item.bundle!, (b) => (b.delete(`assets/${item.name}`) ? [`assets/${item.name}`] : []));
     this.refresh();
   }
 
   async #import(uris: vscode.Uri[]): Promise<void> {
-    const bundle = this.current.bundle;
-    if (!bundle || !uris.length) return;
+    const { bundle, plain } = this.current;
+    if ((!bundle && !plain) || !uris.length) return;
     const files = await Promise.all(uris.map(async (u) => ({ name: basename(u.fsPath), data: new Uint8Array(await readFile(u.fsPath)) })));
-    await this.store.update(bundle, (b) => {
+    if (plain) {
+      if (!(await plainExtras().confirm(plain))) return;
+      await plainExtras().addAssets(plain, files, uniqueName);
+      this.refresh();
+      return;
+    }
+    await this.store.update(bundle!, (b) => {
       const taken = b.paths.filter((p) => p.startsWith("assets/")).map((p) => p.slice(7));
       return files.map((f) => {
         const name = uniqueName(f.name, taken);
@@ -457,7 +568,18 @@ async function openScratchpad(store: BundleStore, current: CurrentDocument): Pro
   const editor = vscode.window.activeTextEditor;
   const bundle = (editor?.document.uri.scheme === SCHEME ? splitBundlePath(editor.document.uri.fsPath)?.bundle : undefined) ?? current.bundle;
   if (!bundle) {
-    void vscode.window.showInformationMessage("The Scratchpad is kept inside .highland files; open one to use it.");
+    const extras = plainExtras();
+    const plain = editor && extras.isPlain(editor.document) ? editor.document.uri.fsPath : current.plain;
+    if (!plain) {
+      void vscode.window.showInformationMessage("Open a document to use its Scratchpad.");
+      return;
+    }
+    const existing = await extras.folder(plain);
+    if ((await existing?.scratchpad()) === undefined && !(await extras.confirm(plain))) return;
+    const folder = await extras.folder(plain, true);
+    if (!folder) return;
+    const doc = await vscode.workspace.openTextDocument(extras.uri(await folder.ensureScratchpad()));
+    await vscode.window.showTextDocument(doc, { preview: false });
     return;
   }
   const snap = await store.snapshot(bundle);

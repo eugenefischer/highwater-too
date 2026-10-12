@@ -9,7 +9,8 @@ import { registerLanguageFeatures } from "./language.ts";
 import { registerPanels } from "./panels.ts";
 import { registerPreview } from "./preview.ts";
 import { registerTemplateStatus } from "./render-document.ts";
-import { historyRoot, registerHistory } from "./history.ts";
+import { currentHistory, historyRoot, registerHistory } from "./history.ts";
+import { startPlainExtras } from "./extras.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerWritingTools } from "./writing-tools.ts";
 import { registerStatusBar } from "./status.ts";
@@ -18,6 +19,8 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 /** VS Code glue only; all format, parsing and layout logic lives in the other packages. */
 export function activate(context: vscode.ExtensionContext): void {
   const store = new BundleStore({ backupFolder: () => backupFolder(context) });
+  // Bin, Scratchpad and images for plain .fountain and .md files.
+  startPlainExtras(context, { history: currentHistory, historyRoot });
   const fs = new HighlandFileSystem(store);
 
   // Watch every open Highland document's file (VS Code may also ask the provider to watch).

@@ -5,6 +5,7 @@ import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { exportManuscript, exportManuscriptDocx, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
+import { plainExtras } from "./extras.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
 export const TEMPLATES = ["Screenplay", "Manuscript"] as const;
@@ -24,7 +25,11 @@ export async function templateOf(context: vscode.ExtensionContext, store: Bundle
   const bundle = bundleOf(doc);
   let chosen: unknown;
   if (bundle) chosen = (await store.highlandSettings(bundle).catch(() => ({}) as Record<string, unknown>)).templateName;
-  else chosen = context.workspaceState.get(`template:${doc.uri.toString()}`);
+  else {
+    // A plain file's choice is kept with its Bin and Scratchpad (earlier, in the workspace).
+    if (doc.uri.scheme === "file") chosen = (await (await plainExtras().folder(doc.uri.fsPath).catch(() => null))?.settings())?.templateName;
+    chosen ??= context.workspaceState.get(`template:${doc.uri.toString()}`);
+  }
   if (TEMPLATES.includes(chosen as Template)) return chosen as Template;
   if (doc.languageId === LANGUAGES.fountain) return "Screenplay";
   if (doc.languageId === LANGUAGES.markdown) return "Manuscript";
@@ -35,10 +40,17 @@ const templateChanged = new vscode.EventEmitter<vscode.TextDocument>();
 /** Fires when a document's template is changed (from the preview or the status bar). */
 export const onDidChangeTemplate = templateChanged.event;
 
-/** Saves the template choice: in info.json for .highland files (as Highland does), else in the workspace. */
+/**
+ * Saves the template choice: in info.json for .highland files (as Highland does), with a plain
+ * file's Bin and Scratchpad for plain files, else in the workspace.
+ */
 export async function setTemplate(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template: Template): Promise<void> {
   const bundle = bundleOf(doc);
-  if (!bundle) await context.workspaceState.update(`template:${doc.uri.toString()}`, template);
+  const folder = !bundle && doc.uri.scheme === "file" ? await plainExtras().folder(doc.uri.fsPath, true).catch(() => null) : null;
+  if (folder) {
+    await folder.updateSettings({ templateName: template });
+    await context.workspaceState.update(`template:${doc.uri.toString()}`, undefined);
+  } else if (!bundle) await context.workspaceState.update(`template:${doc.uri.toString()}`, template);
   else
     await store.update(bundle, (b) => {
       const settings = b.highlandSettings;
