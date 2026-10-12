@@ -12,6 +12,7 @@ import { registerPreview } from "./preview.ts";
 import { registerTemplateStatus } from "./render-document.ts";
 import { currentHistory, historyRoot, registerHistory } from "./history.ts";
 import { startPlainExtras } from "./extras.ts";
+import { focusedDocument } from "./focus.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerWritingTools } from "./writing-tools.ts";
 import { registerStatusBar } from "./status.ts";
@@ -22,6 +23,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const store = new BundleStore({ backupFolder: () => backupFolder(context) });
   // Bin, Scratchpad and images for plain .fountain and .md files.
   startPlainExtras(context, { history: currentHistory, historyRoot });
+  // The document the panes show.
+  focusedDocument(context);
   const fs = new HighlandFileSystem(store);
 
   // Watch every open Highland document's file (VS Code may also ask the provider to watch).

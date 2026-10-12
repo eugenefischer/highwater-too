@@ -4,10 +4,11 @@ import * as vscode from "vscode";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import type { ParseCache } from "./language.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
-import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
+import { plainExtras } from "./extras.ts";
 import { blockAt, moveBlock, NAVIGATOR_LABELS, NAVIGATOR_TYPES, navigatorItems, parseFilters, type NavigatorFilters, type NavigatorItem, type NavigatorType } from "./syntax/navigator.ts";
 import { assetMarkdown, binLabel, move, uniqueName } from "./syntax/workspace.ts";
 import { idNote, noteId } from "./extras-folder.ts";
+import { focusedDocument, type FocusedDocument } from "./focus.ts";
 
 /**
  * The Highland sidebar (M6): Navigator, Bin and Assets as tree views in a "Highwater Too" view
@@ -16,7 +17,7 @@ import { idNote, noteId } from "./extras-folder.ts";
  * keeps them with the writing history and in a folder beside it (see PlainExtras).
  */
 export function registerPanels(context: vscode.ExtensionContext, store: BundleStore, fs: HighlandFileSystem, cache: ParseCache): void {
-  const current = new CurrentDocument();
+  const current = focusedDocument(context);
   const navigator = new NavigatorView(context, store, cache, current);
   const bin = new BinView(store, fs, current);
   const assets = new AssetsView(store, current);
@@ -29,7 +30,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     navigator.refresh();
     bin.refresh();
     assets.refresh();
-    navTree.description = current.script ? basename(current.label) : "";
+    navTree.description = current.key ? basename(current.label) : "";
   };
   current.onDidChange(refreshAll);
   const extras = plainExtras();
@@ -41,20 +42,13 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     binTree,
     assetTree,
     navTree,
-    current,
-    vscode.window.onDidChangeActiveTextEditor((e) => {
-      current.follow(e?.document);
-      void showSidebar(e);
-    }),
+    vscode.window.onDidChangeActiveTextEditor((e) => void showSidebar(e)),
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document !== current.script) return;
       clearTimeout(timer);
       timer = setTimeout(() => navigator.refresh(), 250);
     }),
-    vscode.workspace.onDidCloseTextDocument((d) => {
-      current.closed(d);
-      shown.delete(d.uri.toString());
-    }),
+    vscode.workspace.onDidCloseTextDocument((d) => shown.delete(d.uri.toString())),
     { dispose: store.onExternalChange((path) => (path === current.bundle ? refreshAll() : undefined)) },
     extras.onDidChange((path) => {
       if (path !== current.plain) return;
@@ -83,7 +77,6 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     vscode.commands.registerCommand("highwater.panels.refresh", () => refreshAll()),
     vscode.commands.registerCommand("highwater.linkHistoryToFile", () => linkHistoryToFile()),
   );
-  for (const e of [vscode.window.activeTextEditor, ...vscode.window.visibleTextEditors]) if (e) current.follow(e.document);
   void showSidebar(vscode.window.activeTextEditor);
 
   /**
@@ -146,62 +139,6 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
 }
 
 /** The Highland script (and its bundle, or its path for a plain file) the panels show. */
-class CurrentDocument implements vscode.Disposable {
-  script: vscode.TextDocument | undefined;
-  bundle: string | undefined;
-  /** A plain .fountain or .md file's path. */
-  plain: string | undefined;
-  readonly #emitter = new vscode.EventEmitter<void>();
-  readonly onDidChange = this.#emitter.event;
-
-  get label(): string {
-    return this.bundle ?? this.plain ?? this.script?.uri.fsPath ?? "";
-  }
-
-  follow(doc: vscode.TextDocument | undefined): void {
-    if (!doc) return;
-    // A plain file's Bin item or Scratchpad keeps the file in view.
-    if (doc.uri.scheme === EXTRAS_SCHEME) {
-      const owner = plainExtras().ownerOf(doc.uri);
-      if (!owner || owner === this.plain) return;
-      this.set(vscode.workspace.textDocuments.find((d) => d.uri.scheme === "file" && d.uri.fsPath === owner), undefined, owner);
-      return;
-    }
-    if (!doc.languageId.startsWith("highland-")) return;
-    const parts = doc.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
-    // A Bin item or the Scratchpad keeps its bundle's script in view.
-    if (parts && parts.entry !== "") {
-      if (parts.bundle === this.bundle) return;
-      const script = vscode.workspace.textDocuments.find((d) => d.uri.toString() === toHighlandUri(parts.bundle).toString());
-      this.set(script, parts.bundle);
-      return;
-    }
-    if (doc === this.script) return;
-    const plain = parts ? undefined : doc.uri.scheme === "file" ? doc.uri.fsPath : undefined;
-    this.set(doc, parts?.bundle, plain);
-    // Bin and Scratchpad saved on another computer.
-    if (plain) void plainExtras().bringIn(plain).catch(() => false);
-  }
-
-  closed(doc: vscode.TextDocument): void {
-    if (doc === this.script) this.set(undefined, this.bundle, this.plain);
-  }
-
-  private set(script: vscode.TextDocument | undefined, bundle: string | undefined, plain?: string): void {
-    this.script = script;
-    this.bundle = bundle;
-    this.plain = bundle ? undefined : plain;
-    void vscode.commands.executeCommand("setContext", "highwater.inBundle", bundle !== undefined);
-    void vscode.commands.executeCommand("setContext", "highwater.hasExtras", bundle !== undefined || this.plain !== undefined);
-    void vscode.commands.executeCommand("setContext", "highwater.hasDocument", script !== undefined || bundle !== undefined);
-    this.#emitter.fire();
-  }
-
-  dispose(): void {
-    this.#emitter.dispose();
-  }
-}
-
 // ---------------------------------------------------------------------------------------------
 // Navigator
 
@@ -230,7 +167,7 @@ class NavigatorView implements vscode.TreeDataProvider<NavigatorItem>, vscode.Tr
     private readonly context: vscode.ExtensionContext,
     private readonly store: BundleStore,
     private readonly cache: ParseCache,
-    private readonly current: CurrentDocument,
+    private readonly current: FocusedDocument,
   ) {}
 
   refresh(): void {
@@ -330,7 +267,7 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
   constructor(
     private readonly store: BundleStore,
     private readonly fs: HighlandFileSystem,
-    private readonly current: CurrentDocument,
+    private readonly current: FocusedDocument,
   ) {}
 
   refresh(): void {
@@ -467,7 +404,7 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
 
   constructor(
     private readonly store: BundleStore,
-    private readonly current: CurrentDocument,
+    private readonly current: FocusedDocument,
   ) {}
 
   refresh(): void {
@@ -557,7 +494,7 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
 
 // ---------------------------------------------------------------------------------------------
 
-async function insertText(current: CurrentDocument, text: string): Promise<void> {
+async function insertText(current: FocusedDocument, text: string): Promise<void> {
   const doc = current.script;
   if (!doc) return;
   const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc) ?? (await vscode.window.showTextDocument(doc));
@@ -565,7 +502,7 @@ async function insertText(current: CurrentDocument, text: string): Promise<void>
   await vscode.window.showTextDocument(editor.document, editor.viewColumn);
 }
 
-async function openScratchpad(store: BundleStore, current: CurrentDocument): Promise<void> {
+async function openScratchpad(store: BundleStore, current: FocusedDocument): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   const bundle = (editor?.document.uri.scheme === SCHEME ? splitBundlePath(editor.document.uri.fsPath)?.bundle : undefined) ?? current.bundle;
   if (!bundle) {

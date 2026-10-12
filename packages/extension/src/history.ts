@@ -15,6 +15,7 @@ import { EXTRAS_SCHEME, plainExtras, toExtras } from "./extras.ts";
 import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
 import { toBundle, withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
+import { focusedDocument, roleOf, scriptIsOpen } from "./focus.ts";
 import { afterPull, revertTo, WorksView, type WorksHost } from "./works.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
@@ -58,6 +59,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   const enabled = () => vscode.workspace.getConfiguration("highwater").get<boolean>("writingHistory", true);
   const history = () => historyAt(historyRoot());
   const extras = plainExtras();
+  const focus = focusedDocument(context);
 
   /**
    * The file a document's history belongs to: the .highland file, or a plain .fountain/.md file
@@ -178,7 +180,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   }
 
   async function updateStatus(): Promise<void> {
-    const key = keyOf(vscode.window.activeTextEditor?.document);
+    const key = (focus.key ?? null);
     if (!key || !enabled()) {
       status.hide();
       return;
@@ -280,8 +282,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   }
 
   async function showHistory(): Promise<void> {
-    const doc = vscode.window.activeTextEditor?.document;
-    const key = keyOf(doc);
+    const key = focus.key;
+    const doc = await focus.document();
     if (!doc || !key) {
       void vscode.window.showInformationMessage("Open a document to see its writing history.");
       return;
@@ -305,7 +307,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   }
 
   async function togglePause(): Promise<void> {
-    const key = keyOf(vscode.window.activeTextEditor?.document);
+    const key = (focus.key ?? null);
     if (!key) return;
     const r = await resolve(key);
     await history().setPaused(r.id, !r.paused);
@@ -316,13 +318,16 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
 
   // The Writing History panel: the current script's saves; click one to compare it with now.
   const view = new HistoryView(async () => {
-    const doc = vscode.window.activeTextEditor?.document;
-    const key = keyOf(doc);
-    if (!doc || !key || !enabled()) return null;
+    const key = focus.key;
+    if (!key || !enabled()) return null;
     const r = await lookup(key);
     void vscode.commands.executeCommand("setContext", "highwater.historyPaused", r?.paused ?? false);
-    return r ? { doc, key, commits: await history().log(r.id) } : null;
+    return r ? { key, commits: await history().log(r.id) } : null;
   });
+  /** The document a save in the Writing History pane belongs to (opened if need be). */
+  const documentFor = async (key: string): Promise<vscode.TextDocument> =>
+    vscode.workspace.textDocuments.find((d) => keyOf(d) === key && !(d.uri.scheme === SCHEME && splitBundlePath(d.uri.fsPath)?.entry) && d.uri.scheme !== EXTRAS_SCHEME) ??
+    vscode.workspace.openTextDocument(key.toLowerCase().endsWith(".highland") ? vscode.Uri.file(key).with({ scheme: SCHEME }) : vscode.Uri.file(key));
 
   // The Works panel: every work in the catalog, and what can be done with each.
   const askedJoins = new Set<string>();
@@ -361,14 +366,19 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
         void updateStatus();
       }
     }),
-    vscode.window.onDidChangeActiveTextEditor((e) => {
+    focus.onDidChange(() => {
       void updateStatus();
       view.refresh();
-      // A file this computer has no history for: look it up in the catalog (asked once).
-      const key = keyOf(e?.document);
-      if (key && enabled()) void connector.check(key).then(() => view.refresh());
+      const key = focus.key;
+      if (!key || !enabled()) return;
+      // A file this computer has no history for: look it up in the catalog (asked once); one
+      // that is an older save of its work: offer the latest.
+      void connector
+        .check(key)
+        .then(() => connector.offerLatest(key))
+        .then(() => view.refresh());
       // Opening a document: bring in other computers' saves, at most once a minute.
-      if (enabled() && mirror.url && keyOf(e?.document) && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
+      if (mirror.url && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
     }),
     vscode.workspace.onWillSaveTextDocument((e) => {
       if (keyOf(e.document)) reasons.set(e.document.uri.toString(), e.reason);
@@ -391,7 +401,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       },
     }),
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
-    vscode.commands.registerCommand("highwater.history.revert", (item: HistoryItem) => revertTo(worksHost, item.doc, item.key, item.commit)),
+    vscode.commands.registerCommand("highwater.history.revert", async (item: HistoryItem) => revertTo(worksHost, await documentFor(item.key), item.key, item.commit)),
     vscode.commands.registerCommand("highwater.works.refresh", () => works.refresh()),
     vscode.commands.registerCommand("highwater.works.open", (node: Parameters<WorksView["open"]>[0]) => works.open(node)),
     vscode.commands.registerCommand("highwater.works.restore", (node: Parameters<WorksView["restore"]>[0]) => works.restore(node)),
@@ -399,7 +409,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.commands.registerCommand("highwater.works.remove", (node: Parameters<WorksView["remove"]>[0]) => works.remove(node)),
     vscode.commands.registerCommand("highwater.works.delete", (node: Parameters<WorksView["delete"]>[0]) => works.delete(node)),
     vscode.commands.registerCommand("highwater.history.decide", async () => {
-      const key = keyOf(vscode.window.activeTextEditor?.document);
+      const key = (focus.key ?? null);
       if (key) await connector.check(key);
     }),
     // Used by the conversions (convert.ts), not shown in the Command Palette.
@@ -408,7 +418,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (enabled()) await commitNow(path, "convert", note);
       view.refresh();
     }),
-    vscode.commands.registerCommand("highwater.history.compare", (item: HistoryItem) => compare(item.doc, item.key, item.commit)),
+    vscode.commands.registerCommand("highwater.history.compare", async (item: HistoryItem) => compare(await documentFor(item.key), item.key, item.commit)),
     vscode.commands.registerCommand("highwater.changeHistoryLocation", () => changeLocation()),
     vscode.commands.registerCommand("highwater.toggleDocumentHistory", () => togglePause()),
     mirror,
@@ -421,7 +431,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.commands.registerCommand("highwater.forgetHistoryMirrorSignIn", () => mirror.forgetSignIn()),
     vscode.commands.registerCommand("highwater.pushHistoryNow", () => pulled(mirror.sync(true))),
     vscode.commands.registerCommand("highwater.exportHistory", async () => {
-      const key = keyOf(vscode.window.activeTextEditor?.document);
+      const key = (focus.key ?? null);
       if (!key) {
         void vscode.window.showInformationMessage("Open a document to export its writing history.");
         return;
@@ -553,6 +563,13 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       extras.forget();
       for (const d of vscode.workspace.textDocuments) if (extras.isPlain(d)) await extras.bringIn(d.uri.fsPath).catch(() => false);
       if (updated.includes("main")) await afterPull(worksHost, askedJoins).catch(() => undefined);
+      // Open files that are now older saves of their works: offer the latest.
+      const open = new Set<string>();
+      for (const d of vscode.workspace.textDocuments) {
+        const role = roleOf(d);
+        if (role.kind === "script" && scriptIsOpen(role.key)) open.add(role.key);
+      }
+      for (const key of open) await connector.offerLatest(key).catch(() => undefined);
       view.refresh();
       works.refresh();
       void updateStatus();
@@ -590,7 +607,6 @@ function when(d: Date): string {
 }
 
 interface HistoryItem {
-  doc: vscode.TextDocument;
   key: string;
   commit: CommitInfo;
 }
@@ -599,7 +615,7 @@ class HistoryView implements vscode.TreeDataProvider<HistoryItem> {
   readonly #changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.#changed.event;
 
-  constructor(private readonly load: () => Promise<{ doc: vscode.TextDocument; key: string; commits: CommitInfo[] } | null>) {}
+  constructor(private readonly load: () => Promise<{ key: string; commits: CommitInfo[] } | null>) {}
 
   refresh(): void {
     this.#changed.fire();
@@ -620,6 +636,6 @@ class HistoryView implements vscode.TreeDataProvider<HistoryItem> {
     if (item) return [];
     const data = await this.load().catch(() => null);
     if (!data) return [];
-    return data.commits.map((commit) => ({ doc: data.doc, key: data.key, commit }));
+    return data.commits.map((commit) => ({ key: data.key, commit }));
   }
 }

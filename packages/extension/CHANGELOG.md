@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3
+
+- **Newer saves from another computer:** when a sync brings newer saves of a work whose file is open here, or you switch to such a file, and the file is an older save, you are asked: **Update to the Latest** (the file, its Bin and its Scratchpad become the latest save) or **Keep This Version** (your next save goes back to it, recorded as a `Revert`). With unsaved changes, or changes since that save, **Open the Latest Beside It** takes the place of Update, and you are asked again when you next save. No choice is pre-selected; until you choose, the file's saves are not recorded. Nothing is asked when the file is the latest save, and each latest save is asked about once.
+- **The panes follow the focused document:** Navigator, Bin, Assets and Writing History show the document you are in, and switch as soon as you move to another. Moving to a file that is not a Highwater document, or closing the document, empties them. Moving to the panes, the Preview, a save from the history, or the document's Bin items or Scratchpad keeps it. The Writing History panel fills in by itself, including for a `.md` file switched to Highwater Markdown.
+- **Closing a document closes its Bin items and Scratchpad:** when the document's last tab closes, any open tabs of its Bin items or Scratchpad close too (unsaved ones ask, as VS Code does), for `.highland` and plain files.
+
 ## 0.2.2
 
 - **Works panel** in the Highwater Too sidebar: every work in the catalog, on this computer or only on the mirror, newest first, with its saves (click one to compare it with the file, or to read it if the file is not here). Right-click: Open, Restore…, Remove from This Computer…, Delete Writing History….

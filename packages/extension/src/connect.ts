@@ -1,7 +1,7 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { writeBundle } from "@highwater/bundle";
-import { formOf, type CommitInfo, type History, type Recognition, type SaveKind } from "@highwater/history";
+import { formOf, textHash, type CommitInfo, type History, type Recognition, type SaveKind } from "@highwater/history";
 import * as vscode from "vscode";
 import { plainExtras, toExtras } from "./extras.ts";
 import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
@@ -16,10 +16,10 @@ export interface NextSave {
 }
 
 /** The question a file is waiting on, so it can be asked again. */
-interface Pending {
-  r: Recognition;
-  stage: "connect" | "form" | "text";
-}
+type Pending =
+  | { stage: "connect" | "form" | "text"; r: Recognition }
+  /** The file is an older save of its work, and newer ones came in (from another computer). */
+  | { stage: "latest"; branch: string; title: string; save: CommitInfo; saveText: string; head: CommitInfo; headText: string };
 
 export interface ConnectorHost {
   history(): History;
@@ -47,6 +47,8 @@ export class Connector {
   readonly #pending = new Map<string, Pending>();
   /** How the next save of a file is recorded. */
   readonly #next = new Map<string, NextSave>();
+  /** The latest save each file was last checked against (asked once per latest save). */
+  readonly #offered = new Map<string, string>();
   /** A check in progress, per file. */
   readonly #running = new Map<string, Promise<void>>();
 
@@ -77,6 +79,7 @@ export class Connector {
       this.#looked.delete(k);
       this.#pending.delete(k);
       this.#next.delete(k);
+      this.#offered.delete(k);
     }
   }
 
@@ -121,8 +124,49 @@ export class Connector {
     return this.#ask(key, { r, stage });
   }
 
+  /**
+   * Asks how a tracked file continues when it is an older save of its work, because newer saves
+   * came in from another computer: update it to the latest, or keep this version (the next save
+   * is a revert). No default: until the writer chooses, its saves are not recorded. Asked once per
+   * latest save.
+   */
+  offerLatest(key: string): Promise<void> {
+    const running = this.#running.get(key);
+    if (running) return running.then(() => this.offerLatest(key));
+    const run = this.#offerLatest(key).finally(() => {
+      this.#running.delete(key);
+      this.#host.changed();
+    });
+    this.#running.set(key, run);
+    return run;
+  }
+
+  async #offerLatest(key: string): Promise<void> {
+    // Undecided, or the writer already chose how the next save goes.
+    if (this.#pending.has(key) || this.#next.has(key)) return;
+    const h = this.#host.history();
+    const doc = await this.#identify(key);
+    if (!doc) return;
+    const found = await h.find({ id: doc.id, path: key, text: doc.text });
+    if (!found || found.paused) return;
+    const head = (await h.branchLog(found.branch, 1))[0];
+    if (!head || this.#offered.get(key) === head.hash) return;
+    this.#offered.set(key, head.hash);
+    const headText = textHash(await h.scriptAt(head.hash));
+    const hash = textHash(doc.text);
+    if (hash === headText || doc.savedText === headText) return;
+    // Only a file that is one of the work's saves: other differences are this computer's own edits.
+    let saveText = hash;
+    let save = await h.saveWithText(found.branch, hash);
+    if (!save && doc.savedText) [save, saveText] = [await h.saveWithText(found.branch, doc.savedText), doc.savedText];
+    if (!save || save.hash === head.hash || save.date >= head.date) return;
+    const title = (await h.catalog()).find((e) => e.branch === found.branch)?.title ?? basename(key);
+    return this.#ask(key, { stage: "latest", branch: found.branch, title, save, saveText, head, headText });
+  }
+
   async #ask(key: string, p: Pending): Promise<void> {
     const name = basename(key);
+    if (p.stage === "latest") return this.#askLatest(key, p);
     const title = p.r.entry.title;
     if (p.stage === "connect") {
       const where = p.r.local ? "" : " Its history is on the mirror, not on this computer.";
@@ -233,10 +277,58 @@ export class Connector {
     return this.#done(key);
   }
 
+  async #askLatest(key: string, p: Extract<Pending, { stage: "latest" }>): Promise<void> {
+    const name = basename(key);
+    const when = p.save.date.toLocaleString();
+    const latest = p.head.date.toLocaleString();
+    // Asked again (after comparing, say): the file may have changed since.
+    const now = await this.#identify(key);
+    const hash = now ? textHash(now.text) : p.saveText;
+    if (hash === p.headText) return this.#done(key);
+    const edited = hash !== p.saveText;
+    const dirty = this.#openDocument(key)?.isDirty ?? false;
+    // Replacing is offered only while the file is exactly the older save.
+    const compare = dirty || edited;
+    const go = compare ? "Open the Latest Beside It" : "Update to the Latest";
+    const choice = await vscode.window.showWarningMessage(
+      edited
+        ? `“${p.title}” has newer saves: ${name} was edited since the save of ${when}, and the latest is from ${latest}.`
+        : `“${p.title}” has newer saves: ${name} is the save of ${when}, and the latest is from ${latest}.`,
+      {
+        modal: true,
+        detail:
+          (compare
+            ? "Open the latest beside it: compare the latest save with this file, then choose (this file has changes the latest save does not, so it is not replaced).\n\n"
+            : "Update to the latest: this file, its Bin and its Scratchpad are replaced with the latest save (nothing is lost: this version is itself a save in the history).\n\n") +
+          (edited ? `Keep this version: your next save continues from this file, recorded as going back to the save of ${when} with edits.` : "Keep this version: your next save goes back to it, recorded as a revert.") +
+          "\n\nUntil you choose, saves of this file are not recorded.",
+      },
+      go,
+      "Keep This Version",
+    );
+    if (!choice) return this.#wait(key, p);
+    if (choice === "Keep This Version") {
+      this.#next.set(key, { kind: "revert", note: edited ? `to the save of ${when}, edited since` : `to the save of ${when}` });
+      return this.#done(key);
+    }
+    if (compare) {
+      await this.#host.compare(key, p.head);
+      return this.#wait(key, p);
+    }
+    // A save may have come in meanwhile: update to the newest there is.
+    const head = (await this.#host.history().branchLog(p.branch, 1))[0] ?? p.head;
+    if (!(await this.#update(key, head))) return this.#wait(key, p);
+    this.#offered.set(key, head.hash);
+    return this.#done(key);
+  }
+
+  #openDocument(key: string): vscode.TextDocument | undefined {
+    return vscode.workspace.textDocuments.find((d) => (d.uri.scheme === "file" || d.uri.scheme === "highland") && d.uri.fsPath === key);
+  }
+
   /** Replaces the file with the work's latest save (refused while it has unsaved edits). */
   async #update(key: string, head: CommitInfo): Promise<boolean> {
-    const open = vscode.workspace.textDocuments.find((d) => (d.uri.scheme === "file" || d.uri.scheme === "highland") && d.uri.fsPath === key);
-    if (open?.isDirty) {
+    if (this.#openDocument(key)?.isDirty) {
       void vscode.window.showWarningMessage(`${basename(key)} has unsaved changes. Save or revert them, then choose again from the writing history item in the status bar.`);
       return false;
     }
