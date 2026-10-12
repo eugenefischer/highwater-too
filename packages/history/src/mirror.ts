@@ -83,6 +83,10 @@ const REMOTE = "mirror";
  * Mirrors the history repository to one remote, append-only: never force-pushes. A branch that
  * another computer has moved ahead is merged (a commit with both as parents, keeping this
  * computer's text), so neither history is lost and nothing is rewritten.
+ *
+ * On demand: a computer fetches main (the catalog) and only the works it already has. A work used
+ * elsewhere comes here only when asked for (fetchWork): when it is restored, or a file of it is
+ * opened here and the writer agrees.
  */
 export class Mirror {
   readonly history: History;
@@ -96,11 +100,12 @@ export class Mirror {
     this.auth = auth;
   }
 
-  /** Pushes every branch (main and each work). Branches already up to date cost nothing. */
+  /** Pushes main (with this computer's saves in the catalog) and this computer's works. */
   async push(): Promise<PushResult> {
     const repo = this.history.repo;
     try {
       await this.#remote();
+      await this.history.inside.flushCatalog();
       const branches = (await git(repo, ["for-each-ref", "--format=%(refname:short)", "refs/heads/"])).split("\n").filter(Boolean);
       const rejected: string[] = [];
       const out = await this.#git(["push", "--porcelain", REMOTE, ...branches.map((b) => `refs/heads/${b}:refs/heads/${b}`)]).catch((e: unknown) => {
@@ -113,6 +118,7 @@ export class Mirror {
         if (m) rejected.push(m[1]!);
       }
       for (const branch of rejected) await this.#mergeRemote(branch);
+      if (rejected.length) await this.history.inside.flushCatalog();
       if (rejected.length) await this.#git(["push", "--porcelain", REMOTE, ...rejected.map((b) => `refs/heads/${b}:refs/heads/${b}`)]);
       return { ok: true, pushed: branches.length };
     } catch (error) {
@@ -121,26 +127,44 @@ export class Mirror {
   }
 
   /**
-   * Brings in what other computers pushed: every branch on the remote is fetched; a branch this
-   * computer lacks is created, one it is behind on moves forward, and one that both have moved is
-   * joined with a merge commit (keeping this computer's text). Nothing local is ever lost.
-   * Returns the branches that changed here.
+   * Brings in what other computers pushed: main (the catalog), and the works this computer has. A
+   * work one is behind on moves forward; one that both have moved is joined with a merge commit
+   * (keeping this computer's text). Works not on this computer are not fetched. Nothing local is
+   * ever lost. Returns the branches that changed here.
    */
   async pull(): Promise<PullResult> {
     const repo = this.history.repo;
     try {
       await this.#remote();
-      await this.#git(["fetch", "-q", "--prune", REMOTE, "+refs/heads/*:refs/mirror/*"]);
-      const remote = (await git(repo, ["for-each-ref", "--format=%(refname)", "refs/mirror/"])).split("\n").filter(Boolean).map((r) => r.replace(/^refs\/mirror\//, ""));
+      const remote = await this.remoteBranches();
+      const local = (await git(repo, ["for-each-ref", "--format=%(refname:short)", "refs/heads/works/"])).split("\n").filter(Boolean);
+      const wanted = ["main", ...local].filter((b) => remote.has(b));
+      if (!wanted.length) return { ok: true, updated: [] };
+      await this.#git(["fetch", "-q", REMOTE, ...wanted.map((b) => `+refs/heads/${b}:refs/mirror/${b}`)]);
       const updated: string[] = [];
-      for (const branch of remote) if (await this.#join(branch)) updated.push(branch);
+      for (const branch of wanted) if (await this.#join(branch)) updated.push(branch);
       return { ok: true, updated };
     } catch (error) {
-      const message = (error as Error).message;
-      // A remote with nothing pushed yet has no branches to fetch: nothing to pull.
-      if (/couldn't find remote ref|no matching remote head/i.test(message)) return { ok: true, updated: [] };
-      return failure(message);
+      return failure((error as Error).message);
     }
+  }
+
+  /** Fetches one work's history from the remote (restoring it, or connecting a file to it). */
+  async fetchWork(branch: string): Promise<void> {
+    await this.#remote();
+    await this.#git(["fetch", "-q", REMOTE, `+refs/heads/${branch}:refs/mirror/${branch}`]);
+    await this.#join(branch);
+  }
+
+  /** The remote's branches, by name, without fetching anything. */
+  async remoteBranches(): Promise<Map<string, string>> {
+    const out = await this.#git(["ls-remote", "--heads", REMOTE]);
+    const heads = new Map<string, string>();
+    for (const line of out.split("\n")) {
+      const [hash, ref] = line.split("\t");
+      if (hash && ref?.startsWith("refs/heads/")) heads.set(ref.slice("refs/heads/".length), hash);
+    }
+    return heads;
   }
 
   /** Creates the remote repository over SSH (`git init --bare`), for servers without an API. */
@@ -167,6 +191,8 @@ export class Mirror {
   /** Brings the fetched refs/mirror/<branch> into refs/heads/<branch>; true when that changed it. */
   async #join(branch: string): Promise<boolean> {
     const repo = this.history.repo;
+    // main is the catalog: merged by its own rules.
+    if (branch === "main") return this.history.inside.joinMain("refs/mirror/main");
     const remote = (await git(repo, ["rev-parse", `refs/mirror/${branch}`])).trim();
     const local = (await git(repo, ["rev-parse", "--verify", "-q", `refs/heads/${branch}`]).catch(() => "")).trim();
     if (!local) {
@@ -179,11 +205,6 @@ export class Mirror {
     if (base === remote) return false; // we are ahead
     if (base === local) {
       // The remote is simply ahead (saved on another computer): take it, nothing of ours is lost.
-      await git(repo, ["update-ref", `refs/heads/${branch}`, remote, local]);
-      return true;
-    }
-    // main on a new computer: only the README commit, unrelated to the remote's: take the remote's.
-    if (branch === "main" && !base && !(await git(repo, ["rev-parse", "--verify", "-q", `${local}^`]).catch(() => "")).trim()) {
       await git(repo, ["update-ref", `refs/heads/${branch}`, remote, local]);
       return true;
     }

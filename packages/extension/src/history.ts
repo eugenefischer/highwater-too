@@ -14,6 +14,7 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 import { EXTRAS_SCHEME, plainExtras, toExtras } from "./extras.ts";
 import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
 import { toBundle, withoutSavedText } from "./to-bundle.ts";
+import { Connector } from "./connect.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -102,6 +103,18 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   }
 
   const mirror = new HistoryMirror(context, () => history());
+  const connector = new Connector({
+    history: () => history(),
+    historyRoot,
+    mirror,
+    store,
+    commit: (key, kind, note) => commitNow(key, kind, note),
+    compare: async (key, commit) => {
+      const doc = vscode.workspace.textDocuments.find((d) => keyOf(d) === key && !(d.uri.scheme === SCHEME && splitBundlePath(d.uri.fsPath)?.entry));
+      if (doc) await compare(doc, key, commit);
+    },
+    changed: () => void updateStatus(),
+  });
   mirror.onDidChange(() => void updateStatus());
   /** Commits in progress, per document, so a conversion can wait for them. */
   const inflight = new Map<string, Promise<void>>();
@@ -116,14 +129,20 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
 
   async function commitNow(key: string, kind: SaveKind, note?: string): Promise<void> {
     try {
+      // A file this computer has no history for may belong to a work in the catalog: ask first.
+      if (kind !== "convert" && kind !== "restore") await connector.check(key);
+      if (connector.undecided(key)) return; // its saves wait for the writer's choice
+      const next = kind === "save" || kind === "autosave" || kind === "close" ? connector.takeNext(key) : undefined;
       const r = await resolve(key);
       if (r.paused) return;
-      const c = await history().commit(r.id, r.files, kind, new Date(), note, { form: formOf(key), file: basename(key) });
+      const c = await history().commit(r.id, r.files, next?.kind ?? kind, new Date(), next?.note ?? note, { form: formOf(key), file: basename(key) });
       if (!key.toLowerCase().endsWith(".highland")) await extras.recorded(key, c?.hash ?? null);
       failures.delete(key);
       if (c) {
         lastCommit.set(key, c.date);
-        mirror.schedule();
+        // The catalog goes to main with the next push; with no mirror, now.
+        if (mirror.url) mirror.schedule();
+        else await history().flushCatalog();
       }
       void showNotice();
       view.refresh();
@@ -164,7 +183,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     }
     const failed = failures.get(key);
     status.command = "highwater.showHistory";
-    if (failed) {
+    if (connector.undecided(key)) {
+      status.text = "$(history)$(warning) Choose";
+      status.tooltip = `${basename(key)} matches a work in your writing history, and its saves are not recorded until you choose how it continues. Click to choose.`;
+      status.command = "highwater.history.decide";
+    } else if (failed) {
       status.text = "$(warning) History";
       status.tooltip = `The last save was not added to the writing history: ${failed}. It will be tried again on the next save.`;
     } else {
@@ -312,6 +335,9 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.window.onDidChangeActiveTextEditor((e) => {
       void updateStatus();
       view.refresh();
+      // A file this computer has no history for: look it up in the catalog (asked once).
+      const key = keyOf(e?.document);
+      if (key && enabled()) void connector.check(key).then(() => view.refresh());
       // Opening a document: bring in other computers' saves, at most once a minute.
       if (enabled() && mirror.url && keyOf(e?.document) && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
     }),
@@ -336,6 +362,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       },
     }),
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
+    vscode.commands.registerCommand("highwater.history.decide", async () => {
+      const key = keyOf(vscode.window.activeTextEditor?.document);
+      if (key) await connector.check(key);
+    }),
     // Used by the conversions (convert.ts), not shown in the Command Palette.
     vscode.commands.registerCommand("highwater.history.settle", (path: string) => settle(path)),
     vscode.commands.registerCommand("highwater.history.converted", async (path: string, note: string) => {
@@ -391,8 +421,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
         const here = w.paths.slice().reverse().find((p) => existsSync(p));
         return {
           label: w.title,
-          description: here ? basename(here) : "not on this computer",
-          detail: `Last saved ${w.latest!.date.toLocaleString()} · ${w.latest!.message.replace(/^\S+ \S+ \S+, /, "")}`,
+          description: here ? basename(here) : w.local ? "history on this computer" : "on the mirror",
+          detail: `Last saved ${w.lastSave!.toLocaleString()}${w.file ? ` as ${w.file}` : ""}${w.latest ? ` · ${w.latest.message.replace(/^\S+ \S+ \S+, /, "")}` : ""}`,
           work: w,
           here,
         };
@@ -402,6 +432,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     if (!work) return;
     if (work.here) return void (await openFile(work.here));
     const w = work.work;
+    // Only in the catalog: fetch its history first (the writer asked for this work).
+    if (!w.local) {
+      if (!mirror.url) return void vscode.window.showErrorMessage(`${w.title}'s history is not on this computer. Set up the history mirror to fetch it.`);
+      if (!(await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Fetching ${w.title}…` }, () => mirror.fetchWork(w.branch)))) return;
+    }
     const latest = (await h.branchLog(w.branch, 1))[0];
     if (!latest) return;
     const files = await h.filesAt(latest.hash);

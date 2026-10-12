@@ -76,6 +76,22 @@ export class HistoryMirror implements vscode.Disposable {
     return [];
   }
 
+  /**
+   * Fetches one work's history from the mirror, because the writer asked for it (restoring it, or
+   * connecting a file to it). Says what went wrong if it could not. True when it came.
+   */
+  async fetchWork(branch: string): Promise<boolean> {
+    const url = this.url;
+    if (!url) return false;
+    const h = this.history();
+    const mirror = new Mirror(h, url, () => this.#auth(url));
+    const attempt = () => h.exclusive(() => mirror.fetchWork(branch)).then(() => null, (e: unknown) => (e as Error).message);
+    let error = await attempt();
+    if (error && failureKind(error) === "auth" && (await this.#offerSignIn(url, true))) error = await attempt();
+    if (error) void vscode.window.showErrorMessage(`Could not fetch that work's history from ${url}: ${error.split("\n")[0]}`);
+    return error === null;
+  }
+
   /** When the last pull ran (ms), to space them out. */
   lastPull = 0;
 

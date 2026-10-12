@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { CommitBatcher, commitMessage, formOf, History, moveHistory, similarity, textHash, wordCount } from "../src/index.ts";
+import { CommitBatcher, commitMessage, formOf, History, mergeMain, moveHistory, textHash, wordCount } from "../src/index.ts";
 
 const folder = () => mkdtemp(join(tmpdir(), "highwater-history-"));
 const script = "INT. HOUSE - DAY\n\nShe enters.\n\nBOB\nHello there.\n";
@@ -43,20 +43,16 @@ describe("History: one repository, one branch per document", () => {
     expect(gitIn(h.repo, "bundle", "list-heads", join(h.folder, "a.bundle"))).toContain(a.branch);
   });
 
-  it("finds a moved document by its ID, and by its text when the ID is gone", async () => {
+  it("finds a moved document by its ID or its path, never by guessing from its text", async () => {
     const dir = await folder();
     const h = new History(dir);
     const first = await h.resolve({ id: null, path: "/a/One.highland", text: script });
     await h.commit(first.id, { scriptName: "text.fountain", script }, "save");
     expect((await h.resolve({ id: first.id, path: "/b/Renamed.highland", text: "different" })).branch).toBe(first.branch);
     const fresh = new History(dir);
-    const byText = await fresh.resolve({ id: null, path: "/c/Again.highland", text: `${script}\nOne more line.\n` });
-    expect(byText).toEqual({ id: first.id, branch: first.branch, created: false, paused: false });
-    const other = await fresh.resolve({ id: null, path: "/d/One.highland", text: "Something else entirely.\n\nNothing alike." });
-    expect(other.created).toBe(true);
-    expect(other.branch).not.toBe(first.branch);
+    expect(await fresh.find({ id: null, path: "/c/Again.highland", text: script })).toBeNull();
     const index = JSON.parse(await readFile(join(dir, "index.json"), "utf8"));
-    expect(index.documents[first.id].paths).toEqual(["/a/One.highland", "/b/Renamed.highland", "/c/Again.highland"]);
+    expect(index.documents[first.id].paths).toEqual(["/a/One.highland", "/b/Renamed.highland"]);
   });
 
   it("looks a document up without creating a history", async () => {
@@ -94,10 +90,6 @@ describe("helpers", () => {
     expect(commitMessage("autosave", new Date(2026, 0, 2, 3, 4), "one two three", "one")).toBe("Autosave 2026-01-02 03:04, −2 words (1)");
   });
 
-  it("scores text similarity by shared lines", () => {
-    expect(similarity("a\nb\nc", "a\nb\nc")).toBe(1);
-    expect(similarity("a\nb", "c\nd")).toBe(0);
-  });
 });
 
 describe("CommitBatcher", () => {
@@ -125,23 +117,66 @@ describe("CommitBatcher", () => {
   });
 });
 
-describe("the README on main", () => {
-  it("explains the repository and lists its works, updating when a work is added", async () => {
-    const { mkdtemp } = await import("node:fs/promises");
-    const { tmpdir } = await import("node:os");
-    const { join } = await import("node:path");
-    const { execFileSync } = await import("node:child_process");
-    const { History } = await import("../src/index.ts");
-    const h = new History(await mkdtemp(join(tmpdir(), "readme-")));
-    const doc = await h.resolve({ id: "1a2b3c4d-0000", path: "/w/The Purity Variations.highland", text: "x" });
-    const text = execFileSync("git", ["show", "main:README.md"], { cwd: h.repo, encoding: "utf8" });
-    expect(text).toContain("Each work has its own branch");
-    expect(text).toContain(`| The Purity Variations | \`${doc.branch}\` |`);
-    expect(text).not.toContain("beside this repository");
-    // Nothing changed: no new commit on main.
-    const before = execFileSync("git", ["rev-parse", "main"], { cwd: h.repo, encoding: "utf8" });
-    await new History(h.folder).resolve({ id: "1a2b3c4d-0000", path: "/w/The Purity Variations.highland", text: "x" });
-    expect(execFileSync("git", ["rev-parse", "main"], { cwd: h.repo, encoding: "utf8" })).toBe(before);
+describe("the catalog on main", () => {
+  const long = Array.from({ length: 60 }, (_, i) => `Line ${i} of the story.`).join("\n") + "\n";
+  const meta = (file: string) => ({ form: formOf(file), file });
+
+  it("lists every work with its saves' text hashes, and writes the README from it", async () => {
+    const h = new History(await folder());
+    const doc = await h.resolve({ id: "1a2b3c4d-0000", path: "/w/The Purity Variations.highland", text: long });
+    await h.commit(doc.id, { scriptName: "text.md", script: long }, "save", new Date(2026, 9, 12, 9, 0), undefined, meta("The Purity Variations.highland"));
+    await h.commit(doc.id, { scriptName: "text.md", script: `${long}More.\n` }, "save", new Date(2026, 9, 12, 9, 5), undefined, meta("The Purity Variations.highland"));
+    // Not on main until flushed, but the catalog already shows it.
+    expect(gitIn(h.repo, "ls-tree", "-r", "--name-only", "main")).toBe("README.md");
+    const [entry] = await h.catalog();
+    expect(entry).toMatchObject({ id: doc.id, branch: doc.branch, title: "The Purity Variations", form: "highland", file: "The Purity Variations.highland", latestText: textHash(`${long}More.\n`) });
+    expect(entry!.texts).toEqual([textHash(long), textHash(`${long}More.\n`)].sort());
+    expect(await h.flushCatalog()).toBe(true);
+    const slug = doc.branch.replace("works/", "");
+    expect(gitIn(h.repo, "ls-tree", "-r", "--name-only", "main").split("\n")).toEqual(["README.md", `works/${slug}/info.json`, `works/${slug}/texts`]);
+    expect(gitIn(h.repo, "show", "main:README.md")).toContain(`| The Purity Variations | \`${doc.branch}\` |`);
+    // Nothing new: no new commit on main.
+    expect(await h.flushCatalog()).toBe(false);
+  });
+
+  it("merges two computers' catalogs by fixed rules", () => {
+    const info = (lastSave: string) => JSON.stringify({ id: "x", branch: "works/A-x", title: "A", form: "md", file: "A.md", lastSave, latestText: lastSave });
+    const mine = new Map([
+      ["README.md", "mine"],
+      ["works/A-x/info.json", info("2026-10-12T09:00:00Z")],
+      ["works/A-x/texts", "aa\ncc\n"],
+      ["works/B-y/info.json", "{}"],
+    ]);
+    const theirs = new Map([
+      ["README.md", "theirs"],
+      ["works/A-x/info.json", info("2026-10-12T10:00:00Z")],
+      ["works/A-x/texts", "bb\ncc\n"],
+      ["deleted/B-y.json", JSON.stringify({ id: "y", branch: "works/B-y", deleted: "2026-10-12T11:00:00Z" })],
+    ]);
+    const merged = mergeMain(mine, theirs);
+    expect(merged.get("works/A-x/texts")).toBe("aa\nbb\ncc\n");
+    expect(merged.get("works/A-x/info.json")).toBe(info("2026-10-12T10:00:00Z"));
+    expect(merged.has("works/B-y/info.json")).toBe(false);
+    expect(merged.has("deleted/B-y.json")).toBe(true);
+    expect(merged.get("README.md")).toBe("mine");
+    expect(mergeMain(theirs, mine).get("works/A-x/texts")).toBe(merged.get("works/A-x/texts"));
+  });
+
+  it("recognises a file by its ID, its text's hash or its file name", async () => {
+    const h = new History(await folder());
+    const doc = await h.resolve({ id: "1a2b3c4d-1111", path: "/w/Novel.md", text: long });
+    await h.commit(doc.id, { scriptName: "text.md", script: long }, "save", new Date(2026, 9, 1), undefined, meta("Novel.md"));
+    await h.commit(doc.id, { scriptName: "text.md", script: `${long}Two.\n` }, "save", new Date(2026, 9, 2), undefined, meta("Novel.md"));
+    const look = (doc: { id?: string; path: string; text: string; savedText?: string }, minWords = 50) => h.recognise({ id: doc.id ?? null, ...doc }, minWords);
+    expect(await look({ id: "1a2b3c4d-1111", path: "/x/Other.highland", text: "anything" })).toMatchObject([{ by: "id", match: "none", local: true }]);
+    expect(await look({ path: "/x/Copy.md", text: `${long}Two.\n` })).toMatchObject([{ by: "hash", match: "latest" }]);
+    expect(await look({ path: "/x/Copy.md", text: long })).toMatchObject([{ by: "hash", match: "older", text: textHash(long) }]);
+    expect((await h.saveWithText(doc.branch, textHash(long)))?.date).toEqual(new Date(2026, 9, 1));
+    expect(await look({ id: "1a2b3c4d-1111", path: "/x/N.highland", text: "edited", savedText: textHash(long) })).toMatchObject([{ by: "id", match: "edited", text: textHash(long) }]);
+    expect(await look({ path: "/x/Novel.md", text: "Rewritten." })).toMatchObject([{ by: "name", match: "none" }]);
+    // Short texts never match by hash (empty files, templates).
+    expect(await look({ path: "/x/Other.md", text: long }, 1000)).toEqual([]);
+    expect(await look({ path: "/x/Other.md", text: "Nothing like it." })).toEqual([]);
   });
 });
 

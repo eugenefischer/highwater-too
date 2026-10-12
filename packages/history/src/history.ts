@@ -4,6 +4,7 @@ import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/pro
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { git, gitBytes } from "./git.ts";
+import { addSave, mergeMain, readCatalog, type CatalogEntry, type MainFiles } from "./catalog.ts";
 
 /**
  * The writing history (M7): one git repository in the history folder, with one branch per
@@ -44,14 +45,33 @@ export interface SaveMeta {
 
 /** A work in the history: indexed on this computer, or pulled from another one. */
 export interface WorkInfo {
-  /** The document ID: from the index, or named by the branch's latest commit; null if unknown. */
+  /** The document ID: from the index or the catalog; null if unknown. */
   id: string | null;
   branch: string;
   title: string;
-  /** Its latest save. */
+  /** Its latest save, when its history is on this computer. */
   latest: CommitInfo | null;
-  /** Paths it was saved at on this computer (none for works only pulled). */
+  /** From the catalog: when it was last saved, and as what. */
+  lastSave: Date | null;
+  form: Form | null;
+  file: string | null;
+  /** Its history is on this computer (else only in the catalog: on the mirror). */
+  local: boolean;
+  /** Paths it was saved at on this computer (none for works not used here). */
   paths: string[];
+}
+
+/** How a file not tracked on this computer relates to a work in the catalog. */
+export interface Recognition {
+  entry: CatalogEntry;
+  /** What found it: its ID, its text's hash, or (a guess) its file name. */
+  by: "id" | "hash" | "name";
+  /** Its text is the latest save, an older one, edited since a known save (.highland), or none. */
+  match: "latest" | "older" | "edited" | "none";
+  /** The save it matches or was last saved from (older, edited). */
+  text: string | null;
+  /** The work's history is already on this computer. */
+  local: boolean;
 }
 
 export interface IndexEntry {
@@ -93,8 +113,8 @@ export interface CommitInfo {
   file?: string;
 }
 
-/** Below this similarity a document with no ID and an unknown path starts a new history. */
-export const MATCH_THRESHOLD = 0.6;
+/** This computer's saves not yet in the catalog on main. */
+const PENDING = "catalog-pending.json";
 
 /** The repository's folder name inside the history folder. */
 export const REPO_NAME = "history.git";
@@ -192,8 +212,8 @@ export class History {
   }
 
   /**
-   * Finds the document's history: by ID, then by path, then by text similarity to each work's
-   * latest script. Starts a new one if nothing matches. Returns the ID to store in the document.
+   * Finds the document's history on this computer: by ID, then by path. Starts a new one if nothing
+   * matches (a file another computer's history may know is recognised first, with recognise). Returns the ID to store in the document.
    */
   resolve(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; created: boolean; paused: boolean }> {
     return this.#serial(async () => {
@@ -211,7 +231,6 @@ export class History {
       if (entry.paths.at(-1) !== doc.path) entry.paths = [...entry.paths.filter((p) => p !== doc.path), doc.path];
       if (index.retired?.includes(doc.path)) index.retired = index.retired.filter((p) => p !== doc.path);
       await this.#save(index);
-      if (created) await this.#updateReadme();
       return { id, branch: entry.branch, created, paused: entry.paused === true };
     });
   }
@@ -245,6 +264,10 @@ export class History {
       const hash = await this.#commitTree(tree, parent, `${message}\n\n${trailers.join("\n")}`, date);
       // Compare-and-swap: fails rather than losing a commit if the branch moved meanwhile.
       await git(this.repo, ["update-ref", ref, hash, parent ?? "0".repeat(40)]);
+      if (meta) {
+        const text = textHash(files.script);
+        await this.#pend({ id, branch: entry.branch, title: branchTitle(entry.branch), form: meta.form, file: meta.file, lastSave: date.toISOString(), latestText: text }, text);
+      }
       return { hash, date, message, ...(meta ?? {}) };
     });
   }
@@ -292,17 +315,141 @@ export class History {
     });
   }
 
-  /** Every work in the history, most recently saved first. */
+  /** Every work: those on this computer, and those only in the catalog; most recently saved first. */
   works(): Promise<WorkInfo[]> {
     return this.#serial(async () => {
       if (!existsSync(this.repo)) return [];
       const index = await this.#load();
+      const catalog = new Map((await this.#catalog()).map((e) => [e.branch, e]));
       const out: WorkInfo[] = [];
-      for (const [id, e] of Object.entries(index.documents)) out.push({ id, branch: e.branch, title: e.title, latest: null, paths: e.paths });
-      for (const o of await this.#unindexed(index)) out.push({ id: o.id, branch: o.branch, title: branchTitle(o.branch), latest: null, paths: [] });
-      for (const w of out) w.latest = (await this.#branchLog(w.branch, 1))[0] ?? null;
-      return out.filter((w) => w.latest).sort((a, b) => b.latest!.date.getTime() - a.latest!.date.getTime());
+      const seen = new Set<string>();
+      const add = (id: string | null, branch: string, paths: string[]) => {
+        if (seen.has(branch)) return;
+        seen.add(branch);
+        const c = catalog.get(branch);
+        out.push({ id: id ?? c?.id ?? null, branch, title: branchTitle(branch), latest: null, lastSave: c?.lastSave ? new Date(c.lastSave) : null, form: c?.form ?? null, file: c?.file ?? null, local: false, paths });
+      };
+      for (const [id, e] of Object.entries(index.documents)) add(id, e.branch, e.paths);
+      for (const o of await this.#unindexed(index)) add(o.id, o.branch, []);
+      for (const c of catalog.values()) add(c.id, c.branch, []);
+      for (const w of out) {
+        w.latest = (await this.#branchLog(w.branch, 1))[0] ?? null;
+        w.local = w.latest !== null;
+        if (w.latest) {
+          w.lastSave = w.latest.date;
+          w.form = w.latest.form ?? w.form;
+          w.file = w.latest.file ?? w.file;
+        }
+      }
+      return out.filter((w) => w.lastSave).sort((a, b) => b.lastSave!.getTime() - a.lastSave!.getTime());
     });
+  }
+
+  /** The catalog: every work any computer has recorded (with this computer's saves not yet on main). */
+  catalog(): Promise<CatalogEntry[]> {
+    return this.#serial(() => this.#catalog());
+  }
+
+  /**
+   * Which work a file not tracked on this computer belongs to, from the catalog: by its ID, then by
+   * its text's hash (texts shorter than `minWords` are skipped), then by its file name. Several works
+   * matching the hash or name are all returned, for the writer to choose.
+   */
+  recognise(doc: { id: string | null; path: string; text: string; savedText?: string | null }, minWords = 50): Promise<Recognition[]> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      if (index.retired?.includes(doc.path)) return [];
+      const entries = await this.#catalog();
+      const hash = textHash(doc.text);
+      const local = new Set(Object.values(index.documents).map((e) => e.branch));
+      for (const o of await this.#unindexed(index)) local.add(o.branch);
+      const describe = (entry: CatalogEntry, by: Recognition["by"]): Recognition => {
+        const texts = new Set(entry.texts);
+        let match: Recognition["match"] = "none";
+        let text: string | null = null;
+        if (hash === entry.latestText) match = "latest";
+        else if (texts.has(hash)) [match, text] = ["older", hash];
+        else if (doc.savedText && doc.savedText === entry.latestText) match = "latest";
+        else if (doc.savedText && texts.has(doc.savedText)) [match, text] = ["edited", doc.savedText];
+        return { entry, by, match, text, local: local.has(entry.branch) };
+      };
+      if (doc.id) {
+        const short = shortId(doc.id);
+        const byId = entries.find((e) => e.id === doc.id) ?? entries.find((e) => branchShortId(e.branch) === short);
+        if (byId) return [describe(byId, "id")];
+      }
+      if (wordCount(doc.text) >= minWords) {
+        const byHash = entries.filter((e) => e.texts.includes(hash));
+        if (byHash.length) return byHash.map((e) => describe(e, "hash"));
+      }
+      const name = doc.path.split(/[\\/]/).pop()!;
+      return entries.filter((e) => e.file === name).map((e) => describe(e, "name"));
+    });
+  }
+
+  /** The latest save whose text has this hash (for "the save of <date>"). */
+  async saveWithText(branch: string, hash: string): Promise<CommitInfo | null> {
+    for (const c of await this.#branchLog(branch, 10_000)) if (textHash(await this.scriptAt(c.hash)) === hash) return c;
+    return null;
+  }
+
+  /** Puts this computer's recorded saves into the catalog on main, in one commit. */
+  flushCatalog(): Promise<boolean> {
+    return this.#serial(() => this.#flushCatalog());
+  }
+
+  /**
+   * The same operations for code already running inside exclusive() (the mirror), which would
+   * otherwise wait for itself.
+   */
+  get inside(): { flushCatalog: () => Promise<boolean>; joinMain: (rev: string) => Promise<boolean> } {
+    return { flushCatalog: () => this.#flushCatalog(), joinMain: (rev) => this.#joinMain(rev) };
+  }
+
+  async #flushCatalog(): Promise<boolean> {
+    {
+      await this.#init();
+      const pending = await this.#pending();
+      const parent = await this.#revParse("refs/heads/main");
+      const files = parent ? await this.#mainFiles(parent) : new Map<string, string>();
+      for (const p of Object.values(pending)) for (const t of p.texts) addSave(files, p.info, t);
+      files.set("README.md", readme(readCatalog(files).works.map((w) => ({ title: w.title, branch: w.branch }))));
+      const changed = await this.#commitMain(files, parent ? [parent] : [], "Update the catalog");
+      await rm(join(this.folder, PENDING), { force: true });
+      return changed;
+    }
+  }
+
+  /**
+   * Brings another computer's main (fetched as `rev`) into this one: ahead or behind, it moves;
+   * when both changed, the catalogs are merged by their rules in a commit with both as parents.
+   * Returns true when main changed here.
+   */
+  joinMain(rev: string): Promise<boolean> {
+    return this.#serial(() => this.#joinMain(rev));
+  }
+
+  async #joinMain(rev: string): Promise<boolean> {
+    {
+      await this.#init();
+      const remote = (await git(this.repo, ["rev-parse", rev])).trim();
+      const local = await this.#revParse("refs/heads/main");
+      if (!local) {
+        await git(this.repo, ["update-ref", "refs/heads/main", remote, "0".repeat(40)]);
+        return true;
+      }
+      if (local === remote) return false;
+      const base = (await git(this.repo, ["merge-base", local, remote]).catch(() => "")).trim();
+      if (base === remote) return false;
+      if (base === local) {
+        await git(this.repo, ["update-ref", "refs/heads/main", remote, local]);
+        return true;
+      }
+      const files = mergeMain(await this.#mainFiles(local), await this.#mainFiles(remote));
+      files.set("README.md", readme(readCatalog(files).works.map((w) => ({ title: w.title, branch: w.branch }))));
+      await this.#commitMain(files, [local, remote], "Join the catalog saved on another computer", true);
+      return true;
+    }
   }
 
   /** A work's saves by branch, newest first (for works not yet in the index). */
@@ -330,7 +477,7 @@ export class History {
    * Takes a work as this computer's document at `path` (after restoring it there): records the
    * path, adds a pulled work to the index, and returns the ID to store in the document.
    */
-  claim(work: WorkInfo, path: string): Promise<string> {
+  claim(work: { id: string | null; branch: string }, path: string): Promise<string> {
     return this.#serial(async () => {
       const index = await this.#load();
       let id = Object.entries(index.documents).find(([, e]) => e.branch === work.branch)?.[0];
@@ -424,21 +571,8 @@ export class History {
       const mine = others.find((o) => o.id === doc.id) ?? others.find((o) => !o.id && branchShortId(o.branch) === short);
       if (mine) return adopt(index, doc.id, mine.branch);
     }
-    let best: { id: string | null; branch: string | null; score: number } | null = null;
-    for (const [id, e] of entries) {
-      const head = await this.#revParse(`refs/heads/${e.branch}`);
-      if (!head) continue;
-      const score = similarity(doc.text, await this.scriptAt(head));
-      if (score >= MATCH_THRESHOLD && (!best || score > best.score)) best = { id, branch: null, score };
-    }
-    for (const o of others) {
-      const score = similarity(doc.text, await this.scriptAt(`refs/heads/${o.branch}`));
-      if (score >= MATCH_THRESHOLD && (!best || score > best.score)) best = { id: null, branch: o.branch, score };
-    }
-    if (!best) return null;
-    if (best.branch === null) return best.id;
-    const pulled = others.find((o) => o.branch === best.branch)!;
-    return adopt(index, pulled.id ?? doc.id ?? randomUUID(), best.branch);
+    // Not found: the catalog (recognise) may know it; that asks the writer first.
+    return null;
   }
 
   /** Work branches with no index entry (pulled from a mirror), with the ID their latest commit names. */
@@ -475,21 +609,50 @@ export class History {
       await git(this.repo, ["update-ref", "refs/heads/main", hash, "0".repeat(40)]);
     }
     this.#ready = true;
-    await this.#updateReadme();
   }
 
   /** Rewrites main's README when its text (or the list of works) changed: one commit on main. */
-  async #updateReadme(): Promise<void> {
-    const index = await this.#load();
-    // Titles from the branch names, so every computer writes the same README for the same works.
-    const works = Object.values(index.documents).map((e) => ({ title: branchTitle(e.branch), branch: e.branch }));
-    for (const o of await this.#unindexed(index)) works.push({ title: branchTitle(o.branch), branch: o.branch });
-    const text = readme(works);
-    const parent = await this.#revParse("refs/heads/main");
-    if (parent && (await this.#read(parent, "README.md")) === text) return;
-    const tree = await this.#mktree([["100644", "blob", await this.#blob(text), "README.md"]]);
-    const hash = await this.#commitTree(tree, parent, "Update the README", new Date());
+  async #catalog(): Promise<CatalogEntry[]> {
+    if (!existsSync(this.repo)) return [];
+    const main = await this.#revParse("refs/heads/main");
+    const files = main ? await this.#mainFiles(main) : new Map<string, string>();
+    for (const p of Object.values(await this.#pending())) for (const t of p.texts) addSave(files, p.info, t);
+    return readCatalog(files).works;
+  }
+
+  async #pending(): Promise<Record<string, { info: Omit<CatalogEntry, "texts">; texts: string[] }>> {
+    try {
+      return JSON.parse(await readFile(join(this.folder, PENDING), "utf8"));
+    } catch {
+      return {};
+    }
+  }
+
+  /** Notes a save for the catalog; flushCatalog puts it on main. */
+  async #pend(info: Omit<CatalogEntry, "texts">, text: string): Promise<void> {
+    const pending = await this.#pending();
+    const old = pending[info.branch];
+    pending[info.branch] = { info, texts: [...new Set([...(old?.texts ?? []), text])] };
+    await writeFile(join(this.folder, PENDING), JSON.stringify(pending));
+  }
+
+  async #mainFiles(rev: string): Promise<MainFiles> {
+    const names = (await git(this.repo, ["ls-tree", "-r", "-z", "--name-only", rev])).split("\0").filter(Boolean);
+    const files: MainFiles = new Map();
+    for (const n of names) files.set(n, await this.#read(rev, n));
+    return files;
+  }
+
+  /** Commits main's files; false when nothing changed (and it was not a merge). */
+  async #commitMain(files: MainFiles, parents: string[], message: string, always = false): Promise<boolean> {
+    const tree = await this.#folder([...files].sort(([a], [b]) => a.localeCompare(b)).map(([path, data]) => ({ path, data })));
+    const parent = parents[0] ?? null;
+    if (!always && parent && (await this.#revParse(`${parent}^{tree}`)) === tree) return false;
+    const args = ["commit-tree", tree, ...parents.flatMap((p) => ["-p", p]), "-m", message];
+    const stamp = new Date().toISOString();
+    const hash = (await git(this.repo, args, { env: { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp } })).trim();
     await git(this.repo, ["update-ref", "refs/heads/main", hash, parent ?? "0".repeat(40)]);
+    return true;
   }
 
   /** 0.0.15–0.0.16 kept one repository per document: bring each in as a branch, commits unchanged. */
@@ -677,13 +840,3 @@ export function commitMessage(kind: SaveKind, date: Date, before: string, after:
   return `${label} ${when}, ${note ? `${note}, ` : ""}${delta >= 0 ? "+" : "−"}${Math.abs(delta).toLocaleString("en-US")} words (${words.toLocaleString("en-US")})`;
 }
 
-/** Share of distinct lines in common (Dice coefficient over non-empty trimmed lines). */
-export function similarity(a: string, b: string): number {
-  const lines = (t: string) => new Set(t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean));
-  const x = lines(a);
-  const y = lines(b);
-  if (!x.size || !y.size) return 0;
-  let common = 0;
-  for (const l of x) if (y.has(l)) common++;
-  return (2 * common) / (x.size + y.size);
-}

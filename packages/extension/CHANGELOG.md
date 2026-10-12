@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- **Fetching on demand:** a computer holds only the works used on it. Pulling brings `main` and the works already here; a work saved elsewhere is fetched only when you restore it, or connect a file to it. Pushing sends `main` and this computer's works.
+- **The catalog on `main`:** for every work, its title, form, file name, last save and the text hash of every save (no writing), one folder per work. When two computers change it, it is merged by fixed rules (hash lists combined, the later save's details kept). The README is written from it. Open Work from History… lists works on the mirror as well as here, and fetches one when you choose it.
+- **Recognising files:** a file this computer has no history for is looked up in the catalog by its ID, then by its text's hash (texts with fewer words than the new `highwater.historyMatchMinWords` setting, default 50, are skipped), then by its file name. It always asks before fetching or connecting. Once connected: a different kind of file asks Make This File the Work's File or Keep as a Separate Copy; an older save asks Update to the Latest, Keep This Version (recorded as a Revert) or Keep as a Separate Copy; a `.highland` file edited since an older save asks Open the Latest Beside It, Keep This Version or Keep as a Separate Copy; a text matching no save asks Join, Continuing from This Text or Keep as a Separate Copy. No choice is pre-selected; until you choose, the file's saves are not recorded, and the status bar's history item asks again.
+- Matching a file to a history by guessing from similar text is gone: only IDs, paths, exact text hashes and (asked) file names.
+
 ## 0.2.0
 
 **Start a new writing history before installing:** this version records saves in a new layout and does not read histories made by earlier versions. Delete the history folder (on a Mac, `~/Library/Application Support/Highwater Too/History`) on each computer, and the mirror's repository if you use one.

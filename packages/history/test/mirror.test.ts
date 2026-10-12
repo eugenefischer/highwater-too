@@ -3,11 +3,12 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { History, Mirror, parseRemote } from "../src/index.ts";
+import { formOf, History, Mirror, parseRemote } from "../src/index.ts";
 
 const temp = () => mkdtemp(join(tmpdir(), "highwater-mirror-"));
 const gitIn = (dir: string, ...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" }).trim();
 const script = "INT. HOUSE - DAY\n\nShe enters.\n";
+const meta = (file: string) => ({ form: formOf(file), file });
 
 describe("parseRemote", () => {
   it("reads the common address forms", () => {
@@ -39,7 +40,7 @@ describe("Mirror", () => {
     const remote = join(await temp(), "remote.git");
     const a = new History(await temp());
     const doc = await a.resolve({ id: "doc-1", path: "/w/Script.highland", text: script });
-    await a.commit(doc.id, { scriptName: "text.fountain", script }, "save");
+    await a.commit(doc.id, { scriptName: "text.fountain", script }, "save", new Date(), undefined, meta("Script.highland"));
 
     const missing = await new Mirror(a, remote).push();
     expect(missing).toMatchObject({ ok: false, missing: true });
@@ -48,6 +49,7 @@ describe("Mirror", () => {
     expect(await new Mirror(a, remote).push()).toMatchObject({ ok: true });
     expect(gitIn(remote, "rev-parse", doc.branch)).toBe(gitIn(a.repo, "rev-parse", doc.branch));
     expect(gitIn(remote, "show", "main:README.md")).toContain("Writing history");
+    expect(gitIn(remote, "show", "main:README.md")).toContain(doc.branch);
 
     // A second computer saves the same document (same ID, travelling inside the .highland file).
     const b = new History(await temp());
@@ -69,7 +71,7 @@ describe("Mirror", () => {
     expect(gitIn(remote, "show", `${doc.branch}:text.fountain`)).toContain("On the desktop.");
   });
 
-  it("pulls another computer's histories onto a new one, matched by ID, path-free", async () => {
+  it("pulls main and the works this computer has, and fetches others only when asked", async () => {
     const remote = join(await temp(), "remote.git");
     execFileSync("git", ["init", "-q", "--bare", remote]);
     const a = new History(await temp());
@@ -77,24 +79,31 @@ describe("Mirror", () => {
     expect(await a.exclusive(() => new Mirror(a, remote).pull())).toEqual({ ok: true, updated: [] });
 
     const doc = await a.resolve({ id: "doc-1", path: "/desk/Script.highland", text: script });
-    await a.commit(doc.id, { scriptName: "text.fountain", script }, "save");
-    const plain = await a.resolve({ id: null, path: "/desk/Notes.md", text: "# Notes\n\nOne idea.\nAnother idea.\n" });
-    await a.commit(plain.id, { scriptName: "text.md", script: "# Notes\n\nOne idea.\nAnother idea.\n" }, "save");
-    expect(await new Mirror(a, remote).push()).toMatchObject({ ok: true });
+    await a.commit(doc.id, { scriptName: "text.fountain", script }, "save", new Date(), undefined, meta("Script.highland"));
+    const notes = await a.resolve({ id: null, path: "/desk/Notes.md", text: "# Notes\n" });
+    await a.commit(notes.id, { scriptName: "text.md", script: "# Notes\n" }, "save", new Date(), undefined, meta("Notes.md"));
+    expect(await a.exclusive(() => new Mirror(a, remote).push())).toMatchObject({ ok: true });
 
-    // A new computer, with the files at other paths (one renamed): pulling finds both histories.
+    // A new computer pulls only main: it knows of both works, but holds neither.
     const b = new History(await temp());
-    const pulled = await b.exclusive(() => new Mirror(b, remote).pull());
-    expect(pulled.ok && pulled.updated.filter((u) => u !== "main").sort()).toEqual([doc.branch, plain.branch].sort());
-    const found = await b.find({ id: "doc-1", path: "/laptop/Renamed.highland", text: "" });
-    expect(found?.branch).toBe(doc.branch);
+    const mirror = new Mirror(b, remote);
+    expect(await b.exclusive(() => mirror.pull())).toEqual({ ok: true, updated: ["main"] });
+    expect(gitIn(b.repo, "for-each-ref", "--format=%(refname)", "refs/heads/works/", "refs/mirror/works/")).toBe("");
+    const works = await b.works();
+    expect(works.map((w) => [w.title, w.local, w.form, w.file]).sort()).toEqual([["Notes", false, "md", "Notes.md"], ["Script", false, "highland", "Script.highland"]]);
+
+    // Asked for one: only that one comes, whole.
+    await b.exclusive(() => mirror.fetchWork(doc.branch));
+    expect(gitIn(b.repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/works/")).toBe(doc.branch);
+    expect((await b.claim({ id: "doc-1", branch: doc.branch }, "/laptop/Script.highland"))).toBe("doc-1");
     expect((await b.log("doc-1")).map((c) => c.hash)).toEqual((await a.log("doc-1")).map((c) => c.hash));
-    // A plain file has no ID: matched by its text, it takes the ID its commits name.
-    const notes = await b.resolve({ id: null, path: "/laptop/Notes.md", text: "# Notes\n\nOne idea.\nAnother idea.\nA third.\n" });
-    expect(notes).toMatchObject({ id: plain.id, branch: plain.branch, created: false });
-    // Saving there continues the same branch.
-    const r = await b.resolve({ id: "doc-1", path: "/laptop/Renamed.highland", text: script });
-    expect(r).toMatchObject({ branch: doc.branch, created: false });
+    // Later pulls bring that work's saves, still not the other's.
+    await a.commit(doc.id, { scriptName: "text.fountain", script: `${script}\nTwo.\n` }, "save", new Date(), undefined, meta("Script.highland"));
+    await a.commit(notes.id, { scriptName: "text.md", script: "# Notes\n\nMore.\n" }, "save", new Date(), undefined, meta("Notes.md"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+    const pulled = await b.exclusive(() => mirror.pull());
+    expect(pulled.ok && pulled.updated.sort()).toEqual([doc.branch, "main"].sort());
+    expect(gitIn(b.repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/works/")).toBe(doc.branch);
   });
 
   it("pull moves a branch forward, or joins one both computers moved, losing nothing", async () => {
@@ -103,26 +112,33 @@ describe("Mirror", () => {
     const a = new History(await temp());
     const b = new History(await temp());
     const doc = await a.resolve({ id: "doc-1", path: "/a/S.highland", text: script });
-    await a.commit(doc.id, { scriptName: "text.fountain", script }, "save");
-    await new Mirror(a, remote).push();
-    await b.exclusive(() => new Mirror(b, remote).pull());
-    await b.resolve({ id: "doc-1", path: "/b/S.highland", text: script });
+    await a.commit(doc.id, { scriptName: "text.fountain", script }, "save", new Date(), undefined, meta("S.highland"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+    await b.exclusive(() => new Mirror(b, remote).fetchWork(doc.branch));
+    await b.claim({ id: "doc-1", branch: doc.branch }, "/b/S.highland");
 
     // a saves again: b is behind and simply moves forward.
-    await a.commit(doc.id, { scriptName: "text.fountain", script: `${script}\nTwo.\n` }, "save");
-    await new Mirror(a, remote).push();
-    expect(await b.exclusive(() => new Mirror(b, remote).pull())).toEqual({ ok: true, updated: [doc.branch] });
+    await a.commit(doc.id, { scriptName: "text.fountain", script: `${script}\nTwo.\n` }, "save", new Date(), undefined, meta("S.highland"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+    let pulled = await b.exclusive(() => new Mirror(b, remote).pull());
+    expect(pulled.ok && pulled.updated).toContain(doc.branch);
     expect(gitIn(b.repo, "rev-parse", doc.branch)).toBe(gitIn(a.repo, "rev-parse", doc.branch));
 
     // Both save: pulling joins them; b's own commit and text stay.
-    await a.commit(doc.id, { scriptName: "text.fountain", script: `${script}\nThree on a.\n` }, "save");
-    await new Mirror(a, remote).push();
-    const mine = await b.commit("doc-1", { scriptName: "text.fountain", script: `${script}\nThree on b.\n` }, "save");
-    expect(await b.exclusive(() => new Mirror(b, remote).pull())).toEqual({ ok: true, updated: [doc.branch] });
+    await a.commit(doc.id, { scriptName: "text.fountain", script: `${script}\nThree on a.\n` }, "save", new Date(), undefined, meta("S.highland"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+    const mine = await b.commit("doc-1", { scriptName: "text.fountain", script: `${script}\nThree on b.\n` }, "save", new Date(), undefined, meta("S.highland"));
+    pulled = await b.exclusive(() => new Mirror(b, remote).pull());
+    expect(pulled.ok && pulled.updated).toContain(doc.branch);
     const head = gitIn(b.repo, "rev-parse", doc.branch);
     expect(gitIn(b.repo, "merge-base", "--is-ancestor", mine!.hash, head) === "").toBe(true);
     expect(gitIn(b.repo, "merge-base", "--is-ancestor", gitIn(a.repo, "rev-parse", doc.branch), head) === "").toBe(true);
     expect(gitIn(b.repo, "show", `${doc.branch}:text.fountain`)).toContain("Three on b.");
+    // Both computers' catalogs, joined: every save's text is listed once b pushes.
+    await b.exclusive(() => new Mirror(b, remote).push());
+    await a.exclusive(() => new Mirror(a, remote).pull());
+    const [entry] = (await a.catalog()).filter((e) => e.branch === doc.branch);
+    expect(entry!.texts.length).toBe(4);
     // Nothing new: nothing changes.
     expect(await b.exclusive(() => new Mirror(b, remote).pull())).toEqual({ ok: true, updated: [] });
   });
@@ -144,15 +160,16 @@ describe("Mirror", () => {
         { path: "assets/map.png", data: png },
       ],
     };
-    await a.commit(doc.id, files, "save");
-    await new Mirror(a, remote).push();
+    await a.commit(doc.id, files, "save", new Date(), undefined, meta("Novel.highland"));
+    await a.exclusive(() => new Mirror(a, remote).push());
 
     const b = new History(await temp());
     await b.exclusive(() => new Mirror(b, remote).pull());
-    const works = await b.works();
-    const work = works.find((w) => w.branch === doc.branch)!;
-    expect(work).toMatchObject({ id: "doc-9", title: "Novel", paths: [] });
-    const back = await b.filesAt(work.latest!.hash);
+    const work = (await b.works()).find((w) => w.branch === doc.branch)!;
+    expect(work).toMatchObject({ id: "doc-9", title: "Novel", paths: [], local: false });
+    await b.exclusive(() => new Mirror(b, remote).fetchWork(work.branch));
+    const latest = (await b.branchLog(work.branch, 1))[0]!;
+    const back = await b.filesAt(latest.hash);
     expect(back).toMatchObject({ scriptName: "text.md", script: files.script, bin: ["cut", "kept"], scratchpad: "notes" });
     const byPath = Object.fromEntries(back.others!.map((o) => [o.path, o.data]));
     expect(Object.keys(byPath).sort()).toEqual(["assets/map.png", "assets/pics/cover.png", "info.json"]);
@@ -161,7 +178,7 @@ describe("Mirror", () => {
     // Restored at a path on b: claimed under its own ID, and later saves continue its branch.
     expect(await b.claim(work, "/laptop/Novel.highland")).toBe("doc-9");
     expect(await b.resolve({ id: "doc-9", path: "/laptop/Novel.highland", text: files.script })).toMatchObject({ branch: doc.branch, created: false });
-    expect((await b.works()).find((w) => w.branch === doc.branch)!.paths).toEqual(["/laptop/Novel.highland"]);
+    expect((await b.works()).find((w) => w.branch === doc.branch)!).toMatchObject({ paths: ["/laptop/Novel.highland"], local: true });
   });
 
   it("bundles one work's history alone", async () => {

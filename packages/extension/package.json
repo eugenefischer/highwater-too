@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -407,6 +407,13 @@
           "default": "",
           "scope": "application",
           "markdownDescription": "Mirror the writing history to this git remote: one repository holding every work, pushed to after saves and never force-pushed. Any host: for example `https://github.com/you/writing-history.git`, `git@gitlab.com:you/history.git` or `ssh://you@server/srv/git/history.git`. Empty: no mirror. Use **Set Up History Mirror…** to set it and create the repository."
+        },
+        "highwater.historyMatchMinWords": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 1,
+          "scope": "application",
+          "markdownDescription": "A file this computer has no writing history for is recognised as a work in the history when its text is exactly one of that work's saves, but only if it has at least this many words, so empty files and templates never match. (It is always asked before anything is fetched.)"
         }
       }
     },
