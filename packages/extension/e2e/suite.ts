@@ -276,8 +276,9 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(await readFile(path, "utf8"), "INT. KITCHEN - NIGHT\n\nA kettle boils.\n", "the file is untouched");
         await vscode.commands.executeCommand("highwater.openScratchpad");
         await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.scheme === "highwater-extras");
-        await vscode.window.showTextDocument(doc);
-        await editor.edit((e) => e.insert(editor.document.lineAt(2).range.end, " It whistles."));
+        // Back to the script: a new editor (the one from before the Scratchpad may be closed).
+        const again = await vscode.window.showTextDocument(doc);
+        await again.edit((e) => e.insert(again.document.lineAt(2).range.end, " It whistles."));
         await vscode.commands.executeCommand("workbench.action.files.save");
         await waitFor("the Bin in the commit", () => {
           try {
