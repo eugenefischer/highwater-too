@@ -276,10 +276,13 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(await readFile(path, "utf8"), "INT. KITCHEN - NIGHT\n\nA kettle boils.\n", "the file is untouched");
         await vscode.commands.executeCommand("highwater.openScratchpad");
         await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.scheme === "highwater-extras");
-        // Back to the script: a new editor (the one from before the Scratchpad may be closed).
-        const again = await vscode.window.showTextDocument(doc);
-        await again.edit((e) => e.insert(again.document.lineAt(2).range.end, " It whistles."));
-        await vscode.commands.executeCommand("workbench.action.files.save");
+        // Edit and save the document itself, not through an editor: VS Code replaces editors as
+        // tabs and the sidebar change, and an edit through a replaced one is refused.
+        const script = await vscode.workspace.openTextDocument(path);
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(script.uri, script.lineAt(2).range.end, " It whistles.");
+        assert.ok(await vscode.workspace.applyEdit(edit), "the edit applies");
+        assert.ok(await script.save(), "the script saves");
         await waitFor("the Bin in the commit", () => {
           try {
             return execFileSync("git", ["show", `${entry.branch}:bin/0.txt`], { cwd: join(historyDir, "history.git"), encoding: "utf8" }) === "A kettle boils.";
