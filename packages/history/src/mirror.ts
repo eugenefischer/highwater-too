@@ -156,6 +156,14 @@ export class Mirror {
     await this.#join(branch);
   }
 
+  /** Deletes a work's branch on the remote (a deletion the writer asked for; never a force-push). */
+  async deleteRemote(branch: string): Promise<void> {
+    await this.#remote();
+    await this.#git(["push", "-q", REMOTE, "--delete", `refs/heads/${branch}`]).catch((e: unknown) => {
+      if (!/remote ref does not exist|unable to delete/i.test((e as Error).message)) throw e;
+    });
+  }
+
   /** The remote's branches, by name, without fetching anything. */
   async remoteBranches(): Promise<Map<string, string>> {
     const out = await this.#git(["ls-remote", "--heads", REMOTE]);
@@ -180,6 +188,8 @@ export class Mirror {
     const current = (await git(repo, ["remote", "get-url", REMOTE]).catch(() => "")).trim();
     if (!current) await git(repo, ["remote", "add", REMOTE, this.url]);
     else if (current !== this.url) await git(repo, ["remote", "set-url", REMOTE, this.url]);
+    // No default fetch: only what is asked for comes here, and no remote-tracking copies of the rest.
+    await git(repo, ["config", "--unset-all", `remote.${REMOTE}.fetch`]).catch(() => "");
   }
 
   /** Joins a branch that moved on the remote: a merge commit whose text is this computer's. */

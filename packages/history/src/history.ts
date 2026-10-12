@@ -4,7 +4,7 @@ import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/pro
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { git, gitBytes } from "./git.ts";
-import { addSave, mergeMain, readCatalog, type CatalogEntry, type MainFiles } from "./catalog.ts";
+import { addDeletion, addSave, mergeMain, readCatalog, type CatalogEntry, type MainFiles } from "./catalog.ts";
 
 /**
  * The writing history (M7): one git repository in the history folder, with one branch per
@@ -93,6 +93,21 @@ interface Index {
    * a .highland file, or back), and exports. Saved, they start a new history instead of joining one.
    */
   retired?: string[];
+  /** IDs of works whose history was deleted: a file still naming one starts a new history. */
+  deleted?: string[];
+  /** Branches deleted here only: never fetched back or offered for this computer's files. */
+  excluded?: string[];
+  /** Pairs ("a|b", branches) the writer chose not to join. */
+  notJoined?: string[];
+}
+
+/** A local work whose history started from a save of another work (a copy worked on offline). */
+export interface CopyCandidate {
+  /** This computer's work. */
+  id: string;
+  branch: string;
+  /** The work it was copied from. */
+  other: CatalogEntry;
 }
 
 /**
@@ -222,7 +237,7 @@ export class History {
       let id = await this.#match(index, doc);
       let created = false;
       if (!id) {
-        id = doc.id && !index.documents[doc.id] && !index.retired?.includes(doc.path) ? doc.id : randomUUID();
+        id = doc.id && !index.documents[doc.id] && !index.retired?.includes(doc.path) && !index.deleted?.includes(doc.id) ? doc.id : randomUUID();
         const title = fileTitle(doc.path);
         index.documents[id] = { branch: branchName(title, id, index), title, paths: [] };
         created = true;
@@ -359,7 +374,8 @@ export class History {
     return this.#serial(async () => {
       const index = await this.#load();
       if (index.retired?.includes(doc.path)) return [];
-      const entries = await this.#catalog();
+      const excluded = new Set(index.excluded ?? []);
+      const entries = (await this.#catalog()).filter((e) => !excluded.has(e.branch) && !index.deleted?.includes(e.id));
       const hash = textHash(doc.text);
       const local = new Set(Object.values(index.documents).map((e) => e.branch));
       for (const o of await this.#unindexed(index)) local.add(o.branch);
@@ -541,6 +557,182 @@ export class History {
       for (const e of Object.values(index.documents)) e.paths = e.paths.filter((p) => p !== path);
       index.retired = [...(index.retired ?? []).filter((p) => p !== path), path];
       await this.#save(index);
+    });
+  }
+
+  /**
+   * Removes a work's history from this computer: its branch, index entry and unsent catalog notes,
+   * then prunes the repository so its data is gone, not just unlisted. `exclude`: never fetch it
+   * back here (a deletion made on this computer only). Returns the paths it was saved at.
+   */
+  remove(id: string, options: { exclude?: boolean } = {}): Promise<string[]> {
+    return this.#serial(async () => {
+      const paths = await this.#removeLocal(id, options.exclude === true);
+      await this.#prune();
+      return paths;
+    });
+  }
+
+  /** Keeps a work this computer does not have from ever being fetched or offered here. */
+  exclude(work: { id: string; branch: string }): Promise<void> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      index.excluded = [...new Set([...(index.excluded ?? []), work.branch])];
+      index.deleted = [...new Set([...(index.deleted ?? []), work.id])];
+      await this.#save(index);
+    });
+  }
+
+  /**
+   * Deletes a work's history: removed here, and a deletion record added to the catalog on main,
+   * so every computer that pulls removes its copy (the mirror's branch is deleted by the mirror).
+   */
+  deleteWork(work: { id: string; branch: string }): Promise<{ branch: string; paths: string[] }> {
+    return this.#serial(async () => {
+      await this.#init();
+      const index = await this.#load();
+      const { id, branch } = work;
+      const parent = await this.#revParse("refs/heads/main");
+      const files = parent ? await this.#mainFiles(parent) : new Map<string, string>();
+      addDeletion(files, { id, branch, deleted: new Date().toISOString() });
+      files.set("README.md", readme(readCatalog(files).works.map((w) => ({ title: w.title, branch: w.branch }))));
+      await this.#commitMain(files, parent ? [parent] : [], `Delete the history of ${branchTitle(branch)}`);
+      const paths = index.documents[id] ? await this.#removeLocal(id, false) : [];
+      index.deleted = [...new Set([...(index.deleted ?? []), id])];
+      await this.#save(index);
+      await this.#prune();
+      return { branch, paths };
+    });
+  }
+
+  /** After main came in: removes works another computer deleted. Returns those removed here. */
+  applyDeletions(): Promise<{ id: string; paths: string[] }[]> {
+    return this.#serial(() => this.#applyDeletions());
+  }
+
+  async #applyDeletions(): Promise<{ id: string; paths: string[] }[]> {
+    const main = await this.#revParse("refs/heads/main");
+    if (!main) return [];
+    const { deleted } = readCatalog(await this.#mainFiles(main));
+    const index = await this.#load();
+    const removed: { id: string; paths: string[] }[] = [];
+    for (const d of deleted) {
+      for (const [id, e] of Object.entries(index.documents)) {
+        if (e.branch !== d.branch) continue;
+        removed.push({ id, paths: await this.#removeLocal(id, false) });
+      }
+      if (await this.#revParse(`refs/heads/${d.branch}`)) {
+        await git(this.repo, ["update-ref", "-d", `refs/heads/${d.branch}`]);
+        if (!removed.some((r) => r.id === d.id)) removed.push({ id: d.id, paths: [] });
+      }
+      await git(this.repo, ["update-ref", "-d", `refs/mirror/${d.branch}`]).catch(() => "");
+      await git(this.repo, ["update-ref", "-d", `refs/remotes/mirror/${d.branch}`]).catch(() => "");
+      if (!index.deleted?.includes(d.id)) index.deleted = [...(index.deleted ?? []), d.id];
+    }
+    await this.#save(index);
+    if (removed.length) await this.#prune();
+    return removed;
+  }
+
+  async #removeLocal(id: string, exclude: boolean): Promise<string[]> {
+    const index = await this.#load();
+    const entry = index.documents[id];
+    if (!entry) return [];
+    await git(this.repo, ["update-ref", "-d", `refs/heads/${entry.branch}`]).catch(() => "");
+    await git(this.repo, ["update-ref", "-d", `refs/mirror/${entry.branch}`]).catch(() => "");
+    await git(this.repo, ["update-ref", "-d", `refs/remotes/mirror/${entry.branch}`]).catch(() => "");
+    delete index.documents[id];
+    if (exclude) {
+      index.excluded = [...new Set([...(index.excluded ?? []), entry.branch])];
+      index.deleted = [...new Set([...(index.deleted ?? []), id])];
+    }
+    await this.#save(index);
+    const pending = await this.#pending();
+    if (pending[entry.branch]) {
+      delete pending[entry.branch];
+      await writeFile(join(this.folder, PENDING), JSON.stringify(pending));
+    }
+    return entry.paths;
+  }
+
+  /** Makes removed objects really gone from this repository. */
+  async #prune(): Promise<void> {
+    // FETCH_HEAD would keep the last fetched work alive.
+    for (const f of ["FETCH_HEAD", "ORIG_HEAD"]) await rm(join(this.repo, f), { force: true });
+    await git(this.repo, ["reflog", "expire", "--expire=now", "--all"]).catch(() => "");
+    await git(this.repo, ["gc", "-q", "--prune=now"]);
+  }
+
+  /**
+   * Local works whose first save matches a save of another work in the catalog (proof they started
+   * from a copy of it), or whose ID names another branch: candidates for joining. Pairs the writer
+   * declined are left out.
+   */
+  copyCandidates(): Promise<CopyCandidate[]> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      const catalog = await this.#catalog();
+      const out: CopyCandidate[] = [];
+      for (const [id, e] of Object.entries(index.documents)) {
+        const root = (await git(this.repo, ["rev-list", "--max-parents=0", `refs/heads/${e.branch}`]).catch(() => "")).trim().split("\n").at(-1);
+        if (!root) continue;
+        const first = textHash(await this.scriptAt(root));
+        const other = catalog.find((c) => c.branch !== e.branch && (c.id === id || c.texts.includes(first)) && !index.notJoined?.includes(pairKey(e.branch, c.branch)) && !index.excluded?.includes(c.branch));
+        if (other) out.push({ id, branch: e.branch, other });
+      }
+      return out;
+    });
+  }
+
+  /** The writer chose not to join these two. */
+  notJoin(a: string, b: string): Promise<void> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      index.notJoined = [...new Set([...(index.notJoined ?? []), pairKey(a, b)])];
+      await this.#save(index);
+    });
+  }
+
+  /**
+   * Joins this computer's work into the one it was copied from (fetched already): a merge commit
+   * on the other's branch with both histories as parents, keeping this computer's files. The local
+   * branch goes (its saves are in the merge), its paths move to the other work, and a deletion
+   * record tells other computers to drop the merged branch. Returns the other work's ID.
+   */
+  join(localId: string, other: CatalogEntry, meta: SaveMeta): Promise<string> {
+    return this.#serial(async () => {
+      await this.#init();
+      const index = await this.#load();
+      const entry = index.documents[localId];
+      if (!entry) throw new Error("This work has no history on this computer.");
+      const mine = await this.#revParse(`refs/heads/${entry.branch}`);
+      const theirs = await this.#revParse(`refs/heads/${other.branch}`);
+      if (!mine || !theirs) throw new Error("Both histories must be on this computer to join them.");
+      const tree = (await git(this.repo, ["rev-parse", `${mine}^{tree}`])).trim();
+      const kind = meta.form === other.form ? "Join" : "Convert";
+      const message = `${kind} ${new Date().toISOString().slice(0, 16).replace("T", " ")}, the history of ${meta.file} saved on another computer\n\n${ID_TRAILER}: ${other.id}\n${FORM_TRAILER}: ${meta.form}\n${FILE_TRAILER}: ${meta.file}`;
+      const stamp = new Date().toISOString();
+      const merge = (await git(this.repo, ["commit-tree", tree, "-p", theirs, "-p", mine, "-m", message], { env: { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp } })).trim();
+      await git(this.repo, ["update-ref", `refs/heads/${other.branch}`, merge, theirs]);
+      // The other work takes this computer's paths and saves; the copy's own branch goes.
+      const target = index.documents[other.id] ?? { branch: other.branch, title: branchTitle(other.branch), paths: [] };
+      target.paths = [...new Set([...target.paths, ...entry.paths])];
+      index.documents[other.id] = target;
+      delete index.documents[localId];
+      await this.#save(index);
+      const texts = new Set<string>();
+      for (const c of await this.#branchLog(entry.branch, 10_000)) texts.add(textHash(await this.scriptAt(c.hash)));
+      const latest = textHash(await this.scriptAt(merge));
+      for (const t of [...texts, latest]) await this.#pend({ id: other.id, branch: other.branch, title: branchTitle(other.branch), form: meta.form, file: meta.file, lastSave: stamp, latestText: latest }, t);
+      const parent = await this.#revParse("refs/heads/main");
+      const files = parent ? await this.#mainFiles(parent) : new Map<string, string>();
+      addDeletion(files, { id: localId, branch: entry.branch, deleted: stamp });
+      await this.#commitMain(files, parent ? [parent] : [], `Join the history of ${branchTitle(entry.branch)} into ${branchTitle(other.branch)}`);
+      await git(this.repo, ["update-ref", "-d", `refs/heads/${entry.branch}`]);
+      const pending = await this.#pending();
+      delete pending[entry.branch];
+      await writeFile(join(this.folder, PENDING), JSON.stringify(pending));
+      return other.id;
     });
   }
 
@@ -734,6 +926,10 @@ export class History {
     this.#queue = next.catch(() => {});
     return next;
   }
+}
+
+function pairKey(a: string, b: string): string {
+  return [a, b].sort().join("|");
 }
 
 function fileTitle(path: string): string {

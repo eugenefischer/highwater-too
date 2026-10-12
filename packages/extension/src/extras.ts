@@ -40,6 +40,8 @@ export class PlainExtras implements vscode.Disposable {
   readonly #host: ExtrasHost;
   /** Plain file path → its extras folder (null: it has none yet). */
   #cache = new Map<string, ExtrasFolder | null>();
+  /** Bumped whenever folders are made or forgotten (see folder()). */
+  #gen = 0;
   /** Extras folder → the plain file it belongs to. */
   readonly #owners = new Map<string, string>();
   readonly #fileChanges = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
@@ -82,9 +84,12 @@ export class PlainExtras implements vscode.Disposable {
    * The plain file's extras folder: null if it has none and `create` is false. Creating one also
    * gives the file its place in the writing history, which names the folder.
    */
-  async folder(path: string, create = false): Promise<ExtrasFolder | null> {
+  async folder(path: string, create = false, fresh = false): Promise<ExtrasFolder | null> {
     const cached = this.#cache.get(path);
-    if (cached !== undefined && (cached !== null || !create)) return cached;
+    if (!fresh && cached !== undefined && (cached !== null || !create)) return cached;
+    // A lookup that started before a folder was made, or before forget(), must not overwrite
+    // what is known now: only the latest generation is cached.
+    const gen = this.#gen;
     const h = this.#host.history();
     const standIn = this.#standIn(path);
     let folder: ExtrasFolder | null = null;
@@ -100,7 +105,8 @@ export class PlainExtras implements vscode.Disposable {
       }
     }
     if (folder) this.#owners.set(folder.dir, path);
-    this.#cache.set(path, folder);
+    if (create) this.#gen++;
+    if (create || gen === this.#gen) this.#cache.set(path, folder);
     return folder;
   }
 
@@ -112,7 +118,37 @@ export class PlainExtras implements vscode.Disposable {
     const folder = this.#host.history() && id ? this.#inHistory(id) : this.#standIn(path);
     this.#owners.set(folder.dir, path);
     this.#cache.delete(path);
+    this.#gen++;
     return folder;
+  }
+
+  /**
+   * A work's history is going (deleted): its plain file keeps its Bin, Scratchpad and settings,
+   * moved to the stand-in place, from which its new history's first save takes them.
+   */
+  async keepForNewHistory(path: string, id: string): Promise<void> {
+    const folder = this.#inHistory(id);
+    if (!folder.exists) return;
+    const standIn = this.#standIn(path);
+    if (standIn.exists) await standIn.remove();
+    await folder.moveTo(standIn.dir);
+    this.forget();
+  }
+
+  /** The extras of a work joined into another move to the other's ID (this computer's win). */
+  async moveTo(fromId: string, toId: string): Promise<void> {
+    const from = this.#inHistory(fromId);
+    if (!from.exists) return;
+    const to = this.#inHistory(toId);
+    if (to.exists) await to.remove();
+    await from.moveTo(to.dir);
+    this.forget();
+  }
+
+  /** Removes a work's extras from this computer (its history was removed here; the mirror has them). */
+  async removeFor(id: string): Promise<void> {
+    await this.#inHistory(id).remove();
+    this.forget();
   }
 
   /** The plain file's ID in the writing history (giving it one if needed); null when history is off. */
@@ -134,6 +170,7 @@ export class PlainExtras implements vscode.Disposable {
   /** Forget cached lookups (the history folder changed, or saves came in from another computer). */
   forget(): void {
     this.#cache = new Map();
+    this.#gen++;
   }
 
   uri(file: string): vscode.Uri {
@@ -184,7 +221,8 @@ export class PlainExtras implements vscode.Disposable {
 
   /** What a save of a plain file records besides its text. */
   async historyFiles(path: string): Promise<Pick<DocumentFiles, "bin" | "scratchpad" | "others">> {
-    const folder = await this.folder(path);
+    // Looked up afresh: a save must record what is there now, never a stale "none yet".
+    const folder = await this.folder(path, false, true);
     const out: Pick<DocumentFiles, "bin" | "scratchpad" | "others"> = {};
     if (folder) {
       const files = await folder.files();

@@ -261,7 +261,8 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.workspace.getConfiguration("highwater").update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
       await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
       try {
-        const path = join(dir, "Plain.fountain");
+        // Not "Plain.fountain": an earlier test leaves that file open, with other text.
+        const path = join(dir, "Kettle.fountain");
         await writeFile(path, "INT. KITCHEN - NIGHT\n\nA kettle boils.\n");
         const doc = await vscode.workspace.openTextDocument(path);
         await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
@@ -324,7 +325,8 @@ const tests: [string, () => Promise<void>][] = [
         const log = execFileSync("git", ["log", "--format=%s", entry.branch], { cwd: repo, encoding: "utf8" }).trim().split("\n");
         assert.deepEqual(log.slice(0, 2).map((m) => m.split(" ")[0]), ["Convert", "Convert"]);
         assert.ok(log[0]!.includes("to Round.fountain") && log[1]!.includes("to Round.highland"), log.join("\n"));
-        assert.equal(execFileSync("git", ["diff", `${entry.branch}~2`, entry.branch, "--", "text.fountain", "bin"], { cwd: repo, encoding: "utf8" }), "", "the text and Bin are unchanged");
+        const record = () => execFileSync("git", ["log", "--format=%h %s", "--name-only", entry.branch], { cwd: repo, encoding: "utf8" });
+        assert.equal(execFileSync("git", ["diff", `${entry.branch}~2`, entry.branch, "--", "text.fountain", "bin"], { cwd: repo, encoding: "utf8" }), "", `the text and Bin are unchanged; the branch:\n${record()}`);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
       }

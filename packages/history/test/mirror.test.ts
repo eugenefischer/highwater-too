@@ -181,6 +181,102 @@ describe("Mirror", () => {
     expect((await b.works()).find((w) => w.branch === doc.branch)!).toMatchObject({ paths: ["/laptop/Novel.highland"], local: true });
   });
 
+  it("removes a work from this computer, or deletes it everywhere, leaving none of its data", async () => {
+    const remote = join(await temp(), "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", remote]);
+    const a = new History(await temp());
+    const b = new History(await temp());
+    const secret = "A text found in no other work: the lighthouse keeper's last letter.\n";
+    const doc = await a.resolve({ id: "doc-7", path: "/a/Letter.md", text: secret });
+    const c = await a.commit(doc.id, { scriptName: "text.md", script: secret }, "save", new Date(), undefined, meta("Letter.md"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+    await b.exclusive(() => new Mirror(b, remote).fetchWork(doc.branch));
+    await b.claim({ id: "doc-7", branch: doc.branch }, "/b/Letter.md");
+    await b.exclusive(() => new Mirror(b, remote).pull());
+    const gone = (h: History, rev: string) => {
+      try {
+        gitIn(h.repo, "cat-file", "-e", rev);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    expect(gone(b, c!.hash)).toBe(false);
+
+    // Remove from this computer: gone here, still on the mirror, and offered again.
+    expect(await b.remove("doc-7")).toEqual(["/b/Letter.md"]);
+    expect(gone(b, c!.hash)).toBe(true);
+    expect((await b.works()).find((w) => w.branch === doc.branch)).toMatchObject({ local: false });
+    expect(await b.recognise({ id: "doc-7", path: "/b/Letter.md", text: secret })).toMatchObject([{ by: "id", local: false }]);
+
+    // Deleted everywhere: the mirror's branch goes, and b drops its copy when it pulls.
+    await b.exclusive(() => new Mirror(b, remote).fetchWork(doc.branch));
+    await b.claim({ id: "doc-7", branch: doc.branch }, "/b/Letter.md");
+    expect(await a.deleteWork({ id: "doc-7", branch: doc.branch })).toEqual({ branch: doc.branch, paths: ["/a/Letter.md"] });
+    await a.exclusive(async () => {
+      await new Mirror(a, remote).deleteRemote(doc.branch);
+      return new Mirror(a, remote).push();
+    });
+    expect(gone(a, c!.hash)).toBe(true);
+    expect(() => gitIn(remote, "rev-parse", "--verify", doc.branch)).toThrow();
+    await b.exclusive(() => new Mirror(b, remote).pull());
+    expect(await b.applyDeletions()).toEqual([{ id: "doc-7", paths: ["/b/Letter.md"] }]);
+    expect(gone(b, c!.hash)).toBe(true);
+    expect((await b.works()).find((w) => w.branch === doc.branch)).toBeUndefined();
+    // A file still naming the deleted work starts a new history.
+    const again = await b.resolve({ id: "doc-7", path: "/b/Letter.md", text: secret });
+    expect(again.id).not.toBe("doc-7");
+    expect(again.branch).not.toBe(doc.branch);
+  });
+
+  it("deleting on this computer only keeps the work from coming back here", async () => {
+    const h = new History(await temp());
+    const doc = await h.resolve({ id: "doc-8", path: "/w/Draft.md", text: script });
+    await h.commit(doc.id, { scriptName: "text.md", script }, "save", new Date(), undefined, meta("Draft.md"));
+    await h.flushCatalog();
+    await h.remove("doc-8", { exclude: true });
+    expect(await h.recognise({ id: "doc-8", path: "/w/Draft.md", text: script })).toEqual([]);
+    expect((await h.resolve({ id: "doc-8", path: "/w/Draft.md", text: script })).id).not.toBe("doc-8");
+  });
+
+  it("finds a history started from a copy of another work's save, and joins the two", async () => {
+    const remote = join(await temp(), "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", remote]);
+    const a = new History(await temp());
+    const text = Array.from({ length: 60 }, (_, i) => `Line ${i}.`).join("\n") + "\n";
+    const doc = await a.resolve({ id: "doc-a", path: "/a/Play.fountain", text });
+    await a.commit(doc.id, { scriptName: "text.fountain", script: text }, "save", new Date(2026, 9, 1), undefined, meta("Play.fountain"));
+    await a.commit(doc.id, { scriptName: "text.fountain", script: `${text}On a.\n` }, "save", new Date(2026, 9, 2), undefined, meta("Play.fountain"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+
+    // b got a copy of the first save and worked on it with no mirror: a history of its own.
+    const b = new History(await temp());
+    const copy = await b.resolve({ id: null, path: "/b/Play copy.fountain", text });
+    await b.commit(copy.id, { scriptName: "text.fountain", script: text }, "save", new Date(2026, 9, 3), undefined, meta("Play copy.fountain"));
+    const mine = await b.commit(copy.id, { scriptName: "text.fountain", script: `${text}On b.\n` }, "save", new Date(2026, 9, 4), undefined, meta("Play copy.fountain"));
+    await b.exclusive(() => new Mirror(b, remote).pull());
+    const [candidate] = await b.copyCandidates();
+    expect(candidate).toMatchObject({ id: copy.id, branch: copy.branch, other: { id: "doc-a", branch: doc.branch } });
+
+    await b.exclusive(() => new Mirror(b, remote).fetchWork(doc.branch));
+    expect(await b.join(copy.id, candidate!.other, meta("Play copy.fountain"))).toBe("doc-a");
+    const head = gitIn(b.repo, "rev-parse", doc.branch);
+    expect(gitIn(b.repo, "merge-base", "--is-ancestor", mine!.hash, head) === "").toBe(true);
+    expect(gitIn(b.repo, "merge-base", "--is-ancestor", gitIn(a.repo, "rev-parse", doc.branch), head) === "").toBe(true);
+    expect(gitIn(b.repo, "show", `${doc.branch}:text.fountain`)).toContain("On b.");
+    expect(() => gitIn(b.repo, "rev-parse", "--verify", copy.branch)).toThrow();
+    expect((await b.find({ id: null, path: "/b/Play copy.fountain", text: "" }))?.id).toBe("doc-a");
+    expect(await b.copyCandidates()).toEqual([]);
+    // Declined pairs are not offered again.
+    const c2 = new History(await temp());
+    const other = await c2.resolve({ id: null, path: "/c/P.fountain", text });
+    await c2.commit(other.id, { scriptName: "text.fountain", script: text }, "save", new Date(), undefined, meta("P.fountain"));
+    await c2.exclusive(() => new Mirror(c2, remote).pull());
+    const [c2Candidate] = await c2.copyCandidates();
+    await c2.notJoin(other.branch, c2Candidate!.other.branch);
+    expect(await c2.copyCandidates()).toEqual([]);
+  });
+
   it("bundles one work's history alone", async () => {
     const h = new History(await temp());
     const doc = await h.resolve({ id: "doc-2", path: "/w/A.highland", text: script });

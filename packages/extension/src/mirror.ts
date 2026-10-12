@@ -92,6 +92,19 @@ export class HistoryMirror implements vscode.Disposable {
     return error === null;
   }
 
+  /** Deletes a work's branch on the mirror (Delete Writing History, everywhere). */
+  async deleteRemote(branch: string): Promise<boolean> {
+    const url = this.url;
+    if (!url) return false;
+    const h = this.history();
+    const mirror = new Mirror(h, url, () => this.#auth(url));
+    const attempt = () => h.exclusive(() => mirror.deleteRemote(branch)).then(() => null, (e: unknown) => (e as Error).message);
+    let error = await attempt();
+    if (error && failureKind(error) === "auth" && (await this.#offerSignIn(url, true))) error = await attempt();
+    if (error) void vscode.window.showErrorMessage(`Could not delete that work's history on ${url}: ${error.split("\n")[0]}`);
+    return error === null;
+  }
+
   /** When the last pull ran (ms), to space them out. */
   lastPull = 0;
 

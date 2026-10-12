@@ -66,6 +66,20 @@ export class Connector {
     return n;
   }
 
+  /** How the next save of a file is to be recorded (Revert to This Save). */
+  setNext(key: string, next: NextSave): void {
+    this.#next.set(key, next);
+  }
+
+  /** Files to look up afresh (their work's history was removed or deleted here). */
+  forget(keys: string[]): void {
+    for (const k of keys) {
+      this.#looked.delete(k);
+      this.#pending.delete(k);
+      this.#next.delete(k);
+    }
+  }
+
   /** Looks a file up once per session, or asks again when it is still undecided. */
   check(key: string): Promise<void> {
     const running = this.#running.get(key);

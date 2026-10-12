@@ -264,7 +264,9 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       await moveHistory(current, target);
     }
     await vscode.workspace.getConfiguration("highwater").update("historyFolder", target === fallback ? undefined : target, vscode.ConfigurationTarget.Global);
-    histories = new Map();
+    // The folders' contents moved: start afresh with both.
+    histories.delete(current);
+    histories.delete(target);
     extras.forget();
     view.refresh();
     void updateStatus();
@@ -326,7 +328,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.window.registerTreeDataProvider("highwater.history", view),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("highwater.historyFolder") || e.affectsConfiguration("highwater.writingHistory")) {
-        histories = new Map();
+        // One History per folder, kept: a second one for the same folder would race the first.
         extras.forget();
         view.refresh();
         void updateStatus();
@@ -431,7 +433,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     );
     if (!work) return;
     if (work.here) return void (await openFile(work.here));
-    const w = work.work;
+    await restoreWork(work.work);
+  }
+
+  /** Restores a work not on this computer (fetching it first if only the mirror has it). */
+  async function restoreWork(w: WorkInfo): Promise<void> {
+    const h = history();
     // Only in the catalog: fetch its history first (the writer asked for this work).
     if (!w.local) {
       if (!mirror.url) return void vscode.window.showErrorMessage(`${w.title}'s history is not on this computer. Set up the history mirror to fetch it.`);
