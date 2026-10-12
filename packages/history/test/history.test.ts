@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { CommitBatcher, commitMessage, History, moveHistory, similarity, wordCount } from "../src/index.ts";
+import { CommitBatcher, commitMessage, formOf, History, moveHistory, similarity, textHash, wordCount } from "../src/index.ts";
 
 const folder = () => mkdtemp(join(tmpdir(), "highwater-history-"));
 const script = "INT. HOUSE - DAY\n\nShe enters.\n\nBOB\nHello there.\n";
@@ -68,24 +68,6 @@ describe("History: one repository, one branch per document", () => {
     expect(await h.find({ id: null, path: "/w/New.highland", text: "" })).toEqual({ id: made.id, branch: made.branch, paused: false });
   });
 
-  it("brings 0.0.15–0.0.16 per-document repositories in as branches, commits unchanged", async () => {
-    const dir = await folder();
-    const old = join(dir, "Old Script");
-    await mkdir(old);
-    gitIn(old, "init", "-q");
-    gitIn(old, "config", "user.email", "t@example.com");
-    gitIn(old, "config", "user.name", "T");
-    await writeFile(join(old, "text.fountain"), script);
-    gitIn(old, "add", "-A");
-    gitIn(old, "commit", "-q", "-m", "Save");
-    const hash = gitIn(old, "rev-parse", "HEAD");
-    await writeFile(join(dir, "index.json"), JSON.stringify({ version: 1, documents: { "abc-123": { repo: "Old Script", paths: ["/w/Old Script.highland"] } } }));
-    const h = new History(dir);
-    const r = await h.resolve({ id: "abc-123", path: "/w/Old Script.highland", text: script });
-    expect(r.created).toBe(false);
-    expect((await h.log("abc-123"))[0]!.hash).toBe(hash);
-    expect(existsSync(join(dir, "old-repositories", "Old Script"))).toBe(true);
-  });
 });
 
 describe("moving and pausing", () => {
@@ -164,16 +146,32 @@ describe("the README on main", () => {
 });
 
 describe("plain files", () => {
-  it("records a plain file's settings, and brings them back", async () => {
+  it("records a save as the .highland file unpacked, with the form and file name", async () => {
     const h = new History(await folder());
     const { id, branch } = await h.resolve({ id: null, path: "/w/Script.fountain", text: script });
-    const c = await h.commit(id, { scriptName: "text.fountain", script, bin: ["b"], settings: { templateName: "Screenplay", assetsFolder: "Script assets" }, others: [{ path: "assets/a.png", data: new Uint8Array([1, 2]) }] }, "save");
-    expect(gitIn(h.repo, "ls-tree", "--name-only", branch).split("\n")).toEqual(["bin", "document", "settings.json", "text.fountain"]);
-    const files = await h.filesAt(c!.hash);
-    expect(files.settings).toEqual({ templateName: "Screenplay", assetsFolder: "Script assets" });
-    expect(files.others?.map((o) => o.path)).toEqual(["assets/a.png"]);
-    expect(await h.commit(id, { scriptName: "text.fountain", script, bin: ["b"], settings: {}, others: [{ path: "assets/a.png", data: new Uint8Array([1, 2]) }] }, "save")).not.toBeNull();
-    expect(gitIn(h.repo, "ls-tree", "--name-only", branch).split("\n")).not.toContain("settings.json");
+    const info = new TextEncoder().encode('{"com.quoteunquoteapps.highland2":{"templateName":"Screenplay"}}');
+    const files = { scriptName: "text.fountain", script, bin: ["b"], others: [{ path: "info.json", data: info }, { path: "assets/a.png", data: new Uint8Array([1, 2]) }] };
+    const c = await h.commit(id, files, "save", new Date(2026, 9, 12, 9, 0), undefined, { form: "fountain", file: "Script.fountain" });
+    expect(gitIn(h.repo, "ls-tree", "-r", "--name-only", branch).split("\n")).toEqual(["assets/a.png", "bin/0.txt", "info.json", "text.fountain"]);
+    const back = await h.filesAt(c!.hash);
+    expect(back.others?.map((o) => o.path)).toEqual(["assets/a.png", "info.json"]);
+    expect(back.others?.find((o) => o.path === "info.json")?.data).toEqual(info);
+    expect(gitIn(h.repo, "log", "-1", "--format=%B", branch)).toBe(`Save 2026-10-12 09:00, +8 words (8)\n\nHighwater-Document: ${id}\nHighwater-Form: fountain\nHighwater-File: Script.fountain`);
+    const [latest] = await h.log(id, 1);
+    expect(latest).toMatchObject({ form: "fountain", file: "Script.fountain" });
+    // An unchanged save is not recorded; a Restore (like Convert and Revert) always is.
+    expect(await h.commit(id, files, "save")).toBeNull();
+    expect((await h.commit(id, files, "restore", new Date(2026, 9, 12, 9, 5), "on Desk", { form: "fountain", file: "Script.fountain" }))?.message).toBe("Restore 2026-10-12 09:05, on Desk, +0 words (8)");
+  });
+
+  it("hashes a text as git does, whatever its line endings", async () => {
+    const dir = await folder();
+    await writeFile(join(dir, "t.txt"), "One.\nTwo.\n");
+    expect(textHash("One.\nTwo.\n")).toBe(gitIn(dir, "hash-object", "t.txt"));
+    expect(textHash("One.\r\nTwo.\r\n")).toBe(textHash("One.\nTwo.\n"));
+    expect(formOf("/w/A.highland")).toBe("highland");
+    expect(formOf("/w/A.markdown")).toBe("md");
+    expect(formOf("/w/A.spmd")).toBe("fountain");
   });
 
   it("retires a path whose work moved on: the file there starts a new history, even with the old ID", async () => {
@@ -205,7 +203,7 @@ describe("converting between a .highland file and a plain file", () => {
     expect(await h.tracks("/w/Script.fountain")).toBe(false);
     const c = await h.commit(id, { scriptName: "text.fountain", script, others: [{ path: "info.json", data: new Uint8Array([123, 125]) }] }, "convert", new Date(2026, 9, 12, 9, 30), "to Script.highland");
     expect(c?.message).toBe("Convert 2026-10-12 09:30, to Script.highland, +0 words (8)");
-    expect(gitIn(h.repo, "diff", "--name-status", `${branch}~1`, branch)).toBe("A\tdocument/info.json");
+    expect(gitIn(h.repo, "diff", "--name-status", `${branch}~1`, branch)).toBe("A\tinfo.json");
     // And back to the first path: it belongs to the history again.
     await h.attach(id, "/w/Script.fountain");
     await h.retire("/w/Script.highland");

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { assetsFolderName, ExtrasFolder, idNote, listAssets, noteId, relinkAssets, sameExtras, withoutIdNote } from "../src/extras-folder.ts";
+import { assetsFolderName, detectAssetsFolder, ExtrasFolder, idNote, listAssets, noteId, relinkAssets, sameExtras, withoutIdNote } from "../src/extras-folder.ts";
 import { assetMarkdown } from "../src/syntax/workspace.ts";
 
 const temp = () => mkdtemp(join(tmpdir(), "highwater-extras-"));
@@ -31,20 +31,24 @@ describe("a plain file's extras folder", () => {
     await f.updateSettings({ templateName: "Manuscript" });
     await f.updateSettings({ assetsFolder: "Script assets" });
     expect(await f.settings()).toEqual({ templateName: "Manuscript", assetsFolder: "Script assets" });
-    expect(await f.files()).toEqual({ bin: [], scratchpad: "ideas", settings: { templateName: "Manuscript", assetsFolder: "Script assets" } });
+    // The template is in info.json, as a .highland file keeps it; the images folder's name stays local.
+    const info = '{"com.quoteunquoteapps.highland2":{"templateName":"Manuscript"}}';
+    expect(await f.files()).toEqual({ bin: [], scratchpad: "ideas", document: [{ path: "info.json", data: new TextEncoder().encode(info) }] });
+    await f.updateSettings({ templateName: undefined });
+    expect(await f.settings()).toEqual({ assetsFolder: "Script assets" });
   });
 
   it("is replaced by a save brought in from the history, and remembers that save", async () => {
     const f = new ExtrasFolder(join(await temp(), "x"));
     await f.setBinItems(["old 1", "old 2"]);
     await f.ensureScratchpad();
-    await f.replace({ bin: ["new"], settings: { templateName: "Screenplay" } });
-    expect(await f.files()).toEqual({ bin: ["new"], settings: { templateName: "Screenplay" } });
+    await f.replace({ bin: ["new"] });
+    expect(await f.files()).toEqual({ bin: ["new"] });
     expect(await f.base()).toBeNull();
     await f.setBase("abc123");
     expect(await f.base()).toBe("abc123");
-    expect(sameExtras(await f.files(), { bin: ["new"], settings: { templateName: "Screenplay" } })).toBe(true);
-    expect(sameExtras(await f.files(), { bin: ["new"] })).toBe(false);
+    expect(sameExtras(await f.files(), { bin: ["new"] })).toBe(true);
+    expect(sameExtras(await f.files(), { bin: ["new", "other"] })).toBe(false);
     expect(sameExtras({ bin: [], scratchpad: "" }, { bin: [] })).toBe(true);
   });
 
@@ -86,6 +90,12 @@ describe("a plain file's images", () => {
     await writeFile(join(dir, ".DS_Store"), "");
     expect(await listAssets(dir)).toEqual(["a.jpg", "b.png"]);
     expect(assetMarkdown("a b.png", "My Script assets")).toBe("![a b](My%20Script%20assets/a%20b.png)");
+  });
+
+  it("are found in the folder the text refers to", () => {
+    expect(detectAssetsFolder("![a](My%20Book%20assets/a.png) ![b](<My Book assets/b.png>) ![c](elsewhere/c.png)", ["a.png", "b.png"])).toBe("My Book assets");
+    expect(detectAssetsFolder("![a](assets/a.png)", ["a.png"])).toBe("assets");
+    expect(detectAssetsFolder("No images.", ["a.png"])).toBeNull();
   });
 
   it("are relinked when they move to another folder", () => {

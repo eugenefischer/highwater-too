@@ -54,7 +54,7 @@ const tests: [string, () => Promise<void>][] = [
       assert.equal(await editor.document.save(), true);
       const after = (await readBundle(path)).bundle;
       assert.equal(after.text, "EDITED IN VS CODE\n\n" + before.text);
-      for (const p of before.paths) if (p !== before.textPath) assert.deepEqual(after.get(p), before.get(p), p);
+      for (const p of before.paths) if (p !== before.textPath && p !== "info.json") assert.deepEqual(after.get(p), before.get(p), p);
       assert.equal((await readdir(join(dir, "history", "backups", "Save"))).length, 1);
     },
   ],

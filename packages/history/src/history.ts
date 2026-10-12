@@ -1,13 +1,15 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { git, gitBytes } from "./git.ts";
 
 /**
  * The writing history (M7): one git repository in the history folder, with one branch per
- * document ("works/<name>-<id>"), holding the script text (revision tags kept), Bin items and
- * Scratchpad. Branches are independent (no shared ancestry), so one work's history can be shared
+ * document ("works/<name>-<id>"). Each commit holds exactly what is inside the .highland file,
+ * unpacked: the text (revision tags kept), Bin items, Scratchpad and the rest (info.json, images, …);
+ * a plain file's commit holds the same, with only what it has. Branches are independent (no shared ancestry), so one work's history can be shared
  * or deleted on its own without rewriting anything, while the whole history needs only one remote.
  * Commits are made with git's plumbing commands: nothing is ever checked out.
  *
@@ -23,15 +25,21 @@ export interface DocumentFiles {
   bin?: string[];
   scratchpad?: string;
   /**
-   * The rest of a .highland file (info.json, assets, characters.json, …), by path inside it, so a
-   * document can be rebuilt whole from its history. Stored under "document/".
+   * The rest of the .highland file (info.json, assets/…, characters.json, …), by path inside it,
+   * stored at those same paths, so a commit's files are the .highland file unpacked. A plain file
+   * has an info.json only for its settings, and its images under assets/.
    */
   others?: { path: string; data: Uint8Array }[];
-  /**
-   * A plain .fountain or .md file's own settings (print template, assets folder), which a .highland
-   * file keeps in info.json. Stored as "settings.json".
-   */
-  settings?: Record<string, unknown>;
+}
+
+/** What a work is kept as: a .highland file, or a plain file of one of these kinds. */
+export type Form = "highland" | "fountain" | "md" | "txt";
+
+/** The kind of file and its name, recorded with every save. */
+export interface SaveMeta {
+  form: Form;
+  /** The file's name (not its path, which differs from computer to computer). */
+  file: string;
 }
 
 /** A work in the history: indexed on this computer, or pulled from another one. */
@@ -67,13 +75,22 @@ interface Index {
   retired?: string[];
 }
 
-/** "convert": the document became another kind of file (a plain file a .highland file, or back). */
-export type SaveKind = "save" | "autosave" | "close" | "convert";
+/**
+ * "convert": the work moved to another kind of file; "revert": an older save was brought back;
+ * "restore": the work was written out on a computer that did not have it. These three are recorded
+ * even when no file changed.
+ */
+export type SaveKind = "save" | "autosave" | "close" | "convert" | "revert" | "restore";
+
+const ALWAYS_RECORDED: SaveKind[] = ["convert", "revert", "restore"];
 
 export interface CommitInfo {
   hash: string;
   date: Date;
   message: string;
+  /** From the commit's Highwater-Form and Highwater-File lines (absent on older commits). */
+  form?: Form;
+  file?: string;
 }
 
 /** Below this similarity a document with no ID and an unknown path starts a new history. */
@@ -114,25 +131,35 @@ others.
 ## What each commit holds
 
 One commit is one save. Its message says when, and how the word count changed, e.g.
-\`Save 2026-10-11 14:03, +120 words (4,567)\` (\`Autosave\` and \`Close\` mark automatic saves; \`Convert\` marks a work changing between a \`.highland\` file and a plain
-\`.fountain\` or \`.md\` file, e.g. \`Convert 2026-10-12 09:30, to Script.fountain, +0 words (4,567)\`). Its files:
+\`Save 2026-10-11 14:03, +120 words (4,567)\`. \`Autosave\` and \`Close\` mark automatic saves; \`Convert\` marks a work
+moving between a \`.highland\` file and a plain \`.fountain\`, \`.md\` or \`.txt\` file; \`Revert\` marks an older save
+brought back; \`Restore\` marks the work written out on a computer that did not have it.
+
+A commit's files are exactly what is inside the \`.highland\` file, unpacked (zipped, they are that file):
 
 | File | Contents |
 |---|---|
 | \`text.fountain\`, \`text.md\` or \`text.txt\` | The script or manuscript text, exactly as saved (revision marks included) |
 | \`bin/0.txt\`, \`bin/1.txt\`, … | The document's Bin items, in order |
 | \`scratchpad.txt\` | The Scratchpad |
-| \`document/…\` | Everything else in the \`.highland\` file: settings (\`info.json\`), images (\`assets/\`) and so on; for a plain \`.fountain\` or \`.md\` file, its images (\`assets/\`) |
-| \`settings.json\` | A plain \`.fountain\` or \`.md\` file's settings, such as its print template |
+| \`info.json\` | Settings, such as the print template |
+| \`assets/…\` | Images |
+| \`characters.json\`, \`navigatorFilters.json\`, … | The rest of the file, as Highland 2 writes it |
 
-Commits also carry a \`Highwater-Document:\` line naming the document's ID, which is how Highwater Too on another
-computer knows which document a branch belongs to. A commit titled *Join the history saved on another computer*
+A work kept as a plain \`.fountain\`, \`.md\` or \`.txt\` file has the same files, as far as it has them: its Bin and
+Scratchpad (kept by Highwater Too, not in the file), an \`info.json\` for its settings, and its images from the folder
+beside it.
+
+Each commit message ends with lines naming the work's ID (\`Highwater-Document:\`), the kind of file it was kept in
+(\`Highwater-Form:\` \`highland\`, \`fountain\`, \`md\` or \`txt\`) and the file's name (\`Highwater-File:\`). They are how
+Highwater Too on another computer knows which document a branch belongs to. A commit titled *Join the history saved on another computer*
 joins saves made on two computers; its text is the later computer's.
 
 ## Getting a work back
 
-- **In Highwater Too:** *Open Work from History…* (in the Writing History panel) lists every work here and writes any
-  save out as a \`.highland\` or plain text file that continues the same history.
+- **In Highwater Too:** *Open Work from History…* (in the Writing History panel) lists every work here and, on a
+  computer that does not have it, writes its latest save out as it was kept (a \`.highland\` or plain file), continuing
+  the same history.
 - **With git:** \`git clone <this repository's address>\`, then for example
   \`git log works/<name>\` to list a work's saves and \`git show <commit>:text.fountain > script.fountain\` to get the text
   of one save.
@@ -201,7 +228,7 @@ export class History {
   }
 
   /** Commits the document's files to its branch; returns null when nothing changed. */
-  commit(id: string, files: DocumentFiles, kind: SaveKind, date = new Date(), note?: string): Promise<CommitInfo | null> {
+  commit(id: string, files: DocumentFiles, kind: SaveKind, date = new Date(), note?: string, meta?: SaveMeta): Promise<CommitInfo | null> {
     return this.#serial(async () => {
       await this.#init();
       const entry = (await this.#load()).documents[id];
@@ -209,15 +236,16 @@ export class History {
       const ref = `refs/heads/${entry.branch}`;
       const parent = await this.#revParse(ref);
       const tree = await this.#tree(files);
-      if (parent && (await this.#revParse(`${parent}^{tree}`)) === tree) return null;
+      if (parent && !ALWAYS_RECORDED.includes(kind) && (await this.#revParse(`${parent}^{tree}`)) === tree) return null;
       const before = parent ? await this.#read(parent, files.scriptName) : "";
       const message = commitMessage(kind, date, before, files.script, note);
-      // The document's ID rides along as a trailer, so another computer that pulls this branch
-      // can tell which document it belongs to.
-      const hash = await this.#commitTree(tree, parent, `${message}\n\n${ID_TRAILER}: ${id}`, date);
+      // The document's ID, form and file name ride along as trailers, so another computer can tell
+      // which document a branch belongs to and what kind of file it is kept in.
+      const trailers = [`${ID_TRAILER}: ${id}`, ...(meta ? [`${FORM_TRAILER}: ${meta.form}`, `${FILE_TRAILER}: ${meta.file}`] : [])];
+      const hash = await this.#commitTree(tree, parent, `${message}\n\n${trailers.join("\n")}`, date);
       // Compare-and-swap: fails rather than losing a commit if the branch moved meanwhile.
       await git(this.repo, ["update-ref", ref, hash, parent ?? "0".repeat(40)]);
-      return { hash, date, message };
+      return { hash, date, message, ...(meta ?? {}) };
     });
   }
 
@@ -230,13 +258,18 @@ export class History {
 
   async #branchLog(branch: string, limit: number): Promise<CommitInfo[]> {
     if (!existsSync(this.repo)) return [];
-    const out = await git(this.repo, ["log", `-${limit}`, "--format=%H%x00%aI%x00%s", `refs/heads/${branch}`, "--"]).catch(() => "");
+    const format = `%H%x00%aI%x00%s%x00%(trailers:key=${FORM_TRAILER},valueonly,separator=)%x00%(trailers:key=${FILE_TRAILER},valueonly,separator=)%x1e`;
+    const out = await git(this.repo, ["log", `-${limit}`, `--format=${format}`, `refs/heads/${branch}`, "--"]).catch(() => "");
     return out
-      .split("\n")
+      .split("\x1e")
+      .map((l) => l.replace(/^\n/, ""))
       .filter(Boolean)
       .map((l) => {
-        const [hash, date, message] = l.split("\0");
-        return { hash: hash!, date: new Date(date!), message: message! };
+        const [hash, date, message, form, file] = l.split("\0").map((x) => x.trim());
+        const info: CommitInfo = { hash: hash!, date: new Date(date!), message: message! };
+        if (form && isForm(form)) info.form = form;
+        if (file) info.file = file;
+        return info;
       });
   }
 
@@ -277,7 +310,7 @@ export class History {
     return this.#branchLog(branch, limit);
   }
 
-  /** Everything a save recorded: the script, Bin, Scratchpad, (from 0.1.3) the rest of the file and (from 0.1.5) a plain file's settings. */
+  /** Everything a save recorded: the script, Bin, Scratchpad and the rest of the file. */
   async filesAt(hash: string): Promise<DocumentFiles> {
     const scriptName = (await this.#scriptName(hash)) ?? "text.md";
     const listing = await git(this.repo, ["ls-tree", "-r", "-z", "--name-only", hash]);
@@ -288,16 +321,8 @@ export class History {
       .sort((a, b) => Number(a[1]) - Number(b[1]));
     const files: DocumentFiles = { scriptName, script: await this.#read(hash, scriptName), bin: await Promise.all(bin.map((m) => this.#read(hash, m[0]))) };
     if (names.includes("scratchpad.txt")) files.scratchpad = await this.#read(hash, "scratchpad.txt");
-    if (names.includes("settings.json")) {
-      try {
-        const settings = JSON.parse(await this.#read(hash, "settings.json")) as unknown;
-        if (settings && typeof settings === "object" && !Array.isArray(settings)) files.settings = settings as Record<string, unknown>;
-      } catch {
-        // unreadable settings: the rest of the save still comes back
-      }
-    }
-    const others = names.filter((n) => n.startsWith("document/"));
-    if (others.length) files.others = await Promise.all(others.map(async (n) => ({ path: n.slice("document/".length), data: await gitBytes(this.repo, ["cat-file", "blob", `${hash}:${n}`]) })));
+    const others = names.filter((n) => n !== scriptName && n !== "scratchpad.txt" && !/^bin\/\d+\.txt$/.test(n));
+    if (others.length) files.others = await Promise.all(others.map(async (n) => ({ path: n, data: await gitBytes(this.repo, ["cat-file", "blob", `${hash}:${n}`]) })));
     return files;
   }
 
@@ -449,7 +474,6 @@ export class History {
       const hash = await this.#commitTree(tree, null, "Writing history kept by Highwater Too", new Date());
       await git(this.repo, ["update-ref", "refs/heads/main", hash, "0".repeat(40)]);
     }
-    await this.#migrate();
     this.#ready = true;
     await this.#updateReadme();
   }
@@ -469,52 +493,18 @@ export class History {
   }
 
   /** 0.0.15–0.0.16 kept one repository per document: bring each in as a branch, commits unchanged. */
-  async #migrate(): Promise<void> {
-    let raw: { version?: number; documents?: Record<string, { repo?: string; paths?: string[]; paused?: boolean }> };
-    try {
-      raw = JSON.parse(await readFile(join(this.folder, "index.json"), "utf8"));
-    } catch {
-      return;
-    }
-    if (raw.version !== 1 || !raw.documents) return;
-    const index: Index = { version: 2, documents: {} };
-    for (const [id, old] of Object.entries(raw.documents)) {
-      const title = old.repo ?? fileTitle(old.paths?.at(-1) ?? "Untitled");
-      const branch = branchName(title, id, index);
-      const dir = old.repo ? join(this.folder, old.repo) : null;
-      if (dir && existsSync(join(dir, ".git"))) {
-        const head = (await git(dir, ["rev-parse", "--verify", "-q", "HEAD"]).catch(() => "")).trim();
-        if (head) await git(this.repo, ["fetch", "-q", dir, `+${head}:refs/heads/${branch}`]);
-      }
-      index.documents[id] = { branch, title, paths: old.paths ?? [], ...(old.paused ? { paused: true } : {}) };
-    }
-    await this.#save(index);
-    this.#index = index;
-    // The old repositories are now branches; keep them aside rather than delete.
-    const aside = join(this.folder, "old-repositories");
-    for (const old of Object.values(raw.documents)) {
-      if (!old.repo || !existsSync(join(this.folder, old.repo))) continue;
-      await mkdir(aside, { recursive: true });
-      await rename(join(this.folder, old.repo), join(aside, old.repo));
-    }
-  }
-
   async #tree(files: DocumentFiles): Promise<string> {
-    const entries: [string, string, string, string][] = [["100644", "blob", await this.#blob(files.script), files.scriptName]];
-    if (files.bin?.length) {
-      const items = await Promise.all(files.bin.map(async (t, i): Promise<[string, string, string, string]> => ["100644", "blob", await this.#blob(t), `${i}.txt`]));
-      entries.push(["040000", "tree", await this.#mktree(items), "bin"]);
-    }
-    if (files.scratchpad) entries.push(["100644", "blob", await this.#blob(files.scratchpad), "scratchpad.txt"]);
-    if (files.settings && Object.keys(files.settings).length) entries.push(["100644", "blob", await this.#blob(`${JSON.stringify(files.settings, null, 2)}\n`), "settings.json"]);
-    if (files.others?.length) entries.push(["040000", "tree", await this.#folder(files.others), "document"]);
-    return this.#mktree(entries);
+    const all: { path: string; data: Uint8Array | string }[] = [{ path: files.scriptName, data: files.script }];
+    for (const [i, t] of (files.bin ?? []).entries()) all.push({ path: `bin/${i}.txt`, data: t });
+    if (files.scratchpad) all.push({ path: "scratchpad.txt", data: files.scratchpad });
+    for (const o of files.others ?? []) if (o.path !== files.scriptName && o.path !== "scratchpad.txt" && !o.path.startsWith("bin/")) all.push(o);
+    return this.#folder(all);
   }
 
   /** A tree of files by path ("assets/a.png"), with a subtree per folder. */
-  async #folder(files: { path: string; data: Uint8Array }[]): Promise<string> {
+  async #folder(files: { path: string; data: Uint8Array | string }[]): Promise<string> {
     const here: [string, string, string, string][] = [];
-    const folders = new Map<string, { path: string; data: Uint8Array }[]>();
+    const folders = new Map<string, { path: string; data: Uint8Array | string }[]>();
     for (const f of files) {
       const slash = f.path.indexOf("/");
       if (slash < 0) here.push(["100644", "blob", await this.#blob(f.data), f.path]);
@@ -590,6 +580,37 @@ function fileTitle(path: string): string {
 
 /** The commit trailer naming the document a work branch belongs to. */
 export const ID_TRAILER = "Highwater-Document";
+/** The commit trailers naming the kind of file the work was kept in, and its name, at that save. */
+export const FORM_TRAILER = "Highwater-Form";
+export const FILE_TRAILER = "Highwater-File";
+
+const FORMS: Form[] = ["highland", "fountain", "md", "txt"];
+export function isForm(value: string): value is Form {
+  return (FORMS as string[]).includes(value);
+}
+
+/** The form of a file, by its name: a .highland file, or a plain file's kind. */
+export function formOf(path: string): Form {
+  const ext = (/\.([^.\\/]+)$/.exec(path)?.[1] ?? "").toLowerCase();
+  if (ext === "highland") return "highland";
+  if (ext === "fountain" || ext === "spmd") return "fountain";
+  if (ext === "md" || ext === "markdown") return "md";
+  return "txt";
+}
+
+/** The name of the computer, for Restore saves. */
+export function computerName(): string {
+  return hostname().replace(/\.local$/i, "") || "this computer";
+}
+
+/**
+ * A text's hash as the catalog lists it: git's object ID of the text with its line endings made
+ * LF, so a copy that went through Windows still matches.
+ */
+export function textHash(text: string): string {
+  const data = Buffer.from(text.replace(/\r\n?/g, "\n"), "utf8");
+  return createHash("sha1").update(`blob ${data.length}\0`).update(data).digest("hex");
+}
 
 function shortId(id: string): string {
   return id.replace(/[^A-Za-z0-9]/g, "").slice(0, 8) || "doc";
@@ -652,7 +673,7 @@ export function commitMessage(kind: SaveKind, date: Date, before: string, after:
   const when = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   const words = wordCount(after);
   const delta = words - wordCount(before);
-  const label = kind === "save" ? "Save" : kind === "autosave" ? "Autosave" : kind === "convert" ? "Convert" : "Close";
+  const label = { save: "Save", autosave: "Autosave", close: "Close", convert: "Convert", revert: "Revert", restore: "Restore" }[kind];
   return `${label} ${when}, ${note ? `${note}, ` : ""}${delta >= 0 ? "+" : "−"}${Math.abs(delta).toLocaleString("en-US")} words (${words.toLocaleString("en-US")})`;
 }
 

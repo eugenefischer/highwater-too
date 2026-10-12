@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from "node:fs";
 import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { textHash } from "@highwater/history";
 import { HighlandBundle, readBundle, stripHighlandExtension, unchangedSince, writeBundle, type DiskFingerprint } from "@highwater/bundle";
 
 /**
@@ -93,7 +94,13 @@ export class BundleStore {
     return this.update(path, (bundle) => {
       const key = entry === "" ? bundle.textPath : entry;
       bundle.set(key, data);
-      return [key];
+      if (entry !== "") return [key];
+      // Saving the text: note which text was saved (as the writing history's catalog names it),
+      // so a copy of this file that falls behind can be recognised even after it is edited.
+      const ours = { ...((bundle.info.highwaterToo as object | undefined) ?? {}) } as Record<string, unknown>;
+      ours.savedText = textHash(new TextDecoder().decode(data));
+      bundle.setInfo({ ...bundle.info, highwaterToo: ours });
+      return [key, "info.json"];
     }).then(() => {});
   }
 

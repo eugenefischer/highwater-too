@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
-import { CommitBatcher, defaultHistoryFolder, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type SaveKind, type WorkInfo } from "@highwater/history";
-import { HIGHLAND_KEY, writeBundle } from "@highwater/bundle";
+import { CommitBatcher, computerName, defaultHistoryFolder, formOf, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type Form, type SaveKind, type WorkInfo } from "@highwater/history";
+import { writeBundle } from "@highwater/bundle";
 import { mkdir, writeFile } from "node:fs/promises";
 import { openHighland } from "./open.ts";
 import { LANGUAGES } from "./language.ts";
@@ -12,8 +12,8 @@ import { SCHEME } from "./fs-provider.ts";
 import { exportHistory, HistoryMirror } from "./mirror.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { EXTRAS_SCHEME, plainExtras, toExtras } from "./extras.ts";
-import { ExtrasFolder, noteId, relinkAssets } from "./extras-folder.ts";
-import { toBundle } from "./to-bundle.ts";
+import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
+import { toBundle, withoutSavedText } from "./to-bundle.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -75,8 +75,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const b = await store.snapshot(key);
       const info = b.info[INFO_KEY] as { documentId?: unknown } | undefined;
       const id = typeof info?.documentId === "string" ? info.documentId : null;
-      // Everything else in the file too (settings, assets, …), so the history can rebuild it whole.
-      const others = b.paths.filter((p) => p !== b.textPath && p !== "scratchpad.txt" && !/^bin\/\d+\.txt$/.test(p)).map((p) => ({ path: p, data: b.get(p)! }));
+      // Everything else in the file too (settings, assets, …): the commit is the file unpacked.
+      const others = b.paths
+        .filter((p) => p !== b.textPath && p !== "scratchpad.txt" && !/^bin\/\d+\.txt$/.test(p) && !p.endsWith("/"))
+        .map((p) => ({ path: p, data: p === "info.json" ? withoutSavedText(b.get(p)!) : b.get(p)! }));
       return { id, files: { scriptName: b.textPath.split("/").pop()!, script: b.text, bin: b.binItems, ...(b.scratchpad !== undefined ? { scratchpad: b.scratchpad } : {}), others } };
     }
     const ext = extname(key).toLowerCase();
@@ -116,7 +118,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     try {
       const r = await resolve(key);
       if (r.paused) return;
-      const c = await history().commit(r.id, r.files, kind, new Date(), note);
+      const c = await history().commit(r.id, r.files, kind, new Date(), note, { form: formOf(key), file: basename(key) });
       if (!key.toLowerCase().endsWith(".highland")) await extras.recorded(key, c?.hash ?? null);
       failures.delete(key);
       if (c) {
@@ -371,8 +373,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   void updateStatus();
 
   /**
-   * Open Work from History…: any work in the history (pulled from another computer too), at any
-   * save, written out as a .highland or plain file that continues the same history.
+   * Open Work from History…: any work in the history (pulled from another computer too). A work
+   * already on this computer opens; any other is restored exactly as its latest save was kept — a
+   * .highland or plain file under its recorded name — and continues the same history. Converting it
+   * is a separate step afterwards; going back to an older save is done from the open document.
    */
   async function openWork(): Promise<void> {
     const h = history();
@@ -383,89 +387,71 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       return;
     }
     const work = await vscode.window.showQuickPick(
-      works.map((w) => ({
-        label: w.title,
-        description: w.paths.length ? basename(w.paths.at(-1)!) : "not on this computer",
-        detail: `Last saved ${w.latest!.date.toLocaleString()} · ${w.latest!.message.replace(/^\S+ \S+ \S+, /, "")}`,
-        work: w,
-      })),
+      works.map((w) => {
+        const here = w.paths.slice().reverse().find((p) => existsSync(p));
+        return {
+          label: w.title,
+          description: here ? basename(here) : "not on this computer",
+          detail: `Last saved ${w.latest!.date.toLocaleString()} · ${w.latest!.message.replace(/^\S+ \S+ \S+, /, "")}`,
+          work: w,
+          here,
+        };
+      }),
       { title: "Open Work from History", placeHolder: "Choose a work", matchOnDescription: true },
     );
     if (!work) return;
+    if (work.here) return void (await openFile(work.here));
     const w = work.work;
-    // Already here: open it, or restore a save anyway (say, an older one) as another file.
-    const here = w.paths.slice().reverse().find((p) => existsSync(p));
-    if (here) {
-      const choice = await vscode.window.showInformationMessage(
-        `${w.title} is already on this computer at ${here}.`,
-        { modal: true, detail: "A restored file continues the same writing history." },
-        "Open It",
-        "Restore a Save…",
-      );
-      if (!choice) return;
-      if (choice === "Open It") return void (await openFile(here));
-    }
-    const saves = await h.branchLog(w.branch);
-    const save = await vscode.window.showQuickPick(
-      saves.map((c, i) => ({ label: c.message.split(",")[0]!, description: i === 0 ? "latest" : "", detail: c.message.replace(/^[^,]*, /, ""), commit: c })),
-      { title: `${w.title}: which save?`, placeHolder: "The latest is first" },
-    );
-    if (!save) return;
-    const files = await h.filesAt(save.commit.hash);
-    const plainExt = files.scriptName.replace(/^text\./, "");
-    const hasExtras = !!(files.bin?.length || files.scratchpad !== undefined);
-    const hasAssets = !!files.others?.some((o) => o.path.startsWith("assets/"));
-    const plainDescription = hasExtras || hasAssets ? `with its ${[hasExtras ? "Bin and Scratchpad (kept by Highwater Too)" : "", hasAssets ? "images (in a folder beside it)" : ""].filter(Boolean).join(" and ")}` : "the text";
-    const kinds = [
-      { label: ".highland file", description: files.others?.length ? "with its settings, Bin, Scratchpad and assets" : "with its Bin and Scratchpad", ext: "highland" },
-      { label: `.${plainExt} file`, description: plainDescription, ext: plainExt },
-    ];
-    const kind = await vscode.window.showQuickPick(kinds, { title: `${w.title}: save as` });
-    if (!kind) return;
+    const latest = (await h.branchLog(w.branch, 1))[0];
+    if (!latest) return;
+    const files = await h.filesAt(latest.hash);
+    const form = latest.form ?? savedForm(files);
+    const ext = form === "highland" ? "highland" : form;
+    const name = latest.file ?? `${w.title}.${ext}`;
     const target = await vscode.window.showSaveDialog({
-      defaultUri: vscode.Uri.file(join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? homedir(), `${w.title}${here ? " (restored)" : ""}.${kind.ext}`)),
-      filters: { [kind.ext === "highland" ? ".highland files" : `.${kind.ext} files`]: [kind.ext] },
-      title: `Save ${w.title}`,
+      defaultUri: vscode.Uri.file(join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? homedir(), name)),
+      filters: { [ext === "highland" ? ".highland files" : `.${ext} files`]: [ext] },
+      title: `Restore ${w.title}`,
     });
     if (!target) return;
     const path = target.fsPath;
-    // The new file continues the work's history.
+    if (formOf(path) !== form) {
+      void vscode.window.showErrorMessage(`${w.title} is kept as a .${ext} file, and is restored as one. To change that, convert it after restoring.`);
+      return;
+    }
+    if (existsSync(path)) {
+      const choice = await vscode.window.showWarningMessage(
+        `${basename(path)} is already in that folder.`,
+        { modal: true, detail: "It may have been copied or synced there. Open it instead, or replace it with the restored work?" },
+        "Open It",
+        "Replace It",
+      );
+      if (!choice) return;
+      if (choice === "Open It") return void (await openFile(path));
+    }
+    // The restored file continues the work's history.
     const id = await h.claim(w, path);
-    if (kind.ext === "highland") await writeBundle(path, toBundle(files, id));
+    if (form === "highland") await writeBundle(path, toBundle(files, id));
     else {
-      // A plain file: the text, its Bin, Scratchpad and settings back with Highwater Too, its
-      // images in a folder beside it (the text's image paths follow that folder's new name).
-      const assets = (files.others ?? []).filter((o) => /^assets\/[^/]+$/.test(o.path));
+      // A plain file, exactly as saved: the text, its Bin, Scratchpad and the rest back with
+      // Highwater Too, its images in the folder its text refers to, beside it.
+      const images = (files.others ?? []).filter((o) => /^assets\/[^/]+$/.test(o.path));
+      await writeFile(path, files.script);
       const kept = toExtras(files);
-      const settings = { ...(kept.settings ?? {}) };
-      // From a .highland file's save: its template, as the plain file's.
-      const info = files.others?.find((o) => o.path === "info.json");
-      if (info && settings.templateName === undefined) {
-        try {
-          const t = (JSON.parse(new TextDecoder().decode(info.data)) as Record<string, { templateName?: unknown } | undefined>)[HIGHLAND_KEY]?.templateName;
-          if (typeof t === "string") settings.templateName = t;
-        } catch {
-          // no template: chosen from the text type
-        }
-      }
-      let text = files.script;
-      if (assets.length) {
-        const folder = `${basename(path, extname(path))} assets`;
-        const dir = join(dirname(path), folder);
-        text = relinkAssets(text, typeof settings.assetsFolder === "string" ? settings.assetsFolder : "assets", folder);
-        settings.assetsFolder = folder;
+      const folderName = images.length ? (detectAssetsFolder(files.script, images.map((o) => o.path.slice("assets/".length))) ?? `${basename(path, extname(path))} assets`) : null;
+      if (folderName) {
+        const dir = join(dirname(path), folderName);
         await mkdir(dir, { recursive: true });
-        for (const a of assets) await writeFile(join(dir, a.path.slice("assets/".length)), a.data);
+        for (const a of images) await writeFile(join(dir, a.path.slice("assets/".length)), a.data);
       }
-      await writeFile(path, text);
-      const document = (kept.document ?? []).filter((o) => !/^assets\/[^/]+$/.test(o.path));
-      if (hasExtras || Object.keys(settings).length || document.length) {
+      if (kept.bin.length || kept.scratchpad !== undefined || kept.document || folderName) {
         const folder = new ExtrasFolder(join(historyRoot(), "extras", id));
-        await folder.replace({ bin: kept.bin, ...(kept.scratchpad !== undefined ? { scratchpad: kept.scratchpad } : {}), settings, document });
-        await folder.setBase(save.commit.hash);
+        await folder.replace(kept);
+        if (folderName) await folder.updateSettings({ assetsFolder: folderName });
       }
       extras.forget();
     }
+    await commitNow(path, "restore", `on ${computerName()}`);
     await openFile(path);
     view.refresh();
     void updateStatus();
@@ -500,6 +486,19 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     if (enabled() && mirror.url) void pulled(mirror.pull());
   }, 10 * 60_000);
   context.subscriptions.push({ dispose: () => clearInterval(timer) });
+}
+
+/** A save's form, judged by its files, for saves made before the Highwater-Form line. */
+function savedForm(files: DocumentFiles): Form {
+  const info = files.others?.find((o) => o.path === "info.json");
+  if (info) {
+    try {
+      if ("type" in (JSON.parse(new TextDecoder().decode(info.data)) as object)) return "highland";
+    } catch {
+      // not a .highland file's info.json
+    }
+  }
+  return formOf(files.scriptName);
 }
 
 /** "14:03" today, else "11 Oct". */

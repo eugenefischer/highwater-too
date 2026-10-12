@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promi
 import { basename, dirname, extname, join, relative, sep } from "node:path";
 import type { DocumentFiles, History } from "@highwater/history";
 import * as vscode from "vscode";
-import { assetsFolderName, ExtrasFolder, listAssets, noteId, sameExtras, type ExtrasFiles, type ExtrasSettings } from "./extras-folder.ts";
+import { assetsFolderName, ExtrasFolder, listAssets, noteId, sameExtras, type ExtrasFiles } from "./extras-folder.ts";
 
 /**
  * Bin, Scratchpad, assets and settings for plain .fountain and .md files (see ExtrasFolder). The
@@ -183,14 +183,13 @@ export class PlainExtras implements vscode.Disposable {
   // The writing history.
 
   /** What a save of a plain file records besides its text. */
-  async historyFiles(path: string): Promise<Pick<DocumentFiles, "bin" | "scratchpad" | "settings" | "others">> {
+  async historyFiles(path: string): Promise<Pick<DocumentFiles, "bin" | "scratchpad" | "others">> {
     const folder = await this.folder(path);
-    const out: Pick<DocumentFiles, "bin" | "scratchpad" | "settings" | "others"> = {};
+    const out: Pick<DocumentFiles, "bin" | "scratchpad" | "others"> = {};
     if (folder) {
       const files = await folder.files();
       if (files.bin.length) out.bin = files.bin;
       if (files.scratchpad !== undefined) out.scratchpad = files.scratchpad;
-      if (files.settings) out.settings = files.settings;
       if (files.document) out.others = files.document;
     }
     const { dir } = await this.assetsFolder(path);
@@ -291,8 +290,7 @@ export class PlainExtras implements vscode.Disposable {
 export function toExtras(files: DocumentFiles): ExtrasFiles {
   const out: ExtrasFiles = { bin: files.bin ?? [] };
   if (files.scratchpad !== undefined) out.scratchpad = files.scratchpad;
-  if (files.settings) out.settings = files.settings as ExtrasSettings;
-  const document = (files.others ?? []).filter((o) => !o.path.startsWith("assets/"));
+  const document = (files.others ?? []).filter((o) => !/^assets\/[^/]+$/.test(o.path));
   if (document.length) out.document = document;
   return out;
 }

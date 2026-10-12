@@ -125,7 +125,11 @@ async function convertToPlain(store: BundleStore, chosen?: vscode.Uri): Promise<
   }
   await writeFile(path, plain.text);
   const e = plain.extras;
-  if (e.bin.length || e.scratchpad !== undefined || e.settings || e.document) await extras.prepare(path, id).replace(e);
+  if (e.bin.length || e.scratchpad !== undefined || e.document || plain.assets.length) {
+    const folder = extras.prepare(path, id);
+    await folder.replace(e);
+    if (plain.assets.length) await folder.updateSettings({ assetsFolder: folderName });
+  }
 
   // The work moves to the plain file; the .highland file left behind no longer names it.
   if (history && id) {

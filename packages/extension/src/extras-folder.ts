@@ -1,18 +1,19 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, sep } from "node:path";
+import { HIGHLAND_KEY } from "@highwater/bundle";
 
 /**
- * A plain .fountain or .md file's extras — Bin, Scratchpad and settings — which a .highland file
- * keeps inside itself. A plain file has nowhere to keep them, so they live in a folder of their
- * own in the writing history folder (`<history>/extras/<document ID>/`), laid out as inside a
- * .highland file: `bin/0.txt`…, `scratchpad.txt`, plus `settings.json`, and in `document/` the rest
- * of the .highland file a plain file was converted from (info.json and so on), kept so converting
- * back restores it and the history's files stay the same. Each save commits them with the text.
- * No VS Code dependency, so it is unit-tested on real folders.
+ * A plain .fountain or .md file's extras: what a .highland file would hold besides the text. A
+ * plain file has nowhere to keep them, so they live in a folder of their own in the writing history
+ * folder (`<history>/extras/<document ID>/`): `bin/0.txt`…, `scratchpad.txt`, and in `document/`
+ * the rest of the .highland file (info.json and so on: everything a .highland file it came from had,
+ * or just an info.json holding its print template). Each save commits them with the text, at the
+ * same paths as in a .highland file. `local.json` holds what only this computer needs (the name of
+ * the images folder) and is not committed. No VS Code dependency, so it is unit-tested.
  *
  * Images are different: the text refers to them by path, so they go in a visible folder next to
- * the file (`<name> assets/`), made only when the first one is added.
+ * the file (`<name> assets`), made only when the first one is added.
  */
 export interface ExtrasSettings {
   /** The print template chosen in the preview, as a .highland file's templateName. */
@@ -25,8 +26,7 @@ export interface ExtrasSettings {
 export interface ExtrasFiles {
   bin: string[];
   scratchpad?: string;
-  settings?: ExtrasSettings;
-  /** The rest of the .highland file it was converted from, by path inside it (no images). */
+  /** The rest of the .highland file (info.json and so on), by path inside it; no images. */
   document?: { path: string; data: Uint8Array }[];
 }
 
@@ -80,21 +80,37 @@ export class ExtrasFolder {
     return this.scratchpadPath;
   }
 
+  /** The print template (from info.json, as a .highland file keeps it) and the images folder's name (local). */
   async settings(): Promise<ExtrasSettings> {
-    try {
-      const data = JSON.parse(await readFile(join(this.dir, "settings.json"), "utf8")) as unknown;
-      return data && typeof data === "object" && !Array.isArray(data) ? (data as ExtrasSettings) : {};
-    } catch {
-      return {};
-    }
+    const out: ExtrasSettings = {};
+    const info = await readJson(join(this.dir, "document", "info.json"));
+    const template = (info?.[HIGHLAND_KEY] as { templateName?: unknown } | undefined)?.templateName;
+    if (typeof template === "string" && template) out.templateName = template;
+    const local = await readJson(join(this.dir, "local.json"));
+    if (typeof local?.assetsFolder === "string" && local.assetsFolder) out.assetsFolder = local.assetsFolder;
+    return out;
   }
 
-  async updateSettings(change: Partial<ExtrasSettings>): Promise<ExtrasSettings> {
-    const next = { ...(await this.settings()), ...change };
-    for (const [k, v] of Object.entries(next)) if (v === undefined) delete next[k];
+  async updateSettings(change: { templateName?: string | undefined; assetsFolder?: string | undefined }): Promise<ExtrasSettings> {
     await mkdir(this.dir, { recursive: true });
-    await writeAtomic(join(this.dir, "settings.json"), `${JSON.stringify(next, null, 2)}\n`);
-    return next;
+    if ("templateName" in change) {
+      const path = join(this.dir, "document", "info.json");
+      const info = (await readJson(path)) ?? {};
+      const block = { ...((info[HIGHLAND_KEY] as Record<string, unknown> | undefined) ?? {}) };
+      if (change.templateName === undefined) delete block.templateName;
+      else block.templateName = change.templateName;
+      info[HIGHLAND_KEY] = block;
+      await mkdir(dirname(path), { recursive: true });
+      await writeAtomic(path, JSON.stringify(info));
+    }
+    if ("assetsFolder" in change) {
+      const path = join(this.dir, "local.json");
+      const local = (await readJson(path)) ?? {};
+      if (change.assetsFolder === undefined) delete local.assetsFolder;
+      else local.assetsFolder = change.assetsFolder;
+      await writeAtomic(path, `${JSON.stringify(local, null, 2)}\n`);
+    }
+    return this.settings();
   }
 
   /** The rest of the .highland file it was converted from (none for a file that never was one). */
@@ -128,8 +144,6 @@ export class ExtrasFolder {
     const out: ExtrasFiles = { bin: await this.binItems() };
     const scratchpad = await this.scratchpad();
     if (scratchpad !== undefined) out.scratchpad = scratchpad;
-    const settings = await this.settings();
-    if (Object.keys(settings).length) out.settings = settings;
     const document = await this.document();
     if (document.length) out.document = document;
     return out;
@@ -141,8 +155,6 @@ export class ExtrasFolder {
     await this.setBinItems(files.bin);
     if (files.scratchpad !== undefined) await writeAtomic(this.scratchpadPath, files.scratchpad);
     else await rm(this.scratchpadPath, { force: true });
-    if (files.settings && Object.keys(files.settings).length) await writeAtomic(join(this.dir, "settings.json"), `${JSON.stringify(files.settings, null, 2)}\n`);
-    else await rm(join(this.dir, "settings.json"), { force: true });
     await this.setDocument(files.document ?? []);
   }
 
@@ -168,13 +180,12 @@ export class ExtrasFolder {
   }
 }
 
-/** True when two sets of extras hold the same Bin, Scratchpad and settings. */
+/** True when two sets of extras hold the same Bin, Scratchpad and the rest of the file. */
 export function sameExtras(a: ExtrasFiles, b: ExtrasFiles): boolean {
   return (
     a.bin.length === b.bin.length &&
     a.bin.every((t, i) => t === b.bin[i]) &&
     (a.scratchpad ?? "") === (b.scratchpad ?? "") &&
-    JSON.stringify(sortKeys(a.settings ?? {})) === JSON.stringify(sortKeys(b.settings ?? {})) &&
     sameFiles(a.document ?? [], b.document ?? [])
   );
 }
@@ -186,10 +197,6 @@ function sameFiles(a: { path: string; data: Uint8Array }[], b: { path: string; d
     const other = byPath.get(f.path);
     return other !== undefined && other.length === f.data.length && other.every((x, i) => x === f.data[i]);
   });
-}
-
-function sortKeys(o: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(o).sort(([x], [y]) => x.localeCompare(y)));
 }
 
 /** "Script.fountain" → "Script assets". */
@@ -257,6 +264,39 @@ export function withoutIdNote(text: string): string {
   // The note ended the text: drop the blank lines before it too, keeping the final line break.
   const trimmed = before.replace(/\s+$/, "");
   return trimmed + (text.endsWith("\n") || before.endsWith("\n") ? "\n" : "");
+}
+
+async function readJson(path: string): Promise<Record<string, unknown> | null> {
+  try {
+    const data = JSON.parse(await readFile(path, "utf8")) as unknown;
+    return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The folder a text's images are in, judged from the text: the folder most image references use
+ * for one of `names`. Null if none refers to them.
+ */
+export function detectAssetsFolder(text: string, names: string[]): string | null {
+  const wanted = new Set(names);
+  const counts = new Map<string, number>();
+  for (const m of text.matchAll(/!\[[^\]\n]*\]\(<?([^)>\n]+?)>?\)/g)) {
+    let path = m[1]!.trim();
+    try {
+      path = decodeURIComponent(path);
+    } catch {
+      // keep it as written
+    }
+    const slash = path.lastIndexOf("/");
+    if (slash <= 0 || !wanted.has(path.slice(slash + 1))) continue;
+    const folder = path.slice(0, slash);
+    counts.set(folder, (counts.get(folder) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  for (const [folder, n] of counts) if (best === null || n > counts.get(best)!) best = folder;
+  return best;
 }
 
 async function writeAtomic(path: string, data: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { textHash } from "@highwater/history";
 import { chmod, copyFile, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,8 +55,12 @@ describe("BundleStore", () => {
     await store.write(file, "", enc("INT. NEW - DAY\n\nChanged."));
     const after = (await readBundle(file)).bundle;
     expect(after.text).toBe("INT. NEW - DAY\n\nChanged.");
-    for (const p of before.paths) if (p !== "text.fountain") expect(after.get(p)).toEqual(before.get(p));
+    for (const p of before.paths) if (p !== "text.fountain" && p !== "info.json") expect(after.get(p)).toEqual(before.get(p));
     expect(dec(await store.read(file))).toBe("INT. NEW - DAY\n\nChanged.");
+    // info.json changes only by noting which text was saved.
+    const { highwaterToo, ...rest } = after.info as { highwaterToo?: { savedText?: string } };
+    expect(highwaterToo?.savedText).toBe(textHash("INT. NEW - DAY\n\nChanged."));
+    expect(rest).toEqual(before.info);
   });
 
   it("backs up the original once per session and keeps the newest 10", async () => {

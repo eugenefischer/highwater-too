@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+**Start a new writing history before installing:** this version records saves in a new layout and does not read histories made by earlier versions. Delete the history folder (on a Mac, `~/Library/Application Support/Highwater Too/History`) on each computer, and the mirror's repository if you use one.
+
+- Each save now holds exactly what is inside the `.highland` file, unpacked (zipped, a save is that file): the text, `bin/`, `scratchpad.txt`, `info.json`, `assets/` and the rest, at the same paths. A plain file's save holds the same, as far as it has them; its print template is kept in an `info.json` as a `.highland` file keeps it. Converting between the two leaves the recorded files unchanged.
+- Every save names the kind of file the work is kept in and the file's name (`Highwater-Form`, `Highwater-File`). New kinds of save: `Revert` and `Restore`; `Convert`, `Revert` and `Restore` are recorded even when nothing changed.
+- `.highland` files note which text they last saved (`highwaterToo.savedText` in `info.json`, not recorded in the history), for recognising copies that fall behind in a later version.
+- **Open Work from History…** opens a work already on this computer, and restores any other exactly as its latest save was kept, under its recorded name. Restoring an older save, or as another kind of file, is gone: going back to an older save from the open document comes in a later version, and converting is done after restoring.
+
 ## 0.1.6
 
 - **Convert to .highland File…** (was Save as .highland File…) and new **Convert to .fountain / .md / .txt File…** (by the text type) move a work between a `.highland` file and a plain file. The writing history, Bin, Scratchpad, images and print template go with it, so the history stays one branch whichever way it goes; each conversion is a `Convert` save naming the new file. A plain file made from a `.highland` file keeps the rest of it (settings, characters, navigator filters), so converting back restores it, and the history's text, Bin and image files are unchanged by a round trip. The file a work was converted from is no longer tracked; you are asked whether to move it (and its images folder) to the Trash.
