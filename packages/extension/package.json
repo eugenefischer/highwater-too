@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -285,6 +285,42 @@
       {
         "command": "highwater.history.compare",
         "title": "Compare with Now",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.history.revert",
+        "title": "Revert to This Save…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.works.refresh",
+        "title": "Refresh",
+        "category": "Highwater Too",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "highwater.works.open",
+        "title": "Open",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.works.restore",
+        "title": "Restore…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.works.showSave",
+        "title": "Show This Save",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.works.remove",
+        "title": "Remove from This Computer…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.works.delete",
+        "title": "Delete Writing History…",
         "category": "Highwater Too"
       },
       {
@@ -1076,6 +1112,30 @@
           "when": "false"
         },
         {
+          "command": "highwater.history.revert",
+          "when": "false"
+        },
+        {
+          "command": "highwater.works.open",
+          "when": "false"
+        },
+        {
+          "command": "highwater.works.restore",
+          "when": "false"
+        },
+        {
+          "command": "highwater.works.showSave",
+          "when": "false"
+        },
+        {
+          "command": "highwater.works.remove",
+          "when": "false"
+        },
+        {
+          "command": "highwater.works.delete",
+          "when": "false"
+        },
+        {
           "command": "highwater.toggleDocumentHistory",
           "when": "editorLangId =~ /^highland-/"
         },
@@ -1150,6 +1210,11 @@
           "group": "navigation"
         },
         {
+          "command": "highwater.works.refresh",
+          "when": "view == highwater.works",
+          "group": "navigation"
+        },
+        {
           "command": "highwater.openHistoryFolder",
           "when": "view == highwater.history",
           "group": "navigation@1"
@@ -1201,6 +1266,31 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "highwater.history.revert",
+          "when": "view == highwater.history && viewItem == save",
+          "group": "1_history"
+        },
+        {
+          "command": "highwater.works.open",
+          "when": "view == highwater.works && viewItem == work.here",
+          "group": "1_open@1"
+        },
+        {
+          "command": "highwater.works.restore",
+          "when": "view == highwater.works && (viewItem == work.local || viewItem == work.remote)",
+          "group": "1_open@2"
+        },
+        {
+          "command": "highwater.works.remove",
+          "when": "view == highwater.works && (viewItem == work.here || viewItem == work.local)",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "highwater.works.delete",
+          "when": "view == highwater.works && viewItem =~ /^work\\./",
+          "group": "2_manage@2"
+        },
         {
           "command": "highwater.bin.insert",
           "when": "view == highwater.bin && viewItem == binItem",
@@ -1416,10 +1506,25 @@
           "id": "highwater.history",
           "name": "Writing History",
           "icon": "media/highwater.svg"
+        },
+        {
+          "id": "highwater.works",
+          "name": "Works",
+          "icon": "media/highwater.svg"
         }
       ]
     },
     "viewsWelcome": [
+      {
+        "view": "highwater.works",
+        "contents": "Every work in your writing history appears here, including works saved only on another computer and kept on the mirror. Save a document to start.\n[Open Work from History…](command:highwater.openWorkFromHistory)",
+        "when": "config.highwater.writingHistory"
+      },
+      {
+        "view": "highwater.works",
+        "contents": "The writing history is off.",
+        "when": "!config.highwater.writingHistory"
+      },
       {
         "view": "highwater.navigator",
         "contents": "Open a .highland, .fountain or .md document to see its scenes, sections and notes, or start a new one.\n[New Document…](command:highwater.newDocument)\n[Open Document…](command:highwater.open)",

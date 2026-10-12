@@ -80,6 +80,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     vscode.commands.registerCommand("highwater.assets.delete", (item: AssetItem) => assets.remove(item)),
 
     vscode.commands.registerCommand("highwater.openScratchpad", () => openScratchpad(store, current)),
+    vscode.commands.registerCommand("highwater.panels.refresh", () => refreshAll()),
     vscode.commands.registerCommand("highwater.linkHistoryToFile", () => linkHistoryToFile()),
   );
   for (const e of [vscode.window.activeTextEditor, ...vscode.window.visibleTextEditors]) if (e) current.follow(e.document);

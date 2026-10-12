@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2
+
+- **Works panel** in the Highwater Too sidebar: every work in the catalog, on this computer or only on the mirror, newest first, with its saves (click one to compare it with the file, or to read it if the file is not here). Right-click: Open, Restore…, Remove from This Computer…, Delete Writing History….
+- **Revert to This Save…** (right-click a save in the Writing History panel): the save's text replaces the document's, unsaved, and its Bin and Scratchpad come back; saving records a `Revert` naming the save. Nothing later is lost.
+- **Remove from This Computer…:** sends the work's latest saves to the mirror, then removes its history from this computer and prunes the repository so none of its data is left here. It can be restored, or its file connected again, later.
+- **Delete Writing History…:** permanent, after a warning that names how many saves go. With a mirror, **Delete everywhere?** removes it from the mirror and, through a deletion record in the catalog, from every computer when it next syncs; **Only on This Computer** deletes it here and never fetches it back. The file is not touched: a `.highland` file gets a new ID on its next save and a plain file keeps its Bin and Scratchpad, starting a new history.
+- **Joining copies:** after a sync, a history on this computer that began from a save of another work (a copy worked on offline) is offered to be joined with it: both histories are kept, in a merge on the original work's branch. A different kind of file asks Make This File the Work's File or Keep as a Separate Copy.
+- The mirror no longer sets a default fetch, so nothing but what is asked for is copied here.
+
 ## 0.2.1
 
 - **Fetching on demand:** a computer holds only the works used on it. Pulling brings `main` and the works already here; a work saved elsewhere is fetched only when you restore it, or connect a file to it. Pushing sends `main` and this computer's works.

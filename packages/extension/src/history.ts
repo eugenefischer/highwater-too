@@ -15,6 +15,7 @@ import { EXTRAS_SCHEME, plainExtras, toExtras } from "./extras.ts";
 import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
 import { toBundle, withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
+import { afterPull, revertTo, WorksView, type WorksHost } from "./works.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -146,6 +147,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       }
       void showNotice();
       view.refresh();
+      works.refresh();
     } catch (error) {
       failures.set(key, (error as Error).message);
     }
@@ -322,10 +324,35 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     return r ? { doc, key, commits: await history().log(r.id) } : null;
   });
 
+  // The Works panel: every work in the catalog, and what can be done with each.
+  const askedJoins = new Set<string>();
+  const worksHost: WorksHost = {
+    history: () => history(),
+    mirror,
+    connector,
+    store,
+    openFile: (path) => openFile(path),
+    restoreWork: (w) => restoreWork(w),
+    showSave: async (path, title, commit) => {
+      const left = vscode.Uri.from({ scheme: HISTORY_SCHEME, path: `/${title} (${commit.hash.slice(0, 7)})`, query: JSON.stringify({ hash: commit.hash }) });
+      if (path && existsSync(path)) {
+        const right = path.toLowerCase().endsWith(".highland") ? vscode.Uri.file(path).with({ scheme: SCHEME }) : vscode.Uri.file(path);
+        await vscode.commands.executeCommand("vscode.diff", left, right, `${title}: ${commit.message} ↔ now`);
+      } else await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(left), { preview: true });
+    },
+    changed: () => {
+      view.refresh();
+      works.refresh();
+      void updateStatus();
+    },
+  };
+  const works = new WorksView(worksHost);
+
   context.subscriptions.push(
     status,
     { dispose: () => batcher.dispose() },
     vscode.window.registerTreeDataProvider("highwater.history", view),
+    vscode.window.registerTreeDataProvider("highwater.works", works),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("highwater.historyFolder") || e.affectsConfiguration("highwater.writingHistory")) {
         // One History per folder, kept: a second one for the same folder would race the first.
@@ -364,6 +391,13 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       },
     }),
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
+    vscode.commands.registerCommand("highwater.history.revert", (item: HistoryItem) => revertTo(worksHost, item.doc, item.key, item.commit)),
+    vscode.commands.registerCommand("highwater.works.refresh", () => works.refresh()),
+    vscode.commands.registerCommand("highwater.works.open", (node: Parameters<WorksView["open"]>[0]) => works.open(node)),
+    vscode.commands.registerCommand("highwater.works.restore", (node: Parameters<WorksView["restore"]>[0]) => works.restore(node)),
+    vscode.commands.registerCommand("highwater.works.showSave", (node: Parameters<WorksView["showSave"]>[0]) => works.showSave(node)),
+    vscode.commands.registerCommand("highwater.works.remove", (node: Parameters<WorksView["remove"]>[0]) => works.remove(node)),
+    vscode.commands.registerCommand("highwater.works.delete", (node: Parameters<WorksView["delete"]>[0]) => works.delete(node)),
     vscode.commands.registerCommand("highwater.history.decide", async () => {
       const key = keyOf(vscode.window.activeTextEditor?.document);
       if (key) await connector.check(key);
@@ -509,13 +543,18 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     await vscode.window.showTextDocument(doc, { preview: false });
   }
 
-  /** After a pull: show what came in, and bring in open plain files' Bin and Scratchpad. */
+  /**
+   * After a pull: show what came in, bring in open plain files' Bin and Scratchpad, drop works
+   * deleted elsewhere, and offer to join histories that began as copies.
+   */
   async function pulled(work: Promise<string[]>): Promise<void> {
     const updated = await work.catch(() => [] as string[]);
     if (updated.length) {
       extras.forget();
       for (const d of vscode.workspace.textDocuments) if (extras.isPlain(d)) await extras.bringIn(d.uri.fsPath).catch(() => false);
+      if (updated.includes("main")) await afterPull(worksHost, askedJoins).catch(() => undefined);
       view.refresh();
+      works.refresh();
       void updateStatus();
     }
   }
@@ -573,6 +612,7 @@ class HistoryView implements vscode.TreeDataProvider<HistoryItem> {
     t.tooltip = `${item.commit.message}\n${item.commit.hash}\nClick to compare with the script as it is now.`;
     t.iconPath = new vscode.ThemeIcon(kind === "Save" ? "save" : "history");
     t.command = { command: "highwater.history.compare", title: "Compare", arguments: [item] };
+    t.contextValue = "save";
     return t;
   }
 
