@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -79,13 +79,28 @@
       },
       {
         "command": "highwater.export",
-        "title": "Export Text (.fountain / .md)…",
+        "title": "Export Text (.fountain / .md / .txt)…",
         "category": "Highwater Too",
         "icon": "$(file-text)"
       },
       {
         "command": "highwater.convertToHighland",
-        "title": "Save as .highland File…",
+        "title": "Convert to .highland File…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.convertToFountain",
+        "title": "Convert to .fountain File…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.convertToMarkdown",
+        "title": "Convert to .md File…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.convertToText",
+        "title": "Convert to .txt File…",
         "category": "Highwater Too"
       },
       {
@@ -931,7 +946,19 @@
       "commandPalette": [
         {
           "command": "highwater.export",
-          "when": "resourceScheme == highland"
+          "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.convertToFountain",
+          "when": "resourceScheme == highland && editorLangId == highland-fountain"
+        },
+        {
+          "command": "highwater.convertToMarkdown",
+          "when": "resourceScheme == highland && editorLangId == highland-markdown"
+        },
+        {
+          "command": "highwater.convertToText",
+          "when": "resourceScheme == highland && editorLangId == highland-plain"
         },
         {
           "command": "highwater.convertToHighland",
@@ -1085,7 +1112,7 @@
         },
         {
           "command": "highwater.export",
-          "when": "resourceScheme == highland && editorLangId =~ /^highland-/",
+          "when": "editorLangId =~ /^highland-/ && resourceScheme != highwater-extras",
           "group": "navigation@2"
         }
       ],
@@ -1398,7 +1425,7 @@
       },
       {
         "view": "highwater.bin",
-        "contents": "The Bin holds text cut or copied from the script (⌥⌘X, ⌥⌘C) to use later. For a plain .fountain or .md file, the Bin and Scratchpad are kept with the writing history, not in the file: only Highwater Too shows them. Save as a .highland file to keep them in the file.\n[New Bin Item](command:highwater.bin.new)\n[Open Scratchpad](command:highwater.openScratchpad)",
+        "contents": "The Bin holds text cut or copied from the script (⌥⌘X, ⌥⌘C) to use later. For a plain .fountain or .md file, the Bin and Scratchpad are kept with the writing history, not in the file: only Highwater Too shows them. Convert it to a .highland file to keep them in the file.\n[New Bin Item](command:highwater.bin.new)\n[Open Scratchpad](command:highwater.openScratchpad)",
         "when": "highwater.hasExtras && !highwater.inBundle"
       },
       {

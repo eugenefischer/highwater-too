@@ -104,6 +104,17 @@ export class PlainExtras implements vscode.Disposable {
     return folder;
   }
 
+  /**
+   * Where a plain file's extras go when it is made from a .highland file (converted or restored):
+   * in the history under its document ID, or the stand-in place when the history is off.
+   */
+  prepare(path: string, id: string | null): ExtrasFolder {
+    const folder = this.#host.history() && id ? this.#inHistory(id) : this.#standIn(path);
+    this.#owners.set(folder.dir, path);
+    this.#cache.delete(path);
+    return folder;
+  }
+
   /** The plain file's ID in the writing history (giving it one if needed); null when history is off. */
   async documentId(path: string): Promise<string | null> {
     const h = this.#host.history();
@@ -180,10 +191,12 @@ export class PlainExtras implements vscode.Disposable {
       if (files.bin.length) out.bin = files.bin;
       if (files.scratchpad !== undefined) out.scratchpad = files.scratchpad;
       if (files.settings) out.settings = files.settings;
+      if (files.document) out.others = files.document;
     }
     const { dir } = await this.assetsFolder(path);
     const names = await listAssets(dir);
-    if (names.length) out.others = await Promise.all(names.map(async (n) => ({ path: `assets/${n}`, data: new Uint8Array(await readFile(join(dir, n))) })));
+    const images = await Promise.all(names.map(async (n) => ({ path: `assets/${n}`, data: new Uint8Array(await readFile(join(dir, n))) })));
+    if (images.length) out.others = [...(out.others ?? []), ...images];
     return out;
   }
 
@@ -256,10 +269,10 @@ export class PlainExtras implements vscode.Disposable {
         detail:
           `${where}. They are not part of the file itself: only Highwater Too shows them, and they don’t travel with the file when you copy or send it. ` +
           `Images go in a “${assetsFolderName(path)}” folder next to the file.\n\n` +
-          "To keep everything in one file, save it as a .highland file. This message is shown once.",
+          "To keep everything in one file, convert it to a .highland file. This message is shown once.",
       },
       "Continue",
-      "Save as .highland File…",
+      "Convert to .highland File…",
     );
     if (!choice) return false;
     await this.#context.globalState.update(NOTICE_KEY, true);
@@ -279,6 +292,8 @@ export function toExtras(files: DocumentFiles): ExtrasFiles {
   const out: ExtrasFiles = { bin: files.bin ?? [] };
   if (files.scratchpad !== undefined) out.scratchpad = files.scratchpad;
   if (files.settings) out.settings = files.settings as ExtrasSettings;
+  const document = (files.others ?? []).filter((o) => !o.path.startsWith("assets/"));
+  if (document.length) out.document = document;
   return out;
 }
 

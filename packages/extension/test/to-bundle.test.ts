@@ -2,7 +2,7 @@ import { createDocument } from "@highwater/bundle";
 import { parse } from "@highwater/parser";
 import { describe, expect, it } from "vitest";
 import { navigatorItems } from "../src/syntax/navigator.ts";
-import { toBundle } from "../src/to-bundle.ts";
+import { toBundle, toPlain } from "../src/to-bundle.ts";
 
 const id = "1a2b3c4d-5e6f-4a1b-8c9d-0e1f2a3b4c5d";
 
@@ -42,6 +42,35 @@ describe("a .highland file from a save", () => {
     expect(b.get("characters.json")).toBeDefined();
     expect(b.binItems).toEqual(["b"]);
     expect((b.info.highwaterToo as { documentId: string }).documentId).toBe(id);
+  });
+});
+
+describe("converting a .highland file to a plain file and back", () => {
+  it("takes the file apart for a plain file, and puts it back together unchanged", () => {
+    const original = createDocument({ mode: "markdown", template: "Manuscript", text: "Text ![map](assets/map.png).\n" });
+    original.set("assets/map.png", new Uint8Array([1, 2, 3]));
+    original.setBinItems(["cut"]);
+    original.scratchpad = "ideas";
+    original.setInfo({ ...original.info, highwaterToo: { documentId: id } });
+    const plain = toPlain(original, "Book assets");
+    expect(plain.text).toBe("Text ![map](Book%20assets/map.png).\n");
+    expect(plain.assets).toEqual([{ name: "map.png", data: new Uint8Array([1, 2, 3]) }]);
+    expect(plain.extras.bin).toEqual(["cut"]);
+    expect(plain.extras.scratchpad).toBe("ideas");
+    expect(plain.extras.settings).toEqual({ templateName: "Manuscript", assetsFolder: "Book assets" });
+    expect(plain.extras.document?.map((d) => d.path).sort()).toEqual(["characters.json", "info.json", "navigatorFilters.json", "sprints.json"]);
+    // Back again, as the history would record the plain file.
+    const others = [...plain.extras.document!, ...plain.assets.map((a) => ({ path: `assets/${a.name}`, data: a.data }))];
+    const back = toBundle({ scriptName: "text.md", script: plain.text, bin: plain.extras.bin, scratchpad: plain.extras.scratchpad!, settings: plain.extras.settings!, others }, id);
+    expect(back.text).toBe(original.text);
+    expect([...back.paths].sort()).toEqual([...original.paths].sort());
+    for (const p of original.paths) expect(back.get(p), p).toEqual(original.get(p));
+  });
+
+  it("uses a template chosen while the file was plain", () => {
+    const plain = toPlain(createDocument({ mode: "fountain", template: "Screenplay", text: "x\n" }), "x assets");
+    const back = toBundle({ scriptName: "text.fountain", script: "x\n", settings: { templateName: "Manuscript" }, others: plain.extras.document! }, id);
+    expect(back.highlandSettings.templateName).toBe("Manuscript");
   });
 });
 

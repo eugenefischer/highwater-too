@@ -1,18 +1,13 @@
 import { homedir } from "node:os";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { createDocument, writeBundle, type DocumentMode } from "@highwater/bundle";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
 import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
-import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import { plainExtras } from "./extras.ts";
-import { currentHistory } from "./history.ts";
-import { toBundle } from "./to-bundle.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
-import { stripRevisionTags, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
+import { toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
 
 const NEW: Record<string, { mode: DocumentMode; template: string; name: string }> = {
   screenplay: { mode: "fountain", template: "Screenplay", name: "Untitled Screenplay" },
@@ -34,8 +29,6 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     vscode.commands.registerCommand("highwater.newScreenplay", () => newDocument("screenplay")),
     vscode.commands.registerCommand("highwater.newManuscript", () => newDocument("manuscript")),
     vscode.commands.registerCommand("highwater.newDocument", (kind?: NewKind, target?: vscode.Uri) => newAnyDocument(kind, target)),
-    vscode.commands.registerCommand("highwater.export", exportText),
-    vscode.commands.registerCommand("highwater.convertToHighland", convertToHighland),
     vscode.commands.registerCommand("highwater.useForMarkdown", useForMarkdown),
     vscode.commands.registerCommand("highwater.stopUsingForMarkdown", stopUsingForMarkdown),
     // Menus (the editor title button) pass the document's URI; only an explicit option sets where to save.
@@ -135,73 +128,7 @@ async function newAnyDocument(kind?: NewKind, target?: vscode.Uri): Promise<void
   await vscode.window.showTextDocument(doc, { preview: false });
 }
 
-/** Export the script as .fountain / .md / .txt, without revision tags. */
-async function exportText(): Promise<void> {
-  const doc = vscode.window.activeTextEditor?.document;
-  if (!doc || doc.uri.scheme !== SCHEME) {
-    void vscode.window.showInformationMessage("Open a document to export it.");
-    return;
-  }
-  const p = splitBundlePath(doc.uri.fsPath);
-  if (!p || p.entry !== "") return;
-  const ext = doc.languageId === LANGUAGES.fountain ? "fountain" : doc.languageId === LANGUAGES.markdown ? "md" : "txt";
-  const target = await vscode.window.showSaveDialog({
-    defaultUri: vscode.Uri.file(p.bundle.replace(/\.highland$/i, `.${ext}`)),
-    filters: { [ext === "fountain" ? "Fountain" : ext === "md" ? "Markdown" : "Plain text"]: [ext] },
-    title: "Export Text",
-  });
-  if (!target) return;
-  await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(stripRevisionTags(doc.getText())));
-  void vscode.window.showInformationMessage(`Exported ${basename(target.fsPath)}`);
-}
 
-/**
- * Make a .highland document from a plain .fountain or .md file, bringing its Bin, Scratchpad,
- * images and settings into it. It continues the file's writing history; the original is left as it
- * is, and starts a history of its own if it is saved again.
- */
-async function convertToHighland(uri?: vscode.Uri): Promise<void> {
-  const source = uri ?? vscode.window.activeTextEditor?.document.uri;
-  if (!source || source.scheme !== "file") {
-    void vscode.window.showInformationMessage("Open or select a .fountain or .md file to convert.");
-    return;
-  }
-  const ext = extname(source.fsPath).toLowerCase();
-  const scriptName = ext === ".fountain" || ext === ".spmd" ? "text.fountain" : ext === ".md" || ext === ".markdown" ? "text.md" : "text.txt";
-  const open = vscode.workspace.textDocuments.find((d) => d.uri.toString() === source.toString());
-  const text = open ? open.getText() : new TextDecoder().decode(await vscode.workspace.fs.readFile(source));
-  const target = await vscode.window.showSaveDialog({
-    defaultUri: vscode.Uri.file(join(dirname(source.fsPath), `${basename(source.fsPath, extname(source.fsPath))}.highland`)),
-    filters: { ".highland files": ["highland"] },
-    title: "Save as .highland File",
-  });
-  if (!target) return;
-  const path = source.fsPath;
-  const extras = plainExtras();
-  const history = currentHistory();
-  const id = (history && (await extras.documentId(path))) || randomUUID();
-  const more = await extras.historyFiles(path);
-  const folder = await extras.folder(path);
-  await writeBundle(target.fsPath, toBundle({ scriptName, script: text, ...more }, id));
-  // The .highland file carries the work on: its history, Bin, Scratchpad and images.
-  if (history) await history.retire(path);
-  await folder?.remove();
-  extras.forget();
-  extras.changed(path);
-  await openHighland(target);
-  const images = more.others?.length ? (await extras.assetsFolder(path)).dir : null;
-  const name = basename(path);
-  const moved = more.bin?.length || more.scratchpad !== undefined || images ? "its Bin, Scratchpad and images are in the .highland file now, and " : "";
-  const choice = await vscode.window.showInformationMessage(
-    `Saved ${basename(target.fsPath)}. ${name} is unchanged: ${moved}${history ? "the writing history continues with the .highland file" : "you can keep or remove it"}.`,
-    images && existsSync(images) ? `Move ${name} and “${basename(images)}” to the Trash` : `Move ${name} to the Trash`,
-  );
-  if (!choice) return;
-  for (const tab of vscode.window.tabGroups.all.flatMap((g) => g.tabs))
-    if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === source.toString()) await vscode.window.tabGroups.close(tab);
-  await vscode.workspace.fs.delete(source, { useTrash: true });
-  if (images && existsSync(images)) await vscode.workspace.fs.delete(vscode.Uri.file(images), { recursive: true, useTrash: true });
-}
 
 function defaultFolder(): string {
   const doc = vscode.window.activeTextEditor?.document;

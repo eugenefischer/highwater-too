@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 import { CommitBatcher, defaultHistoryFolder, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type SaveKind, type WorkInfo } from "@highwater/history";
-import { writeBundle } from "@highwater/bundle";
+import { HIGHLAND_KEY, writeBundle } from "@highwater/bundle";
 import { mkdir, writeFile } from "node:fs/promises";
 import { openHighland } from "./open.ts";
 import { LANGUAGES } from "./language.ts";
@@ -11,7 +11,7 @@ import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { exportHistory, HistoryMirror } from "./mirror.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
-import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
+import { EXTRAS_SCHEME, plainExtras, toExtras } from "./extras.ts";
 import { ExtrasFolder, noteId, relinkAssets } from "./extras-folder.ts";
 import { toBundle } from "./to-bundle.ts";
 
@@ -101,11 +101,22 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
 
   const mirror = new HistoryMirror(context, () => history());
   mirror.onDidChange(() => void updateStatus());
-  const batcher = new CommitBatcher(async (key, kind) => {
+  /** Commits in progress, per document, so a conversion can wait for them. */
+  const inflight = new Map<string, Promise<void>>();
+  const batcher = new CommitBatcher((key, kind) => {
+    const run = commitNow(key, kind);
+    inflight.set(key, run);
+    void run.finally(() => {
+      if (inflight.get(key) === run) inflight.delete(key);
+    });
+    return run;
+  });
+
+  async function commitNow(key: string, kind: SaveKind, note?: string): Promise<void> {
     try {
       const r = await resolve(key);
       if (r.paused) return;
-      const c = await history().commit(r.id, r.files, kind);
+      const c = await history().commit(r.id, r.files, kind, new Date(), note);
       if (!key.toLowerCase().endsWith(".highland")) await extras.recorded(key, c?.hash ?? null);
       failures.delete(key);
       if (c) {
@@ -117,8 +128,16 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     } catch (error) {
       failures.set(key, (error as Error).message);
     }
-    updateStatus();
-  });
+    void updateStatus();
+  }
+
+  /** Before a conversion: the file's last save is in the history, and nothing is still being recorded. */
+  async function settle(key: string): Promise<void> {
+    if (!enabled()) return;
+    await inflight.get(key);
+    await batcher.saved(key, "save");
+    await history().idle();
+  }
 
   /** Once ever: say that history is being kept, and where, with the ways to change that. */
   async function showNotice(): Promise<void> {
@@ -315,6 +334,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       },
     }),
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
+    // Used by the conversions (convert.ts), not shown in the Command Palette.
+    vscode.commands.registerCommand("highwater.history.settle", (path: string) => settle(path)),
+    vscode.commands.registerCommand("highwater.history.converted", async (path: string, note: string) => {
+      if (enabled()) await commitNow(path, "convert", note);
+      view.refresh();
+    }),
     vscode.commands.registerCommand("highwater.history.compare", (item: HistoryItem) => compare(item.doc, item.key, item.commit)),
     vscode.commands.registerCommand("highwater.changeHistoryLocation", () => changeLocation()),
     vscode.commands.registerCommand("highwater.toggleDocumentHistory", () => togglePause()),
@@ -410,8 +435,19 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     else {
       // A plain file: the text, its Bin, Scratchpad and settings back with Highwater Too, its
       // images in a folder beside it (the text's image paths follow that folder's new name).
-      const assets = (files.others ?? []).filter((o) => o.path.startsWith("assets/"));
-      const settings = { ...(files.settings ?? {}) };
+      const assets = (files.others ?? []).filter((o) => /^assets\/[^/]+$/.test(o.path));
+      const kept = toExtras(files);
+      const settings = { ...(kept.settings ?? {}) };
+      // From a .highland file's save: its template, as the plain file's.
+      const info = files.others?.find((o) => o.path === "info.json");
+      if (info && settings.templateName === undefined) {
+        try {
+          const t = (JSON.parse(new TextDecoder().decode(info.data)) as Record<string, { templateName?: unknown } | undefined>)[HIGHLAND_KEY]?.templateName;
+          if (typeof t === "string") settings.templateName = t;
+        } catch {
+          // no template: chosen from the text type
+        }
+      }
       let text = files.script;
       if (assets.length) {
         const folder = `${basename(path, extname(path))} assets`;
@@ -422,9 +458,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
         for (const a of assets) await writeFile(join(dir, a.path.slice("assets/".length)), a.data);
       }
       await writeFile(path, text);
-      if (hasExtras || Object.keys(settings).length) {
+      const document = (kept.document ?? []).filter((o) => !/^assets\/[^/]+$/.test(o.path));
+      if (hasExtras || Object.keys(settings).length || document.length) {
         const folder = new ExtrasFolder(join(historyRoot(), "extras", id));
-        await folder.replace({ bin: files.bin ?? [], ...(files.scratchpad !== undefined ? { scratchpad: files.scratchpad } : {}), settings });
+        await folder.replace({ bin: kept.bin, ...(kept.scratchpad !== undefined ? { scratchpad: kept.scratchpad } : {}), settings, document });
         await folder.setBase(save.commit.hash);
       }
       extras.forget();

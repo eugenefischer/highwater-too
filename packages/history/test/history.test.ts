@@ -193,3 +193,33 @@ describe("plain files", () => {
     expect((await h.find({ id: plain.id, path: "/w/Script.highland", text: script }))?.id).toBe(plain.id);
   });
 });
+
+describe("converting between a .highland file and a plain file", () => {
+  it("moves the history to the new file, leaves the old one out, and says so in the commit", async () => {
+    const h = new History(await folder());
+    const { id, branch } = await h.resolve({ id: null, path: "/w/Script.fountain", text: script });
+    await h.commit(id, { scriptName: "text.fountain", script }, "save");
+    expect(await h.tracks("/w/Script.fountain")).toBe(true);
+    await h.attach(id, "/w/Script.highland");
+    await h.retire("/w/Script.fountain");
+    expect(await h.tracks("/w/Script.fountain")).toBe(false);
+    const c = await h.commit(id, { scriptName: "text.fountain", script, others: [{ path: "info.json", data: new Uint8Array([123, 125]) }] }, "convert", new Date(2026, 9, 12, 9, 30), "to Script.highland");
+    expect(c?.message).toBe("Convert 2026-10-12 09:30, to Script.highland, +0 words (8)");
+    expect(gitIn(h.repo, "diff", "--name-status", `${branch}~1`, branch)).toBe("A\tdocument/info.json");
+    // And back to the first path: it belongs to the history again.
+    await h.attach(id, "/w/Script.fountain");
+    await h.retire("/w/Script.highland");
+    expect((await h.find({ id: null, path: "/w/Script.fountain", text: script }))?.id).toBe(id);
+    expect(await h.find({ id, path: "/w/Script.highland", text: script })).toBeNull();
+  });
+
+  it("clears a retired path when a work is restored there", async () => {
+    const h = new History(await folder());
+    const r = await h.resolve({ id: null, path: "/w/A.fountain", text: script });
+    await h.commit(r.id, { scriptName: "text.fountain", script }, "save");
+    await h.retire("/w/A.fountain");
+    const [work] = await h.works();
+    expect(await h.claim(work!, "/w/A.fountain")).toBe(r.id);
+    expect((await h.find({ id: null, path: "/w/A.fountain", text: script }))?.id).toBe(r.id);
+  });
+});

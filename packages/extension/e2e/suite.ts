@@ -291,6 +291,46 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "converts a plain file to a .highland file and back, keeping one writing history",
+    async () => {
+      const historyDir = join(dir, "history");
+      await vscode.workspace.getConfiguration("highwater").update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
+      try {
+        const path = join(dir, "Round.fountain");
+        const original = "INT. HALL - DAY\n\nThe clock strikes.\n";
+        await writeFile(path, original);
+        const doc = await vscode.workspace.openTextDocument(path);
+        await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selection = new vscode.Selection(editor.document.lineAt(2).range.start, editor.document.lineAt(2).range.end);
+        await vscode.commands.executeCommand("highwater.copyToBin");
+        const highland = join(dir, "Round.highland");
+        await vscode.commands.executeCommand("highwater.convertToHighland", vscode.Uri.file(path), { target: vscode.Uri.file(highland) });
+        const b = (await readBundle(highland)).bundle;
+        assert.equal(b.text, original);
+        assert.deepEqual(b.binItems, ["The clock strikes."]);
+        const id = (b.info as { highwaterToo?: { documentId?: string } }).highwaterToo?.documentId;
+        assert.ok(id, "the .highland file carries the work's ID");
+        await waitFor("the .highland editor", () => vscode.window.activeTextEditor?.document.uri.scheme === "highland" && vscode.window.activeTextEditor.document.languageId === "highland-fountain");
+        await vscode.commands.executeCommand("highwater.convertToFountain", undefined, { target: vscode.Uri.file(path) });
+        assert.equal(await readFile(path, "utf8"), original);
+        const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { branch: string; paths: string[] }>; retired?: string[] };
+        const entry = index.documents[id!]!;
+        assert.equal(entry.paths.at(-1), path, "the history follows the plain file again");
+        assert.ok(index.retired?.includes(highland), "the .highland file is no longer tracked");
+        assert.equal(await readFile(join(historyDir, "extras", id!, "bin", "0.txt"), "utf8"), "The clock strikes.");
+        const repo = join(historyDir, "history.git");
+        const log = execFileSync("git", ["log", "--format=%s", entry.branch], { cwd: repo, encoding: "utf8" }).trim().split("\n");
+        assert.deepEqual(log.slice(0, 2).map((m) => m.split(" ")[0]), ["Convert", "Convert"]);
+        assert.ok(log[0]!.includes("to Round.fountain") && log[1]!.includes("to Round.highland"), log.join("\n"));
+        assert.equal(execFileSync("git", ["diff", `${entry.branch}~2`, entry.branch, "--", "text.fountain", "bin"], { cwd: repo, encoding: "utf8" }), "", "the text and Bin are unchanged");
+      } finally {
+        await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
+  [
     "exports a manuscript, with its image, as a PDF",
     async () => {
       const path = join(dir, "ManuscriptExport.highland");

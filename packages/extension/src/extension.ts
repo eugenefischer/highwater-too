@@ -5,6 +5,7 @@ import { DISK_SCHEME, DiskVersionProvider, handleExternalChange } from "./confli
 import { HighlandFileSystem, SCHEME } from "./fs-provider.ts";
 import { OPEN_VIEW_TYPE, OpenRedirect, openHighland } from "./open.ts";
 import { registerCommands } from "./commands.ts";
+import { registerConversions } from "./convert.ts";
 import { registerLanguageFeatures } from "./language.ts";
 import { registerPanels } from "./panels.ts";
 import { registerPreview } from "./preview.ts";
@@ -69,6 +70,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const features: [string, () => void][] = [
     ["status bar", () => registerStatusBar(context, cache)],
     ["commands", () => registerCommands(context, store)],
+    ["conversions and exports", () => registerConversions(context, store)],
     ["sidebar panels", () => registerPanels(context, store, fs, cache)],
     ["Live Margins and Title Page Builder", () => registerWorkspaceTools(context, cache)],
     ["completion, markers and cheat sheet", () => registerWritingTools(context, cache)],

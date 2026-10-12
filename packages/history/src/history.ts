@@ -61,13 +61,14 @@ interface Index {
   version: 2;
   documents: Record<string, IndexEntry>;
   /**
-   * Paths whose work has moved on to another file (a plain file saved as a .highland file): a
-   * document at one of these paths starts a new history instead of joining the old one.
+   * Paths that belong to no history: files a document was converted from (a plain file that became
+   * a .highland file, or back), and exports. Saved, they start a new history instead of joining one.
    */
   retired?: string[];
 }
 
-export type SaveKind = "save" | "autosave" | "close";
+/** "convert": the document became another kind of file (a plain file a .highland file, or back). */
+export type SaveKind = "save" | "autosave" | "close" | "convert";
 
 export interface CommitInfo {
   hash: string;
@@ -113,7 +114,8 @@ others.
 ## What each commit holds
 
 One commit is one save. Its message says when, and how the word count changed, e.g.
-\`Save 2026-10-11 14:03, +120 words (4,567)\` (\`Autosave\` and \`Close\` mark automatic saves). Its files:
+\`Save 2026-10-11 14:03, +120 words (4,567)\` (\`Autosave\` and \`Close\` mark automatic saves; \`Convert\` marks a work changing between a \`.highland\` file and a plain
+\`.fountain\` or \`.md\` file, e.g. \`Convert 2026-10-12 09:30, to Script.fountain, +0 words (4,567)\`). Its files:
 
 | File | Contents |
 |---|---|
@@ -199,7 +201,7 @@ export class History {
   }
 
   /** Commits the document's files to its branch; returns null when nothing changed. */
-  commit(id: string, files: DocumentFiles, kind: SaveKind, date = new Date()): Promise<CommitInfo | null> {
+  commit(id: string, files: DocumentFiles, kind: SaveKind, date = new Date(), note?: string): Promise<CommitInfo | null> {
     return this.#serial(async () => {
       await this.#init();
       const entry = (await this.#load()).documents[id];
@@ -209,7 +211,7 @@ export class History {
       const tree = await this.#tree(files);
       if (parent && (await this.#revParse(`${parent}^{tree}`)) === tree) return null;
       const before = parent ? await this.#read(parent, files.scriptName) : "";
-      const message = commitMessage(kind, date, before, files.script);
+      const message = commitMessage(kind, date, before, files.script, note);
       // The document's ID rides along as a trailer, so another computer that pulls this branch
       // can tell which document it belongs to.
       const hash = await this.#commitTree(tree, parent, `${message}\n\n${ID_TRAILER}: ${id}`, date);
@@ -313,8 +315,32 @@ export class History {
       }
       const entry = index.documents[id]!;
       entry.paths = [...entry.paths.filter((p) => p !== path), path];
+      if (index.retired?.includes(path)) index.retired = index.retired.filter((p) => p !== path);
       await this.#save(index);
       return id;
+    });
+  }
+
+  /**
+   * The document now lives at `path` (converted to another kind of file there): records the path,
+   * which also stops it being retired. Pair with `retire` for the file it was converted from.
+   */
+  attach(id: string, path: string): Promise<void> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      const entry = index.documents[id];
+      if (!entry) throw new Error(`No history for document ${id}`);
+      entry.paths = [...entry.paths.filter((p) => p !== path), path];
+      if (index.retired?.includes(path)) index.retired = index.retired.filter((p) => p !== path);
+      await this.#save(index);
+    });
+  }
+
+  /** True when a document's history follows the file at `path`. */
+  tracks(path: string): Promise<boolean> {
+    return this.#serial(async () => {
+      if (!existsSync(this.repo) && !existsSync(join(this.folder, "index.json"))) return false;
+      return Object.values((await this.#load()).documents).some((e) => e.paths.includes(path));
     });
   }
 
@@ -333,9 +359,9 @@ export class History {
   }
 
   /**
-   * The document at `path` has moved on to another file (say, it was saved as a .highland file
-   * that continues its history): the file left at `path` no longer belongs to that history, and
-   * starts a new one if it is saved again.
+   * The file at `path` is not, or no longer, any document's history: a document converted to
+   * another kind of file left it behind, or it is an export. If it is saved, it starts a history of
+   * its own rather than joining one by its path or text.
    */
   retire(path: string): Promise<void> {
     return this.#serial(async () => {
@@ -621,13 +647,13 @@ export function wordCount(text: string): number {
 }
 
 /** "Save 2026-10-11 14:03, +120 words (4,567)" */
-export function commitMessage(kind: SaveKind, date: Date, before: string, after: string): string {
+export function commitMessage(kind: SaveKind, date: Date, before: string, after: string, note?: string): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   const when = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   const words = wordCount(after);
   const delta = words - wordCount(before);
-  const label = kind === "save" ? "Save" : kind === "autosave" ? "Autosave" : "Close";
-  return `${label} ${when}, ${delta >= 0 ? "+" : "−"}${Math.abs(delta).toLocaleString("en-US")} words (${words.toLocaleString("en-US")})`;
+  const label = kind === "save" ? "Save" : kind === "autosave" ? "Autosave" : kind === "convert" ? "Convert" : "Close";
+  return `${label} ${when}, ${note ? `${note}, ` : ""}${delta >= 0 ? "+" : "−"}${Math.abs(delta).toLocaleString("en-US")} words (${words.toLocaleString("en-US")})`;
 }
 
 /** Share of distinct lines in common (Dice coefficient over non-empty trimmed lines). */

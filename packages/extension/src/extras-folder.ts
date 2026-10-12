@@ -1,13 +1,15 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { basename, dirname, extname, join, relative, sep } from "node:path";
 
 /**
  * A plain .fountain or .md file's extras — Bin, Scratchpad and settings — which a .highland file
  * keeps inside itself. A plain file has nowhere to keep them, so they live in a folder of their
  * own in the writing history folder (`<history>/extras/<document ID>/`), laid out as inside a
- * .highland file: `bin/0.txt`…, `scratchpad.txt`, plus `settings.json`. Each save commits them
- * with the text. No VS Code dependency, so it is unit-tested on real folders.
+ * .highland file: `bin/0.txt`…, `scratchpad.txt`, plus `settings.json`, and in `document/` the rest
+ * of the .highland file a plain file was converted from (info.json and so on), kept so converting
+ * back restores it and the history's files stay the same. Each save commits them with the text.
+ * No VS Code dependency, so it is unit-tested on real folders.
  *
  * Images are different: the text refers to them by path, so they go in a visible folder next to
  * the file (`<name> assets/`), made only when the first one is added.
@@ -24,6 +26,8 @@ export interface ExtrasFiles {
   bin: string[];
   scratchpad?: string;
   settings?: ExtrasSettings;
+  /** The rest of the .highland file it was converted from, by path inside it (no images). */
+  document?: { path: string; data: Uint8Array }[];
 }
 
 export class ExtrasFolder {
@@ -93,6 +97,32 @@ export class ExtrasFolder {
     return next;
   }
 
+  /** The rest of the .highland file it was converted from (none for a file that never was one). */
+  async document(): Promise<{ path: string; data: Uint8Array }[]> {
+    const root = join(this.dir, "document");
+    const out: { path: string; data: Uint8Array }[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) await walk(p);
+        else if (e.isFile()) out.push({ path: relative(root, p).split(sep).join("/"), data: new Uint8Array(await readFile(p)) });
+      }
+    };
+    await walk(root);
+    return out.sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  async setDocument(files: { path: string; data: Uint8Array }[]): Promise<void> {
+    const root = join(this.dir, "document");
+    await rm(root, { recursive: true, force: true });
+    for (const f of files) {
+      if (f.path.split("/").some((part) => part === ".." || part === "")) continue;
+      const p = join(root, ...f.path.split("/"));
+      await mkdir(dirname(p), { recursive: true });
+      await writeFile(p, f.data);
+    }
+  }
+
   /** What the history records. */
   async files(): Promise<ExtrasFiles> {
     const out: ExtrasFiles = { bin: await this.binItems() };
@@ -100,6 +130,8 @@ export class ExtrasFolder {
     if (scratchpad !== undefined) out.scratchpad = scratchpad;
     const settings = await this.settings();
     if (Object.keys(settings).length) out.settings = settings;
+    const document = await this.document();
+    if (document.length) out.document = document;
     return out;
   }
 
@@ -111,6 +143,7 @@ export class ExtrasFolder {
     else await rm(this.scratchpadPath, { force: true });
     if (files.settings && Object.keys(files.settings).length) await writeAtomic(join(this.dir, "settings.json"), `${JSON.stringify(files.settings, null, 2)}\n`);
     else await rm(join(this.dir, "settings.json"), { force: true });
+    await this.setDocument(files.document ?? []);
   }
 
   /** The save these extras last matched (made here, or brought in from another computer). */
@@ -141,8 +174,18 @@ export function sameExtras(a: ExtrasFiles, b: ExtrasFiles): boolean {
     a.bin.length === b.bin.length &&
     a.bin.every((t, i) => t === b.bin[i]) &&
     (a.scratchpad ?? "") === (b.scratchpad ?? "") &&
-    JSON.stringify(sortKeys(a.settings ?? {})) === JSON.stringify(sortKeys(b.settings ?? {}))
+    JSON.stringify(sortKeys(a.settings ?? {})) === JSON.stringify(sortKeys(b.settings ?? {})) &&
+    sameFiles(a.document ?? [], b.document ?? [])
   );
+}
+
+function sameFiles(a: { path: string; data: Uint8Array }[], b: { path: string; data: Uint8Array }[]): boolean {
+  if (a.length !== b.length) return false;
+  const byPath = new Map(b.map((f) => [f.path, f.data]));
+  return a.every((f) => {
+    const other = byPath.get(f.path);
+    return other !== undefined && other.length === f.data.length && other.every((x, i) => x === f.data[i]);
+  });
 }
 
 function sortKeys(o: Record<string, unknown>): Record<string, unknown> {

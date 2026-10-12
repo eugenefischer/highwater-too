@@ -48,6 +48,21 @@ describe("a plain file's extras folder", () => {
     expect(sameExtras({ bin: [], scratchpad: "" }, { bin: [] })).toBe(true);
   });
 
+  it("keeps the rest of the .highland file it was converted from", async () => {
+    const f = new ExtrasFolder(join(await temp(), "x"));
+    expect(await f.document()).toEqual([]);
+    const document = [
+      { path: "info.json", data: new Uint8Array([123, 125]) },
+      { path: "assets/deep/a.png", data: new Uint8Array([1]) },
+    ];
+    await f.replace({ bin: [], document });
+    expect(await f.document()).toEqual([document[1], document[0]]);
+    expect(sameExtras(await f.files(), { bin: [], document })).toBe(true);
+    expect(sameExtras(await f.files(), { bin: [], document: [document[0]!] })).toBe(false);
+    await f.replace({ bin: [] });
+    expect(await f.document()).toEqual([]);
+  });
+
   it("moves (from the stand-in place used while history is off) and is removed", async () => {
     const dir = await temp();
     const f = new ExtrasFolder(join(dir, "standin", "k"));
