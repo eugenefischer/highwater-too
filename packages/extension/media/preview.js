@@ -21,10 +21,12 @@ let editorAt = null;
 // The editor leads, except while the writer scrolls the preview: only scrolling the writer does
 // here (wheel or trackpad, keys, dragging the scrollbar) is sent to the editor. Scrolls the preview
 // makes itself (a refresh, a resize, pages finishing drawing) never move the editor.
+// A press on the scrollbar is noticed, but the browser may never report its release, so a press
+// counts only while the scrolling it causes goes on: it lapses 400 ms after the last scroll.
 let userUntil = 0;
-let dragging = false;
+let pressed = false;
 const intent = () => (userUntil = performance.now() + 400);
-const userScrolling = () => dragging || performance.now() < userUntil;
+const userScrolling = () => performance.now() < userUntil;
 
 try {
   pdfjs = await import(document.body.dataset.pdfjs);
@@ -53,12 +55,12 @@ pagesEl.addEventListener("wheel", intent, { passive: true });
 pagesEl.addEventListener("touchmove", intent, { passive: true });
 window.addEventListener("keydown", (e) => ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key) && intent());
 // A press on the scrolling area itself (not on a page) is the scrollbar.
-pagesEl.addEventListener("pointerdown", (e) => e.target === pagesEl && (dragging = true));
-window.addEventListener("pointerup", () => {
-  if (!dragging) return;
-  dragging = false;
+pagesEl.addEventListener("pointerdown", (e) => {
+  if (e.target !== pagesEl) return;
+  pressed = true;
   intent();
 });
+for (const ev of ["pointerup", "pointercancel", "blur"]) window.addEventListener(ev, () => (pressed = false));
 
 const scale = () => (zoomEl.value === "fit" ? Math.max(0.3, (pagesEl.clientWidth - 40) / 612) : Number(zoomEl.value));
 const pageEls = () => [...pagesEl.querySelectorAll(".page")];
@@ -164,6 +166,8 @@ function scrollToOffset(offset) {
 let pending = 0;
 pagesEl.addEventListener("scroll", () => {
   showPage();
+  if (pressed && userScrolling()) intent(); // a scrollbar drag in progress
+  else pressed = false;
   if (!syncEl.checked || !userScrolling()) return;
   cancelAnimationFrame(pending);
   pending = requestAnimationFrame(() => {

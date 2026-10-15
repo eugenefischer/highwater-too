@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.8
+
+- Fixed: 0.2.7 broke the Preview's sync. A press on the Preview's scrollbar marked a drag in progress, and the browser often never reports the release, so the Preview took every later scroll as yours and stopped following the editor (and a resize could move the editor again). A press now counts only while the scrolling it causes goes on.
+
 ## 0.2.7
 
 - Fixed: while typing with the Preview open, the editor could jump. After a refresh the Preview kept its place by proportion, and at some widths its pages settled a pixel or so later; that settling was taken for the writer scrolling the Preview and sent to the editor. Now the editor leads: the Preview lines up with the editor's top line after every refresh and resize, and only scrolling you do in the Preview (wheel or trackpad, keys, its scrollbar) moves the editor.
