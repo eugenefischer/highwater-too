@@ -15,8 +15,16 @@ const rendered = new Map(); // page index -> generation it was drawn for
 let generation = 0;
 let anchors = []; // [{ page, y, offset }] in print order
 let summary = "";
-/** Until this time, scroll events are our own (following the editor) and are not sent back. */
-let quietUntil = 0;
+/** The editor's top line (a source offset), as last heard from the extension or sent to it. */
+let editorAt = null;
+
+// The editor leads, except while the writer scrolls the preview: only scrolling the writer does
+// here (wheel or trackpad, keys, dragging the scrollbar) is sent to the editor. Scrolls the preview
+// makes itself (a refresh, a resize, pages finishing drawing) never move the editor.
+let userUntil = 0;
+let dragging = false;
+const intent = () => (userUntil = performance.now() + 400);
+const userScrolling = () => dragging || performance.now() < userUntil;
 
 try {
   pdfjs = await import(document.body.dataset.pdfjs);
@@ -41,6 +49,16 @@ syncEl.onchange = () => save({ sync: syncEl.checked });
 $("export").onclick = () => vscode.postMessage({ type: "export" });
 $("exportDocx").onclick = () => vscode.postMessage({ type: "exportDocx" });
 window.addEventListener("resize", () => zoomEl.value === "fit" && layoutPages(true));
+pagesEl.addEventListener("wheel", intent, { passive: true });
+pagesEl.addEventListener("touchmove", intent, { passive: true });
+window.addEventListener("keydown", (e) => ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key) && intent());
+// A press on the scrolling area itself (not on a page) is the scrollbar.
+pagesEl.addEventListener("pointerdown", (e) => e.target === pagesEl && (dragging = true));
+window.addEventListener("pointerup", () => {
+  if (!dragging) return;
+  dragging = false;
+  intent();
+});
 
 const scale = () => (zoomEl.value === "fit" ? Math.max(0.3, (pagesEl.clientWidth - 40) / 612) : Number(zoomEl.value));
 const pageEls = () => [...pagesEl.querySelectorAll(".page")];
@@ -49,7 +67,10 @@ const topOf = (el) => el.offsetTop - pagesEl.offsetTop;
 
 const observer = new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && draw(Number(e.target.dataset.index))), { root: pagesEl, rootMargin: "800px 0px" });
 
-/** Sizes one placeholder per page; keeps the scroll position as a fraction of the document. */
+/**
+ * Sizes one placeholder per page, then puts the editor's top line at the top again (with sync on
+ * and the writer not scrolling here); otherwise keeps the scroll position as a fraction.
+ */
 function layoutPages(redraw) {
   const fraction = pagesEl.scrollHeight > 0 ? pagesEl.scrollTop / pagesEl.scrollHeight : 0;
   const s = scale();
@@ -69,8 +90,8 @@ function layoutPages(redraw) {
     el.style.height = `${h * s}px`;
   });
   if (redraw) rendered.clear();
-  quiet();
-  pagesEl.scrollTop = fraction * pagesEl.scrollHeight;
+  if (syncEl.checked && editorAt !== null && anchors.length && !userScrolling()) scrollToOffset(editorAt);
+  else pagesEl.scrollTop = fraction * pagesEl.scrollHeight;
   drawVisible();
 }
 
@@ -132,14 +153,10 @@ function offsetAt(top) {
   return Math.round(a.offset + f * (b.offset - a.offset));
 }
 
-function quiet() {
-  quietUntil = performance.now() + 300;
-}
 
 function scrollToOffset(offset) {
   const top = positionOf(offset);
   if (top === null) return;
-  quiet();
   pagesEl.scrollTop = Math.max(0, top);
   drawVisible();
 }
@@ -147,11 +164,13 @@ function scrollToOffset(offset) {
 let pending = 0;
 pagesEl.addEventListener("scroll", () => {
   showPage();
-  if (performance.now() < quietUntil || !syncEl.checked) return;
+  if (!syncEl.checked || !userScrolling()) return;
   cancelAnimationFrame(pending);
   pending = requestAnimationFrame(() => {
     const offset = offsetAt(pagesEl.scrollTop);
-    if (offset !== null) vscode.postMessage({ type: "reveal", offset });
+    if (offset === null) return;
+    editorAt = offset; // the editor follows
+    vscode.postMessage({ type: "reveal", offset });
   });
 });
 
@@ -177,7 +196,8 @@ function showPage() {
 window.addEventListener("message", async ({ data: msg }) => {
   if (msg.type === "busy") status.textContent = "Updating…";
   else if (msg.type === "scrollTo") {
-    if (syncEl.checked) scrollToOffset(msg.offset);
+    editorAt = msg.offset;
+    if (syncEl.checked && !userScrolling()) scrollToOffset(msg.offset);
   } else if (msg.type === "empty") {
     $("exportDocx").hidden = true;
     pdf = null;
@@ -203,8 +223,8 @@ window.addEventListener("message", async ({ data: msg }) => {
       for (let k = 0; k + 2 < msg.anchors.length; k += 3) anchors.push({ page: msg.anchors[k], y: msg.anchors[k + 1], offset: msg.anchors[k + 2] });
       generation++;
       pagesEl.querySelector("#message")?.remove();
+      if (msg.at !== null) editorAt = msg.at;
       layoutPages(false);
-      if (msg.fresh && msg.at !== null && syncEl.checked) scrollToOffset(msg.at);
       void old?.loadingTask?.destroy();
       summary = msg.problems.length ? ` · ${msg.problems.join("; ")}` : "";
       showPage();

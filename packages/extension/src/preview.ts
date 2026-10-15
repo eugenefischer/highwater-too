@@ -45,7 +45,6 @@ class Preview {
   #timer: NodeJS.Timeout | undefined;
   #version = 0;
   #ready = false;
-  #posted: vscode.TextDocument | undefined;
   /** Until this time, editor scrolling is the preview's own doing and is not sent back. */
   #quietUntil = 0;
   readonly #disposed = new vscode.EventEmitter<void>();
@@ -142,8 +141,7 @@ class Preview {
       const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
       const top = editor?.visibleRanges[0];
       const at = top ? doc.offsetAt(top.start) : null;
-      void this.#panel.webview.postMessage({ type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, pages: rendered.pages, problems: rendered.problems, anchors: rendered.anchors, at, fresh: this.#posted !== doc });
-      this.#posted = doc;
+      void this.#panel.webview.postMessage({ type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, pages: rendered.pages, problems: rendered.problems, anchors: rendered.anchors, at });
     } catch (error) {
       if (version === this.#version) void this.#panel.webview.postMessage({ type: "empty", message: `Could not lay out the document: ${(error as Error).message}` });
     }
@@ -163,7 +161,7 @@ body { display: flex; flex-direction: column; background: var(--vscode-editorWid
 #bar button[hidden] { display: none; }
 #bar button { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); border: none; padding: 3px 10px; cursor: pointer; }
 #status { margin-left: auto; color: var(--vscode-descriptionForeground); }
-#pages { flex: 1; overflow: auto; padding: 16px 0; }
+#pages { flex: 1; overflow: auto; padding: 16px 0; overflow-anchor: none; }
 .page { margin: 0 auto 16px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,.4); position: relative; cursor: text; }
 .page canvas { display: block; width: 100%; height: 100%; }
 #message { padding: 24px; color: var(--vscode-descriptionForeground); }

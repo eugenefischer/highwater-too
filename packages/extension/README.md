@@ -37,7 +37,7 @@ Click the Highwater Too icon in the activity bar (it opens by itself when you op
 
 ## Preview and export
 
-- **Preview** (⌘E, or the button in the editor's title bar): the PDF exactly as it will export, beside the editor, updated as you type; it scrolls with the editor, and clicking a line takes you to it.
+- **Preview** (⌘E, or the button in the editor's title bar): the PDF exactly as it will export, beside the editor, updated as you type; it follows the editor, and scrolling it yourself moves the editor to match (the editor never moves while you type in it). Clicking a line takes you to it; Sync turns the following off.
 - **Export PDF** (in the Preview's toolbar, or the Command Palette): the PDF.
 - **Export Text** (title bar button): the text as `.fountain`, `.md` or `.txt` without revision marks; the save dialog's format menu offers plain text as well as the document's own kind. An export is always a new file, outside the writing history: edited and saved, it starts a history of its own. To change the kind of file a work is kept in, convert it instead (see Plain files).
 - **Export Word Document** (manuscripts; in the Preview's toolbar, or the Command Palette): a `.docx` laid out like the PDF, built from ordinary Word styles, a real header with page numbers, lists and tables, so it can be edited and resubmitted. Word does its own page breaks, so the page count can differ slightly from the PDF. The **Docx Font** setting (`highwater.docxFont`) chooses Courier New (the default; on every computer) or the PDF's Courier Prime, embedded in the file (shown by Word and LibreOffice, not by Pages or Google Docs).

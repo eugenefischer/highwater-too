@@ -2,7 +2,7 @@
 
 A VS Code extension that replaces the discontinued Highland 2: it opens, edits and saves `.highland` files safely, gives screenplays and manuscripts a Highland-style workspace, exports PDFs that match Highland's, and keeps a git writing history as a record of authorship.
 
-**Status:** version 0.2.6: the MVP (M0–M8) and M9 are built, with Bin, Scratchpad and Assets for plain files, conversion between `.highland` and plain files, and the second version of the writing history (a catalog of works, fetching on demand, recognising files, the Works panel, reverting, removing and deleting, offering newer saves from other computers, and connecting a file to a work by hand). In real-world testing. See the spec for decisions and the build plan.
+**Status:** version 0.2.7: the MVP (M0–M8) and M9 are built, with Bin, Scratchpad and Assets for plain files, conversion between `.highland` and plain files, and the second version of the writing history (a catalog of works, fetching on demand, recognising files, the Works panel, reverting, removing and deleting, offering newer saves from other computers, and connecting a file to a work by hand). In real-world testing. See the spec for decisions and the build plan.
 
 ## Plain .fountain, .md and .txt files
 
