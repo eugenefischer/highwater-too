@@ -56,12 +56,15 @@ export function parseRemote(url: string): RemoteInfo {
 /** Why a push or pull failed: the remote is missing, needs a login (or refused it), can't be reached, or something else. */
 export type FailureKind = "missing" | "auth" | "unreachable" | "other";
 
+/** Works removed from this computer because main records their deletion. */
+export type Removed = { id: string; paths: string[] }[];
+
 export type PushResult =
-  | { ok: true; pushed: number }
+  | { ok: true; pushed: number; removed: Removed }
   | { ok: false; kind: FailureKind; missing: boolean; message: string };
 
 export type PullResult =
-  | { ok: true; updated: string[] }
+  | { ok: true; updated: string[]; removed: Removed }
   | { ok: false; kind: FailureKind; missing: boolean; message: string };
 
 /** Sorts a git failure by what the writer can do about it. */
@@ -100,27 +103,30 @@ export class Mirror {
     this.auth = auth;
   }
 
-  /** Pushes main (with this computer's saves in the catalog) and this computer's works. */
+  /**
+   * Pushes main (with this computer's saves in the catalog), then this computer's works. Main goes
+   * first and is joined with the mirror's if it moved, because the deletions it records decide
+   * what may be pushed: a deleted work is removed here, never pushed back, and taken off the mirror
+   * if another push brought it back.
+   */
   async push(): Promise<PushResult> {
     const repo = this.history.repo;
     try {
       await this.#remote();
       await this.history.inside.flushCatalog();
-      const branches = (await git(repo, ["for-each-ref", "--format=%(refname:short)", "refs/heads/"])).split("\n").filter(Boolean);
-      const rejected: string[] = [];
-      const out = await this.#git(["push", "--porcelain", REMOTE, ...branches.map((b) => `refs/heads/${b}:refs/heads/${b}`)]).catch((e: unknown) => {
-        // Rejected branches still print porcelain lines ("!\t…"); keep them, rethrow real failures.
-        if (e instanceof GitError && /^!\t/m.test(e.stdout)) return e.stdout;
-        throw e;
-      });
-      for (const line of out.split("\n")) {
-        const m = /^!\trefs\/heads\/(.+?):refs\/heads\//.exec(line);
-        if (m) rejected.push(m[1]!);
-      }
+      await this.#pushMain();
+      const removed = await this.history.inside.applyDeletions();
+      const gone = await this.history.inside.deletedBranches();
+      const works = (await git(repo, ["for-each-ref", "--format=%(refname:short)", "refs/heads/works/"])).split("\n").filter((b) => b && !gone.has(b));
+      const rejected = await this.#pushBranches(works);
       for (const branch of rejected) await this.#mergeRemote(branch);
-      if (rejected.length) await this.history.inside.flushCatalog();
-      if (rejected.length) await this.#git(["push", "--porcelain", REMOTE, ...rejected.map((b) => `refs/heads/${b}:refs/heads/${b}`)]);
-      return { ok: true, pushed: branches.length };
+      if (rejected.length) {
+        const again = await this.#pushBranches(rejected);
+        if (again.length) throw new Error(`the mirror refused ${again.join(", ")}`);
+      }
+      const remote = await this.remoteBranches();
+      for (const branch of gone) if (remote.has(branch)) await this.deleteRemote(branch);
+      return { ok: true, pushed: works.length + 1, removed };
     } catch (error) {
       return failure((error as Error).message);
     }
@@ -129,8 +135,9 @@ export class Mirror {
   /**
    * Brings in what other computers pushed: main (the catalog), and the works this computer has. A
    * work one is behind on moves forward; one that both have moved is joined with a merge commit
-   * (keeping this computer's text). Works not on this computer are not fetched. Nothing local is
-   * ever lost. Returns the branches that changed here.
+   * (keeping this computer's text). Works not on this computer are not fetched, and works main
+   * records as deleted are removed here. Nothing else local is ever lost. Returns the branches
+   * that changed here.
    */
   async pull(): Promise<PullResult> {
     const repo = this.history.repo;
@@ -139,21 +146,61 @@ export class Mirror {
       const remote = await this.remoteBranches();
       const local = (await git(repo, ["for-each-ref", "--format=%(refname:short)", "refs/heads/works/"])).split("\n").filter(Boolean);
       const wanted = ["main", ...local].filter((b) => remote.has(b));
-      if (!wanted.length) return { ok: true, updated: [] };
-      await this.#git(["fetch", "-q", REMOTE, ...wanted.map((b) => `+refs/heads/${b}:refs/mirror/${b}`)]);
+      if (wanted.length) await this.#git(["fetch", "-q", REMOTE, ...wanted.map((b) => `+refs/heads/${b}:refs/mirror/${b}`)]);
       const updated: string[] = [];
-      for (const branch of wanted) if (await this.#join(branch)) updated.push(branch);
-      return { ok: true, updated };
+      if (wanted.includes("main") && (await this.#join("main"))) updated.push("main");
+      // Deletions first, so a deleted work's copy is not joined back in.
+      const removed = await this.history.inside.applyDeletions();
+      const gone = await this.history.inside.deletedBranches();
+      for (const branch of wanted) if (branch !== "main" && !gone.has(branch) && (await this.#join(branch))) updated.push(branch);
+      return { ok: true, updated, removed };
     } catch (error) {
       return failure((error as Error).message);
     }
   }
 
-  /** Fetches one work's history from the remote (restoring it, or connecting a file to it). */
-  async fetchWork(branch: string): Promise<void> {
+  /**
+   * Fetches one work's history from the remote (restoring it, or connecting a file to it). The
+   * catalog comes first, so a work deleted since this computer last pulled is not fetched:
+   * `deleted` is then true.
+   */
+  async fetchWork(branch: string): Promise<{ deleted: boolean; removed: Removed }> {
     await this.#remote();
+    const remote = await this.remoteBranches();
+    if (remote.has("main")) {
+      await this.#git(["fetch", "-q", REMOTE, "+refs/heads/main:refs/mirror/main"]);
+      await this.#join("main");
+    }
+    const removed = await this.history.inside.applyDeletions();
+    if ((await this.history.inside.deletedBranches()).has(branch) || !remote.has(branch)) return { deleted: true, removed };
     await this.#git(["fetch", "-q", REMOTE, `+refs/heads/${branch}:refs/mirror/${branch}`]);
     await this.#join(branch);
+    return { deleted: false, removed };
+  }
+
+  /** Pushes main, joining the mirror's first when it moved (another computer pushed meanwhile). */
+  async #pushMain(): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (!(await this.#pushBranches(["main"])).length) return;
+      await this.#mergeRemote("main");
+    }
+    throw new Error("the mirror's catalog kept changing while pushing; try again");
+  }
+
+  /** Pushes branches (never forcing); returns those the mirror refused because it moved on. */
+  async #pushBranches(branches: string[]): Promise<string[]> {
+    if (!branches.length) return [];
+    const out = await this.#git(["push", "--porcelain", REMOTE, ...branches.map((b) => `refs/heads/${b}:refs/heads/${b}`)]).catch((e: unknown) => {
+      // Rejected branches still print porcelain lines ("!\t…"); keep them, rethrow real failures.
+      if (e instanceof GitError && /^!\t/m.test(e.stdout)) return e.stdout;
+      throw e;
+    });
+    const rejected: string[] = [];
+    for (const line of out.split("\n")) {
+      const m = /^!\trefs\/heads\/(.+?):refs\/heads\//.exec(line);
+      if (m) rejected.push(m[1]!);
+    }
+    return rejected;
   }
 
   /** Deletes a work's branch on the remote (a deletion the writer asked for; never a force-push). */

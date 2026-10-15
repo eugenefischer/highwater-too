@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { failureKind, git, History, Mirror, parseRemote } from "@highwater/history";
+import { failureKind, git, History, Mirror, parseRemote, type Removed } from "@highwater/history";
 import * as vscode from "vscode";
 
 /**
@@ -20,6 +20,9 @@ export class HistoryMirror implements vscode.Disposable {
   state: { at: Date | null; error: string | null; signIn: boolean } = { at: null, error: null, signIn: false };
   readonly #changed = new vscode.EventEmitter<void>();
   readonly onDidChange = this.#changed.event;
+  readonly #removed = new vscode.EventEmitter<Removed>();
+  /** Works removed from this computer because another computer deleted them (seen on any pull, push or fetch). */
+  readonly onDidRemoveDeleted = this.#removed.event;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -52,6 +55,7 @@ export class HistoryMirror implements vscode.Disposable {
       if (await this.#create(url, mirror)) result = await h.exclusive(() => mirror.push());
     }
     this.#record(result);
+    if (result.ok && result.removed.length) this.#removed.fire(result.removed);
     return result.ok;
   }
 
@@ -68,7 +72,10 @@ export class HistoryMirror implements vscode.Disposable {
     let result = await h.exclusive(() => mirror.pull());
     if (!result.ok && result.kind === "auth" && interactive && (await this.#offerSignIn(url, true))) result = await h.exclusive(() => mirror.pull());
     this.lastPull = Date.now();
-    if (result.ok) return result.updated;
+    if (result.ok) {
+      if (result.removed.length) this.#removed.fire(result.removed);
+      return result.updated;
+    }
     if (result.kind === "auth" && !this.state.signIn) {
       this.state = { at: this.state.at, error: result.message, signIn: true };
       this.#changed.fire();
@@ -85,9 +92,22 @@ export class HistoryMirror implements vscode.Disposable {
     if (!url) return false;
     const h = this.history();
     const mirror = new Mirror(h, url, () => this.#auth(url));
-    const attempt = () => h.exclusive(() => mirror.fetchWork(branch)).then(() => null, (e: unknown) => (e as Error).message);
+    let deleted = false;
+    const attempt = () =>
+      h.exclusive(() => mirror.fetchWork(branch)).then(
+        (r) => {
+          if (r.removed.length) this.#removed.fire(r.removed);
+          deleted = r.deleted;
+          return null;
+        },
+        (e: unknown) => (e as Error).message,
+      );
     let error = await attempt();
     if (error && failureKind(error) === "auth" && (await this.#offerSignIn(url, true))) error = await attempt();
+    if (!error && deleted) {
+      void vscode.window.showWarningMessage("That work's writing history was deleted on another computer, so there is nothing to fetch.");
+      return false;
+    }
     if (error) void vscode.window.showErrorMessage(`Could not fetch that work's history from ${url}: ${error.split("\n")[0]}`);
     return error === null;
   }

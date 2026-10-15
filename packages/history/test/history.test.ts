@@ -255,4 +255,37 @@ describe("converting between a .highland file and a plain file", () => {
     expect(await h.claim(work!, "/w/A.fountain")).toBe(r.id);
     expect((await h.find({ id: null, path: "/w/A.fountain", text: script }))?.id).toBe(r.id);
   });
+  it("connects a file that lost its ID and was renamed back to its work, joining its own history", async () => {
+    const h = new History(await folder());
+    const meta = (file: string) => ({ form: formOf(file), file });
+    const work = await h.resolve({ id: null, path: "/w/Play copy.highland", text: script });
+    await h.commit(work.id, { scriptName: "text.fountain", script }, "save", new Date(2026, 9, 13, 7, 29), undefined, meta("Play copy.highland"));
+    // Highland 2 removed the ID, the file was edited and renamed: its next save started a new history.
+    const edited = script.replace("She enters.", "She enters, slowly.");
+    const stray = await h.resolve({ id: null, path: "/w/Play yoo hoo.highland", text: edited });
+    expect(stray.branch).not.toBe(work.branch);
+    await h.commit(stray.id, { scriptName: "text.fountain", script: edited }, "save", new Date(2026, 9, 13, 8, 37), undefined, meta("Play yoo hoo.highland"));
+    // The writer connects it by hand.
+    await h.retire("/w/Play copy.highland");
+    const id = await h.join(stray.id, { id: work.id, branch: work.branch, form: "highland" }, meta("Play yoo hoo.highland"), "connected by hand");
+    expect(id).toBe(work.id);
+    const [merge] = await h.log(work.id, 1);
+    expect(merge!.message).toMatch(/^Join .*, the history of Play yoo hoo\.highland connected by hand$/);
+    expect(gitIn(h.repo, "rev-list", "--count", work.branch)).toBe("3");
+    expect(await h.scriptAt(merge!.hash)).toBe(edited);
+    expect(() => gitIn(h.repo, "rev-parse", "--verify", `refs/heads/${stray.branch}`)).toThrow();
+    expect((await h.find({ id: null, path: "/w/Play yoo hoo.highland", text: edited }))?.id).toBe(work.id);
+    // The old file, if it turns up again, is not the work.
+    expect(await h.find({ id: null, path: "/w/Play copy.highland", text: script })).toBeNull();
+    // Its separate history is recorded as deleted, so other computers drop it.
+    expect((await h.works()).map((w) => w.branch)).not.toContain(stray.branch);
+  });
+
+  it("records a Connect even when nothing changed", async () => {
+    const h = new History(await folder());
+    const r = await h.resolve({ id: null, path: "/w/A.fountain", text: script });
+    await h.commit(r.id, { scriptName: "text.fountain", script }, "save");
+    const c = await h.commit(r.id, { scriptName: "text.fountain", script }, "connect", new Date(), "to B.fountain, connected by hand");
+    expect(c?.message).toMatch(/^Connect .*, to B\.fountain, connected by hand, \+0 words/);
+  });
 });

@@ -16,7 +16,7 @@ import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
 import { toBundle, withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
 import { focusedDocument, roleOf, scriptIsOpen } from "./focus.ts";
-import { afterPull, revertTo, WorksView, type WorksHost } from "./works.ts";
+import { afterPull, deletedElsewhere, revertTo, WorksView, type WorksHost } from "./works.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -133,7 +133,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   async function commitNow(key: string, kind: SaveKind, note?: string): Promise<void> {
     try {
       // A file this computer has no history for may belong to a work in the catalog: ask first.
-      if (kind !== "convert" && kind !== "restore") await connector.check(key);
+      if (kind !== "convert" && kind !== "restore" && kind !== "connect") await connector.check(key);
       if (connector.undecided(key)) return; // its saves wait for the writer's choice
       const next = kind === "save" || kind === "autosave" || kind === "close" ? connector.takeNext(key) : undefined;
       const r = await resolve(key);
@@ -316,6 +316,25 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     view.refresh();
   }
 
+  /**
+   * A document came into focus (or was in focus when the writing history started: VS Code starts
+   * the extension for the file being opened, before anything here listens).
+   */
+  function focused(): void {
+    void updateStatus();
+    view.refresh();
+    const key = focus.key;
+    if (!key || !enabled()) return;
+    // A file this computer has no history for: look it up in the catalog (asked once); one that
+    // is an older save of its work: offer the latest.
+    void connector
+      .check(key)
+      .then(() => connector.offerLatest(key))
+      .then(() => view.refresh());
+    // Opening a document: bring in other computers' saves, at most once a minute.
+    if (mirror.url && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
+  }
+
   // The Writing History panel: the current script's saves; click one to compare it with now.
   const view = new HistoryView(async () => {
     const key = focus.key;
@@ -352,6 +371,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     },
   };
   const works = new WorksView(worksHost);
+  // Works another computer deleted, removed here whenever main comes in (pull, push or fetch).
+  context.subscriptions.push(mirror.onDidRemoveDeleted((removed) => void deletedElsewhere(worksHost, removed)));
 
   context.subscriptions.push(
     status,
@@ -366,20 +387,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
         void updateStatus();
       }
     }),
-    focus.onDidChange(() => {
-      void updateStatus();
-      view.refresh();
-      const key = focus.key;
-      if (!key || !enabled()) return;
-      // A file this computer has no history for: look it up in the catalog (asked once); one
-      // that is an older save of its work: offer the latest.
-      void connector
-        .check(key)
-        .then(() => connector.offerLatest(key))
-        .then(() => view.refresh());
-      // Opening a document: bring in other computers' saves, at most once a minute.
-      if (mirror.url && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
-    }),
+    focus.onDidChange(() => focused()),
     vscode.workspace.onWillSaveTextDocument((e) => {
       if (keyOf(e.document)) reasons.set(e.document.uri.toString(), e.reason);
     }),
@@ -402,7 +410,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     }),
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
     vscode.commands.registerCommand("highwater.history.revert", async (item: HistoryItem) => revertTo(worksHost, await documentFor(item.key), item.key, item.commit)),
-    vscode.commands.registerCommand("highwater.works.refresh", () => works.refresh()),
+    // Refreshing the Works panel brings the catalog up to date from the mirror first.
+    vscode.commands.registerCommand("highwater.works.refresh", async () => {
+      if (enabled() && mirror.url) await pulled(mirror.pull(true));
+      works.refresh();
+    }),
     vscode.commands.registerCommand("highwater.works.open", (node: Parameters<WorksView["open"]>[0]) => works.open(node)),
     vscode.commands.registerCommand("highwater.works.restore", (node: Parameters<WorksView["restore"]>[0]) => works.restore(node)),
     vscode.commands.registerCommand("highwater.works.showSave", (node: Parameters<WorksView["showSave"]>[0]) => works.showSave(node)),
@@ -444,9 +456,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       await exportHistory(history(), found.id, key);
     }),
     vscode.commands.registerCommand("highwater.openWorkFromHistory", () => openWork()),
+    vscode.commands.registerCommand("highwater.connectToWork", () => connectToWork()),
     vscode.commands.registerCommand("highwater.openHistoryFolder", () => vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(historyRoot()))),
   );
-  void updateStatus();
+  // The document already in focus (often the one whose opening started the extension).
+  focused();
 
   /**
    * Open Work from History…: any work in the history (pulled from another computer too). A work
@@ -480,20 +494,101 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     await restoreWork(work.work);
   }
 
+  /**
+   * Connect to a Work's History…: the writer joins the focused document (and its own history, if
+   * it has one) to another work, usually one whose file is no longer where it was saved: renamed
+   * or moved after Highland 2 removed its ID, say. Nothing finds such a file by itself; this is the
+   * writer's choice, and permanent, so it is spelled out and confirmed first.
+   */
+  async function connectToWork(): Promise<void> {
+    const key = focus.key;
+    if (!key) return void vscode.window.showInformationMessage("Open a document to connect it to a work's writing history.");
+    if (!enabled()) return void vscode.window.showInformationMessage("Turn the writing history on to connect a document to a work's history.");
+    const h = history();
+    const name = basename(key);
+    // Its latest save goes into its own history first, so nothing is left out of the join.
+    await settle(key);
+    const own = await lookup(key);
+    const others = (await h.works()).filter((w) => w.id && w.branch !== own?.branch);
+    const missing = others.filter((w) => w.local && w.paths.length > 0 && !w.paths.some((p) => existsSync(p)));
+    type Item = vscode.QuickPickItem & { work?: WorkInfo; all?: true };
+    const item = (w: WorkInfo): Item => {
+      const last = w.paths.at(-1);
+      return {
+        label: w.title,
+        description: last ? basename(last) : (w.file ?? ""),
+        detail: [w.lastSave ? `Last saved ${w.lastSave.toLocaleString()}` : "", last ? `was at ${last}` : w.local ? "" : "only on the mirror"].filter(Boolean).join(" · "),
+        work: w,
+      };
+    };
+    const title = `Connect ${name} to a work's writing history`;
+    let picked = await vscode.window.showQuickPick<Item>([...missing.map(item), { label: "Show All Works…", all: true }], {
+      title,
+      placeHolder: missing.length ? "Works whose file is no longer where it was saved" : "No work's file is missing from where it was saved",
+    });
+    if (picked?.all) picked = await vscode.window.showQuickPick<Item>(others.map(item), { title, placeHolder: "Every work in the writing history" });
+    const w = picked?.work;
+    if (!w?.id) return;
+
+    const form = formOf(key);
+    const kept = w.form;
+    const saves = own ? (await h.log(own.id, 10_000)).length : 0;
+    const previous = w.paths.filter((p) => p !== key);
+    const detail = [
+      `${name} becomes the file of “${w.title}”, and its saves continue that work's history${w.lastSave ? ` (last saved ${w.lastSave.toLocaleString()})` : ""}.`,
+      own
+        ? `${name}'s own writing history (${saves} save${saves === 1 ? "" : "s"}) is joined into the history of “${w.title}” in one merge. Both are kept, but they can never be separated again, and ${name}'s separate history is deleted, here and, when they next sync, on your other computers.`
+        : `${name} has no writing history of its own: the history of “${w.title}” continues from ${name} as it is now, Bin and Scratchpad included.`,
+      kept && kept !== form ? `“${w.title}” is kept as ${kept === "highland" ? "a .highland file" : `a .${kept} file`}, and continues as ${name}, recorded as a conversion.` : "",
+      previous.length ? `The work's previous file (${previous.map((p) => basename(p)).join(", ")}) is no longer tracked: if it turns up again, it starts a history of its own.` : "",
+      "This cannot be undone.",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const ok = await vscode.window.showWarningMessage(`Permanently join ${name}${own ? " and its writing history" : ""} to the writing history of “${w.title}”?`, { modal: true, detail }, "Join Permanently");
+    if (ok !== "Join Permanently") return;
+
+    if (!w.local && !(await mirror.fetchWork(w.branch))) return;
+    connector.forget([key, ...previous]);
+    for (const p of previous) await h.retire(p);
+    if (own) {
+      const id = await h.join(own.id, { id: w.id, branch: w.branch, form: kept }, { form, file: name }, "connected by hand");
+      // The work's ID goes into a .highland file; a plain file's Bin and Scratchpad move with it.
+      if (form === "highland") {
+        await store.update(key, (b) => {
+          b.setInfo({ ...b.info, highwaterToo: { ...((b.info.highwaterToo as object | undefined) ?? {}), documentId: id } });
+          return ["info.json"];
+        });
+      } else await extras.moveTo(own.id, id);
+      if (mirror.url) mirror.schedule();
+      else await h.flushCatalog();
+    } else {
+      await h.claim({ id: w.id, branch: w.branch }, key);
+      // Recorded now (even if nothing changed), so the history shows where the file joined it.
+      await commitNow(key, kind(kept, form), `to ${name}, connected by hand`);
+    }
+    extras.forget();
+    await vscode.commands.executeCommand("highwater.panels.refresh");
+    view.refresh();
+    works.refresh();
+    void updateStatus();
+    void vscode.window.showInformationMessage(`${name} now continues the writing history of “${w.title}”.`);
+  }
+
+  /** A connection to a work kept as another kind of file is a conversion. */
+  function kind(kept: Form | null, form: Form): SaveKind {
+    return kept && kept !== form ? "convert" : "connect";
+  }
+
   /** Restores a work not on this computer (fetching it first if only the mirror has it). */
   async function restoreWork(w: WorkInfo): Promise<void> {
     const h = history();
-    // Only in the catalog: fetch its history first (the writer asked for this work).
-    if (!w.local) {
-      if (!mirror.url) return void vscode.window.showErrorMessage(`${w.title}'s history is not on this computer. Set up the history mirror to fetch it.`);
-      if (!(await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Fetching ${w.title}…` }, () => mirror.fetchWork(w.branch)))) return;
-    }
-    const latest = (await h.branchLog(w.branch, 1))[0];
-    if (!latest) return;
-    const files = await h.filesAt(latest.hash);
-    const form = latest.form ?? savedForm(files);
-    const ext = form === "highland" ? "highland" : form;
-    const name = latest.file ?? `${w.title}.${ext}`;
+    if (!w.local && !mirror.url) return void vscode.window.showErrorMessage(`${w.title}'s history is not on this computer. Set up the history mirror to fetch it.`);
+    // Where it goes is asked before anything is fetched, so a cancelled restore leaves nothing here.
+    const here = w.local ? (await h.branchLog(w.branch, 1))[0] : undefined;
+    const known = here?.form ?? w.form ?? (here ? savedForm(await h.filesAt(here.hash)) : "highland");
+    const ext = known === "highland" ? "highland" : known;
+    const name = here?.file ?? w.file ?? `${w.title}.${ext}`;
     const target = await vscode.window.showSaveDialog({
       defaultUri: vscode.Uri.file(join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? homedir(), name)),
       filters: { [ext === "highland" ? ".highland files" : `.${ext} files`]: [ext] },
@@ -501,7 +596,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     });
     if (!target) return;
     const path = target.fsPath;
-    if (formOf(path) !== form) {
+    if (formOf(path) !== known) {
       void vscode.window.showErrorMessage(`${w.title} is kept as a .${ext} file, and is restored as one. To change that, convert it after restoring.`);
       return;
     }
@@ -515,6 +610,13 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (!choice) return;
       if (choice === "Open It") return void (await openFile(path));
     }
+    // Only in the catalog: fetch its history now (the writer asked for this work).
+    if (!w.local && !(await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Fetching ${w.title}…` }, () => mirror.fetchWork(w.branch)))) return;
+    const latest = (await h.branchLog(w.branch, 1))[0];
+    if (!latest) return;
+    const files = await h.filesAt(latest.hash);
+    const form = latest.form ?? savedForm(files);
+    if (form !== known) return void vscode.window.showErrorMessage(`${w.title} is now kept as a .${form === "highland" ? "highland" : form} file. Restore it again to choose a name for that.`);
     // The restored file continues the work's history.
     const id = await h.claim(w, path);
     if (form === "highland") await writeBundle(path, toBundle(files, id));

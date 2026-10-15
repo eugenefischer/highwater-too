@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.4
+
+- **Connect to a Work's History…** (Writing History panel menu, Command Palette): joins the open document to another work's history, by your choice. It lists works whose file is no longer where it was saved, newest first, or every work. A document with a history of its own is joined to the work in one merge (both kept, no longer separable); one without continues the work from its current text, recorded as `Connect`. A confirmation spells this out first. This is for a `.highland` file that lost its link to its history: Highland 2 removes the link when it saves, so a file saved in Highland, then edited and renamed, starts a new history when VS Code next saves it.
+- Fixed: **Delete Everywhere** did not always stick. A work fetched to a computer but never opened there survived the deletion on that computer and was pushed back to the mirror, so other computers could still restore it; and a computer that pushed before pulling could push a deleted work back. Deletion now goes by the work's branch, every pull, push or fetch applies the catalog's deletions first, and a push takes off the mirror any work recorded as deleted.
+- Fixed: a moved plain file was only recognised when first saved, not when opened, if it was the first document opened in the session.
+- Restore asks where to save before fetching, so a cancelled restore leaves nothing on this computer. Fetching a work deleted since the last sync says so instead of failing.
+- The Works panel's Refresh brings the catalog up to date from the mirror first.
+
 ## 0.2.3
 
 - **Newer saves from another computer:** when a sync brings newer saves of a work whose file is open here, or you switch to such a file, and the file is an older save, you are asked: **Update to the Latest** (the file, its Bin and its Scratchpad become the latest save) or **Keep This Version** (your next save goes back to it, recorded as a `Revert`). With unsaved changes, or changes since that save, **Open the Latest Beside It** takes the place of Update, and you are asked again when you next save. No choice is pre-selected; until you choose, the file's saves are not recorded. Nothing is asked when the file is the latest save, and each latest save is asked about once.

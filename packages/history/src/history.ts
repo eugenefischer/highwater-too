@@ -112,12 +112,13 @@ export interface CopyCandidate {
 
 /**
  * "convert": the work moved to another kind of file; "revert": an older save was brought back;
- * "restore": the work was written out on a computer that did not have it. These three are recorded
- * even when no file changed.
+ * "restore": the work was written out on a computer that did not have it; "connect": the writer
+ * connected a file to the work by hand (Connect to a Work's History). These four are recorded even
+ * when no file changed.
  */
-export type SaveKind = "save" | "autosave" | "close" | "convert" | "revert" | "restore";
+export type SaveKind = "save" | "autosave" | "close" | "convert" | "revert" | "restore" | "connect";
 
-const ALWAYS_RECORDED: SaveKind[] = ["convert", "revert", "restore"];
+const ALWAYS_RECORDED: SaveKind[] = ["convert", "revert", "restore", "connect"];
 
 export interface CommitInfo {
   hash: string;
@@ -418,8 +419,18 @@ export class History {
    * The same operations for code already running inside exclusive() (the mirror), which would
    * otherwise wait for itself.
    */
-  get inside(): { flushCatalog: () => Promise<boolean>; joinMain: (rev: string) => Promise<boolean> } {
-    return { flushCatalog: () => this.#flushCatalog(), joinMain: (rev) => this.#joinMain(rev) };
+  get inside(): {
+    flushCatalog: () => Promise<boolean>;
+    joinMain: (rev: string) => Promise<boolean>;
+    applyDeletions: () => Promise<{ id: string; paths: string[] }[]>;
+    deletedBranches: () => Promise<Set<string>>;
+  } {
+    return {
+      flushCatalog: () => this.#flushCatalog(),
+      joinMain: (rev) => this.#joinMain(rev),
+      applyDeletions: () => this.#applyDeletions(),
+      deletedBranches: () => this.#deletedBranches(),
+    };
   }
 
   async #flushCatalog(): Promise<boolean> {
@@ -565,9 +576,9 @@ export class History {
    * then prunes the repository so its data is gone, not just unlisted. `exclude`: never fetch it
    * back here (a deletion made on this computer only). Returns the paths it was saved at.
    */
-  remove(id: string, options: { exclude?: boolean } = {}): Promise<string[]> {
+  remove(work: { id: string; branch: string }, options: { exclude?: boolean } = {}): Promise<string[]> {
     return this.#serial(async () => {
-      const paths = await this.#removeLocal(id, options.exclude === true);
+      const paths = await this.#removeLocal(work.branch, options.exclude ? work.id : undefined);
       await this.#prune();
       return paths;
     });
@@ -590,14 +601,16 @@ export class History {
   deleteWork(work: { id: string; branch: string }): Promise<{ branch: string; paths: string[] }> {
     return this.#serial(async () => {
       await this.#init();
-      const index = await this.#load();
       const { id, branch } = work;
       const parent = await this.#revParse("refs/heads/main");
       const files = parent ? await this.#mainFiles(parent) : new Map<string, string>();
       addDeletion(files, { id, branch, deleted: new Date().toISOString() });
       files.set("README.md", readme(readCatalog(files).works.map((w) => ({ title: w.title, branch: w.branch }))));
       await this.#commitMain(files, parent ? [parent] : [], `Delete the history of ${branchTitle(branch)}`);
-      const paths = index.documents[id] ? await this.#removeLocal(id, false) : [];
+      // By branch: a branch fetched here but never opened has no index entry, and left behind it
+      // would be pushed back to the mirror.
+      const paths = await this.#removeLocal(branch);
+      const index = await this.#load();
       index.deleted = [...new Set([...(index.deleted ?? []), id])];
       await this.#save(index);
       await this.#prune();
@@ -614,45 +627,54 @@ export class History {
     const main = await this.#revParse("refs/heads/main");
     if (!main) return [];
     const { deleted } = readCatalog(await this.#mainFiles(main));
-    const index = await this.#load();
     const removed: { id: string; paths: string[] }[] = [];
     for (const d of deleted) {
-      for (const [id, e] of Object.entries(index.documents)) {
-        if (e.branch !== d.branch) continue;
-        removed.push({ id, paths: await this.#removeLocal(id, false) });
-      }
-      if (await this.#revParse(`refs/heads/${d.branch}`)) {
-        await git(this.repo, ["update-ref", "-d", `refs/heads/${d.branch}`]);
-        if (!removed.some((r) => r.id === d.id)) removed.push({ id: d.id, paths: [] });
-      }
-      await git(this.repo, ["update-ref", "-d", `refs/mirror/${d.branch}`]).catch(() => "");
-      await git(this.repo, ["update-ref", "-d", `refs/remotes/mirror/${d.branch}`]).catch(() => "");
-      if (!index.deleted?.includes(d.id)) index.deleted = [...(index.deleted ?? []), d.id];
+      const indexed = Object.entries((await this.#load()).documents).find(([, e]) => e.branch === d.branch);
+      const present = indexed !== undefined || (await this.#revParse(`refs/heads/${d.branch}`)) !== null;
+      if (present) removed.push({ id: indexed?.[0] ?? d.id, paths: await this.#removeLocal(d.branch) });
+      else await git(this.repo, ["update-ref", "-d", `refs/mirror/${d.branch}`]).catch(() => "");
     }
-    await this.#save(index);
+    const index = await this.#load();
+    const ids = deleted.map((d) => d.id).filter((id) => !index.deleted?.includes(id));
+    if (ids.length) {
+      index.deleted = [...(index.deleted ?? []), ...ids];
+      await this.#save(index);
+    }
     if (removed.length) await this.#prune();
     return removed;
   }
 
-  async #removeLocal(id: string, exclude: boolean): Promise<string[]> {
+  /** Branches main records as deleted (which no computer may push back). */
+  async #deletedBranches(): Promise<Set<string>> {
+    const main = await this.#revParse("refs/heads/main");
+    return new Set(main ? readCatalog(await this.#mainFiles(main)).deleted.map((d) => d.branch) : []);
+  }
+
+  /**
+   * Takes a work off this computer, found by its branch (it may have no index entry: fetched but
+   * never opened): the branch and its fetched copies, every index entry on it, and its unsent
+   * catalog notes. `excludeId`: never fetch it back here. Returns the paths it was saved at.
+   */
+  async #removeLocal(branch: string, excludeId?: string): Promise<string[]> {
+    for (const ref of [`refs/heads/${branch}`, `refs/mirror/${branch}`, `refs/remotes/mirror/${branch}`]) await git(this.repo, ["update-ref", "-d", ref]).catch(() => "");
     const index = await this.#load();
-    const entry = index.documents[id];
-    if (!entry) return [];
-    await git(this.repo, ["update-ref", "-d", `refs/heads/${entry.branch}`]).catch(() => "");
-    await git(this.repo, ["update-ref", "-d", `refs/mirror/${entry.branch}`]).catch(() => "");
-    await git(this.repo, ["update-ref", "-d", `refs/remotes/mirror/${entry.branch}`]).catch(() => "");
-    delete index.documents[id];
-    if (exclude) {
-      index.excluded = [...new Set([...(index.excluded ?? []), entry.branch])];
-      index.deleted = [...new Set([...(index.deleted ?? []), id])];
+    const paths: string[] = [];
+    for (const [id, e] of Object.entries(index.documents)) {
+      if (e.branch !== branch) continue;
+      paths.push(...e.paths);
+      delete index.documents[id];
+    }
+    if (excludeId) {
+      index.excluded = [...new Set([...(index.excluded ?? []), branch])];
+      index.deleted = [...new Set([...(index.deleted ?? []), excludeId])];
     }
     await this.#save(index);
     const pending = await this.#pending();
-    if (pending[entry.branch]) {
-      delete pending[entry.branch];
+    if (pending[branch]) {
+      delete pending[branch];
       await writeFile(join(this.folder, PENDING), JSON.stringify(pending));
     }
-    return entry.paths;
+    return paths;
   }
 
   /** Makes removed objects really gone from this repository. */
@@ -694,12 +716,13 @@ export class History {
   }
 
   /**
-   * Joins this computer's work into the one it was copied from (fetched already): a merge commit
+   * Joins this computer's work into another (on this computer already): one it was copied from, or
+   * one the writer connected its file to by hand (`how` says which, in the message). A merge commit
    * on the other's branch with both histories as parents, keeping this computer's files. The local
    * branch goes (its saves are in the merge), its paths move to the other work, and a deletion
    * record tells other computers to drop the merged branch. Returns the other work's ID.
    */
-  join(localId: string, other: CatalogEntry, meta: SaveMeta): Promise<string> {
+  join(localId: string, other: Pick<CatalogEntry, "id" | "branch" | "form">, meta: SaveMeta, how = "saved on another computer"): Promise<string> {
     return this.#serial(async () => {
       await this.#init();
       const index = await this.#load();
@@ -710,7 +733,7 @@ export class History {
       if (!mine || !theirs) throw new Error("Both histories must be on this computer to join them.");
       const tree = (await git(this.repo, ["rev-parse", `${mine}^{tree}`])).trim();
       const kind = meta.form === other.form ? "Join" : "Convert";
-      const message = `${kind} ${new Date().toISOString().slice(0, 16).replace("T", " ")}, the history of ${meta.file} saved on another computer\n\n${ID_TRAILER}: ${other.id}\n${FORM_TRAILER}: ${meta.form}\n${FILE_TRAILER}: ${meta.file}`;
+      const message = `${kind} ${new Date().toISOString().slice(0, 16).replace("T", " ")}, the history of ${meta.file} ${how}\n\n${ID_TRAILER}: ${other.id}\n${FORM_TRAILER}: ${meta.form}\n${FILE_TRAILER}: ${meta.file}`;
       const stamp = new Date().toISOString();
       const merge = (await git(this.repo, ["commit-tree", tree, "-p", theirs, "-p", mine, "-m", message], { env: { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp } })).trim();
       await git(this.repo, ["update-ref", `refs/heads/${other.branch}`, merge, theirs]);
@@ -1032,7 +1055,7 @@ export function commitMessage(kind: SaveKind, date: Date, before: string, after:
   const when = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   const words = wordCount(after);
   const delta = words - wordCount(before);
-  const label = { save: "Save", autosave: "Autosave", close: "Close", convert: "Convert", revert: "Revert", restore: "Restore" }[kind];
+  const label = { save: "Save", autosave: "Autosave", close: "Close", convert: "Convert", revert: "Revert", restore: "Restore", connect: "Connect" }[kind];
   return `${label} ${when}, ${note ? `${note}, ` : ""}${delta >= 0 ? "+" : "−"}${Math.abs(delta).toLocaleString("en-US")} words (${words.toLocaleString("en-US")})`;
 }
 

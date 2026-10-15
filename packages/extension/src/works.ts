@@ -109,7 +109,7 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
       return;
     }
     const h = this.#host.history();
-    const paths = await h.remove(w.id);
+    const paths = await h.remove({ id: w.id, branch: w.branch });
     await plainExtras().removeFor(w.id);
     this.#host.connector.forget(paths);
     this.#host.changed();
@@ -157,7 +157,7 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
         await mirror.deleteRemote(w.branch);
         await mirror.push(true);
       }
-    } else if (w.local) paths = await h.remove(w.id, { exclude: true });
+    } else if (w.local) paths = await h.remove({ id: w.id, branch: w.branch }, { exclude: true });
     else {
       await h.exclude({ id: w.id, branch: w.branch });
       paths = [];
@@ -169,17 +169,21 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
 }
 
 /**
- * After main came in: works another computer deleted are gone here too (their plain files keep
- * their Bin and Scratchpad for a new history); and local works that began as a copy of another
- * work's save are offered to join it.
+ * Works another computer deleted, just removed here by a pull, push or fetch: their plain files
+ * keep their Bin and Scratchpad for a new history, and their files are looked at afresh.
  */
-export async function afterPull(host: WorksHost, asked: Set<string>): Promise<void> {
-  const h = host.history();
-  for (const r of await h.applyDeletions()) {
+export async function deletedElsewhere(host: WorksHost, removed: { id: string; paths: string[] }[]): Promise<void> {
+  for (const r of removed) {
     for (const p of r.paths) if (formOf(p) !== "highland") await plainExtras().keepForNewHistory(p, r.id);
     host.connector.forget(r.paths);
     if (r.paths.length) void vscode.window.showInformationMessage(`The writing history of ${basename(r.paths.at(-1)!)} was deleted on another computer. The file is untouched; if you keep working on it, it starts a new history.`);
   }
+  host.changed();
+}
+
+/** After main came in: local works that began as a copy of another work's save are offered to join it. */
+export async function afterPull(host: WorksHost, asked: Set<string>): Promise<void> {
+  const h = host.history();
   if (!host.mirror.url) return;
   const works = await h.works();
   for (const c of await h.copyCandidates()) {

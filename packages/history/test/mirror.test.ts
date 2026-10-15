@@ -76,7 +76,7 @@ describe("Mirror", () => {
     execFileSync("git", ["init", "-q", "--bare", remote]);
     const a = new History(await temp());
     // Nothing pushed yet: nothing to pull, and that is not an error.
-    expect(await a.exclusive(() => new Mirror(a, remote).pull())).toEqual({ ok: true, updated: [] });
+    expect(await a.exclusive(() => new Mirror(a, remote).pull())).toEqual({ ok: true, updated: [], removed: [] });
 
     const doc = await a.resolve({ id: "doc-1", path: "/desk/Script.highland", text: script });
     await a.commit(doc.id, { scriptName: "text.fountain", script }, "save", new Date(), undefined, meta("Script.highland"));
@@ -87,7 +87,7 @@ describe("Mirror", () => {
     // A new computer pulls only main: it knows of both works, but holds neither.
     const b = new History(await temp());
     const mirror = new Mirror(b, remote);
-    expect(await b.exclusive(() => mirror.pull())).toEqual({ ok: true, updated: ["main"] });
+    expect(await b.exclusive(() => mirror.pull())).toEqual({ ok: true, updated: ["main"], removed: [] });
     expect(gitIn(b.repo, "for-each-ref", "--format=%(refname)", "refs/heads/works/", "refs/mirror/works/")).toBe("");
     const works = await b.works();
     expect(works.map((w) => [w.title, w.local, w.form, w.file]).sort()).toEqual([["Notes", false, "md", "Notes.md"], ["Script", false, "highland", "Script.highland"]]);
@@ -140,7 +140,7 @@ describe("Mirror", () => {
     const [entry] = (await a.catalog()).filter((e) => e.branch === doc.branch);
     expect(entry!.texts.length).toBe(4);
     // Nothing new: nothing changes.
-    expect(await b.exclusive(() => new Mirror(b, remote).pull())).toEqual({ ok: true, updated: [] });
+    expect(await b.exclusive(() => new Mirror(b, remote).pull())).toEqual({ ok: true, updated: [], removed: [] });
   });
 
   it("records the whole document and gives it back on another computer, for a work it does not have", async () => {
@@ -204,7 +204,7 @@ describe("Mirror", () => {
     expect(gone(b, c!.hash)).toBe(false);
 
     // Remove from this computer: gone here, still on the mirror, and offered again.
-    expect(await b.remove("doc-7")).toEqual(["/b/Letter.md"]);
+    expect(await b.remove({ id: "doc-7", branch: doc.branch })).toEqual(["/b/Letter.md"]);
     expect(gone(b, c!.hash)).toBe(true);
     expect((await b.works()).find((w) => w.branch === doc.branch)).toMatchObject({ local: false });
     expect(await b.recognise({ id: "doc-7", path: "/b/Letter.md", text: secret })).toMatchObject([{ by: "id", local: false }]);
@@ -219,8 +219,8 @@ describe("Mirror", () => {
     });
     expect(gone(a, c!.hash)).toBe(true);
     expect(() => gitIn(remote, "rev-parse", "--verify", doc.branch)).toThrow();
-    await b.exclusive(() => new Mirror(b, remote).pull());
-    expect(await b.applyDeletions()).toEqual([{ id: "doc-7", paths: ["/b/Letter.md"] }]);
+    expect(await b.exclusive(() => new Mirror(b, remote).pull())).toMatchObject({ ok: true, removed: [{ id: "doc-7", paths: ["/b/Letter.md"] }] });
+    expect(await b.applyDeletions()).toEqual([]);
     expect(gone(b, c!.hash)).toBe(true);
     expect((await b.works()).find((w) => w.branch === doc.branch)).toBeUndefined();
     // A file still naming the deleted work starts a new history.
@@ -229,12 +229,83 @@ describe("Mirror", () => {
     expect(again.branch).not.toBe(doc.branch);
   });
 
+  it("deleting everywhere a work fetched here but never opened leaves nothing to push back", async () => {
+    const remote = join(await temp(), "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", remote]);
+    const a = new History(await temp());
+    const doc = await a.resolve({ id: "doc-9", path: "/a/Note.md", text: script });
+    await a.commit(doc.id, { scriptName: "text.md", script }, "save", new Date(), undefined, meta("Note.md"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+
+    // b fetches the work (a restore it then cancelled), so its branch is here with no index entry.
+    const b = new History(await temp());
+    await b.exclusive(() => new Mirror(b, remote).pull());
+    await b.exclusive(() => new Mirror(b, remote).fetchWork(doc.branch));
+    expect((await b.works()).find((w) => w.branch === doc.branch)).toMatchObject({ local: true });
+    await b.deleteWork({ id: "doc-9", branch: doc.branch });
+    expect(() => gitIn(b.repo, "rev-parse", "--verify", `refs/heads/${doc.branch}`)).toThrow();
+    await b.exclusive(async () => {
+      await new Mirror(b, remote).deleteRemote(doc.branch);
+      return new Mirror(b, remote).push();
+    });
+    expect(() => gitIn(remote, "rev-parse", "--verify", doc.branch)).toThrow();
+  });
+
+  it("a computer that pushes before it pulls does not bring a deleted work back", async () => {
+    const remote = join(await temp(), "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", remote]);
+    const a = new History(await temp());
+    const doc = await a.resolve({ id: "doc-10", path: "/a/Play.fountain", text: script });
+    await a.commit(doc.id, { scriptName: "text.fountain", script }, "save", new Date(2026, 9, 1), undefined, meta("Play.fountain"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+    const b = new History(await temp());
+    await b.exclusive(() => new Mirror(b, remote).fetchWork(doc.branch));
+    await b.claim({ id: "doc-10", branch: doc.branch }, "/b/Play.fountain");
+
+    // a deletes it everywhere; b saves and pushes without pulling first.
+    await a.deleteWork({ id: "doc-10", branch: doc.branch });
+    await a.exclusive(async () => {
+      await new Mirror(a, remote).deleteRemote(doc.branch);
+      return new Mirror(a, remote).push();
+    });
+    await b.commit("doc-10", { scriptName: "text.fountain", script: `${script}More.\n` }, "save", new Date(2026, 9, 2), undefined, meta("Play.fountain"));
+    expect(await b.exclusive(() => new Mirror(b, remote).push())).toMatchObject({ ok: true, removed: [{ id: "doc-10", paths: ["/b/Play.fountain"] }] });
+    expect(() => gitIn(remote, "rev-parse", "--verify", doc.branch)).toThrow();
+    expect((await b.works()).find((w) => w.branch === doc.branch)).toBeUndefined();
+    // And a mirror that has it back (pushed by an older version) loses it on the next push.
+    gitIn(b.repo, "update-ref", `refs/heads/${doc.branch}`, gitIn(a.repo, "rev-parse", "main"));
+    execFileSync("git", ["push", "-q", remote, `refs/heads/${doc.branch}:refs/heads/${doc.branch}`], { cwd: b.repo });
+    await a.exclusive(() => new Mirror(a, remote).push());
+    expect(() => gitIn(remote, "rev-parse", "--verify", doc.branch)).toThrow();
+  });
+
+  it("does not fetch a work deleted since this computer last pulled", async () => {
+    const remote = join(await temp(), "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", remote]);
+    const a = new History(await temp());
+    const doc = await a.resolve({ id: "doc-11", path: "/a/Story.md", text: script });
+    await a.commit(doc.id, { scriptName: "text.md", script }, "save", new Date(), undefined, meta("Story.md"));
+    await a.exclusive(() => new Mirror(a, remote).push());
+    const b = new History(await temp());
+    await b.exclusive(() => new Mirror(b, remote).pull());
+    expect((await b.works()).find((w) => w.branch === doc.branch)).toMatchObject({ local: false });
+    await a.deleteWork({ id: "doc-11", branch: doc.branch });
+    await a.exclusive(async () => {
+      await new Mirror(a, remote).deleteRemote(doc.branch);
+      return new Mirror(a, remote).push();
+    });
+    // b's catalog is stale: it still lists the work, but fetching it finds the deletion first.
+    expect((await b.works()).find((w) => w.branch === doc.branch)).toBeDefined();
+    expect(await b.exclusive(() => new Mirror(b, remote).fetchWork(doc.branch))).toMatchObject({ deleted: true });
+    expect((await b.works()).find((w) => w.branch === doc.branch)).toBeUndefined();
+  });
+
   it("deleting on this computer only keeps the work from coming back here", async () => {
     const h = new History(await temp());
     const doc = await h.resolve({ id: "doc-8", path: "/w/Draft.md", text: script });
     await h.commit(doc.id, { scriptName: "text.md", script }, "save", new Date(), undefined, meta("Draft.md"));
     await h.flushCatalog();
-    await h.remove("doc-8", { exclude: true });
+    await h.remove({ id: "doc-8", branch: doc.branch }, { exclude: true });
     expect(await h.recognise({ id: "doc-8", path: "/w/Draft.md", text: script })).toEqual([]);
     expect((await h.resolve({ id: "doc-8", path: "/w/Draft.md", text: script })).id).not.toBe("doc-8");
   });
