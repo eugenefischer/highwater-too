@@ -9,7 +9,8 @@ const root = process.env.HIGHWATER_PRIVATE_FIXTURES;
 function findHighland(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const full = join(dir, name);
-    if (statSync(full).isDirectory()) return name.endsWith(".textbundle") ? [] : findHighland(full);
+    // EJ's working copies for hands-on testing change as he tests: not fixtures.
+    if (statSync(full).isDirectory()) return name.endsWith(".textbundle") || name === "Human Testing Files" ? [] : findHighland(full);
     return name.endsWith(".highland") ? [full] : [];
   });
 }
