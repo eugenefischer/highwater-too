@@ -22,7 +22,8 @@ let editorAt = null;
 // here (wheel or trackpad, keys, dragging the scrollbar) is sent to the editor. Scrolls the preview
 // makes itself (a refresh, a resize, pages finishing drawing) never move the editor.
 // A press on the scrollbar is noticed, but the browser may never report its release, so a press
-// counts only while the scrolling it causes goes on: it lapses 400 ms after the last scroll.
+// counts only while the scrolling it causes goes on: it lapses 400 ms after the last scroll (or
+// 2 s after the press, if the drag has not started by then).
 let userUntil = 0;
 let pressed = false;
 const intent = () => (userUntil = performance.now() + 400);
@@ -58,7 +59,7 @@ window.addEventListener("keydown", (e) => ["ArrowUp", "ArrowDown", "PageUp", "Pa
 pagesEl.addEventListener("pointerdown", (e) => {
   if (e.target !== pagesEl) return;
   pressed = true;
-  intent();
+  userUntil = performance.now() + 2000;
 });
 for (const ev of ["pointerup", "pointercancel", "blur"]) window.addEventListener(ev, () => (pressed = false));
 
