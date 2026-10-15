@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.5
+
+- **Changes made elsewhere** now ask as Highland 2 does: **Save Anyway** (keep your changes), **Revert** (keep the other application's), **Save As…**, or **Compare**. The version that loses is kept: as a save in the writing history noting it was set aside, or in the backups when the history is off.
+- Fixed: images dragged from the Assets panel into the text arrived as the image file's address instead of an image. The panel's items carry their file's address, and VS Code inserted that; dropping a document's own image now inserts `![name](assets/name.png)`.
+- Fixed: Bin cut and copy (⌥⌘X, ⌥⌘C, and the right-click items) did nothing in plain `.fountain` and `.md` files.
+- Fixed: the Bin panel did not show a Bin item's changes after it was saved in its tab (or after Revert to This Save) in a `.highland` file.
+- Fixed: character name completion often came only after most of the name was typed. At the first capital nothing is offered (it may be action), and VS Code took that as final for the word; it now asks again at the second letter.
+- Reading time for prose is now 250 words a minute, as Highland 2 states it (was 230).
+- Export Text offers plain text (`.txt`) as well as the document's own kind, and leaves out the note linking a plain file to its history.
+- Conversions are also in the editor's “…” menu and the tab's right-click menu.
+- The Move to Trash question after a conversion offers **Keep** instead of Cancel.
+
 ## 0.2.4
 
 - **Connect to a Work's History…** (Writing History panel menu, Command Palette): joins the open document to another work's history, by your choice. It lists works whose file is no longer where it was saved, newest first, or every work. A document with a history of its own is joined to the work in one merge (both kept, no longer separable); one without continues the work from its current text, recorded as `Connect`. A confirmation spells this out first. This is for a `.highland` file that lost its link to its history: Highland 2 removes the link when it saves, so a file saved in Highland, then edited and renamed, starts a new history when VS Code next saves it.

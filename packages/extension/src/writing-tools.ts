@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { join } from "node:path";
 import { LANGUAGES, type ParseCache } from "./language.ts";
-import { markerText, nextMarker, suggest, vocabulary } from "./syntax/completion.ts";
+import { askAgain, markerText, nextMarker, suggest, vocabulary } from "./syntax/completion.ts";
 
 const KINDS = {
   character: vscode.CompletionItemKind.Value,
@@ -23,7 +23,7 @@ export function registerWritingTools(context: vscode.ExtensionContext, cache: Pa
           let list = suggest(before, afterBlank, vocabulary(cache.get(document)));
           // A typed space only brings up a heading's location or time, never the cue list.
           if (context.triggerKind === vscode.CompletionTriggerKind.TriggerCharacter) list = list.filter((s) => s.kind === "location" || s.kind === "time");
-          return list.map((s, i) => {
+          const items = list.map((s, i) => {
             const item = new vscode.CompletionItem({ label: s.label, description: s.kind }, KINDS[s.kind]);
             item.insertText = s.insert;
             item.range = new vscode.Range(position.line, s.replaceFrom, position.line, position.character);
@@ -32,6 +32,7 @@ export function registerWritingTools(context: vscode.ExtensionContext, cache: Pa
             if (s.kind === "location") item.command = { command: "editor.action.triggerSuggest", title: "" };
             return item;
           });
+          return new vscode.CompletionList(items, askAgain(before, afterBlank));
         },
       },
       " ",

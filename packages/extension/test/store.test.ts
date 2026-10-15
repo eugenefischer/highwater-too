@@ -81,6 +81,26 @@ describe("BundleStore", () => {
     expect(names.at(-1)).toBe("2026-10-11T09-00-11.highland");
   });
 
+  it("tells listeners which entries it wrote, after they are on disk", async () => {
+    const seen: [string, string[]][] = [];
+    const stop = store.onDidWrite((path, entries) => seen.push([path, entries]));
+    await store.write(file, "bin/0.txt", enc("A note."));
+    expect(seen).toEqual([[file, ["bin/0.txt"]]]);
+    expect((await readBundle(file)).bundle.binItems[0]).toBe("A note.");
+    stop();
+    await store.write(file, "bin/0.txt", enc("Another."));
+    expect(seen).toHaveLength(1);
+  });
+
+  it("keeps a version that lost a conflict in the backups, as on disk or with an editor's text", async () => {
+    const disk = await store.keepAside(file);
+    expect((await readBundle(disk)).bundle.text).toBe((await readBundle(file)).bundle.text);
+    const yours = await store.keepAside(file, "", enc("INT. YOURS - DAY\n"));
+    expect((await readBundle(yours)).bundle.text).toBe("INT. YOURS - DAY\n");
+    expect(yours).toMatch(/your unsaved changes\.highland$/);
+    expect((await readBundle(file)).bundle.text).not.toBe("INT. YOURS - DAY\n");
+  });
+
   it("queues writes to the same bundle", async () => {
     await Promise.all([store.write(file, "", enc("script")), store.write(file, "scratchpad.txt", enc("notes")), store.write(file, "bin/0.txt", enc("cut line"))]);
     const after = (await readBundle(file)).bundle;

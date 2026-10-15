@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -936,6 +936,7 @@
     ],
     "configurationDefaults": {
       "[highland-fountain]": {
+        "editor.dropIntoEditor.preferences": ["highwater.asset"],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -954,6 +955,7 @@
         "editor.lineNumbers": "off"
       },
       "[highland-markdown]": {
+        "editor.dropIntoEditor.preferences": ["highwater.asset"],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -972,6 +974,7 @@
         "editor.lineNumbers": "off"
       },
       "[highland-plain]": {
+        "editor.dropIntoEditor.preferences": ["highwater.asset"],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -1090,11 +1093,11 @@
         },
         {
           "command": "highwater.copyToBin",
-          "when": "editorLangId =~ /^highland-/ && resourceScheme == highland"
+          "when": "editorLangId =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
         },
         {
           "command": "highwater.cutToBin",
-          "when": "editorLangId =~ /^highland-/ && resourceScheme == highland"
+          "when": "editorLangId =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
         },
         {
           "command": "highwater.toggleLiveMargins",
@@ -1180,7 +1183,49 @@
           "group": "7_modification"
         }
       ],
+      "editor/title/context": [
+        {
+          "command": "highwater.convertToHighland",
+          "when": "resourceScheme == file && editorLangId =~ /^highland-/",
+          "group": "5_convert"
+        },
+        {
+          "command": "highwater.convertToFountain",
+          "when": "resourceScheme == highland && resourceFilename =~ /\\.highland$/ && editorLangId == highland-fountain",
+          "group": "5_convert"
+        },
+        {
+          "command": "highwater.convertToMarkdown",
+          "when": "resourceScheme == highland && resourceFilename =~ /\\.highland$/ && editorLangId == highland-markdown",
+          "group": "5_convert"
+        },
+        {
+          "command": "highwater.convertToText",
+          "when": "resourceScheme == highland && resourceFilename =~ /\\.highland$/ && editorLangId == highland-plain",
+          "group": "5_convert"
+        }
+      ],
       "editor/title": [
+        {
+          "command": "highwater.convertToHighland",
+          "when": "resourceScheme == file && editorLangId =~ /^highland-/",
+          "group": "5_convert"
+        },
+        {
+          "command": "highwater.convertToFountain",
+          "when": "resourceScheme == highland && resourceFilename =~ /\\.highland$/ && editorLangId == highland-fountain",
+          "group": "5_convert"
+        },
+        {
+          "command": "highwater.convertToMarkdown",
+          "when": "resourceScheme == highland && resourceFilename =~ /\\.highland$/ && editorLangId == highland-markdown",
+          "group": "5_convert"
+        },
+        {
+          "command": "highwater.convertToText",
+          "when": "resourceScheme == highland && resourceFilename =~ /\\.highland$/ && editorLangId == highland-plain",
+          "group": "5_convert"
+        },
         {
           "command": "highwater.preview",
           "when": "editorLangId =~ /^highland-(fountain|markdown)$/",
@@ -1349,12 +1394,12 @@
       "editor/context": [
         {
           "command": "highwater.cutToBin",
-          "when": "editorHasSelection && resourceScheme == highland && editorLangId =~ /^highland-(fountain|markdown|plain)$/",
+          "when": "editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-(fountain|markdown|plain)$/",
           "group": "9_cutcopypaste@10"
         },
         {
           "command": "highwater.copyToBin",
-          "when": "editorHasSelection && resourceScheme == highland && editorLangId =~ /^highland-(fountain|markdown|plain)$/",
+          "when": "editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-(fountain|markdown|plain)$/",
           "group": "9_cutcopypaste@11"
         }
       ]
@@ -1421,13 +1466,13 @@
         "command": "highwater.cutToBin",
         "mac": "alt+cmd+x",
         "key": "ctrl+alt+x",
-        "when": "editorTextFocus && editorHasSelection && resourceScheme == highland"
+        "when": "editorTextFocus && editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.copyToBin",
         "mac": "alt+cmd+c",
         "key": "ctrl+alt+c",
-        "when": "editorTextFocus && editorHasSelection && resourceScheme == highland"
+        "when": "editorTextFocus && editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.navigator.focus",

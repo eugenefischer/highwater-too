@@ -1,10 +1,13 @@
 import { inlineText, type Document, type Element, type Inline } from "@highwater/parser";
 
+/** Highland's reading speed for prose. */
+export const READING_WPM = 250;
+
 export interface DocumentStats {
   words: number;
   /** Estimated printed pages (the PDF engine gives the exact count later). */
   pages: number;
-  /** Screenplays: about a minute a page. Prose: reading time at 230 words a minute. */
+  /** Screenplays: about a minute a page. Prose: reading time at 250 words a minute, as Highland counts it. */
   minutes: number;
 }
 
@@ -117,5 +120,5 @@ export function documentStats(doc: Document): DocumentStats {
     if (e.kind === "sceneBreak") lines += 1;
   }
   const pages = Math.max(lines > 0 ? 1 : 0, Math.ceil(lines / 22));
-  return { words, pages, minutes: Math.max(words > 0 ? 1 : 0, Math.round(words / 230)) };
+  return { words, pages, minutes: Math.max(words > 0 ? 1 : 0, Math.round(words / READING_WPM)) };
 }

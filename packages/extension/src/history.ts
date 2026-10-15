@@ -73,8 +73,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     return null;
   };
 
-  /** Reads what the history records for a document, and its stored ID. */
-  async function snapshot(key: string): Promise<{ id: string | null; files: DocumentFiles }> {
+  /**
+   * Reads what the history records for a document, and its stored ID. `instead`: one entry's text
+   * as it is in the editor rather than on disk (unsaved changes being set aside).
+   */
+  async function snapshot(key: string, instead?: Instead): Promise<{ id: string | null; files: DocumentFiles }> {
     if (key.toLowerCase().endsWith(".highland")) {
       const b = await store.snapshot(key);
       const info = b.info[INFO_KEY] as { documentId?: unknown } | undefined;
@@ -83,7 +86,15 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const others = b.paths
         .filter((p) => p !== b.textPath && p !== "scratchpad.txt" && !/^bin\/\d+\.txt$/.test(p) && !p.endsWith("/"))
         .map((p) => ({ path: p, data: p === "info.json" ? withoutSavedText(b.get(p)!) : b.get(p)! }));
-      return { id, files: { scriptName: b.textPath.split("/").pop()!, script: b.text, bin: b.binItems, ...(b.scratchpad !== undefined ? { scratchpad: b.scratchpad } : {}), others } };
+      const files: DocumentFiles = { scriptName: b.textPath.split("/").pop()!, script: b.text, bin: [...b.binItems], ...(b.scratchpad !== undefined ? { scratchpad: b.scratchpad } : {}), others };
+      if (instead) {
+        // (The store's bundle is shared and read-only: the change goes into this copy of its parts.)
+        const bin = /^bin\/(\d+)\.txt$/.exec(instead.entry);
+        if (instead.entry === "") files.script = instead.text;
+        else if (instead.entry === "scratchpad.txt") files.scratchpad = instead.text;
+        else if (bin) files.bin![Number(bin[1])] = instead.text;
+      }
+      return { id, files };
     }
     const ext = extname(key).toLowerCase();
     const scriptName = ext === ".fountain" || ext === ".spmd" ? "text.fountain" : ext === ".txt" ? "text.txt" : "text.md";
@@ -92,8 +103,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     return { id: noteId(script), files: { scriptName, script, ...(await extras.historyFiles(key)) } };
   }
 
-  async function resolve(key: string) {
-    const { id, files } = await snapshot(key);
+  async function resolve(key: string, instead?: Instead) {
+    const { id, files } = await snapshot(key, instead);
     const resolved = await history().resolve({ id, path: key, text: files.script });
     // Highland drops keys it does not know when it saves; put the ID back.
     if (key.toLowerCase().endsWith(".highland") && resolved.id !== id) {
@@ -154,6 +165,30 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       failures.set(key, (error as Error).message);
     }
     void updateStatus();
+  }
+
+  /**
+   * Keeps a version that lost a conflict with another application, as a save noting why. Not for
+   * a file whose saves are held (undecided) or whose history is paused: false then, so the caller
+   * keeps it in the backups instead.
+   */
+  async function keepVersion(key: string, note: string, instead?: Instead): Promise<boolean> {
+    if (connector.undecided(key)) return false;
+    try {
+      const r = await resolve(key, instead);
+      if (r.paused) return false;
+      const c = await history().commit(r.id, r.files, "save", new Date(), note, { form: formOf(key), file: basename(key) });
+      if (c) {
+        lastCommit.set(key, c.date);
+        if (mirror.url) mirror.schedule();
+        else await history().flushCatalog();
+      }
+      view.refresh();
+      return true; // recorded now, or identical to the last save (kept already)
+    } catch (error) {
+      failures.set(key, (error as Error).message);
+      return false;
+    }
   }
 
   /** Before a conversion: the file's last save is in the history, and nothing is still being recorded. */
@@ -426,6 +461,17 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     }),
     // Used by the conversions (convert.ts), not shown in the Command Palette.
     vscode.commands.registerCommand("highwater.history.settle", (path: string) => settle(path)),
+    // Used when another application changed an open .highland file (conflicts.ts): the version
+    // that loses is kept as a save, then the one that wins is recorded on top.
+    vscode.commands.registerCommand("highwater.history.setAside", async (path: string, note: string, instead?: Instead) => {
+      if (!enabled()) return false;
+      await inflight.get(path);
+      await batcherIdle();
+      return keepVersion(path, note, instead);
+    }),
+    vscode.commands.registerCommand("highwater.history.record", async (path: string) => {
+      if (enabled()) await commitNow(path, "save");
+    }),
     vscode.commands.registerCommand("highwater.history.converted", async (path: string, note: string) => {
       if (enabled()) await commitNow(path, "convert", note);
       view.refresh();
@@ -686,6 +732,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     if (enabled() && mirror.url) void pulled(mirror.pull());
   }, 10 * 60_000);
   context.subscriptions.push({ dispose: () => clearInterval(timer) });
+}
+
+/** One entry of a .highland file as an editor holds it (not as on disk). */
+interface Instead {
+  entry: string;
+  text: string;
 }
 
 /** A save's form, judged by its files, for saves made before the Highwater-Form line. */

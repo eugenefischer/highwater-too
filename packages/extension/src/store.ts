@@ -29,6 +29,14 @@ export class BundleStore {
     return () => this.#listeners.delete(listener);
   }
 
+  readonly #written = new Set<(path: string, entries: string[]) => void>();
+
+  /** Entries this extension wrote (a saved Bin item, a new image, …), after they are on disk. */
+  onDidWrite(listener: (path: string, entries: string[]) => void): () => void {
+    this.#written.add(listener);
+    return () => this.#written.delete(listener);
+  }
+
   async read(path: string, entry = ""): Promise<Uint8Array> {
     const { bundle } = await this.#current(path);
     const data = bundle.get(entry === "" ? bundle.textPath : entry);
@@ -130,6 +138,13 @@ export class BundleStore {
         }
         const saved = await this.#load(path, current);
         for (const key of touched) saved.times.set(key, saved.fingerprint.mtimeMs);
+        for (const listener of this.#written) {
+          try {
+            listener(path, touched);
+          } catch {
+            // a listener's failure is not the save's
+          }
+        }
         return touched;
       } finally {
         state.writing = false;
@@ -233,6 +248,21 @@ export class BundleStore {
     const loaded = { bundle, fingerprint, times };
     this.#state(path).loaded = loaded;
     return loaded;
+  }
+
+  /**
+   * Keeps a version that lost a conflict with another application, in the backups folder (used
+   * when the writing history is off): the file as on disk, or with one entry as an editor has it.
+   * Returns where it went.
+   */
+  async keepAside(path: string, entry?: string, data?: Uint8Array): Promise<string> {
+    const dir = join(await this.#options.backupFolder(), stripHighlandExtension(path));
+    await mkdir(dir, { recursive: true });
+    const stamp = this.#options.now().toISOString().replace(/:/g, "-").replace(/\.\d+Z$/, "");
+    const target = join(dir, `${stamp} ${entry === undefined ? "other application's version" : "your unsaved changes"}.highland`);
+    if (entry === undefined || !data) await copyFile(path, target);
+    else await this.writeCopy(path, entry, data, target);
+    return target;
   }
 
   async #backup(path: string): Promise<void> {

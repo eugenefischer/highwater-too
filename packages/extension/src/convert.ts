@@ -5,7 +5,7 @@ import { basename, dirname, extname, join } from "node:path";
 import { writeBundle } from "@highwater/bundle";
 import * as vscode from "vscode";
 import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
-import { assetsFolderName } from "./extras-folder.ts";
+import { assetsFolderName, withoutIdNote } from "./extras-folder.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { currentHistory } from "./history.ts";
 import { LANGUAGES } from "./language.ts";
@@ -29,7 +29,7 @@ type Options = { target?: vscode.Uri };
 export function registerConversions(context: vscode.ExtensionContext, store: BundleStore): void {
   testing = context.extensionMode === vscode.ExtensionMode.Test;
   // Menus pass a URI; only the tests pass a target.
-  const toPlainFile = (_uri?: unknown, options?: Options) => convertToPlain(store, options?.target);
+  const toPlainFile = (uri?: unknown, options?: Options) => convertToPlain(store, options?.target, uri instanceof vscode.Uri ? uri : undefined);
   context.subscriptions.push(
     vscode.commands.registerCommand("highwater.convertToHighland", (uri?: unknown, options?: Options) => convertToHighland(uri instanceof vscode.Uri ? uri : undefined, options?.target)),
     vscode.commands.registerCommand("highwater.convertToFountain", toPlainFile),
@@ -86,9 +86,12 @@ async function convertToHighland(uri?: vscode.Uri, chosen?: vscode.Uri): Promise
   await offerTrash(source, images, history !== null);
 }
 
-/** The active .highland document becomes a plain .fountain, .md or .txt file. */
-async function convertToPlain(store: BundleStore, chosen?: vscode.Uri): Promise<void> {
-  const doc = vscode.window.activeTextEditor?.document;
+/**
+ * A .highland document becomes a plain .fountain, .md or .txt file: the one whose tab or title-bar
+ * menu was used (`uri`), else the active one.
+ */
+async function convertToPlain(store: BundleStore, chosen?: vscode.Uri, uri?: vscode.Uri): Promise<void> {
+  const doc = (uri && vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString())) || vscode.window.activeTextEditor?.document;
   const parts = doc?.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
   if (!doc || !parts || parts.entry !== "") {
     void vscode.window.showInformationMessage("Open a .highland document to convert it to a plain file.");
@@ -169,7 +172,8 @@ async function exportText(): Promise<void> {
   const ext = PLAIN_EXT[doc.languageId] ?? "txt";
   const target = await vscode.window.showSaveDialog({
     defaultUri: vscode.Uri.file(join(dirname(from), `${basename(from, extname(from))}${plain ? " (export)" : ""}.${ext}`)),
-    filters: { [ext === "fountain" ? "Fountain" : ext === "md" ? "Markdown" : "Plain text"]: [ext] },
+    // Its own kind first; plain text is always offered too (the dialog's format menu switches).
+    filters: ext === "txt" ? { "Plain Text": ["txt"] } : { [ext === "fountain" ? "Fountain" : "Markdown"]: [ext], "Plain Text": ["txt"] },
     title: "Export Text",
   });
   if (!target) return;
@@ -178,7 +182,8 @@ async function exportText(): Promise<void> {
     void vscode.window.showErrorMessage(`${basename(target.fsPath)} is a document with its own writing history. Export to a new file.`);
     return;
   }
-  await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(stripRevisionTags(doc.getText())));
+  // Without the note linking a plain file to its history: the export is a separate copy.
+  await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(withoutIdNote(stripRevisionTags(doc.getText()))));
   if (history) await history.retire(target.fsPath);
   void vscode.window.showInformationMessage(`Exported ${basename(target.fsPath)}. It is a separate copy, outside the writing history.`);
 }
@@ -217,9 +222,11 @@ async function offerTrash(file: vscode.Uri, images: string | null, tracked: bool
       modal: true,
       detail: `${tracked ? `The writing history now follows the converted file, and ${name} is no longer tracked. ` : ""}Everything in it is in the converted file. If you keep it and edit it, it is a separate copy${tracked ? " with a history of its own" : ""}.`,
     },
-    "Move to Trash",
+    { title: "Move to Trash" },
+    // Keep, not VS Code's usual Cancel: keeping the file is a choice, not a cancelled conversion.
+    { title: "Keep", isCloseAffordance: true },
   );
-  if (choice !== "Move to Trash") return;
+  if (choice?.title !== "Move to Trash") return;
   await vscode.workspace.fs.delete(file, { useTrash: true });
   if (folder) await vscode.workspace.fs.delete(vscode.Uri.file(folder), { recursive: true, useTrash: true });
 }

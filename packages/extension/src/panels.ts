@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import * as vscode from "vscode";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import type { ParseCache } from "./language.ts";
@@ -8,7 +8,8 @@ import { plainExtras } from "./extras.ts";
 import { blockAt, moveBlock, NAVIGATOR_LABELS, NAVIGATOR_TYPES, navigatorItems, parseFilters, type NavigatorFilters, type NavigatorItem, type NavigatorType } from "./syntax/navigator.ts";
 import { assetMarkdown, binLabel, move, uniqueName } from "./syntax/workspace.ts";
 import { idNote, noteId } from "./extras-folder.ts";
-import { focusedDocument, type FocusedDocument } from "./focus.ts";
+import { focusedDocument, roleOf, type FocusedDocument } from "./focus.ts";
+import { LANGUAGES } from "./language.ts";
 
 /**
  * The Highland sidebar (M6): Navigator, Bin and Assets as tree views in a "Highwater Too" view
@@ -50,12 +51,34 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     }),
     vscode.workspace.onDidCloseTextDocument((d) => shown.delete(d.uri.toString())),
     { dispose: store.onExternalChange((path) => (path === current.bundle ? refreshAll() : undefined)) },
+    // This extension's own writes too: a Bin item saved in its tab, a Revert, an image added.
+    {
+      dispose: store.onDidWrite((path, entries) => {
+        if (path !== current.bundle) return;
+        if (entries.some((e) => e.startsWith("bin/"))) bin.refresh();
+        if (entries.some((e) => e.startsWith("assets/"))) assets.refresh();
+      }),
+    },
     extras.onDidChange((path) => {
       if (path !== current.plain) return;
       bin.refresh();
       assets.refresh();
     }),
 
+    // An image dragged from the Assets panel into the text becomes an image reference. The panel's
+    // items carry their file's address (for their icons), and without this VS Code inserts that
+    // address instead; the setting highwater.asset in configurationDefaults makes this the choice.
+    vscode.languages.registerDocumentDropEditProvider(
+      Object.values(LANGUAGES).map((language) => ({ language })),
+      {
+        provideDocumentDropEdits: async (doc, _position, data) => {
+          const list = await data.get("text/uri-list")?.asString();
+          const text = list ? await assetReferences(doc, list) : null;
+          return text ? new vscode.DocumentDropEdit(text, "Insert Image", ASSET_DROP) : undefined;
+        },
+      },
+      { dropMimeTypes: ["text/uri-list"], providedDropEditKinds: [ASSET_DROP] },
+    ),
     vscode.commands.registerCommand("highwater.navigator.reveal", (uri: vscode.Uri, offset: number) => reveal(uri, offset)),
     vscode.commands.registerCommand("highwater.navigator.filter", () => navigator.chooseFilters()),
 
@@ -392,6 +415,34 @@ type AssetItem = Owner & {
 
 function assetUri(item: AssetItem): vscode.Uri {
   return item.file ? vscode.Uri.file(item.file) : toHighlandUri(item.bundle!, `assets/${item.name}`);
+}
+
+const ASSET_DROP = vscode.DocumentDropOrPasteEditKind.Empty.append("highwater", "asset");
+
+/**
+ * The image references for files dropped on a document, when every one is in that document's
+ * assets (its .highland file's assets/, or a plain file's images folder); null otherwise.
+ */
+async function assetReferences(doc: vscode.TextDocument, uriList: string): Promise<string | null> {
+  const role = roleOf(doc);
+  if (role.kind !== "script") return null;
+  const uris = uriList
+    .split(/\r?\n/)
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => vscode.Uri.parse(l));
+  if (!uris.length) return null;
+  const plainFolder = role.plain ? await plainExtras().assetsFolder(role.plain) : null;
+  const refs: string[] = [];
+  for (const uri of uris) {
+    if (role.bundle && uri.scheme === SCHEME) {
+      const parts = splitBundlePath(uri.fsPath);
+      if (parts?.bundle !== role.bundle || !/^assets\/[^/]+$/.test(parts.entry)) return null;
+      refs.push(assetMarkdown(parts.entry.slice("assets/".length), "assets"));
+    } else if (plainFolder && uri.scheme === "file" && dirname(uri.fsPath) === plainFolder.dir) {
+      refs.push(assetMarkdown(basename(uri.fsPath), plainFolder.name));
+    } else return null;
+  }
+  return refs.join("\n\n");
 }
 
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "heic", "webp", "pdf"];

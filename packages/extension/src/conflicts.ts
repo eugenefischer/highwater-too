@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import { openHighland } from "./open.ts";
 import { splitBundlePath } from "./store.ts";
+import { currentHistory } from "./history.ts";
 
 export const DISK_SCHEME = "highland-disk";
 
@@ -18,8 +19,10 @@ export class DiskVersionProvider implements vscode.TextDocumentContentProvider {
 
 /**
  * Another program (usually Highland 2) saved a bundle that is open here. Unmodified editors reload
- * on their own; editors with unsaved changes get Highland's choices: Revert, Save over, Save As,
- * plus Compare.
+ * on their own; editors with unsaved changes get Highland's choices, as Highland words them:
+ * Save Anyway, Revert or Save As, plus Compare. As in Highland, the version that loses is kept:
+ * in the writing history (a save noting it was set aside), or in the backups when the history is
+ * off.
  */
 export async function handleExternalChange(fs: HighlandFileSystem, bundle: string, entries: string[]): Promise<void> {
   fs.fireChanged(bundle, entries);
@@ -33,23 +36,33 @@ export async function handleExternalChange(fs: HighlandFileSystem, bundle: strin
 async function askAboutConflict(fs: HighlandFileSystem, doc: vscode.TextDocument): Promise<void> {
   const p = splitBundlePath(doc.uri.fsPath)!;
   const name = basename(p.bundle) + (p.entry ? ` (${p.entry})` : "");
+  const kept = currentHistory() ? "kept in the writing history" : "kept in the backups";
   for (;;) {
     const choice = await vscode.window.showWarningMessage(
-      `${name} was changed by another program, and you have unsaved changes.`,
-      { modal: false, detail: "Revert loads the version on disk. Save writes yours over it. Save As writes yours to a new file." },
+      `The document “${name}” has been changed by another application.`,
+      {
+        modal: true,
+        detail: `Save Anyway keeps your changes, and the other application's version is ${kept}. Revert keeps the other application's changes, and your changes are ${kept}. Save As saves your changes to a different file. Compare shows the two side by side.`,
+      },
+      "Save Anyway",
       "Revert",
-      "Save",
       "Save As…",
       "Compare",
     );
     if (choice === "Compare") {
-      await vscode.commands.executeCommand("vscode.diff", doc.uri.with({ scheme: DISK_SCHEME }), doc.uri, `${name}: on disk ↔ yours`);
+      await vscode.commands.executeCommand("vscode.diff", doc.uri.with({ scheme: DISK_SCHEME }), doc.uri, `${name}: other application's version ↔ yours`);
       continue; // ask again after showing the diff
     }
-    if (choice === "Revert") await revert(doc);
-    else if (choice === "Save") {
+    if (choice === "Save Anyway") {
+      // Theirs first (what is on disk), then yours over it: the history ends where the file is.
+      await setAside(fs, p.bundle, "set aside: the version saved by another application");
       await fs.store.write(p.bundle, p.entry, new TextEncoder().encode(doc.getText()));
       await revert(doc); // the editor now matches the disk: clear its modified state
+      await vscode.commands.executeCommand("highwater.history.record", p.bundle);
+    } else if (choice === "Revert") {
+      await setAside(fs, p.bundle, "set aside: your unsaved changes", { entry: p.entry, text: doc.getText() });
+      await revert(doc);
+      await vscode.commands.executeCommand("highwater.history.record", p.bundle);
     } else if (choice === "Save As…") {
       const target = await vscode.window.showSaveDialog({
         defaultUri: vscode.Uri.file(p.bundle.replace(/\.highland$/i, " copy.highland")),
@@ -60,8 +73,19 @@ async function askAboutConflict(fs: HighlandFileSystem, doc: vscode.TextDocument
       await revert(doc);
       await openHighland(target);
     }
-    return;
+    return; // dismissed: the changes stay unsaved, and saving asks again
   }
+}
+
+/** Keeps the version that lost: as a save in the writing history, or else in the backups. */
+async function setAside(fs: HighlandFileSystem, bundle: string, note: string, yours?: { entry: string; text: string }): Promise<void> {
+  const recorded = await vscode.commands.executeCommand<boolean>("highwater.history.setAside", bundle, note, yours).then(
+    (r) => r === true,
+    () => false,
+  );
+  if (recorded) return;
+  const where = await fs.store.keepAside(bundle, yours?.entry, yours ? new TextEncoder().encode(yours.text) : undefined);
+  vscode.window.setStatusBarMessage(`$(archive) Kept ${basename(where)} in the backups`, 8000);
 }
 
 async function revert(doc: vscode.TextDocument): Promise<void> {

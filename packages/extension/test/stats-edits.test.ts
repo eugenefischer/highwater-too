@@ -96,3 +96,10 @@ describe("export", () => {
     expect(stripRevisionTags("She {{REVISION: #ff0000}}runs{{/REVISION}} [[note]] /* gone */ home.")).toBe("She runs [[note]] /* gone */ home.");
   });
 });
+
+describe("reading time", () => {
+  it("reads prose at Highland's 250 words a minute", () => {
+    const prose = Array.from({ length: 2500 }, (_, i) => (i % 10 === 9 ? "word." : "word")).join(" ");
+    expect(documentStats(parse(prose, { mode: "markdown" })).minutes).toBe(10);
+  });
+});
