@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.6
+
+- Fixed: with Live Margins on, transitions and other lines indented more than 43 characters had their margin cut short with "…" (VS Code's default limit for inlay hints; now off in Highwater documents).
+- Known: while you type the first words of a line, VS Code may briefly show "…" at the left edge in place of part of the margin. VS Code holds margins before the cursor at their previous width while typing; it settles within about a second. Left as is; a Highland-style editor (M15) would not have it.
+
 ## 0.2.5
 
 - **Changes made elsewhere** now ask as Highland 2 does: **Save Anyway** (keep your changes), **Revert** (keep the other application's), **Save As…**, or **Compare**. The version that loses is kept: as a save in the writing history noting it was set aside, or in the backups when the history is off.

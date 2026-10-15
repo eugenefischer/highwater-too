@@ -74,6 +74,7 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 
 ## Known limitations
 
+- With Live Margins on, while you type the first words of a line VS Code may briefly show "…" where part of the margin should be; it settles within about a second of a pause.
 - Only the Screenplay and Manuscript templates so far; documents using Highland 2's other templates print with one of these.
 - Live Margins cannot indent the continuation of a wrapped line (VS Code's editor does not allow it).
 - `{{TOC: ##}}` with a level filter prints its entries; Highland 2 prints it oddly.

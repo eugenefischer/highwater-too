@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -936,6 +936,7 @@
     ],
     "configurationDefaults": {
       "[highland-fountain]": {
+        "editor.inlayHints.maximumLength": 0,
         "editor.dropIntoEditor.preferences": ["highwater.asset"],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
@@ -955,6 +956,7 @@
         "editor.lineNumbers": "off"
       },
       "[highland-markdown]": {
+        "editor.inlayHints.maximumLength": 0,
         "editor.dropIntoEditor.preferences": ["highwater.asset"],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
@@ -974,6 +976,7 @@
         "editor.lineNumbers": "off"
       },
       "[highland-plain]": {
+        "editor.inlayHints.maximumLength": 0,
         "editor.dropIntoEditor.preferences": ["highwater.asset"],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
