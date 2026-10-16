@@ -98,8 +98,11 @@ export class PlainExtras implements vscode.Disposable {
     else {
       const text = await this.#text(path);
       const doc = { id: noteId(text), path, text };
-      const found = create || standIn.exists ? await h.resolve(doc) : await h.find(doc);
-      if (found) {
+      const looked = await h.find(doc);
+      // A copy of a work's file, undecided: its Bin and Scratchpad stay its own meanwhile.
+      const found = looked?.copyOf ? null : create || standIn.exists ? await h.resolve(doc) : looked;
+      if (looked?.copyOf) folder = standIn.exists || create ? standIn : null;
+      else if (found) {
         folder = this.#inHistory(found.id);
         if (standIn.exists && !folder.exists) folder = await standIn.moveTo(folder.dir);
         if (!folder.exists && !create) folder = null;
@@ -263,7 +266,7 @@ export class PlainExtras implements vscode.Disposable {
     if (!h) return false;
     const text = await this.#text(path);
     const found = await h.find({ id: noteId(text), path, text });
-    if (!found) return false;
+    if (!found || found.copyOf) return false;
     const head = (await h.log(found.id, 1))[0];
     if (!head) return false;
     const folder = this.#inHistory(found.id);

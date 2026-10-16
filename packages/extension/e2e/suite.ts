@@ -359,6 +359,57 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "asks about a duplicated .highland file, and keeps it separate or makes it the work's file",
+    async () => {
+      const historyDir = join(dir, "history");
+      await vscode.workspace.getConfiguration("highwater").update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
+      const idOf = async (path: string) => ((await readBundle(path)).bundle.info as { highwaterToo?: { documentId?: string } }).highwaterToo?.documentId;
+      const index = () => JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { paths: string[] }> };
+      const asked = () => vscode.commands.executeCommand<{ message: string; choices: string[] }[]>("highwater.test.asked");
+      const saveEdited = async (path: string, words: string) => {
+        const doc = await vscode.workspace.openTextDocument(highland(path));
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(doc.uri, new vscode.Position(0, 0), `${words}\n\n`);
+        assert.ok(await vscode.workspace.applyEdit(edit), "the edit applies");
+        assert.ok(await doc.save(), "the script saves");
+      };
+      try {
+        const original = await copyOf("Duplicated");
+        await openScript(original);
+        await saveEdited(original, "THE ORIGINAL");
+        let id: string | undefined;
+        for (let i = 0; i < 100 && !(id = await idOf(original)); i++) await new Promise((r) => setTimeout(r, 100));
+        assert.ok(id, "the original has the work's ID");
+
+        // A duplicate kept as a separate work gets an ID and history of its own.
+        const separate = join(dir, "Duplicated copy.highland");
+        await copyFile(original, separate);
+        await vscode.commands.executeCommand("highwater.test.answer", "Keep as a Separate Work");
+        await openScript(separate);
+        let question: { message: string; choices: string[] } | undefined;
+        for (let i = 0; i < 100 && !(question = (await asked()).find((q) => q.message.includes("looks like a copy of Duplicated.highland"))); i++) await new Promise((r) => setTimeout(r, 100));
+        assert.deepEqual(question?.choices, ["Keep as a Separate Work", "Make This the Work's File"], "the copy question is asked, with both choices");
+        await saveEdited(separate, "THE SEPARATE COPY");
+        let other: string | undefined;
+        for (let i = 0; i < 100 && (!(other = await idOf(separate)) || other === id); i++) await new Promise((r) => setTimeout(r, 100));
+        assert.ok(other && other !== id, "the separate copy names a work of its own");
+        assert.equal(index().documents[id]!.paths.at(-1), original, "the work's file is still the original");
+
+        // A duplicate made the work's file takes over the history.
+        const taken = join(dir, "Duplicated taken.highland");
+        await copyFile(original, taken);
+        await vscode.commands.executeCommand("highwater.test.answer", "Make This the Work's File");
+        await openScript(taken);
+        await waitFor("the duplicate becomes the work's file", () => index().documents[id!]!.paths.at(-1) === taken);
+        await saveEdited(taken, "THE WORK GOES ON HERE");
+        assert.equal(await idOf(taken), id, "it keeps the work's ID");
+      } finally {
+        await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
+  [
     "exports a manuscript, with its image, as a PDF",
     async () => {
       const path = join(dir, "ManuscriptExport.highland");

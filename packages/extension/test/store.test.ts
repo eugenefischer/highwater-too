@@ -159,6 +159,17 @@ describe("BundleStore", () => {
     expect(copy.originalFolder).toBe("Copy.textbundle");
   });
 
+  it("leaves the writing history's ID out of a copy, keeping the rest of its settings", async () => {
+    await store.update(file, (b) => {
+      b.setInfo({ ...b.info, highwaterToo: { documentId: "1a2b3c4d-0000", savedText: "abc", other: 1 } });
+      return ["info.json"];
+    });
+    const target = join(dir, "Copy.highland");
+    await store.writeCopy(file, "", enc("my version"), target);
+    expect((await readBundle(target)).bundle.info.highwaterToo).toEqual({ other: 1 });
+    expect(((await readBundle(file)).bundle.info.highwaterToo as { documentId: string }).documentId).toBe("1a2b3c4d-0000");
+  });
+
   it("notices changes through the folder watcher", async () => {
     await store.read(file);
     const stop = store.watch(file);

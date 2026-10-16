@@ -61,7 +61,7 @@ describe("History: one repository, one branch per document", () => {
     expect(await h.find({ id: null, path: "/w/New.highland", text: script })).toBeNull();
     expect(existsSync(join(dir, "index.json"))).toBe(false);
     const made = await h.resolve({ id: null, path: "/w/New.highland", text: script });
-    expect(await h.find({ id: null, path: "/w/New.highland", text: "" })).toEqual({ id: made.id, branch: made.branch, paused: false });
+    expect(await h.find({ id: null, path: "/w/New.highland", text: "" })).toEqual({ id: made.id, branch: made.branch, paused: false, copyOf: null });
   });
 
 });
@@ -287,5 +287,74 @@ describe("converting between a .highland file and a plain file", () => {
     await h.commit(r.id, { scriptName: "text.fountain", script }, "save");
     const c = await h.commit(r.id, { scriptName: "text.fountain", script }, "connect", new Date(), "to B.fountain, connected by hand");
     expect(c?.message).toMatch(/^Connect .*, to B\.fountain, connected by hand, \+0 words/);
+  });
+});
+
+describe("copies and moves", () => {
+  const long = Array.from({ length: 60 }, (_, i) => `Line ${i} of the story.`).join("\n") + "\n";
+  const meta = (file: string) => ({ form: formOf(file), file });
+  it("tells a copy (the work's file still there) from a move (it is gone), by ID", async () => {
+    const dir = await folder();
+    const h = new History(join(dir, "history"));
+    const original = join(dir, "Script.highland");
+    const copy = join(dir, "Script copy.highland");
+    await writeFile(original, "x");
+    const first = await h.resolve({ id: null, path: original, text: script });
+    await h.commit(first.id, { scriptName: "text.fountain", script }, "save");
+    // The original is still there: the duplicate is a copy, matched but not recorded as the work's file.
+    expect(await h.find({ id: first.id, path: copy, text: script })).toMatchObject({ id: first.id, copyOf: original });
+    expect(await h.resolve({ id: first.id, path: copy, text: script })).toMatchObject({ id: first.id, created: false, copyOf: original });
+    expect((await h.find({ id: first.id, path: original, text: script }))?.copyOf).toBeNull();
+    const index = () => readFile(join(h.folder, "index.json"), "utf8").then((t) => JSON.parse(t));
+    expect((await index()).documents[first.id].paths).toEqual([original]);
+    // Made the work's file: the original is now the one asked about.
+    await h.claim({ id: first.id, branch: first.branch }, copy);
+    await writeFile(copy, "x");
+    expect((await h.find({ id: first.id, path: copy, text: script }))?.copyOf).toBeNull();
+    expect((await h.find({ id: first.id, path: original, text: script }))?.copyOf).toBe(copy);
+    // The work's file gone: a file with its ID is the work's file moved.
+    const { rm } = await import("node:fs/promises");
+    await rm(copy);
+    const moved = join(dir, "Moved.highland");
+    expect((await h.find({ id: first.id, path: moved, text: script }))?.copyOf).toBeNull();
+    expect((await h.resolve({ id: first.id, path: moved, text: script })).copyOf).toBeNull();
+    expect((await index()).documents[first.id].paths.at(-1)).toBe(moved);
+  });
+
+  it("asks the host whether the work's file is still the work's", async () => {
+    const dir = await folder();
+    const original = join(dir, "A.highland");
+    await writeFile(original, "x");
+    const h = new History(join(dir, "history"), { stillHas: async (path, id) => path === original && id === "keep" });
+    const a = await h.resolve({ id: "keep", path: original, text: script });
+    expect((await h.find({ id: a.id, path: join(dir, "B.highland"), text: script }))?.copyOf).toBe(original);
+    const other = new History(join(dir, "history"), { stillHas: async () => false });
+    expect((await other.find({ id: a.id, path: join(dir, "B.highland"), text: script }))?.copyOf).toBeNull();
+  });
+
+  it("matches only a work's current path: a new file where it used to be is not the work", async () => {
+    const h = new History(await folder());
+    const first = await h.resolve({ id: null, path: "/w/Old.fountain", text: script });
+    await h.commit(first.id, { scriptName: "text.fountain", script }, "save");
+    await h.resolve({ id: first.id, path: "/w/New.fountain", text: script });
+    expect(await h.find({ id: null, path: "/w/Old.fountain", text: "A new script." })).toBeNull();
+    expect((await h.find({ id: null, path: "/w/New.fountain", text: "anything" }))?.id).toBe(first.id);
+    // At a work's current path, the file is that work's whatever ID it names.
+    const other = await h.resolve({ id: null, path: "/w/Other.fountain", text: "Other." });
+    expect((await h.find({ id: other.id, path: "/w/New.fountain", text: "x" }))?.id).toBe(first.id);
+  });
+
+  it("recognises a plain copy by its text, naming the work's file it copies", async () => {
+    const dir = await folder();
+    const h = new History(join(dir, "history"));
+    const original = join(dir, "Novel.md");
+    await writeFile(original, long);
+    const doc = await h.resolve({ id: null, path: original, text: long });
+    await h.commit(doc.id, { scriptName: "text.md", script: long }, "save", new Date(2026, 9, 1), undefined, meta("Novel.md"));
+    const copy = join(dir, "Novel copy.md");
+    expect(await h.recognise({ id: null, path: copy, text: long })).toMatchObject([{ by: "hash", match: "latest", local: true, copyOf: original }]);
+    const { rm } = await import("node:fs/promises");
+    await rm(original);
+    expect(await h.recognise({ id: null, path: copy, text: long })).toMatchObject([{ by: "hash", local: true, copyOf: null }]);
   });
 });

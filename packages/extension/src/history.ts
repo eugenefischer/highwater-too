@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 import { CommitBatcher, computerName, defaultHistoryFolder, formOf, History, moveHistory, syncedFolder, type CommitInfo, type DocumentFiles, type Form, type SaveKind, type WorkInfo } from "@highwater/history";
-import { writeBundle } from "@highwater/bundle";
+import { readBundle, writeBundle } from "@highwater/bundle";
 import { mkdir, writeFile } from "node:fs/promises";
 import { openHighland } from "./open.ts";
 import { LANGUAGES } from "./language.ts";
@@ -13,7 +13,7 @@ import { SCHEME } from "./fs-provider.ts";
 import { exportHistory, HistoryMirror } from "./mirror.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { EXTRAS_SCHEME, plainExtras, toExtras } from "./extras.ts";
-import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
+import { detectAssetsFolder, ExtrasFolder, ID_NOTE, idNote, noteId } from "./extras-folder.ts";
 import { toBundle, withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
 import { focusedDocument, roleOf, scriptIsOpen } from "./focus.ts";
@@ -40,8 +40,28 @@ export function currentHistory(): History | null {
 
 function historyAt(dir: string): History {
   let h = histories.get(dir);
-  if (!h) histories.set(dir, (h = new History(dir)));
+  if (!h) histories.set(dir, (h = new History(dir, { stillHas })));
   return h;
+}
+
+/**
+ * The work's file at `path` is still there and still the work's: it exists and names this ID or
+ * none (Highland 2 drops the ID when it saves). Otherwise a file found elsewhere with the work's ID
+ * or text is the work's file moved, not a copy.
+ */
+async function stillHas(path: string, id: string): Promise<boolean> {
+  if (!existsSync(path)) return false;
+  const named = await fileId(path).catch(() => null);
+  return named === null || named === id;
+}
+
+/** The document ID a file names: in a .highland file's info.json, or a plain file's ID note. */
+async function fileId(path: string): Promise<string | null> {
+  if (path.toLowerCase().endsWith(".highland")) {
+    const ours = (await readBundle(path)).bundle.info[INFO_KEY] as { documentId?: unknown } | undefined;
+    return typeof ours?.documentId === "string" ? ours.documentId : null;
+  }
+  return noteId(await readFile(path, "utf8"));
 }
 
 /**
@@ -107,12 +127,22 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   async function resolve(key: string, instead?: Instead) {
     const { id, files } = await snapshot(key, instead);
     const resolved = await history().resolve({ id, path: key, text: files.script });
-    // Highland drops keys it does not know when it saves; put the ID back.
-    if (key.toLowerCase().endsWith(".highland") && resolved.id !== id) {
+    // Highland drops keys it does not know when it saves; put the ID back (or the new one, for a
+    // copy kept as a separate work). A copy is not written to until the writer decides.
+    if (key.toLowerCase().endsWith(".highland") && resolved.id !== id && !resolved.copyOf) {
       await store.update(key, (b) => {
         b.setInfo({ ...b.info, [INFO_KEY]: { ...((b.info[INFO_KEY] as object | undefined) ?? {}), documentId: resolved.id } });
         return ["info.json"];
       });
+    }
+    // A plain file's ID note naming another work (a copy kept separate) names its own work now.
+    if (!key.toLowerCase().endsWith(".highland") && id && resolved.id !== id && !resolved.copyOf) {
+      const text = await readFile(key, "utf8");
+      const now = text.replace(ID_NOTE, idNote(resolved.id));
+      if (now !== text) {
+        await writeFile(key, now);
+        files.script = files.script.replace(ID_NOTE, idNote(resolved.id));
+      }
     }
     return { ...resolved, files };
   }
@@ -348,6 +378,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   async function togglePause(): Promise<void> {
     const key = (focus.key ?? null);
     if (!key) return;
+    if (connector.undecided(key)) {
+      void vscode.window.showWarningMessage(`First choose how ${basename(key)} continues: click Choose in the status bar.`);
+      return;
+    }
     const r = await resolve(key);
     await history().setPaused(r.id, !r.paused);
     void vscode.window.showInformationMessage(r.paused ? `Writing history is on again for ${basename(key)}.` : `Writing history is off for ${basename(key)}; earlier saves are kept.`);
@@ -472,6 +506,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       await inflight.get(path);
       await batcherIdle();
       return keepVersion(path, note, instead);
+    }),
+    // A copy the writer made on purpose (Save As… in conflicts.ts): it starts a history of its own.
+    vscode.commands.registerCommand("highwater.history.separate", async (path: string) => {
+      if (enabled()) await history().retire(path);
     }),
     vscode.commands.registerCommand("highwater.history.record", async (path: string) => {
       if (enabled()) await commitNow(path, "save");

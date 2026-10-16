@@ -157,10 +157,21 @@ export class BundleStore {
     return run;
   }
 
-  /** Writes the bundle as it is in memory, with `entry` replaced, to a new file (Save As). */
+  /**
+   * Writes the bundle as it is in memory, with `entry` replaced, to a new file (Save As). The copy
+   * leaves out the writing history's ID and saved-text marker: it is a new document.
+   */
   async writeCopy(path: string, entry: string, data: Uint8Array, target: string): Promise<void> {
     const copy = HighlandBundle.fromZip((await this.#current(path)).bundle.toZip(basename(path)));
     copy.set(entry === "" ? copy.textPath : entry, data);
+    const ours = copy.info.highwaterToo as Record<string, unknown> | undefined;
+    if (ours && ("documentId" in ours || "savedText" in ours)) {
+      const { documentId: _id, savedText: _saved, ...rest } = ours;
+      const info: Record<string, unknown> = { ...copy.info };
+      if (Object.keys(rest).length) info.highwaterToo = rest;
+      else delete info.highwaterToo;
+      copy.setInfo(info);
+    }
     await writeBundle(target, copy);
   }
 

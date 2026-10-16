@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.13
+
+- Copies are no longer mistaken for the work's file. A duplicated `.highland` file kept the original's ID, and a duplicated plain file matched its text, so both files saved into one history (with misleading word counts), shared one Bin and Scratchpad, and the Works panel flipped between them. Now, when the work's file is still there and still the work's, you're asked: Keep as a Separate Work, or Make This the Work's File. There is no default; until you choose, the copy's saves are not recorded and its Bin is its own. When the work's file is gone, the new file is the work's file moved, and the history follows it as before.
+- A new file at a path a work used to have no longer joins that work silently: only a work's current path counts.
+- Save As… from the conflict question makes a new document: the copy carries no writing-history ID and starts a history of its own.
+- A plain file kept as a separate work gets its own ID in its Link Writing History note, if it had one.
+
 ## 0.2.12
 
 - Internal: every question Highwater asks the writer now goes through one function, so the end-to-end tests can answer questions by script and check what was asked. The test-only shortcuts that skipped questions are gone, so the tests now run the same code the writer does. No change in behavior.

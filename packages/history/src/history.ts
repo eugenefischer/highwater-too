@@ -72,6 +72,20 @@ export interface Recognition {
   text: string | null;
   /** The work's history is already on this computer. */
   local: boolean;
+  /**
+   * The work's file on this computer, when it is another file that still exists and still belongs
+   * to the work: the file looked up is then a copy of it, not the work's file moved.
+   */
+  copyOf: string | null;
+}
+
+export interface HistoryOptions {
+  /**
+   * Whether the file at `path`, the work's file on this computer, is still there and still the
+   * work's: it exists, and names this work's ID or none. Default: it exists. Decides whether a file
+   * found by its ID or text elsewhere is the work's file moved (no) or a copy of it (yes).
+   */
+  stillHas?: (path: string, id: string) => Promise<boolean>;
 }
 
 export interface IndexEntry {
@@ -221,21 +235,30 @@ export class History {
   #ready = false;
   readonly repo: string;
   readonly folder: string;
+  readonly #stillHas: (path: string, id: string) => Promise<boolean>;
 
-  constructor(folder: string) {
+  constructor(folder: string, options: HistoryOptions = {}) {
+    this.#stillHas = options.stillHas ?? (async (path) => existsSync(path));
     this.folder = folder;
     this.repo = join(folder, REPO_NAME);
   }
 
   /**
-   * Finds the document's history on this computer: by ID, then by path. Starts a new one if nothing
-   * matches (a file another computer's history may know is recognised first, with recognise). Returns the ID to store in the document.
+   * Finds the document's history on this computer: by ID, then by the work's current path. Starts a
+   * new one if nothing matches (a file another computer's history may know is recognised first, with
+   * recognise). Returns the ID to store in the document. A copy of a work's file (`copyOf`) is
+   * matched to the work but not recorded as its file: the writer decides (claim, or retire it).
    */
-  resolve(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; created: boolean; paused: boolean }> {
+  resolve(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; created: boolean; paused: boolean; copyOf: string | null }> {
     return this.#serial(async () => {
       await this.#init();
       const index = await this.#load();
-      let id = await this.#match(index, doc);
+      const matched = await this.#match(index, doc);
+      if (matched?.copyOf) {
+        const entry = index.documents[matched.id]!;
+        return { id: matched.id, branch: entry.branch, created: false, paused: entry.paused === true, copyOf: matched.copyOf };
+      }
+      let id = matched?.id ?? null;
       let created = false;
       if (!id) {
         id = doc.id && !index.documents[doc.id] && !index.retired?.includes(doc.path) && !index.deleted?.includes(doc.id) ? doc.id : randomUUID();
@@ -247,18 +270,18 @@ export class History {
       if (entry.paths.at(-1) !== doc.path) entry.paths = [...entry.paths.filter((p) => p !== doc.path), doc.path];
       if (index.retired?.includes(doc.path)) index.retired = index.retired.filter((p) => p !== doc.path);
       await this.#save(index);
-      return { id, branch: entry.branch, created, paused: entry.paused === true };
+      return { id, branch: entry.branch, created, paused: entry.paused === true, copyOf: null };
     });
   }
 
   /** Like `resolve`, but only looks: creates nothing and writes nothing. */
-  find(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; paused: boolean } | null> {
+  find(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; paused: boolean; copyOf: string | null } | null> {
     return this.#serial(async () => {
       if (!existsSync(this.repo)) return null;
       const index = await this.#load();
-      const id = await this.#match(index, doc);
-      const entry = id ? index.documents[id] : undefined;
-      return id && entry ? { id, branch: entry.branch, paused: entry.paused === true } : null;
+      const matched = await this.#match(index, doc);
+      const entry = matched ? index.documents[matched.id] : undefined;
+      return matched && entry ? { id: matched.id, branch: entry.branch, paused: entry.paused === true, copyOf: matched.copyOf } : null;
     });
   }
 
@@ -380,6 +403,14 @@ export class History {
       const hash = textHash(doc.text);
       const local = new Set(Object.values(index.documents).map((e) => e.branch));
       for (const o of await this.#unindexed(index)) local.add(o.branch);
+      // Only the works that match are checked: that may read their files.
+      const withCopies = async (found: Recognition[]): Promise<Recognition[]> => {
+        for (const r of found) {
+          const id = Object.entries(index.documents).find(([, e]) => e.branch === r.entry.branch)?.[0];
+          r.copyOf = id ? await this.#copyOf(index, id, doc.path) : null;
+        }
+        return found;
+      };
       const describe = (entry: CatalogEntry, by: Recognition["by"]): Recognition => {
         const texts = new Set(entry.texts);
         let match: Recognition["match"] = "none";
@@ -388,19 +419,19 @@ export class History {
         else if (texts.has(hash)) [match, text] = ["older", hash];
         else if (doc.savedText && doc.savedText === entry.latestText) match = "latest";
         else if (doc.savedText && texts.has(doc.savedText)) [match, text] = ["edited", doc.savedText];
-        return { entry, by, match, text, local: local.has(entry.branch) };
+        return { entry, by, match, text, local: local.has(entry.branch), copyOf: null };
       };
       if (doc.id) {
         const short = shortId(doc.id);
         const byId = entries.find((e) => e.id === doc.id) ?? entries.find((e) => branchShortId(e.branch) === short);
-        if (byId) return [describe(byId, "id")];
+        if (byId) return withCopies([describe(byId, "id")]);
       }
       if (wordCount(doc.text) >= minWords) {
         const byHash = entries.filter((e) => e.texts.includes(hash));
-        if (byHash.length) return byHash.map((e) => describe(e, "hash"));
+        if (byHash.length) return withCopies(byHash.map((e) => describe(e, "hash")));
       }
       const name = doc.path.split(/[\\/]/).pop()!;
-      return entries.filter((e) => e.file === name).map((e) => describe(e, "name"));
+      return withCopies(entries.filter((e) => e.file === name).map((e) => describe(e, "name")));
     });
   }
 
@@ -773,21 +804,35 @@ export class History {
 
   // ---------------------------------------------------------------------------------------------
 
-  async #match(index: Index, doc: { id: string | null; path: string; text: string }): Promise<string | null> {
+  /**
+   * The work's history for a file on this computer: by its ID, or by being at the work's current
+   * path (a work's earlier paths are not used: a new file there is not the work). `copyOf`: the
+   * file has the work's ID but the work's own file is elsewhere and still the work's.
+   */
+  async #match(index: Index, doc: { id: string | null; path: string; text: string }): Promise<{ id: string; copyOf: string | null } | null> {
     if (index.retired?.includes(doc.path)) return null;
-    if (doc.id && index.documents[doc.id]) return doc.id;
     const entries = Object.entries(index.documents);
-    const byPath = entries.find(([, e]) => e.paths.at(-1) === doc.path) ?? entries.find(([, e]) => e.paths.includes(doc.path));
-    if (byPath) return byPath[0];
+    const byPath = entries.find(([, e]) => e.paths.at(-1) === doc.path);
+    // At a work's current path, it is that work's file, whatever ID it carries (a file Highland
+    // saved has none; a file put there under the same name is taken as replacing it).
+    if (byPath) return { id: byPath[0], copyOf: null };
+    if (doc.id && index.documents[doc.id]) return { id: doc.id, copyOf: await this.#copyOf(index, doc.id, doc.path) };
     // Branches pulled from another computer, not yet in this computer's index.
     const others = await this.#unindexed(index);
     if (doc.id) {
       const short = shortId(doc.id);
       const mine = others.find((o) => o.id === doc.id) ?? others.find((o) => !o.id && branchShortId(o.branch) === short);
-      if (mine) return adopt(index, doc.id, mine.branch);
+      if (mine) return { id: adopt(index, doc.id, mine.branch), copyOf: null };
     }
     // Not found: the catalog (recognise) may know it; that asks the writer first.
     return null;
+  }
+
+  /** The work's file, when it is not `path` and still exists and is the work's (`path` is then a copy). */
+  async #copyOf(index: Index, id: string, path: string): Promise<string | null> {
+    const current = index.documents[id]?.paths.at(-1);
+    if (!current || current === path) return null;
+    return (await this.#stillHas(current, id).catch(() => false)) ? current : null;
   }
 
   /** Work branches with no index entry (pulled from a mirror), with the ID their latest commit names. */

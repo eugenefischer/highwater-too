@@ -72,6 +72,7 @@ async function askAboutConflict(fs: HighlandFileSystem, doc: vscode.TextDocument
       });
       if (!target) continue;
       await fs.store.writeCopy(p.bundle, p.entry, new TextEncoder().encode(doc.getText()), target.fsPath);
+      await vscode.commands.executeCommand("highwater.history.separate", target.fsPath).then(undefined, () => undefined);
       await revert(doc);
       await openHighland(target);
     }

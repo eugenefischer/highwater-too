@@ -19,6 +19,11 @@ export interface NextSave {
 /** The question a file is waiting on, so it can be asked again. */
 type Pending =
   | { stage: "connect" | "form" | "text"; r: Recognition }
+  /**
+   * The file is a copy of a work's file, which is still there and still the work's. `then`: how
+   * it was recognised (by text or name), whose questions follow if it becomes the work's file.
+   */
+  | { stage: "copy"; work: { id: string | null; branch: string }; title: string; original: string; then: Recognition | null }
   /** The file is an older save of its work, and newer ones came in (from another computer). */
   | { stage: "latest"; branch: string; title: string; save: CommitInfo; saveText: string; head: CommitInfo; headText: string };
 
@@ -103,7 +108,13 @@ export class Connector {
     this.#looked.add(key);
     const h = this.#host.history();
     const doc = await this.#identify(key);
-    if (!doc || (await h.find({ id: doc.id, path: key, text: doc.text }))) return;
+    if (!doc) return;
+    const known = await h.find({ id: doc.id, path: key, text: doc.text });
+    if (known?.copyOf) {
+      const title = (await h.catalog()).find((e) => e.branch === known.branch)?.title ?? basename(known.copyOf);
+      return this.#ask(key, { stage: "copy", work: { id: known.id, branch: known.branch }, title, original: known.copyOf, then: null });
+    }
+    if (known) return;
     const minWords = vscode.workspace.getConfiguration("highwater").get<number>("historyMatchMinWords", 50);
     const found = await h.recognise({ id: doc.id, path: key, text: doc.text, savedText: doc.savedText }, minWords);
     if (!found.length) return;
@@ -120,6 +131,8 @@ export class Connector {
       if (!picked.f) return this.#separate(key);
       r = picked.f;
     }
+    // A copy of the work's file, which is still there: asked first.
+    if (r.copyOf) return this.#ask(key, { stage: "copy", work: { id: r.entry.id, branch: r.entry.branch }, title: r.entry.title, original: r.copyOf, then: r });
     // Already here and found by ID or text: connecting fetches nothing, so it is not asked.
     const stage = r.local && r.by !== "name" ? "form" : "connect";
     return this.#ask(key, { r, stage });
@@ -149,7 +162,7 @@ export class Connector {
     const doc = await this.#identify(key);
     if (!doc) return;
     const found = await h.find({ id: doc.id, path: key, text: doc.text });
-    if (!found || found.paused) return;
+    if (!found || found.paused || found.copyOf) return;
     const head = (await h.branchLog(found.branch, 1))[0];
     if (!head || this.#offered.get(key) === head.hash) return;
     this.#offered.set(key, head.hash);
@@ -168,6 +181,7 @@ export class Connector {
   async #ask(key: string, p: Pending): Promise<void> {
     const name = basename(key);
     if (p.stage === "latest") return this.#askLatest(key, p);
+    if (p.stage === "copy") return this.#askCopy(key, p);
     const title = p.r.entry.title;
     if (p.stage === "connect") {
       const where = p.r.local ? "" : " Its history is on the mirror, not on this computer.";
@@ -283,6 +297,37 @@ export class Connector {
     return this.#done(key);
   }
 
+  /**
+   * A copy of a work's file (Finder's Duplicate, a sync service's conflicted copy): the work's file
+   * is still there, so this one is either a separate work or takes over as the work's file. No
+   * default; until the writer chooses, its saves are not recorded.
+   */
+  async #askCopy(key: string, p: Extract<Pending, { stage: "copy" }>): Promise<void> {
+    const name = basename(key);
+    const other = basename(p.original) === name ? p.original : basename(p.original);
+    const choice = await ask(
+      "warning",
+      `${name} looks like a copy of ${other}, the file for “${p.title}”.`,
+      {
+        modal: true,
+        detail:
+          `The work's file is still at ${p.original}.\n\n` +
+          `Keep as a Separate Work: ${name} gets a writing history of its own from its next save. ${basename(p.original)} keeps “${p.title}”'s history.\n\n` +
+          `Make This the Work's File: “${p.title}”'s history carries on with ${name} from its next save. ${basename(p.original)} is no longer tracked; if you open it again, you'll be asked about it.\n\n` +
+          "Until you choose, your saves aren't recorded.",
+      },
+      "Keep as a Separate Work",
+      "Make This the Work's File",
+    );
+    if (!choice) return this.#wait(key, p);
+    if (choice === "Keep as a Separate Work") return this.#separate(key);
+    // By text or name: the form and text questions follow, as for any work found that way.
+    if (p.then) return this.#ask(key, { r: { ...p.then, copyOf: null }, stage: "form" });
+    await this.#host.history().claim(p.work, key);
+    plainExtras().forget();
+    return this.#done(key);
+  }
+
   async #askLatest(key: string, p: Extract<Pending, { stage: "latest" }>): Promise<void> {
     const name = basename(key);
     const day = { dateStyle: "medium", timeStyle: "short" } as const;
@@ -392,5 +437,6 @@ export class Connector {
   async #separate(key: string): Promise<void> {
     this.#pending.delete(key);
     await this.#host.history().retire(key);
+    plainExtras().forget();
   }
 }
