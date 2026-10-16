@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.10
+
+- Fixed: character completion waited for an L or N in the name (CAMPBELL at "CAMPBEL", COLLEGE KID at "COL", INGRAM at "IN"). The documents' word pattern used Unicode letter classes, which VS Code compiles without the Unicode flag unless told to, so only the letters p, L and N (and a few marks) counted as parts of words. Words are now whole names, which also fixes double-click selection and moving by word.
+- The 0.2.5 change to completion (asking again after the first letter) is removed: it rested on a wrong explanation and was not needed.
+
 ## 0.2.9
 
 - Preview: a scrollbar press now allows two seconds for the drag to start, so pressing and pausing before dragging still moves the editor.

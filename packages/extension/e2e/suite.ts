@@ -36,6 +36,20 @@ async function openScript(path: string, language = "highland-fountain"): Promise
 
 const tests: [string, () => Promise<void>][] = [
   [
+    "treats a whole name as one word (completion, double-click and word moves depend on it)",
+    async () => {
+      // Not "Plain.fountain" or "Kettle.fountain": other tests open those.
+      const path = join(dir, "Words.fountain");
+      await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello, Doña.\n");
+      const doc = await vscode.workspace.openTextDocument(path);
+      await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
+      const range = doc.getWordRangeAtPosition(new vscode.Position(2, 3));
+      assert.equal(range && doc.getText(range), "CAMPBELL");
+      const accented = doc.getWordRangeAtPosition(new vscode.Position(3, 9));
+      assert.equal(accented && doc.getText(accented), "Doña");
+    },
+  ],
+  [
     "opens the script inside a .highland file as text",
     async () => {
       const path = await copyOf("Open");

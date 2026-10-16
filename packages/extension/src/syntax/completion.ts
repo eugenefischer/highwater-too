@@ -56,16 +56,6 @@ export function suggest(before: string, afterBlank: boolean, vocab: ScriptVocabu
   return out;
 }
 
-/**
- * True when nothing is offered yet only because one capital letter is too little to tell a cue
- * from a line of action. VS Code asks for completions once per word and filters what it got as
- * typing goes on; an empty answer at the first letter would end the asking for that word, so the
- * answer is marked incomplete and VS Code asks again at the next letter.
- */
-export function askAgain(before: string, afterBlank: boolean): boolean {
-  return afterBlank && /^[A-Z]$/.test(before);
-}
-
 /** Highland's marker, as Insert Marker writes it. */
 export function markerText(label: string): string {
   return label.trim() ? `{{%m: ${label.trim()}}}` : "{{%m}}";

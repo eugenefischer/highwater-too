@@ -1,6 +1,6 @@
 import { parse } from "@highwater/parser";
 import { describe, expect, it } from "vitest";
-import { askAgain, markerText, nextMarker, suggest, vocabulary } from "../src/syntax/completion.ts";
+import { markerText, nextMarker, suggest, vocabulary } from "../src/syntax/completion.ts";
 
 const script = "INT. KITCHEN - DAY\n\nBOB\nHi.\n\nALICE\nHello.\n\nBOB (V.O.)\nAgain.\n\nEXT. GARDEN - NIGHT\n\nINT. KITCHEN - LATER\n";
 
@@ -39,13 +39,5 @@ describe("markers", () => {
     expect(nextMarker(text, 2)).toBe(16);
     expect(nextMarker(text, 16)).toBe(2);
     expect(nextMarker("none", 0)).toBe(null);
-  });
-
-  it("asks again after the first capital, so the cue list comes at the second", () => {
-    expect(askAgain("B", true)).toBe(true);
-    expect(suggest("B", true, vocabulary(parse(script, { mode: "fountain" })))).toEqual([]);
-    expect(askAgain("BO", true)).toBe(false);
-    expect(askAgain("B", false)).toBe(false);
-    expect(askAgain("b", true)).toBe(false);
   });
 });
