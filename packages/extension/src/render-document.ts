@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import * as vscode from "vscode";
+import { pick } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { exportManuscript, exportManuscriptDocx, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
@@ -90,7 +91,7 @@ export function registerTemplateStatus(context: vscode.ExtensionContext, store: 
       const doc = vscode.window.activeTextEditor?.document;
       if (!doc || !doc.languageId.startsWith("highland-")) return;
       const current = await templateOf(context, store, doc);
-      const picked = await vscode.window.showQuickPick(
+      const picked = await pick(
         TEMPLATES.map((t) => ({ label: t, description: t === current ? "current" : "", picked: t === current })),
         { title: "Print template for Export PDF and the preview" },
       );

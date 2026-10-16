@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import * as vscode from "vscode";
+import { ask, pick } from "./ask.ts";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import type { ParseCache } from "./language.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
@@ -237,7 +238,7 @@ class NavigatorView implements vscode.TreeDataProvider<NavigatorItem>, vscode.Tr
   async chooseFilters(): Promise<void> {
     await this.#loadFilters();
     const picks = NAVIGATOR_TYPES.map((t) => ({ label: NAVIGATOR_LABELS[t], type: t, picked: this.#filters[t] }));
-    const chosen = await vscode.window.showQuickPick(picks, { canPickMany: true, title: "Show in the Navigator" });
+    const chosen = await pick(picks, { canPickMany: true, title: "Show in the Navigator" });
     if (!chosen) return;
     const filters = Object.fromEntries(NAVIGATOR_TYPES.map((t) => [t, chosen.some((c) => c.type === t)])) as NavigatorFilters;
     await this.context.workspaceState.update(this.#key(), filters);
@@ -353,7 +354,7 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
   }
 
   async remove(item: BinItem): Promise<void> {
-    const ok = await vscode.window.showWarningMessage(`Delete the Bin item “${binLabel(item.text, 40)}”?`, { modal: true }, "Delete");
+    const ok = await ask("warning", `Delete the Bin item “${binLabel(item.text, 40)}”?`, { modal: true }, "Delete");
     if (ok !== "Delete") return;
     await this.#change(item, (items) => items.filter((_, i) => i !== item.index));
   }
@@ -513,7 +514,7 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
 
   async remove(item: AssetItem): Promise<void> {
     const detail = item.file ? `It is moved to the Trash from the “${item.folder}” folder. Images in the text that use it will no longer print.` : "Images in the text that use it will no longer print.";
-    const ok = await vscode.window.showWarningMessage(`Delete ${item.name} from this document's assets?`, { modal: true, detail }, "Delete");
+    const ok = await ask("warning", `Delete ${item.name} from this document's assets?`, { modal: true, detail }, "Delete");
     if (ok !== "Delete") return;
     if (item.file) await vscode.workspace.fs.delete(vscode.Uri.file(item.file), { useTrash: true });
     else await this.store.update(item.bundle!, (b) => (b.delete(`assets/${item.name}`) ? [`assets/${item.name}`] : []));

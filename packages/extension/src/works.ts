@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { formOf, type CommitInfo, type History, type WorkInfo } from "@highwater/history";
 import * as vscode from "vscode";
+import { ask } from "./ask.ts";
 import type { Connector } from "./connect.ts";
 import { plainExtras } from "./extras.ts";
 import type { HistoryMirror } from "./mirror.ts";
@@ -98,7 +99,8 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
       void vscode.window.showErrorMessage(`Without a history mirror, removing ${w.title} from this computer would lose its history. Delete Writing History… removes it for good.`);
       return;
     }
-    const ok = await vscode.window.showWarningMessage(
+    const ok = await ask(
+      "warning",
       `Remove the writing history of “${w.title}” from this computer?`,
       { modal: true, detail: `It is sent to the mirror first and stays there: you can restore it, or connect its file again, later. ${node.here ? `${basename(node.here)} itself is not touched.` : ""}`.trim() },
       "Remove",
@@ -124,7 +126,8 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
     const { mirror } = this.#host;
     const count = w.local ? (await h.branchLog(w.branch, 100_000)).length : 0;
     const saves = count ? `All ${count.toLocaleString()} saves` : "Its saves";
-    const first = await vscode.window.showWarningMessage(
+    const first = await ask(
+      "warning",
       `Delete the writing history of “${w.title}”?`,
       {
         modal: true,
@@ -135,7 +138,8 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
     if (first !== "Delete History") return;
     let everywhere = true;
     if (mirror.url) {
-      const where = await vscode.window.showWarningMessage(
+      const where = await ask(
+        "warning",
         "Delete everywhere?",
         {
           modal: true,
@@ -197,7 +201,8 @@ export async function afterPull(host: WorksHost, asked: Set<string>): Promise<vo
     const sameForm = !c.other.form || c.other.form === formOf(path);
     const join = sameForm ? "Join Them" : "Make This File the Work's File";
     const separate = sameForm ? "Keep Separate" : "Keep as a Separate Copy";
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ask(
+      "warning",
       `The history of ${name} on this computer started from a save of “${c.other.title}” made on another computer.`,
       {
         modal: true,
@@ -236,7 +241,8 @@ export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: s
   const h = host.history();
   const files = await h.filesAt(commit.hash);
   const when = commit.date.toLocaleString();
-  const ok = await vscode.window.showWarningMessage(
+  const ok = await ask(
+    "warning",
     `Go back to the save of ${when}?`,
     {
       modal: true,

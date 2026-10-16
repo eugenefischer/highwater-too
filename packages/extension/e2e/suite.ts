@@ -283,7 +283,11 @@ const tests: [string, () => Promise<void>][] = [
         const editor = await vscode.window.showTextDocument(doc);
         const line = editor.document.lineAt(2);
         editor.selection = new vscode.Selection(line.range.start, line.range.end);
+        // The first Bin item of a plain file says, once, where it is kept.
+        await vscode.commands.executeCommand("highwater.test.answer", "Continue");
         await vscode.commands.executeCommand("highwater.copyToBin");
+        const asked = await vscode.commands.executeCommand<{ message: string; choices: string[] }[]>("highwater.test.asked");
+        assert.ok(asked.some((q) => q.message.includes("can’t hold a Bin or Scratchpad") && q.choices.includes("Continue")), "the once-only notice about plain files is asked");
         const index = () => JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { branch: string; paths: string[] }> };
         const [id, entry] = Object.entries(index().documents).find(([, e]) => e.paths.includes(path))!;
         assert.equal(await readFile(join(historyDir, "extras", id, "bin", "0.txt"), "utf8"), "A kettle boils.");
@@ -325,6 +329,8 @@ const tests: [string, () => Promise<void>][] = [
         editor.selection = new vscode.Selection(editor.document.lineAt(2).range.start, editor.document.lineAt(2).range.end);
         await vscode.commands.executeCommand("highwater.copyToBin");
         const highland = join(dir, "Round.highland");
+        // Each conversion offers to move the old file to the Trash: keep it.
+        await vscode.commands.executeCommand("highwater.test.answer", "Keep", "Keep");
         await vscode.commands.executeCommand("highwater.convertToHighland", vscode.Uri.file(path), { target: vscode.Uri.file(highland) });
         const b = (await readBundle(highland)).bundle;
         assert.equal(b.text, original);
@@ -333,6 +339,8 @@ const tests: [string, () => Promise<void>][] = [
         assert.ok(id, "the .highland file carries the work's ID");
         await waitFor("the .highland editor", () => vscode.window.activeTextEditor?.document.uri.scheme === "highland" && vscode.window.activeTextEditor.document.languageId === "highland-fountain");
         await vscode.commands.executeCommand("highwater.convertToFountain", undefined, { target: vscode.Uri.file(path) });
+        const trash = (await vscode.commands.executeCommand<{ message: string; choices: string[] }[]>("highwater.test.asked")).filter((q) => q.message.includes("to the Trash?"));
+        assert.deepEqual(trash.map((q) => q.choices), [["Move to Trash", "Keep"], ["Move to Trash", "Keep"]], "both conversions offered the Trash, with Keep");
         assert.equal(await readFile(path, "utf8"), original);
         const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { branch: string; paths: string[] }>; retired?: string[] };
         const entry = index.documents[id!]!;

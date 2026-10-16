@@ -3,6 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { writeBundle } from "@highwater/bundle";
 import { formOf, textHash, type CommitInfo, type History, type Recognition, type SaveKind } from "@highwater/history";
 import * as vscode from "vscode";
+import { ask, pick } from "./ask.ts";
 import { plainExtras, toExtras } from "./extras.ts";
 import { detectAssetsFolder, ExtrasFolder, noteId } from "./extras-folder.ts";
 import type { HistoryMirror } from "./mirror.ts";
@@ -108,7 +109,7 @@ export class Connector {
     if (!found.length) return;
     let r = found[0]!;
     if (found.length > 1) {
-      const picked = await vscode.window.showQuickPick(
+      const picked = await pick(
         [
           ...found.map((f) => ({ label: f.entry.title, description: f.entry.file ?? "", detail: f.entry.lastSave ? `Last saved ${new Date(f.entry.lastSave).toLocaleString()}` : "", f })),
           { label: "None of these", description: "keep this file separate", f: null },
@@ -177,7 +178,8 @@ export class Connector {
             ? `${name} has exactly the text of a save of “${title}” in your writing history.`
             : `${name} has the same name as “${title}” in your writing history, and may be a copy of it.`;
       const go = p.r.local ? "Connect It" : "Fetch Its History";
-      const choice = await vscode.window.showWarningMessage(
+      const choice = await ask(
+        "warning",
         why,
         { modal: true, detail: `${where} ${p.r.local ? "Connect" : "Fetch that history to this computer and connect"} this file to it, so its saves continue the same history? Or keep it as a separate copy, with a history of its own.`.trim() },
         go,
@@ -197,7 +199,8 @@ export class Connector {
       const form = head.form ?? entry.form;
       if (form && form !== formOf(key)) {
         const kept = form === "highland" ? "a .highland file" : `a plain .${form} file`;
-        const choice = await vscode.window.showWarningMessage(
+        const choice = await ask(
+          "warning",
           `“${title}” is kept as ${kept}, and ${name} is a different kind of file.`,
           {
             modal: true,
@@ -220,7 +223,8 @@ export class Connector {
     const when = save ? save.date.toLocaleString() : "an earlier date";
     const latest = head.date.toLocaleString();
     if (p.r.match === "older") {
-      const choice = await vscode.window.showWarningMessage(
+      const choice = await ask(
+        "warning",
         `${name} is an older version of “${title}”: the save of ${when}. The latest save is from ${latest}.`,
         {
           modal: true,
@@ -241,7 +245,8 @@ export class Connector {
       return this.#done(key);
     }
     if (p.r.match === "edited") {
-      const choice = await vscode.window.showWarningMessage(
+      const choice = await ask(
+        "warning",
         `${name} was edited since the save of ${when} of “${title}”, and the work has been saved since, most recently on ${latest}.`,
         {
           modal: true,
@@ -262,7 +267,8 @@ export class Connector {
       await this.#host.compare(key, head);
       return this.#wait(key, p);
     }
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ask(
+      "warning",
       `${name}'s text matches no save of “${title}”.`,
       {
         modal: true,
@@ -291,7 +297,8 @@ export class Connector {
     // Replacing is offered only while the file is exactly the older save.
     const compare = dirty || edited;
     const go = compare ? "Open the Latest Beside It" : "Update to the Latest";
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ask(
+      "warning",
       `“${p.title}” has newer saves from another computer.`,
       {
         modal: true,

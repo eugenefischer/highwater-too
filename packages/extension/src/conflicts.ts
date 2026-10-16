@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 import * as vscode from "vscode";
+import { ask } from "./ask.ts";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import { openHighland } from "./open.ts";
 import { splitBundlePath } from "./store.ts";
@@ -38,7 +39,8 @@ async function askAboutConflict(fs: HighlandFileSystem, doc: vscode.TextDocument
   const name = basename(p.bundle) + (p.entry ? ` (${p.entry})` : "");
   const kept = currentHistory() ? "kept in the writing history" : "kept in the backups";
   for (;;) {
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ask(
+      "warning",
       `The document “${name}” has been changed by another application.`,
       {
         modal: true,

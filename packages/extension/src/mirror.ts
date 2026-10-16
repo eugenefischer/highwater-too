@@ -1,6 +1,7 @@
 import { basename } from "node:path";
 import { failureKind, git, History, Mirror, parseRemote, type Removed } from "@highwater/history";
 import * as vscode from "vscode";
+import { ask, askText } from "./ask.ts";
 
 /**
  * Mirroring the writing history to one git remote (any host): pushes after saves, never forces,
@@ -137,7 +138,7 @@ export class HistoryMirror implements vscode.Disposable {
 
   /** Asks for the remote address, checks it, saves it and pushes. */
   async setUp(): Promise<void> {
-    const url = await vscode.window.showInputBox({
+    const url = await askText({
       title: "Mirror the writing history",
       prompt: "A git remote address for one repository holding all your writing history. It is pushed to after saves and never overwritten.",
       placeHolder: "https://github.com/you/writing-history.git   ·   https://git.example.net/you/history.git   ·   git@host:you/history.git",
@@ -209,7 +210,7 @@ export class HistoryMirror implements vscode.Disposable {
     const url = this.url;
     const host = hostOf(url) ?? url;
     if (this.state.signIn) {
-      void vscode.window.showWarningMessage(`The history mirror at ${host} needs you to sign in.`, "Sign In…").then((c) => c && this.signIn());
+      void ask("warning", `The history mirror at ${host} needs you to sign in.`, {}, "Sign In…").then((c) => c && this.signIn());
       return;
     }
     const error = this.state.error ?? "";
@@ -225,7 +226,7 @@ export class HistoryMirror implements vscode.Disposable {
     if (r.kind === "github") {
       if (!interactive && this.#asked.has("github.com")) return false;
       this.#asked.add("github.com");
-      const choice = await vscode.window.showWarningMessage("Sign in to GitHub to mirror your writing history there?", "Sign In");
+      const choice = await ask("warning", "Sign in to GitHub to mirror your writing history there?", {}, "Sign In");
       return choice === "Sign In" && !!(await vscode.authentication.getSession("github", ["repo"], { createIfNone: true }).then((s) => s, () => undefined));
     }
     const host = r.host!;
@@ -233,7 +234,7 @@ export class HistoryMirror implements vscode.Disposable {
     this.#asked.add(host);
     const stored = await this.context.secrets.get(loginKey(host));
     const message = stored ? `${host} refused the stored sign-in for the writing history mirror.` : `${host} needs you to sign in to mirror the writing history.`;
-    const choice = interactive ? "Sign In…" : await vscode.window.showWarningMessage(message, "Sign In…");
+    const choice = interactive ? "Sign In…" : await ask("warning", message, {}, "Sign In…");
     if (choice !== "Sign In…") return false;
     return this.#askLogin(url);
   }
@@ -250,7 +251,7 @@ export class HistoryMirror implements vscode.Disposable {
     const gitea = await isGitea(host);
     const tokenPage = gitea ? `https://${host}/user/settings/applications` : r.kind === "gitlab" ? "https://gitlab.com/-/user_settings/personal_access_tokens" : null;
     const previous = parseLogin(await this.context.secrets.get(loginKey(host)));
-    const username = await vscode.window.showInputBox({
+    const username = await askText({
       title: `Sign in to ${host} (1/2)`,
       prompt: "Your username on the server.",
       value: previous?.username ?? r.owner ?? "",
@@ -259,7 +260,8 @@ export class HistoryMirror implements vscode.Disposable {
     });
     if (!username) return false;
     if (tokenPage) {
-      const open = await vscode.window.showInformationMessage(
+      const open = await ask(
+        "info",
         `Next: an access token for ${host}. Make one on the server's token page with permission to read and write repositories${gitea ? " (Gitea and Forgejo: \"repository: Read and Write\")" : ""}, then paste it.`,
         { modal: true },
         "Open Token Page",
@@ -268,7 +270,7 @@ export class HistoryMirror implements vscode.Disposable {
       if (!open) return false;
       if (open === "Open Token Page") await vscode.env.openExternal(vscode.Uri.parse(tokenPage));
     }
-    const token = await vscode.window.showInputBox({
+    const token = await askText({
       title: `Sign in to ${host} (2/2)`,
       prompt: "An access token (or password). Kept in VS Code's secure storage and sent only to this server.",
       password: true,
@@ -313,27 +315,27 @@ export class HistoryMirror implements vscode.Disposable {
     const name = r.name ?? "writing-history";
     try {
       if (r.kind === "github") {
-        if ((await vscode.window.showInformationMessage(`There is no repository at ${url} yet. Create it on GitHub, private?`, "Create")) !== "Create") return false;
+        if ((await ask("info", `There is no repository at ${url} yet. Create it on GitHub, private?`, {}, "Create")) !== "Create") return false;
         const session = await vscode.authentication.getSession("github", ["repo"], { createIfNone: true });
         const mine = r.owner === null || r.owner.toLowerCase() === session.account.label.toLowerCase();
         await api(`https://api.github.com/${mine ? "user" : `orgs/${r.owner}`}/repos`, `Bearer ${session.accessToken}`, { name, private: true, description: "Writing history kept by Highwater Too" });
         return true;
       }
       if (r.kind === "ssh") {
-        if ((await vscode.window.showInformationMessage(`There is no repository at ${url} yet. Create it on ${r.host} over SSH (git init --bare)?`, "Create")) !== "Create") return false;
+        if ((await ask("info", `There is no repository at ${url} yet. Create it on ${r.host} over SSH (git init --bare)?`, {}, "Create")) !== "Create") return false;
         await mirror.createOverSsh();
         return true;
       }
       if (r.kind === "local") {
-        if ((await vscode.window.showInformationMessage(`There is no repository at ${url} yet. Create it?`, "Create")) !== "Create") return false;
+        if ((await ask("info", `There is no repository at ${url} yet. Create it?`, {}, "Create")) !== "Create") return false;
         await git(process.cwd(), ["init", "-q", "--bare", r.path]);
         return true;
       }
       if (r.kind === "https" && r.host && (await isGitea(r.host))) {
-        if ((await vscode.window.showInformationMessage(`There is no repository at ${url} yet. Create it on ${r.host}, private? You will be asked for an access token with permission to create repositories.`, "Create")) !== "Create") return false;
+        if ((await ask("info", `There is no repository at ${url} yet. Create it on ${r.host}, private? You will be asked for an access token with permission to create repositories.`, {}, "Create")) !== "Create") return false;
         const key = tokenKey(r.host);
         let token = (await this.context.secrets.get(key)) ?? parseLogin(await this.context.secrets.get(loginKey(r.host)))?.token;
-        token ??= await vscode.window.showInputBox({ title: `Access token for ${r.host}`, password: true, ignoreFocusOut: true, prompt: "Kept in VS Code's secure storage." });
+        token ??= await askText({ title: `Access token for ${r.host}`, password: true, ignoreFocusOut: true, prompt: "Kept in VS Code's secure storage." });
         if (!token) return false;
         await this.context.secrets.store(key, token);
         const user = await api(`https://${r.host}/api/v1/user`, `token ${token}`);
@@ -397,8 +399,10 @@ export async function exportHistory(h: History, id: string, documentPath: string
   const target = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(documentPath.replace(/[^/\\]+$/, `${name} writing history.bundle`)), filters: { "Git bundle": ["bundle"] }, title: "Export writing history" });
   if (!target) return;
   await h.bundle(id, target.fsPath);
-  const choice = await vscode.window.showInformationMessage(
+  const choice = await ask(
+    "info",
     `Exported the writing history of ${name}. Anyone with git can open it: git clone "${basename(target.fsPath)}". Only this work is in it.`,
+    {},
     "Show File",
   );
   if (choice) void vscode.commands.executeCommand("revealFileInOS", target);

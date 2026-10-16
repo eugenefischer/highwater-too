@@ -8,6 +8,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { openHighland } from "./open.ts";
 import { LANGUAGES } from "./language.ts";
 import * as vscode from "vscode";
+import { ask, pick } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { exportHistory, HistoryMirror } from "./mirror.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
@@ -203,8 +204,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   async function showNotice(): Promise<void> {
     if (context.globalState.get<boolean>(NOTICE_KEY)) return;
     await context.globalState.update(NOTICE_KEY, true);
-    const choice = await vscode.window.showInformationMessage(
+    const choice = await ask(
+      "info",
       `Highwater Too keeps a writing history of your scripts: each save is recorded in a git repository, one branch per script, in ${historyRoot()}. It stays on this computer.`,
+      {},
       "Show History",
       "Change Location…",
       "Turn Off",
@@ -265,7 +268,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   async function changeLocation(): Promise<void> {
     const current = historyRoot();
     const fallback = defaultHistoryFolder(process.platform, process.env, homedir());
-    const picked = await vscode.window.showQuickPick(
+    const picked = await pick(
       [
         { label: "Default location", description: fallback, value: "default" as const },
         { label: "Choose a folder…", value: "choose" as const },
@@ -280,7 +283,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       target = uris[0].fsPath;
       const sync = syncedFolder(target);
       if (sync) {
-        const ok = await vscode.window.showWarningMessage(
+        const ok = await ask(
+          "warning",
           `That folder is kept in sync by ${sync}.`,
           { modal: true, detail: "Sync services can damage git repositories, especially when two computers save the same document. The default location plus a remote mirror is safer." },
           "Use It Anyway",
@@ -291,13 +295,13 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     if (target === current) return;
     const existing = existsSync(target) ? readdirSync(target) : [];
     if (existing.includes("index.json")) {
-      const ok = await vscode.window.showInformationMessage(`${target} already holds a writing history. Use it from now on? The history in ${current} stays where it is.`, { modal: true }, "Use It");
+      const ok = await ask("info", `${target} already holds a writing history. Use it from now on? The history in ${current} stays where it is.`, { modal: true }, "Use It");
       if (ok !== "Use It") return;
     } else if (existing.length > 0) {
       void vscode.window.showErrorMessage(`${target} is not empty. Choose an empty folder, or a new one, for the writing history.`);
       return;
     } else if (existsSync(current)) {
-      const ok = await vscode.window.showInformationMessage(`Move the writing history from ${current} to ${target}?`, { modal: true }, "Move");
+      const ok = await ask("info", `Move the writing history from ${current} to ${target}?`, { modal: true }, "Move");
       if (ok !== "Move") return;
       await batcherIdle();
       await moveHistory(current, target);
@@ -329,7 +333,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       void vscode.window.showInformationMessage("No history yet: it starts with the next save.");
       return;
     }
-    const picked = await vscode.window.showQuickPick(
+    const picked = await pick(
       commits.map((c) => ({ label: c.message, description: c.hash.slice(0, 7), commit: c })),
       { title: `Writing history: ${basename(key)}`, placeHolder: "Pick a save to compare with the script as it is now" },
     );
@@ -522,7 +526,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       void vscode.window.showInformationMessage(mirror.url ? "The writing history has no works yet." : "The writing history has no works yet. To bring in works saved on another computer, set up the history mirror there and here.");
       return;
     }
-    const work = await vscode.window.showQuickPick(
+    const work = await pick(
       works.map((w) => {
         const here = w.paths.slice().reverse().find((p) => existsSync(p));
         return {
@@ -568,11 +572,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       };
     };
     const title = `Connect ${name} to a work's writing history`;
-    let picked = await vscode.window.showQuickPick<Item>([...missing.map(item), { label: "Show All Works…", all: true }], {
+    let picked = await pick<Item>([...missing.map(item), { label: "Show All Works…", all: true }], {
       title,
       placeHolder: missing.length ? "Works whose file is no longer where it was saved" : "No work's file is missing from where it was saved",
     });
-    if (picked?.all) picked = await vscode.window.showQuickPick<Item>(others.map(item), { title, placeHolder: "Every work in the writing history" });
+    if (picked?.all) picked = await pick<Item>(others.map(item), { title, placeHolder: "Every work in the writing history" });
     const w = picked?.work;
     if (!w?.id) return;
 
@@ -591,7 +595,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     ]
       .filter(Boolean)
       .join("\n\n");
-    const ok = await vscode.window.showWarningMessage(`Permanently join ${name}${own ? " and its writing history" : ""} to the writing history of “${w.title}”?`, { modal: true, detail }, "Join Permanently");
+    const ok = await ask("warning", `Permanently join ${name}${own ? " and its writing history" : ""} to the writing history of “${w.title}”?`, { modal: true, detail }, "Join Permanently");
     if (ok !== "Join Permanently") return;
 
     if (!w.local && !(await mirror.fetchWork(w.branch))) return;
@@ -647,7 +651,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       return;
     }
     if (existsSync(path)) {
-      const choice = await vscode.window.showWarningMessage(
+      const choice = await ask(
+        "warning",
         `${basename(path)} is already in that folder.`,
         { modal: true, detail: "It may have been copied or synced there. Open it instead, or replace it with the restored work?" },
         "Open It",

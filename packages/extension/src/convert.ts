@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 import { writeBundle } from "@highwater/bundle";
 import * as vscode from "vscode";
+import { ask } from "./ask.ts";
 import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
 import { assetsFolderName, withoutIdNote } from "./extras-folder.ts";
 import { SCHEME } from "./fs-provider.ts";
@@ -21,13 +22,9 @@ import { toBundle, toPlain } from "./to-bundle.ts";
  *
  * Exporting is different: an export is always a new file, outside the writing history.
  */
-/** In the end-to-end tests: targets are passed in, and nobody is asked about the Trash. */
-let testing = false;
-
 type Options = { target?: vscode.Uri };
 
 export function registerConversions(context: vscode.ExtensionContext, store: BundleStore): void {
-  testing = context.extensionMode === vscode.ExtensionMode.Test;
   // Menus pass a URI; only the tests pass a target.
   const toPlainFile = (uri?: unknown, options?: Options) => convertToPlain(store, options?.target, uri instanceof vscode.Uri ? uri : undefined);
   context.subscriptions.push(
@@ -212,11 +209,11 @@ async function closeTabs(match: (uri: vscode.Uri) => boolean): Promise<void> {
 
 /** Asks whether to move the file the work was converted from (and its images folder) to the Trash. */
 async function offerTrash(file: vscode.Uri, images: string | null, tracked: boolean): Promise<void> {
-  if (testing) return;
   const name = basename(file.fsPath);
   const folder = images && existsSync(images) ? images : null;
   const what = folder ? `${name} and the “${basename(folder)}” folder` : name;
-  const choice = await vscode.window.showInformationMessage(
+  const choice = await ask(
+    "info",
     `Move ${what} to the Trash?`,
     {
       modal: true,

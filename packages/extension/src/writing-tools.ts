@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { askText } from "./ask.ts";
 import { join } from "node:path";
 import { LANGUAGES, type ParseCache } from "./language.ts";
 import { markerText, nextMarker, suggest, vocabulary } from "./syntax/completion.ts";
@@ -39,7 +40,7 @@ export function registerWritingTools(context: vscode.ExtensionContext, cache: Pa
     vscode.commands.registerCommand("highwater.insertMarker", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
-      const label = await vscode.window.showInputBox({ title: "Insert Marker", prompt: "A label for the marker (optional); it shows in the Navigator." });
+      const label = await askText({ title: "Insert Marker", prompt: "A label for the marker (optional); it shows in the Navigator." });
       if (label === undefined) return;
       await editor.edit((b) => b.replace(editor.selection, markerText(label)));
     }),

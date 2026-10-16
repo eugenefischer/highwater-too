@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.12
+
+- Internal: every question Highwater asks the writer now goes through one function, so the end-to-end tests can answer questions by script and check what was asked. The test-only shortcuts that skipped questions are gone, so the tests now run the same code the writer does. No change in behavior.
+
 ## 0.2.11
 
 - Clearer wording when a file has newer saves from another computer: what this file is, when the newest version was saved, and what each choice does ("Keep This Version: carry on with the currently open file, edits included. When you next save, it becomes the newest version.").

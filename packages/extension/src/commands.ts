@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { createDocument, writeBundle, type DocumentMode } from "@highwater/bundle";
 import * as vscode from "vscode";
+import { ask, pick } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
@@ -98,7 +99,7 @@ const PLAIN: Record<"fountain" | "markdown", { ext: string; name: string; filter
 /** New Document…: any kind the extension edits, chosen from a list (or given, for tests and links). */
 async function newAnyDocument(kind?: NewKind, target?: vscode.Uri): Promise<void> {
   if (!kind) {
-    const picked = await vscode.window.showQuickPick<vscode.QuickPickItem & { value?: NewKind }>(
+    const picked = await pick<vscode.QuickPickItem & { value?: NewKind }>(
       [
         { label: ".highland files", kind: vscode.QuickPickItemKind.Separator },
         { label: "$(book) Screenplay", description: ".highland", detail: "Fountain, printed with the Screenplay template; Bin, Scratchpad and Assets kept in the file", value: "screenplay" },
@@ -173,7 +174,7 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
     await vscode.workspace.fs.writeFile(out, result.pdf);
     for (const problem of result.problems) void vscode.window.showWarningMessage(problem);
     if (!target) {
-      void vscode.window.showInformationMessage(`Exported ${basename(out.fsPath)} (${template} template, ${result.pages} pages).`, "Open", "Reveal in Finder").then((choice) => {
+      void ask("info", `Exported ${basename(out.fsPath)} (${template} template, ${result.pages} pages).`, {}, "Open", "Reveal in Finder").then((choice) => {
         if (choice === "Open") void vscode.env.openExternal(out);
         if (choice === "Reveal in Finder") void vscode.commands.executeCommand("revealFileInOS", out);
       });
@@ -210,7 +211,7 @@ async function exportDocx(context: vscode.ExtensionContext, store: BundleStore, 
     await vscode.workspace.fs.writeFile(out, result.docx);
     for (const problem of result.problems) void vscode.window.showWarningMessage(problem);
     if (!target) {
-      void vscode.window.showInformationMessage(`Exported ${basename(out.fsPath)}.`, "Open", "Reveal in Finder").then((choice) => {
+      void ask("info", `Exported ${basename(out.fsPath)}.`, {}, "Open", "Reveal in Finder").then((choice) => {
         if (choice === "Open") void vscode.env.openExternal(out);
         if (choice === "Reveal in Finder") void vscode.commands.executeCommand("revealFileInOS", out);
       });
@@ -227,7 +228,7 @@ async function useForMarkdown(): Promise<void> {
     { label: "Everywhere", description: "user settings", target: vscode.ConfigurationTarget.Global },
     ...(vscode.workspace.workspaceFolders?.length ? [{ label: "This workspace", description: "workspace settings", target: vscode.ConfigurationTarget.Workspace }] : []),
   ];
-  const picked = await vscode.window.showQuickPick(choices, {
+  const picked = await pick(choices, {
     title: "Open .md files with Highwater Too",
     placeHolder: "VS Code's Markdown preview and Markdown extensions will not apply to them",
   });

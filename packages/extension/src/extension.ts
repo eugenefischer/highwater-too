@@ -13,6 +13,7 @@ import { registerTemplateStatus } from "./render-document.ts";
 import { currentHistory, historyRoot, registerHistory } from "./history.ts";
 import { startPlainExtras } from "./extras.ts";
 import { focusedDocument } from "./focus.ts";
+import { registerAsk } from "./ask.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerWritingTools } from "./writing-tools.ts";
 import { registerStatusBar } from "./status.ts";
@@ -20,6 +21,8 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 
 /** VS Code glue only; all format, parsing and layout logic lives in the other packages. */
 export function activate(context: vscode.ExtensionContext): void {
+  // Questions to the writer (answered by script in the end-to-end tests).
+  registerAsk(context);
   const store = new BundleStore({ backupFolder: () => backupFolder(context) });
   // Bin, Scratchpad and images for plain .fountain and .md files.
   startPlainExtras(context, { history: currentHistory, historyRoot });

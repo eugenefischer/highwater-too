@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promi
 import { basename, dirname, extname, join, relative, sep } from "node:path";
 import type { DocumentFiles, History } from "@highwater/history";
 import * as vscode from "vscode";
+import { ask } from "./ask.ts";
 import { assetsFolderName, ExtrasFolder, listAssets, noteId, sameExtras, type ExtrasFiles } from "./extras-folder.ts";
 
 /**
@@ -293,13 +294,13 @@ export class PlainExtras implements vscode.Disposable {
    * part of the file. Returns false to stop (the writer cancelled, or chose to save as .highland).
    */
   async confirm(path: string): Promise<boolean> {
-    // (Not in the end-to-end tests, where nobody can answer it.)
-    if (this.#context.globalState.get<boolean>(NOTICE_KEY) || this.#context.extensionMode === vscode.ExtensionMode.Test) return true;
+    if (this.#context.globalState.get<boolean>(NOTICE_KEY)) return true;
     const kind = extname(path) || "text";
     const where = this.#host.history()
       ? "Highwater Too saves them with your writing history instead"
       : "Highwater Too keeps them on this computer instead (the writing history is off, so they are not recorded with it)";
-    const choice = await vscode.window.showWarningMessage(
+    const choice = await ask(
+      "warning",
       `${basename(path)} is a plain ${kind} file, which can’t hold a Bin or Scratchpad.`,
       {
         modal: true,
