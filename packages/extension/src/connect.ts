@@ -279,8 +279,9 @@ export class Connector {
 
   async #askLatest(key: string, p: Extract<Pending, { stage: "latest" }>): Promise<void> {
     const name = basename(key);
-    const when = p.save.date.toLocaleString();
-    const latest = p.head.date.toLocaleString();
+    const day = { dateStyle: "medium", timeStyle: "short" } as const;
+    const when = p.save.date.toLocaleString(undefined, day);
+    const latest = p.head.date.toLocaleString(undefined, day);
     // Asked again (after comparing, say): the file may have changed since.
     const now = await this.#identify(key);
     const hash = now ? textHash(now.text) : p.saveText;
@@ -291,17 +292,16 @@ export class Connector {
     const compare = dirty || edited;
     const go = compare ? "Open the Latest Beside It" : "Update to the Latest";
     const choice = await vscode.window.showWarningMessage(
-      edited
-        ? `“${p.title}” has newer saves: ${name} was edited since the save of ${when}, and the latest is from ${latest}.`
-        : `“${p.title}” has newer saves: ${name} is the save of ${when}, and the latest is from ${latest}.`,
+      `“${p.title}” has newer saves from another computer.`,
       {
         modal: true,
         detail:
+          (edited ? `${name} began as the version saved on ${when}, and has been edited since.` : `${name} is the version saved on ${when}.`) +
+          ` The newest version was saved on ${latest}.\n\n` +
           (compare
-            ? "Open the latest beside it: compare the latest save with this file, then choose (this file has changes the latest save does not, so it is not replaced).\n\n"
-            : "Update to the latest: this file, its Bin and its Scratchpad are replaced with the latest save (nothing is lost: this version is itself a save in the history).\n\n") +
-          (edited ? `Keep this version: your next save continues from this file, recorded as going back to the save of ${when} with edits.` : "Keep this version: your next save goes back to it, recorded as a revert.") +
-          "\n\nUntil you choose, saves of this file are not recorded.",
+            ? "Open the Latest Beside It: show the newest version next to this file, to compare before choosing. This file has changes the newest version doesn't, so it isn't replaced.\n\n"
+            : "Update to the Latest: replace this file (with its Bin and Scratchpad) with the newest version.\n\n") +
+          "Keep This Version: carry on with the currently open file, edits included. When you next save, it becomes the newest version.\n\nUntil you choose, your saves aren't recorded.",
       },
       go,
       "Keep This Version",

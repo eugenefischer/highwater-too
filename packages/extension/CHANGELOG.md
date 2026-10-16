@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.11
+
+- Clearer wording when a file has newer saves from another computer: what this file is, when the newest version was saved, and what each choice does ("Keep This Version: carry on with the currently open file, edits included. When you next save, it becomes the newest version.").
+
 ## 0.2.10
 
 - Fixed: character completion waited for an L or N in the name (CAMPBELL at "CAMPBEL", COLLEGE KID at "COL", INGRAM at "IN"). The documents' word pattern used Unicode letter classes, which VS Code compiles without the Unicode flag unless told to, so only the letters p, L and N (and a few marks) counted as parts of words. Words are now whole names, which also fixes ⌘D (select the word at the cursor) and other commands that act on the word at the cursor. (Double-click and ⌥←/⌥→ use a separate VS Code setting and were not affected.)
