@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutScreenplay, manuscriptDocx, renderPdf, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
+import { layoutManuscript, layoutScreenplay, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
 import type { Element, MergedElement } from "@highwater/parser";
 
 export interface ExportOptions {
@@ -13,6 +13,11 @@ export interface ExportOptions {
   fontDir: string;
   titlePage?: boolean;
   date?: Date;
+}
+
+export interface ScriptExportOptions extends ExportOptions {
+  /** A script template's name (Screenplay, Stage Play, Graphic Novel); default Screenplay. */
+  template?: string;
 }
 
 export interface ManuscriptExportOptions extends ExportOptions {
@@ -32,7 +37,7 @@ export const includeLoader: IncludeLoader = async (path, from) => {
 };
 
 /** Lays out and renders a screenplay, with {{INCLUDE}} files merged in. */
-export async function exportScreenplay(options: ExportOptions): Promise<ExportResult> {
+export async function exportScreenplay(options: ScriptExportOptions): Promise<ExportResult> {
   const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
   const merged = await resolveIncludes(root, "fountain", includeLoader);
   const doc = parse(options.text, { mode: "fountain" });
@@ -41,6 +46,7 @@ export async function exportScreenplay(options: ExportOptions): Promise<ExportRe
     sourceOf: sourceMap(merged.elements, root),
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
+    template: SCRIPT_TEMPLATES[options.template ?? "Screenplay"] ?? SCREENPLAY,
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });

@@ -9,7 +9,7 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
-export const TEMPLATES = ["Screenplay", "Manuscript"] as const;
+export const TEMPLATES = ["Screenplay", "Stage Play", "Graphic Novel", "Manuscript"] as const;
 export type Template = (typeof TEMPLATES)[number];
 
 export interface Rendered extends ExportResult {
@@ -132,7 +132,7 @@ export async function renderDocument(context: vscode.ExtensionContext, store: Bu
   const chosen = template ?? (await templateOf(context, store, doc));
   if (!chosen) return null;
   const { base, read } = await sources(context, store, doc);
-  if (chosen === "Screenplay") return { ...(await exportScreenplay(base)), template: chosen };
+  if (chosen !== "Manuscript") return { ...(await exportScreenplay({ ...base, template: chosen })), template: chosen };
   return { ...(await exportManuscript({ ...base, image: await loadImages(base.text, read) })), template: chosen };
 }
 

@@ -5,7 +5,7 @@
  */
 export const PACKAGE_NAME = "@highwater/pdf";
 export * from "./types.ts";
-export { SCREENPLAY, layoutScreenplay, type ScreenplayOptions } from "./screenplay.ts";
+export { GRAPHIC_NOVEL, SCREENPLAY, SCRIPT_TEMPLATES, STAGE_PLAY, layoutScreenplay, type ScreenplayOptions, type ScriptTemplate } from "./screenplay.ts";
 export { defaultFontDir, renderPdf, type RenderOptions } from "./render.ts";
 export { plain, toRuns, wrapRuns, type InlineContext } from "./text.ts";
 export { MANUSCRIPT, imageSize, layoutManuscript, manuscriptHeadingPages, type ManuscriptOptions } from "./manuscript.ts";

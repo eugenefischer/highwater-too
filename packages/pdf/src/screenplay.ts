@@ -2,11 +2,45 @@ import { parseInline, seriesCounter, type Directive, type Document, type Element
 import { plain, sentenceEnds, sliceRuns, toRuns, trimStartRuns, wrapRuns, type InlineContext } from "./text.ts";
 import { assignSources, CHAR, type Layout, type Page, type PlacedText, type Run, type SourceRange } from "./types.ts";
 
+/** A script template's measured layout (Highland 2: Screenplay, Stage Play, Graphic Novel). x values are where text starts; y values are baselines. */
+export interface ScriptTemplate {
+  name: string;
+  width: number;
+  height: number;
+  firstLineY: number;
+  lineHeight: number;
+  /** Lines on a page without a footer (one fewer with). */
+  linesPerPage: number;
+  action: { x: number; width: number };
+  /** Scene headings, and centred or right-aligned text. */
+  sceneHeading: { x: number; width: number };
+  sceneNumberLeft: number;
+  sceneNumberRight: number;
+  cue: { x: number; width: number };
+  /** Wrapped parenthetical lines indent one character and are one character narrower. */
+  parenthetical: { x: number; width: number };
+  dialogue: { x: number; width: number };
+  /** (MORE) at a dialogue page break. */
+  more: { x: number };
+  dual: {
+    left: { cue: number; parenthetical: number; dialogue: number; dialogueWidth: number; parentheticalWidth: number };
+    right: { cue: number; parenthetical: number; dialogue: number; dialogueWidth: number; parentheticalWidth: number };
+  };
+  rightEdge: number;
+  centre: number;
+  header: { y: number; left: number; centre: number; right: number };
+  footer: { y: number; left: number; centre: number; right: number };
+  title: { pitch: number; blank: number; firstY: number; centre: number; bottomY: number; left: number; right: number; width: number };
+  /** Sections print in the text: level 1 in capitals, bold and underlined, others plain (Graphic Novel). */
+  printSections?: boolean;
+}
+
 /**
  * Highland 2's Screenplay template on US Letter, measured from its PDFs (see the spec's
- * "Screenplay template (measured)"). x values are where text starts; y values are baselines.
+ * "Screenplay template (measured)").
  */
-export const SCREENPLAY = {
+export const SCREENPLAY: ScriptTemplate = {
+  name: "Screenplay",
   width: 612,
   height: 792,
   firstLineY: 81,
@@ -14,13 +48,12 @@ export const SCREENPLAY = {
   /** 55 lines, or 54 when the page has a footer (ScreenplayEdgeCases vs Astounding). */
   linesPerPage: 55,
   action: { x: 108, width: 63 },
+  sceneHeading: { x: 108, width: 63 },
   sceneNumberLeft: 54,
   sceneNumberRight: 540,
   cue: { x: 249, width: 38 },
-  /** Wrapped parenthetical lines indent one character (to 214.2) and are one character narrower. */
   parenthetical: { x: 207, width: 29 },
   dialogue: { x: 179, width: 34 },
-  /** (MORE) at a dialogue page break. */
   more: { x: 214.2 },
   /** Measured with FirstLineTests: the right column is wider than the left. */
   dual: {
@@ -33,7 +66,35 @@ export const SCREENPLAY = {
   footer: { y: 747, left: 72, centre: 306, right: 540 },
   /** Blank lines inside a title page field: 14 pt (StartTest2, Maximal; the 2024 Astounding export shows 15). */
   title: { pitch: 14.4, blank: 14, firstY: 241.4, centre: 306, bottomY: 716.6, left: 72, right: 540, width: 63 },
-} as const;
+};
+
+/** Graphic Novel (M10, GraphicNovelProbe): the Screenplay layout, with sections printed. */
+export const GRAPHIC_NOVEL: ScriptTemplate = { ...SCREENPLAY, name: "Graphic Novel", printSections: true };
+
+/**
+ * Stage Play (M10, StagePlayProbe): action (and lyrics) in a column on the right, from 4 in.;
+ * wide dialogue from the left; cue and parenthetical between.
+ */
+export const STAGE_PLAY: ScriptTemplate = {
+  ...SCREENPLAY,
+  name: "Stage Play",
+  action: { x: 288, width: 35 },
+  cue: { x: 215, width: 38 },
+  parenthetical: { x: 215, width: 33 },
+  dialogue: { x: 124.28, width: 46 },
+  more: { x: 222.2 },
+  // Dialogue widths from the probe's wrapping (left exactly 29; right 29 to 34); parenthetical widths not probed.
+  dual: {
+    left: { cue: 145, parenthetical: 145, dialogue: 54.28, dialogueWidth: 29, parentheticalWidth: 23 },
+    right: { cue: 323, parenthetical: 349, dialogue: 286.95, dialogueWidth: 29, parentheticalWidth: 25 },
+  },
+};
+
+/** The script templates, by the name Highland stores in info.json. */
+export const SCRIPT_TEMPLATES: Record<string, ScriptTemplate> = { Screenplay: SCREENPLAY, "Graphic Novel": GRAPHIC_NOVEL, "Stage Play": STAGE_PLAY };
+
+/** The template being laid out (layout is synchronous; set by layoutScreenplay). */
+let active: ScriptTemplate = SCREENPLAY;
 
 type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
 
@@ -60,6 +121,8 @@ export interface ScreenplayOptions {
   date?: Date;
   /** Print the title page (Highland's print option, on by default). */
   titlePage?: boolean;
+  /** The script template; default Screenplay. */
+  template?: ScriptTemplate;
 }
 
 /** One line slot on the page: text items at their x positions. */
@@ -98,7 +161,17 @@ interface Block {
 }
 
 export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {}): Layout {
-  const S = SCREENPLAY;
+  const previous = active;
+  active = options.template ?? SCREENPLAY;
+  try {
+    return layout(doc, options);
+  } finally {
+    active = previous;
+  }
+}
+
+function layout(doc: Document, options: ScreenplayOptions): Layout {
+  const S = active;
   const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date() };
   // Measured (StartTest1 vs StartTest2): when the text starts with an empty line, directive lines
   // at the top of the first page print as an empty line instead of vanishing.
@@ -157,6 +230,8 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
     if (content) p.content = true;
   };
 
+  // The kind of the last block printed whole (see startsOnLast below).
+  let previousKind: Block["kind"] | null = null;
   for (let i = 0; i < blocks.length; i++) {
     let b = blocks[i]!;
     if (b.pageBreak) {
@@ -193,14 +268,20 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
       // A transition never sits on the last line (Highland moves it to the next page).
       if (b.kind === "transition") need += 1;
       const lastLine = need === available && b.lastLineOk === false;
-      if (need <= available && !lastLine) {
+      // An action after an action never starts on line 55 (GraphicNovelProbe and StagePlayProbe,
+      // page D: a run of one-line actions stops at line 54; with a footer, line 54 is fine). After a
+      // speech it may (Astounding p. 28). The rule behind this is not known; this is what was seen.
+      const startsOnLast = b.kind === "action" && previousKind === "action" && p.content && p.rows.length + space === S.linesPerPage - 1;
+      if (need <= available && !lastLine && !startsOnLast) {
         push(p, b.rows, space, true);
+        previousKind = b.kind;
         break;
       }
-      const room = lastLine ? available - 1 : available;
+      const room = lastLine || startsOnLast ? available - 1 : available;
       const split = p.content && room > 0 ? b.split?.(room) : null;
       if (split) {
         push(p, tag(split.head, b.range), space, true);
+        previousKind = b.kind;
         newPage();
         split.tail.range = b.range;
         b = split.tail;
@@ -214,6 +295,7 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
       const forced = b.split?.(available);
       if (forced) {
         push(p, tag(forced.head, b.range), 0, true);
+        previousKind = b.kind;
         newPage();
         forced.tail.range = b.range;
         b = forced.tail;
@@ -223,6 +305,7 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
         if (p.rows.length >= capacity(p)) p = newPage();
         push(p, [row], 0, true);
       }
+      previousKind = b.kind;
       break;
     }
   }
@@ -263,7 +346,7 @@ function tag(rows: Row[], range: SourceRange | undefined): Row[] {
 
 /** The fewest rows a block needs on a page: all of it, or its smallest allowed first part. */
 function minHead(b: Block): number {
-  for (let a = 1; a <= SCREENPLAY.linesPerPage; a++) {
+  for (let a = 1; a <= active.linesPerPage; a++) {
     if (b.rows.length <= a) return b.rows.length;
     const s = b.split?.(a);
     if (s) return s.head.length;
@@ -289,7 +372,7 @@ export function pageText(slots: PageTextSlots, fill: (p: PageTextPart[] | null) 
 // Elements to blocks
 
 function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadingBlank: boolean, sourceOf: (e: Element) => SourceRange): Block[] {
-  const S = SCREENPLAY;
+  const S = active;
   const out: Block[] = [];
   const at = (x: number, runs: Run[]): Row => ({ items: [{ x, runs }] });
   const wrapAt = (x: number, runs: Run[], width: number): Row[] => wrapRuns(runs, width).map((r) => at(x, r));
@@ -316,7 +399,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
     switch (e.kind) {
       case "sceneHeading": {
         const runs = toRuns(e.inline, ctx, { bold: true });
-        const rows = wrapAt(S.action.x, runs, S.action.width);
+        const rows = wrapAt(S.sceneHeading.x, runs, S.sceneHeading.width);
         if (e.sceneNumber && rows[0]) {
           const n: Run[] = [{ text: e.sceneNumber.text, style: { bold: true } }];
           rows[0].items.unshift({ x: S.sceneNumberLeft, runs: n });
@@ -360,7 +443,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       case "centered":
       case "rightAligned": {
         const runs = toRuns(e.inline, ctx);
-        const rows = wrapRuns(runs, S.action.width).map((r) => {
+        const rows = wrapRuns(runs, S.sceneHeading.width).map((r) => {
           const len = plain(r).length * CHAR;
           return at(e.kind === "centered" ? S.centre - len / 2 : S.rightEdge - len, r);
         });
@@ -400,7 +483,14 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
         break;
       }
       case "section":
-        out.push({ kind: "directives", rows: [], space: 0, section: e.text });
+        if (S.printSections && e.text.trim()) {
+          // Graphic Novel (GraphicNovelProbe): printed in place with a blank line before and after;
+          // level 1 in capitals, bold, with a 2 pt rule under it; deeper levels plain.
+          const first = e.level === 1;
+          const runs: Run[] = [{ text: first ? e.text.trim().toUpperCase() : e.text.trim(), style: first ? { bold: true, rule: true } : {} }];
+          out.push({ kind: "section", rows: wrapAt(S.sceneHeading.x, runs, S.sceneHeading.width), space: 1, section: e.text });
+          printed = true;
+        } else out.push({ kind: "directives", rows: [], space: 0, section: e.text });
         break;
       case "synopsis":
         if (printed) out.push({ kind: e.kind, rows: [], space: 1, ghost: true });
@@ -432,15 +522,20 @@ export function extraBlankLines(source: string, offset: number): number {
 
 /** An action paragraph; Highland splits it across pages only after a sentence. */
 function actionBlock(runs: Run[], space: number): Block {
-  const S = SCREENPLAY;
+  const S = active;
   const rows = wrapRuns(runs, S.action.width).map((r) => ({ items: [{ x: S.action.x, runs: r }] }));
   const text = plain(runs);
+  // Highland decides whether an action fits as if words longer than the line were not broken
+  // (StagePlayProbe, page C: an action that prints as four lines, with a broken word, counted as
+  // three and ended on line 55).
+  const counted = unbrokenLines(text, S.action.width);
   return {
     kind: "action",
     rows,
     space,
+    ...(counted !== rows.length ? { fitRows: counted } : {}),
     // SpeechFitTests: two lines may end on the page's last line, three may not.
-    lastLineOk: rows.length <= 2,
+    lastLineOk: counted <= 2,
     split: (available) => {
       // At a sentence, like Better Fountain: only blocks of four lines or more, keeping two lines on each
       // page. At a hard line break (separate source lines): anywhere (SpeechFitTests).
@@ -461,6 +556,22 @@ function actionBlock(runs: Run[], space: number): Block {
   };
 }
 
+/** Lines a text takes when words are wrapped at spaces but never broken (a longer word overflows its line). */
+function unbrokenLines(text: string, width: number): number {
+  let n = 0;
+  for (const para of text.split("\n")) {
+    let line = 0;
+    n++;
+    for (const word of para.split(" ").filter(Boolean)) {
+      if (line > 0 && line + 1 + word.length > width) {
+        n++;
+        line = word.length;
+      } else line += (line > 0 ? 1 : 0) + word.length;
+    }
+  }
+  return n;
+}
+
 interface Part {
   kind: "parenthetical" | "line" | "lyric" | "empty";
   runs: Run[];
@@ -471,7 +582,7 @@ interface Part {
  * of dialogue before "(MORE)", and repeats the cue with "(CONT’D)" on the next page.
  */
 function dialogueBlock(cue: string, parts: Part[], space: number): Block {
-  const S = SCREENPLAY;
+  const S = active;
   const rows = [{ items: [{ x: S.cue.x, runs: [{ text: cue, style: {} }] }] }, ...partRows(parts, null)];
   // SpeechFitTests and Astounding: a speech may end on the page's last line only if its text starts
   // there, or a sentence ends somewhere on the line above.
@@ -512,7 +623,7 @@ function contd(cue: string): string {
 }
 
 function partRows(parts: Part[], side: "left" | "right" | null): Row[] {
-  const S = SCREENPLAY;
+  const S = active;
   const pos = side ? S.dual[side] : { parenthetical: S.parenthetical.x, dialogue: S.dialogue.x, dialogueWidth: S.dialogue.width, parentheticalWidth: S.parenthetical.width };
   const rows: Row[] = [];
   for (const p of parts) {
@@ -538,7 +649,7 @@ function cueText(e: Extract<Element, { kind: "dialogue" }>): string {
 }
 
 function dualRows(left: Extract<Element, { kind: "dialogue" }>, right: Extract<Element, { kind: "dialogue" }>, ctx: InlineContext): Row[] & { sumOfColumns: number } {
-  const S = SCREENPLAY;
+  const S = active;
   const side = (e: typeof left, s: "left" | "right"): Row[] => [
     { items: [{ x: S.dual[s].cue, runs: [{ text: cueText(e), style: {} }] }] },
     ...partRows(e.parts.map((p) => ({ kind: p.kind, runs: p.kind === "empty" ? [] : toRuns(p.inline, ctx, p.kind === "lyric" ? { italic: true } : {}) })), s),
@@ -561,7 +672,7 @@ const BOTTOM_RIGHT = ["draft date", "date", "revision"];
 const BOTTOM_LEFT = ["contact", "contact info", "notes", "copyright"];
 
 function titlePage(fields: TitleField[], ctx: InlineContext): Page {
-  const T = SCREENPLAY.title;
+  const T = active.title;
   const items: PlacedText[] = [];
   const lines = (f: TitleField): Run[][] =>
     f.values.flatMap((v) => (v.text.trim() === "" ? [[]] : wrapRuns(styledValue(v.text, ctx), T.width)));

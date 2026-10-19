@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.14
+
+- Two more print templates, measured against Highland 2's own PDFs: **Stage Play** (action in a column on the right, from 4 inches; wide dialogue from the left margin; character names and parentheticals between) and **Graphic Novel** (the Screenplay layout, with sections printed: `#` in capitals, bold and underlined, `##` and deeper plain). Choose them in the Preview or from the template in the status bar.
+- Screenplay layout, from the new probes: an action that follows an action no longer starts on a page's last line, and an action with a word longer than the line is fitted to the page as Highland does.
+
 ## 0.2.13
 
 - Copies are no longer mistaken for the work's file. A duplicated `.highland` file kept the original's ID, and a duplicated plain file matched its text, so both files saved into one history (with misleading word counts), shared one Bin and Scratchpad, and the Works panel flipped between them. Now, when the work's file is still there and still the work's, you're asked: Keep as a Separate Work, or Make This the Work's File. There is no default; until you choose, the copy's saves are not recorded and its Bin is its own. When the work's file is gone, the new file is the work's file moved, and the history follows it as before.

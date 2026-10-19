@@ -64,6 +64,7 @@ export function renderPdf(layout: Layout, options: RenderOptions = {}): Promise<
         const ink = run.text.trimEnd().length * CHAR;
         if (run.style.underline || run.style.link) line(x, item.y + UNDERLINE_OFFSET, ink, run.style.link ? LINK : "black");
         if (run.style.strike) line(x, item.y - STRIKE_RISE, ink);
+        if (run.style.rule) line(x, item.y + 3, ink, "black", 2);
         x += w;
       }
     }
@@ -71,9 +72,9 @@ export function renderPdf(layout: Layout, options: RenderOptions = {}): Promise<
   doc.end();
   return done;
 
-  function line(x: number, y: number, width: number, color = "black"): void {
+  function line(x: number, y: number, width: number, color = "black", weight = 1): void {
     if (width <= 0) return;
-    doc.save().lineWidth(1).strokeColor(color).moveTo(x, y).lineTo(x + width, y).stroke().restore();
+    doc.save().lineWidth(weight).strokeColor(color).moveTo(x, y).lineTo(x + width, y).stroke().restore();
   }
 }
 

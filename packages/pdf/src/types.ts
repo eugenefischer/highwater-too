@@ -10,6 +10,8 @@ export interface TextStyle {
   link?: boolean;
   /** The link's address, when known (used by the .docx export; the PDF prints only the text). */
   href?: string;
+  /** A heavy rule under the text: 2 pt, 3 pt below the baseline (Graphic Novel's top-level sections). */
+  rule?: boolean;
 }
 
 /** A piece of text in one style. */

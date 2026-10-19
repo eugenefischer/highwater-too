@@ -41,7 +41,7 @@ Click the Highwater Too icon in the activity bar (it opens by itself when you op
 - **Export PDF** (in the Preview's toolbar, or the Command Palette): the PDF.
 - **Export Text** (title bar button): the text as `.fountain`, `.md` or `.txt` without revision marks; the save dialog's format menu offers plain text as well as the document's own kind. An export is always a new file, outside the writing history: edited and saved, it starts a history of its own. To change the kind of file a work is kept in, convert it instead (see Plain files).
 - **Export Word Document** (manuscripts; in the Preview's toolbar, or the Command Palette): a `.docx` laid out like the PDF, built from ordinary Word styles, a real header with page numbers, lists and tables, so it can be edited and resubmitted. Word does its own page breaks, so the page count can differ slightly from the PDF. The **Docx Font** setting (`highwater.docxFont`) chooses Courier New (the default; on every computer) or the PDF's Courier Prime, embedded in the file (shown by Word and LibreOffice, not by Pages or Google Docs).
-- **Templates:** Screenplay and Manuscript, measured against Highland 2's own PDFs; the active one is shown in the status bar (click to change it) and saved in the document as Highland 2 does. `{{HEADER}}`, `{{FOOTER}}`, `{{PAGENUMBER}}`, `{{SERIES}}`, `{{TIMESTAMP}}`, `{{TOC}}` and `{{INCLUDE}}` work. A few of Highland 2's layout quirks are fixed rather than copied: a footer's middle part is centred, `%pp` counts pages after `{{PAGENUMBER}}`, text never runs over the footer, block quotes wrap at the margin and there is no blank last page.
+- **Templates:** Screenplay, Stage Play, Graphic Novel and Manuscript, measured against Highland 2's own PDFs; the active one is shown in the status bar (click to change it) and saved in the document as Highland 2 does. `{{HEADER}}`, `{{FOOTER}}`, `{{PAGENUMBER}}`, `{{SERIES}}`, `{{TIMESTAMP}}`, `{{TOC}}` and `{{INCLUDE}}` work. A few of Highland 2's layout quirks are fixed rather than copied: a footer's middle part is centred, `%pp` counts pages after `{{PAGENUMBER}}`, text never runs over the footer, block quotes wrap at the margin and there is no blank last page.
 
 ## Writing history
 
@@ -76,7 +76,7 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 ## Known limitations
 
 - With Live Margins on, while you type the first words of a line VS Code may briefly show "…" where part of the margin should be; it settles within about a second of a pause.
-- Only the Screenplay and Manuscript templates so far; documents using Highland 2's other templates print with one of these.
+- Only the Screenplay, Stage Play, Graphic Novel and Manuscript templates so far; documents using Highland 2's other templates print with Screenplay or Manuscript. Live Margins show the Screenplay layout whatever the template.
 - Live Margins cannot indent the continuation of a wrapped line (VS Code's editor does not allow it).
 - `{{TOC: ##}}` with a level filter prints its entries; Highland 2 prints it oddly.
 - No Stats panel (⌘3), Sprint, Gender Analysis, Revision Mode or FDX yet; `.textbundle` files are not supported.
