@@ -2,8 +2,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { comparePages, formatReport, extractPages } from "@highwater/pdf-compare";
 import { describe, expect, it } from "vitest";
-import { GRAPHIC_NOVEL, STAGE_PLAY } from "../src/index.ts";
-import { renderHighland } from "./helpers.ts";
+import { GRAPHIC_NOVEL, MULTI_CAM, STAGE_PLAY } from "../src/index.ts";
+import { bodyOnly, renderHighland } from "./helpers.ts";
 
 const templates = fileURLToPath(new URL("../../../fixtures/generated/templates/", import.meta.url));
 
@@ -16,5 +16,26 @@ describe("script templates match Highland's PDFs", () => {
     const r = comparePages(await extractPages(join(templates, `${name}.pdf`)), await renderHighland(join(templates, `${name}.highland`), { template }));
     expect(r.diffs, formatReport(r)).toEqual([]);
     expect(r.ok).toBe(true);
+  });
+});
+
+// Highland 2 does not split Multi-Cam's double-spaced speeches again once split: on its pages 8
+// and 10 the rest of a speech runs off the page (y 939, 1419) and is lost in print. We split them
+// as on any other page, so those sections differ (and our page numbers after them); the pages
+// before them, and every section after them, match.
+describe("Multi-Cam matches Highland's PDF, but for Highland's lost text", () => {
+  it("matches line for line before the width probes and from the capacity pages on", async () => {
+    const expected = await extractPages(join(templates, "MultiCamProbe.pdf"));
+    const actual = await renderHighland(join(templates, "MultiCamProbe.highland"), { template: MULTI_CAM });
+    const before = comparePages(expected.slice(0, 7), actual.slice(0, 7));
+    expect(before.diffs, formatReport(before)).toEqual([]);
+    const from = (pages: typeof expected) => pages.findIndex((p) => p.lines.some((l) => l.text === "INT. CAPACITY - DAY"));
+    const after = comparePages(bodyOnly(expected.slice(from(expected))), bodyOnly(actual.slice(from(actual))));
+    expect(after.diffs, formatReport(after)).toEqual([]);
+  });
+
+  it("splits the speeches Highland lets run off the page, so nothing goes below the last line", async () => {
+    const actual = await renderHighland(join(templates, "MultiCamProbe.highland"), { template: MULTI_CAM });
+    for (const page of actual) for (const line of page.lines) expect(line.y).toBeLessThanOrEqual(747);
   });
 });

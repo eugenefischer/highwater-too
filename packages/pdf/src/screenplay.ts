@@ -33,6 +33,15 @@ export interface ScriptTemplate {
   title: { pitch: number; blank: number; firstY: number; centre: number; bottomY: number; left: number; right: number; width: number };
   /** Sections print in the text: level 1 in capitals, bold and underlined, others plain (Graphic Novel). */
   printSections?: boolean;
+  /** Action, lyrics and centred text in capitals (Multi-Cam's Uppercase action option, on by default). */
+  uppercaseAction?: boolean;
+  /**
+   * Dialogue double-spaced: each line takes two rows, its baseline 6 pt above the second row's
+   * (24 pt line boxes, baseline 15 below the top; Multi-Cam).
+   */
+  doubleSpacedDialogue?: boolean;
+  /** Parentheticals run into the dialogue line after them, in the dialogue's margins (Multi-Cam). */
+  inlineParentheticals?: boolean;
 }
 
 /**
@@ -90,8 +99,19 @@ export const STAGE_PLAY: ScriptTemplate = {
   },
 };
 
+/**
+ * Multi-Cam (M10, MultiCamProbe): the Screenplay margins, action in capitals, dialogue
+ * double-spaced with parentheticals run into it.
+ */
+export const MULTI_CAM: ScriptTemplate = { ...SCREENPLAY, name: "Multi-Cam", uppercaseAction: true, doubleSpacedDialogue: true, inlineParentheticals: true };
+
 /** The script templates, by the name Highland stores in info.json. */
-export const SCRIPT_TEMPLATES: Record<string, ScriptTemplate> = { Screenplay: SCREENPLAY, "Graphic Novel": GRAPHIC_NOVEL, "Stage Play": STAGE_PLAY };
+export const SCRIPT_TEMPLATES: Record<string, ScriptTemplate> = { Screenplay: SCREENPLAY, "Multi-Cam": MULTI_CAM, "Graphic Novel": GRAPHIC_NOVEL, "Stage Play": STAGE_PLAY };
+
+/** Capitals, for templates that print action that way. */
+function caps(runs: Run[]): Run[] {
+  return active.uppercaseAction ? runs.map((r) => ({ ...r, text: r.text.toUpperCase() })) : runs;
+}
 
 /** The template being laid out (layout is synchronous; set by layoutScreenplay). */
 let active: ScriptTemplate = SCREENPLAY;
@@ -129,7 +149,8 @@ export interface ScreenplayOptions {
 interface Row {
   /** The script text it was printed from. */
   range?: SourceRange | undefined;
-  items: { x: number; runs: Run[] }[];
+  /** `dy`: moved from the row's baseline (Multi-Cam's double-spaced dialogue). */
+  items: { x: number; runs: Run[]; dy?: number }[];
 }
 
 /** A unit of the flow: an element's rows plus how it joins the page. */
@@ -318,7 +339,7 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
     p.rows.forEach((row, k) => {
       if (!row) return;
       const line: PlacedText[] = [];
-      for (const it of row.items) if (it.runs.length) line.push({ x: it.x, y: S.firstLineY + k * S.lineHeight, runs: it.runs });
+      for (const it of row.items) if (it.runs.length) line.push({ x: it.x, y: S.firstLineY + k * S.lineHeight + (it.dy ?? 0), runs: it.runs });
       if (line.length) printed.push({ range: row.range, items: line });
       items.push(...line);
     });
@@ -420,12 +441,12 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
           if (printed) out.push({ kind: e.kind, rows: [], space: 1, ghost: true });
           break;
         }
-        out.push(actionBlock(runs, 1));
+        out.push(actionBlock(caps(runs), 1));
         printed = true;
         break;
       }
       case "lyric": {
-        const runs = toRuns(e.inline, ctx, { italic: true });
+        const runs = caps(toRuns(e.inline, ctx, { italic: true }));
         // Consecutive lyric lines print as one block.
         const prev = out.at(-1);
         const rows = wrapAt(S.action.x, runs, S.action.width);
@@ -442,7 +463,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       }
       case "centered":
       case "rightAligned": {
-        const runs = toRuns(e.inline, ctx);
+        const runs = caps(toRuns(e.inline, ctx));
         const rows = wrapRuns(runs, S.sceneHeading.width).map((r) => {
           const len = plain(r).length * CHAR;
           return at(e.kind === "centered" ? S.centre - len / 2 : S.rightEdge - len, r);
@@ -586,8 +607,10 @@ function dialogueBlock(cue: string, parts: Part[], space: number): Block {
   const rows = [{ items: [{ x: S.cue.x, runs: [{ text: cue, style: {} }] }] }, ...partRows(parts, null)];
   // SpeechFitTests and Astounding: a speech may end on the page's last line only if its text starts
   // there, or a sentence ends somewhere on the line above.
-  const above = rows.at(-2)!;
-  const lastLineOk = rows.length === 2 || above.items.some((it) => SENTENCE_END.test(plain(it.runs)));
+  const printedRows = rows.filter((r) => r.items.length > 0);
+  const above = printedRows.at(-2) ?? rows[0]!;
+  // Multi-Cam's double-spaced speeches never end on the last line (MultiCamProbe, page D).
+  const lastLineOk = !S.doubleSpacedDialogue && (printedRows.length === 2 || above.items.some((it) => SENTENCE_END.test(plain(it.runs))));
   return {
     kind: "dialogue",
     rows,
@@ -626,6 +649,14 @@ function partRows(parts: Part[], side: "left" | "right" | null): Row[] {
   const S = active;
   const pos = side ? S.dual[side] : { parenthetical: S.parenthetical.x, dialogue: S.dialogue.x, dialogueWidth: S.dialogue.width, parentheticalWidth: S.parenthetical.width };
   const rows: Row[] = [];
+  const double = S.doubleSpacedDialogue === true;
+  const lines = (runs: Run[], x: number, width: number): void => {
+    for (const line of wrapRuns(runs, width)) {
+      if (double) rows.push({ items: [] }, { items: [{ x, runs: line, dy: -6 }] });
+      else rows.push({ items: [{ x, runs: line }] });
+    }
+  };
+  if (S.inlineParentheticals) parts = joinParentheticals(parts);
   for (const p of parts) {
     if (p.kind === "empty") {
       rows.push({ items: [] });
@@ -633,9 +664,23 @@ function partRows(parts: Part[], side: "left" | "right" | null): Row[] {
     }
     if (p.kind === "parenthetical") {
       wrapRuns(p.runs, pos.parentheticalWidth, pos.parentheticalWidth - 1).forEach((line, k) => rows.push({ items: [{ x: pos.parenthetical + (k > 0 ? CHAR : 0), runs: line }] }));
-    } else for (const line of wrapRuns(p.runs, pos.dialogueWidth)) rows.push({ items: [{ x: pos.dialogue, runs: line }] });
+    } else lines(p.runs, pos.dialogue, pos.dialogueWidth);
   }
   return rows;
+}
+
+/** Each parenthetical joined to the dialogue line after it, with a space (Multi-Cam); one with none after prints as a line. */
+function joinParentheticals(parts: Part[]): Part[] {
+  const out: Part[] = [];
+  for (let k = 0; k < parts.length; k++) {
+    const p = parts[k]!;
+    const next = parts[k + 1];
+    if (p.kind === "parenthetical" && next && (next.kind === "line" || next.kind === "lyric")) {
+      out.push({ kind: next.kind, runs: [...p.runs, { text: " ", style: {} }, ...next.runs] });
+      k++;
+    } else out.push(p.kind === "parenthetical" ? { kind: "line", runs: p.runs } : p);
+  }
+  return out;
 }
 
 /** No blank line between two elements in the source (only true for elements of the same file). */

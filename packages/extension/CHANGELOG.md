@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.15
+
+- **Multi-Cam** print template, measured against Highland 2's PDFs: the Screenplay margins, with action, lyrics and centred text in capitals, dialogue double-spaced, and parentheticals run into the dialogue line after them. A double-spaced speech never ends on a page's last line. Long speeches split across pages with (MORE) and (CONT’D) as in Screenplay; Highland 2 sometimes lets the rest of such a speech run off the bottom of the page, where it is lost in print, and Highwater doesn't.
+
 ## 0.2.14
 
 - Two more print templates, measured against Highland 2's own PDFs: **Stage Play** (action in a column on the right, from 4 inches; wide dialogue from the left margin; character names and parentheticals between) and **Graphic Novel** (the Screenplay layout, with sections printed: `#` in capitals, bold and underlined, `##` and deeper plain). Choose them in the Preview or from the template in the status bar.

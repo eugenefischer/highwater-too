@@ -9,7 +9,7 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
-export const TEMPLATES = ["Screenplay", "Stage Play", "Graphic Novel", "Manuscript"] as const;
+export const TEMPLATES = ["Screenplay", "Multi-Cam", "Stage Play", "Graphic Novel", "Manuscript"] as const;
 export type Template = (typeof TEMPLATES)[number];
 
 export interface Rendered extends ExportResult {
