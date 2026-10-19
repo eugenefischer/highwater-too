@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.18
+
+- Fixed: the prose templates printed no title page for documents using Highland's Markdown title keys (TL, TR, CC, BL, BR), as manuscripts do. They are now placed as in Manuscript: TL and TR at the top corners, CC centred, BL and BR at the bottom corners, in the template's font.
+
 ## 0.2.17
 
 - The eight prose templates: **Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report and Wiki**, in Highland 2's fonts, sizes, margins, spacing and heading styles. These are a close match rather than line for line (Highland 2 lays them out with Apple's text system), so a line or page may break differently. Novel's first line after a heading is in small capitals, and its paragraphs are justified.

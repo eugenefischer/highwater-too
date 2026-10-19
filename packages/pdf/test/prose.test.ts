@@ -66,6 +66,21 @@ describe.runIf(privateFonts && existsSync(privateFonts))("prose templates with t
   });
 });
 
+describe("prose title pages", () => {
+  it.each(["Novel", "Treatment"])("%s prints Highland's corner keys (TL, TR, CC, BL, BR), as manuscripts use them", (name) => {
+    const text = "TL: Top left\nTR: Top right\nCC: A Title\n\t\n\tby Someone\nBL: Bottom left\nBR: Bottom right\n\nThe text.";
+    const layout = layoutProse(parse(text, { mode: "markdown" }), PROSE_TEMPLATES[name]!, { fontDir: defaultFontDir(), fontDirs: [] });
+    const title = layout.pages[0]!;
+    expect(title.number).toBeNull();
+    const at = (t: string) => title.items.find((it) => it.runs.map((r) => r.text).join("") === t);
+    expect(at("Top left")?.x).toBe(72);
+    expect(at("A Title")).toBeDefined();
+    expect(at("by Someone")!.y).toBeGreaterThan(at("A Title")!.y);
+    expect(at("Bottom left")!.y).toBe(at("Bottom right")!.y);
+    expect(layout.pages[1]!.items.some((it) => it.runs.some((r) => r.text.includes("The text.")))).toBe(true);
+  });
+});
+
 describe("fonts", () => {
   it("finds a family's four faces by file name, and the faces of a collection by PostScript name", async () => {
     const dir = await mkdtemp(join(tmpdir(), "highwater-fonts-"));

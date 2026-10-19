@@ -611,25 +611,46 @@ function titlePage(fields: TitleField[], T: ProseTemplate, ctx: InlineContext, m
       items.push({ x: 306 - w / 2, y: y + k * step, runs: r });
     });
   const titleSpec: TextSpec = { ...spec, size: P.titleSize ?? P.size, italic: P.titleItalic };
-  let y = P.ys[0];
-  const order: [string[], TextSpec][] = [
-    [["title"], titleSpec],
-    [["credit"], spec],
-    [["author", "authors"], spec],
-    [["source"], spec],
-  ];
-  order.forEach(([names, s], k) => {
-    const ls = lines(get(...names), s);
-    const at = Math.max(P.ys[k]!, y);
-    centre(ls, at, s, (s.size ?? P.size) * 1.2);
-    if (ls.length) y = at + ls.length * (s.size ?? P.size) * 1.2;
-  });
+  /** Lines of a column, downwards from y (empty field lines kept as space). */
+  const column = (names: string[], y: number, x: (w: number) => number) => {
+    const ls = names.flatMap((n) => {
+      const f = get(n);
+      return f ? f.values.flatMap((v) => (v.text.trim() === "" ? [[] as Run[]] : wrapMeasured(dress(styledValue(v.text, { ...ctx, links: false }), spec), 468, 468, (r) => m.runs(r, spec)))) : [];
+    });
+    while (ls.length && ls[0]!.length === 0) ls.shift();
+    while (ls.length && ls.at(-1)!.length === 0) ls.pop();
+    ls.forEach((r, k) => {
+      if (r.length) items.push({ x: x(m.runs(r, spec)), y: y + k * pitch, runs: r });
+    });
+    return ls.length;
+  };
+  // Highland's Markdown corner keys (TL, TR, CC, BL, BR), as manuscripts use them, and the
+  // screenplay-style keys (Title, Credit, Author, Source, Contact, Draft date) in the same places.
+  const top = 72 + P.size;
+  column(["tl"], top, () => 72);
+  column(["tr"], top, (w) => 540 - w);
+  if (get("cc")) column(["cc"], P.ys[0], (w) => 306 - w / 2);
+  else {
+    let y = P.ys[0];
+    const order: [string[], TextSpec][] = [
+      [["title"], titleSpec],
+      [["credit"], spec],
+      [["author", "authors"], spec],
+      [["source"], spec],
+    ];
+    order.forEach(([names, s], k) => {
+      const ls = lines(get(...names), s);
+      const at = Math.max(P.ys[k]!, y);
+      centre(ls, at, s, (s.size ?? P.size) * 1.2);
+      if (ls.length) y = at + ls.length * (s.size ?? P.size) * 1.2;
+    });
+  }
   const stack = (names: string[], x: (w: number) => number) => {
     const ls = names.flatMap((n) => lines(get(n), spec));
     ls.forEach((r, k) => items.push({ x: x(m.runs(r, spec)), y: P.bottom - (ls.length - 1 - k) * pitch, runs: r }));
   };
-  stack(["contact", "contact info", "notes", "copyright"], () => 72);
-  stack(["draft date", "revision"], (w) => 540 - w);
+  stack(["bl", "contact", "contact info", "notes", "copyright"], () => 72);
+  stack(["br", "draft date", "revision"], (w) => 540 - w);
   for (const it of items) it.source = 0;
   return { number: null, items };
 }
