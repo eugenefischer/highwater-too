@@ -11,3 +11,6 @@ export { plain, toRuns, wrapRuns, type InlineContext } from "./text.ts";
 export { MANUSCRIPT, imageSize, layoutManuscript, manuscriptHeadingPages, type ManuscriptOptions } from "./manuscript.ts";
 export { PLAIN_TEXT, layoutPlainText } from "./plain.ts";
 export { manuscriptDocx, DOCX_FONTS, type DocxFont, type DocxOptions } from "./docx.ts";
+export { Measurer, findFamily, resolveFonts, systemFontDirs, type FontFace, type FontFaces, type ResolvedFonts } from "./fonts.ts";
+export { layoutProse, wrapMeasured, type ProseLayout, type ProseOptions } from "./prose.ts";
+export { ARTICLE, BULLETIN, MLA_REPORT, MODERN_STANDARD, NOVEL, PROSE_TEMPLATES, SPEECH, TREATMENT, WIKI, type ProseTemplate } from "./prose-templates.ts";

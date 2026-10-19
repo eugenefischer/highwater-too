@@ -4,12 +4,14 @@ import * as vscode from "vscode";
 import { pick } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
-import { exportManuscript, exportManuscriptDocx, exportPlainText, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
+import { exportManuscript, exportManuscriptDocx, exportPlainText, exportProse, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
-export const TEMPLATES = ["Screenplay", "Multi-Cam", "Stage Play", "Graphic Novel", "Manuscript", "Plain Text"] as const;
+export const TEMPLATES = ["Screenplay", "Multi-Cam", "Stage Play", "Graphic Novel", "Manuscript", "Novel", "Treatment", "Modern Standard", "Article", "Bulletin", "Speech", "MLA Report", "Wiki", "Plain Text"] as const;
+/** Templates laid out as prose (Markdown). */
+const PROSE = new Set<string>(["Novel", "Treatment", "Modern Standard", "Article", "Bulletin", "Speech", "MLA Report", "Wiki"]);
 export type Template = (typeof TEMPLATES)[number];
 
 export interface Rendered extends ExportResult {
@@ -134,6 +136,7 @@ export async function renderDocument(context: vscode.ExtensionContext, store: Bu
   if (!chosen) return null;
   const { base, read } = await sources(context, store, doc);
   if (chosen === "Plain Text") return { ...(await exportPlainText(base)), template: chosen };
+  if (PROSE.has(chosen)) return { ...(await exportProse({ ...base, template: chosen, image: await loadImages(base.text, read) })), template: chosen };
   if (chosen !== "Manuscript") return { ...(await exportScreenplay({ ...base, template: chosen })), template: chosen };
   return { ...(await exportManuscript({ ...base, image: await loadImages(base.text, read) })), template: chosen };
 }

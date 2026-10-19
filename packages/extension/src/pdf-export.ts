@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutPlainText, layoutScreenplay, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
+import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
 import type { Element, MergedElement } from "@highwater/parser";
 
 export interface ExportOptions {
@@ -51,6 +51,31 @@ export async function exportScreenplay(options: ScriptExportOptions): Promise<Ex
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
   return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
+}
+
+export interface ProseExportOptions extends ExportOptions {
+  /** A prose template's name (Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report, Wiki). */
+  template: string;
+  image?: (src: string) => Uint8Array | null;
+}
+
+/** Lays out and renders a prose template, with {{INCLUDE}} files merged in. */
+export async function exportProse(options: ProseExportOptions): Promise<ExportResult> {
+  const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
+  const merged = await resolveIncludes(root, "markdown", includeLoader);
+  const doc = parse(options.text, { mode: "markdown" });
+  const layout = layoutProse(doc, PROSE_TEMPLATES[options.template]!, {
+    elements: merged.elements.map((m) => m.element),
+    sourceOf: sourceMap(merged.elements, root),
+    fontDir: options.fontDir,
+    ...(options.date ? { date: options.date } : {}),
+    ...(options.titlePage === false ? { titlePage: false } : {}),
+    ...(options.image ? { image: options.image } : {}),
+  });
+  const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
+  const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
+  const missing = Object.entries(layout.substituted).map(([font, sub]) => `${font} isn't installed on this computer, so ${options.template} prints in ${sub} instead; lines and pages may fall differently from Highland 2's.`);
+  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missing], anchors: anchors(layout) };
 }
 
 /** The Plain Text template: the text as typed (includes and directives print as written). */

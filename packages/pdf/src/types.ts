@@ -12,6 +12,10 @@ export interface TextStyle {
   href?: string;
   /** A heavy rule under the text: 2 pt, 3 pt below the baseline (Graphic Novel's top-level sections). */
   rule?: boolean;
+  /** Font family (prose templates; default Courier Prime), size in points (default 12) and colour. */
+  font?: string;
+  size?: number;
+  color?: string;
 }
 
 /** A piece of text in one style. */
@@ -29,6 +33,8 @@ export interface PlacedText {
   source?: number;
   /** Highlight box relative to the baseline: top offset and height (default: the screenplay's -9.5, 12.5). */
   highlightBox?: { top: number; height: number; color: string };
+  /** Justified to this width: the spaces stretch (Novel). */
+  justify?: number;
 }
 
 /** A filled rectangle (table rules) or an image; y is the top edge. */
@@ -48,6 +54,8 @@ export interface Layout {
   width: number;
   height: number;
   pages: Page[];
+  /** Font files for runs that name a font (prose templates), by `${family}/${variant}`. */
+  fonts?: Record<string, { path: string; postscriptName?: string }>;
 }
 
 /** Courier Prime at 12 pt: every character is 7.2 pt wide. */

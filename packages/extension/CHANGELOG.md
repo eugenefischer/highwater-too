@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.17
+
+- The eight prose templates: **Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report and Wiki**, in Highland 2's fonts, sizes, margins, spacing and heading styles. These are a close match rather than line for line (Highland 2 lays them out with Apple's text system), so a line or page may break differently. Novel's first line after a heading is in small capitals, and its paragraphs are justified.
+- Fonts: Amiri and Lato are now bundled with Courier Prime. Georgia, Times New Roman, Avenir Next, SF Pro Display, New York and Highland Sans are used when installed (including the copies inside Highland 2's app); otherwise a bundled font of the same kind prints instead, and Export PDF says so.
+- Fixed in passing, as Highland 2's quirks: Article now prints level-3 headings, quotes wrap at the right margin, nested list items are indented, and Speech's custom footer no longer prints over the text.
+- Lines of one quoted paragraph each start a new line when printed, as in Highland 2 (an attribution under a quote stays on its own line).
+
 ## 0.2.16
 
 - **Plain Text** print template, matching Highland 2's: the text exactly as typed, markup and directives included, 65 characters wide and 54 lines a page, with no title page, header or page numbers. It is the default for plain-text documents, which now have the Preview and Export PDF too.

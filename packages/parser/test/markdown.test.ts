@@ -22,8 +22,8 @@ describe("Markdown blocks", () => {
     expect(only("> One.\n>\n> Two.", "blockQuote").paragraphs.map((p) => p.text)).toEqual(["One.", "Two."]);
   });
 
-  it("joins wrapped lines within one quoted paragraph", () => {
-    expect(only("> One\n> continued.", "blockQuote").paragraphs.map((p) => p.text)).toEqual(["One continued."]);
+  it("keeps the lines of one quoted paragraph as lines (a line break between them)", () => {
+    expect(only("> One\n> continued.", "blockQuote").paragraphs.map((p) => p.text)).toEqual(["One\ncontinued."]);
   });
 
   it("reads * * * as a scene break, not a list", () => {

@@ -129,12 +129,13 @@ function blockQuote(block: L[]): Element {
   let current: LogicalText[] = [];
   const flush = () => {
     if (current.length === 0) return;
-    // Lines inside one quoted paragraph are joined with a space.
+    // Lines inside one quoted paragraph each start a line, as in Highland's print (an
+    // attribution line under a quote stays on its own line: NovelProbe).
     for (const lt of current) {
       const inline = parseInline(lt);
       const prev = paragraphs.at(-1);
       if (prev && current.indexOf(lt) > 0) {
-        prev.inline.push({ kind: "text", text: " ", span: { start: offsetAt(lt, 0), end: offsetAt(lt, 0) } }, ...inline);
+        prev.inline.push({ kind: "lineBreak", span: { start: offsetAt(lt, 0), end: offsetAt(lt, 0) } }, ...inline);
         prev.text = inlineText(prev.inline);
       } else paragraphs.push({ text: inlineText(inline), inline });
     }
