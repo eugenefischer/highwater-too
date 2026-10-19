@@ -2,8 +2,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { comparePages, formatReport, extractPages } from "@highwater/pdf-compare";
 import { describe, expect, it } from "vitest";
-import { GRAPHIC_NOVEL, MULTI_CAM, STAGE_PLAY } from "../src/index.ts";
-import { bodyOnly, renderHighland } from "./helpers.ts";
+import { readFileSync } from "node:fs";
+import { HighlandBundle } from "@highwater/bundle";
+import { GRAPHIC_NOVEL, layoutPlainText, MULTI_CAM, STAGE_PLAY } from "../src/index.ts";
+import { bodyOnly, extractLayout, renderHighland } from "./helpers.ts";
 
 const templates = fileURLToPath(new URL("../../../fixtures/generated/templates/", import.meta.url));
 
@@ -37,5 +39,14 @@ describe("Multi-Cam matches Highland's PDF, but for Highland's lost text", () =>
   it("splits the speeches Highland lets run off the page, so nothing goes below the last line", async () => {
     const actual = await renderHighland(join(templates, "MultiCamProbe.highland"), { template: MULTI_CAM });
     for (const page of actual) for (const line of page.lines) expect(line.y).toBeLessThanOrEqual(747);
+  });
+});
+
+describe("Plain Text matches Highland's PDF", () => {
+  it("prints the text as typed, line for line", async () => {
+    const text = HighlandBundle.fromZip(new Uint8Array(readFileSync(join(templates, "PlainTextProbe.highland")))).text;
+    const r = comparePages(await extractPages(join(templates, "PlainTextProbe.pdf")), await extractLayout(layoutPlainText(text)));
+    expect(r.diffs, formatReport(r)).toEqual([]);
+    expect(r.ok).toBe(true);
   });
 });

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.16
+
+- **Plain Text** print template, matching Highland 2's: the text exactly as typed, markup and directives included, 65 characters wide and 54 lines a page, with no title page, header or page numbers. It is the default for plain-text documents, which now have the Preview and Export PDF too.
+
 ## 0.2.15
 
 - **Multi-Cam** print template, measured against Highland 2's PDFs: the Screenplay margins, with action, lyrics and centred text in capitals, dialogue double-spaced, and parentheticals run into the dialogue line after them. A double-spaced speech never ends on a page's last line. Long speeches split across pages with (MORE) and (CONT’D) as in Screenplay; Highland 2 sometimes lets the rest of such a speech run off the bottom of the page, where it is lost in print, and Highwater doesn't.

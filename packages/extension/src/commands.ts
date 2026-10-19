@@ -160,7 +160,7 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
   const out =
     target ??
     (await vscode.window.showSaveDialog({
-      defaultUri: vscode.Uri.file(path.replace(/\.(highland|fountain|spmd|md|markdown)$/i, "") + ".pdf"),
+      defaultUri: vscode.Uri.file(path.replace(/\.(highland|fountain|spmd|md|markdown|txt)$/i, "") + ".pdf"),
       filters: { PDF: ["pdf"] },
       title: `Export PDF (${template} template)`,
     }));

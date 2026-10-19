@@ -9,4 +9,5 @@ export { GRAPHIC_NOVEL, MULTI_CAM, SCREENPLAY, SCRIPT_TEMPLATES, STAGE_PLAY, lay
 export { defaultFontDir, renderPdf, type RenderOptions } from "./render.ts";
 export { plain, toRuns, wrapRuns, type InlineContext } from "./text.ts";
 export { MANUSCRIPT, imageSize, layoutManuscript, manuscriptHeadingPages, type ManuscriptOptions } from "./manuscript.ts";
+export { PLAIN_TEXT, layoutPlainText } from "./plain.ts";
 export { manuscriptDocx, DOCX_FONTS, type DocxFont, type DocxOptions } from "./docx.ts";

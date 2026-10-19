@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutScreenplay, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
+import { layoutManuscript, layoutPlainText, layoutScreenplay, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
 import type { Element, MergedElement } from "@highwater/parser";
 
 export interface ExportOptions {
@@ -51,6 +51,13 @@ export async function exportScreenplay(options: ScriptExportOptions): Promise<Ex
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
   return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
+}
+
+/** The Plain Text template: the text as typed (includes and directives print as written). */
+export async function exportPlainText(options: ExportOptions): Promise<ExportResult> {
+  const layout = layoutPlainText(options.text);
+  const pdf = await renderPdf(layout, { fontDir: options.fontDir, title: "" });
+  return { pdf, pages: layout.pages.length, problems: [], anchors: anchors(layout) };
 }
 
 /** Lays out and renders a manuscript, with {{INCLUDE}} files merged in. */
