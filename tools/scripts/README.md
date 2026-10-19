@@ -6,4 +6,6 @@ Run with `python3 -I`. The two PDF scripts need PyMuPDF (`pip install pymupdf`).
 - `pdf_dump_lines.py <file.pdf>`: prints every line with y, x-start, x-end and font.
 - `pdf_line_extents.py <file.pdf>`: line counts and first/last y for pages 2–6.
 
+TypeScript generators (run with `node --experimental-strip-types`): `gen-layout-probes.ts` and `gen-manuscript-probes.ts` (Screenplay and Manuscript probes, in `fixtures/generated/`), and `gen-template-probes.ts <out-dir>` (M10: one probe per other template; scripts share one Fountain text, prose templates one Markdown text).
+
 The TypeScript comparison tool in `tools/pdf-compare` supersedes the PDF scripts for tests.
