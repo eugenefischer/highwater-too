@@ -1,9 +1,11 @@
 # Bundled fonts
 
-All under the SIL Open Font License 1.1 (licence texts beside them).
+All under the SIL Open Font License 1.1 (licence texts beside them). The versions are the ones Highland 2 itself ships (in its app's Resources/Fonts), so text measures as in Highland's PDFs.
 
 - Courier Prime 1.203 (OFL.txt): screenplay, manuscript and plain-text templates.
-- Amiri 1.000 (Amiri-OFL.txt; no Reserved Font Name): Novel, and the stand-in for missing serif fonts. Modified for size and for Latin text: subset to Latin, Greek-free Western ranges and punctuation (fontTools pyftsubset, all layout features kept), and the default script's layout features made the same as Latin's, so a run of only punctuation or digits (".", "1. ") takes the Latin glyphs.
-- Lato 2.015 (Lato-OFL.txt; Reserved Font Name "Lato"): unmodified. Article's headings, and the stand-in for missing sans-serif fonts.
+- Highland Sans 2.002 (HighlandSans-OFL.txt; Reserved Font Name "Highland Sans"): Treatment. Unmodified.
+- Amiri 0.113 (Amiri-OFL.txt; no Reserved Font Name): Novel, and the stand-in for Times New Roman. Modified for size and for Latin text: subset to Latin ranges and punctuation (fontTools subset, all layout features kept), and the default script's layout features made the same as Latin's, so a run of only punctuation or digits (".", "1. ") takes the Latin glyphs.
+- Lato 1.104 (Lato-OFL.txt; Reserved Font Name "Lato"): Article's headings, and the stand-in for Avenir Next and SF Pro Display. Unmodified.
+- Merriweather 1.584 (Merriweather-OFL.txt; Reserved Font Name "Merriweather"): Article's table-of-contents numbers, and the stand-in for Georgia and New York. Unmodified.
 
-Highland 2's other template fonts (Georgia, Times New Roman, Avenir Next, SF Pro Display, New York, Highland Sans) are not redistributable and are used only when installed.
+Highland 2's other template fonts are not redistributable and are used only when installed: Georgia, Times New Roman and Avenir Next (macOS), SF Pro Display and New York (Apple; Highland 2 keeps copies inside its app, where Highwater Too finds them).

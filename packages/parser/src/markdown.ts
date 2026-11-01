@@ -10,7 +10,7 @@ import type { LogicalText } from "./overlays.ts";
 const HEADING = /^(#{1,6})(?:\s+|$)/;
 const SCENE_BREAK = /^\*(?:\s*\*){2,}\s*$/;
 const QUOTE = /^>/;
-const LIST_ITEM = /^(\s*)([*-]|\d+[.)])\s+/;
+const LIST_ITEM = /^(\s*)([*+-]|\d+[.)])\s+/;
 const TERM = /^(.+?)\s*::\s*(.*)$/;
 const LINK_DEFINITION = /^\[([^\]]+)\]:\s*(\S+)/;
 const TABLE_SEPARATOR = /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;

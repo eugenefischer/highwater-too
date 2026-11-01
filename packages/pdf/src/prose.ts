@@ -26,6 +26,8 @@ export interface ProseOptions {
   /** Font files: the bundled fonts' folder, and folders to look in for the others (default: the system's). */
   fontDir: string;
   fontDirs?: string[];
+  /** Reproduce Highland's quirks that we otherwise fix (for comparing with its PDFs): quotes keep the full measure and run into the right margin. */
+  highlandQuirks?: boolean;
 }
 
 type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
@@ -46,6 +48,8 @@ interface Line {
   /** An empty line: dropped at the top of a page and where it does not fit. */
   empty?: boolean;
   keepWithNext?: boolean;
+  /** This line and the next `together - 1` move as one (quote paragraphs, table rows). */
+  together?: number;
   graphics?: (top: number) => Graphic[];
   heading?: { text: string; level: number; id: number };
   /** Highlight box for this line's runs, relative to the baseline. */
@@ -90,7 +94,7 @@ function familiesOf(t: ProseTemplate): string[] {
 
 function run(doc: Document, T: ProseTemplate, options: ProseOptions, m: Measurer, tocPages: Map<number, number>) {
   const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true };
-  const units = toUnits(options.elements ?? doc.elements, doc, T, ctx, m, { image: options.image, sourceOf: options.sourceOf ?? ((e) => e.span), tocPages, titleFields: doc.titlePage?.fields ?? [] });
+  const units = toUnits(options.elements ?? doc.elements, doc, T, ctx, m, { image: options.image, sourceOf: options.sourceOf ?? ((e) => e.span), tocPages, titleFields: doc.titlePage?.fields ?? [], quirks: !!options.highlandQuirks });
 
   let header: PageTextDirective | null = null;
   let footer: PageTextDirective | null = null;
@@ -147,16 +151,25 @@ function run(doc: Document, T: ProseTemplate, options: ProseOptions, m: Measurer
     }
     const line = u.line;
     let p = current();
-    if (line.empty && p.lines.length === 0) continue;
+    // An empty line opening the text is dropped; one that spills over a page break prints at
+    // the top of the next page (BulletinProbe C).
+    if (line.empty && body.length === 1 && !p.lines.some((l) => !l.line.empty)) continue;
     let ok = fits(p, line);
+    if (ok && (line.together ?? 1) > 1 && p.lines.length > 0) {
+      // A quote paragraph or a table row moves whole (NovelProbe, MLAReportProbe).
+      let y = p.y;
+      for (let k = 0; k < line.together! && ok; k++) {
+        const n = units[i + k];
+        if (n?.kind !== "line") break;
+        ok = fits(p, n.line, y);
+        y += n.line.height;
+      }
+    }
     if (ok && line.keepWithNext && p.lines.length > 0) {
       const next = units.slice(i + 1).find((n): n is Extract<Unit, { kind: "line" }> => n.kind === "line" && !n.line.empty);
       ok = !next || fits(p, next.line, p.y + line.height);
     }
-    if (!ok) {
-      if (line.empty) continue;
-      p = newPage();
-    }
+    if (!ok) p = newPage();
     place(p, line);
   }
   if (page) {
@@ -290,6 +303,7 @@ interface UnitOptions {
   sourceOf: (e: Element) => SourceRange;
   tocPages: Map<number, number>;
   titleFields: TitleField[];
+  quirks: boolean;
 }
 
 function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: InlineContext, m: Measurer, o: UnitOptions): Unit[] {
@@ -298,7 +312,8 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
   const out: Unit[] = [];
   const width = (spec: TextSpec) => (runs: Run[]) => m.runs(runs, spec);
   const bodyLine = (items: Item[], extra: Partial<Line> = {}): Line => ({ items, height: B.pitch, ascent: B.ascent, ...extra });
-  const empty = (): Line => bodyLine([], { empty: true });
+  // An empty line is an empty paragraph: it may take the last line's space (SpeechProbe C).
+  const empty = (): Line => bodyLine([], { empty: true, opens: true });
   const push = (line: Line) => out.push({ kind: "line", line });
   const measure = (runs: Run[], spec: TextSpec) => m.runs(runs, spec);
   let printed = false;
@@ -356,11 +371,10 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
   let prev: Element | null = null;
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i]!;
-    // The empty source lines between blocks print as empty lines, in templates that keep them.
-    if (printed && prev && e.kind !== "directiveLine" && e.kind !== "pageBreak" && T.blankLines) {
-      const gap = sameParagraph(source, prev, e) ? 0 : 1 + extraBlankLines(source, e.span.start);
-      for (let k = 0; k < gap; k++) push(empty());
-    }
+    // The empty source lines between blocks print as empty lines, in templates that keep them;
+    // added below once the element prints something (a link definition takes its blank line with
+    // it: BulletinProbe).
+    const gap = printed && prev && e.kind !== "directiveLine" && e.kind !== "pageBreak" && T.blankLines ? (sameParagraph(source, prev, e) ? 0 : 1 + extraBlankLines(source, e.span.start)) : 0;
     const before = out.length;
     switch (e.kind) {
       case "paragraph": {
@@ -381,7 +395,11 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           }
           break;
         }
-        if (plain(runs).trim() === "") break; // only a note
+        // Only a note: not printed, but an empty paragraph to Highland (BulletinProbe, NovelProbe).
+        if (plain(runs).trim() === "") {
+          if (printed) push(empty());
+          break;
+        }
         const indent = T.indent.rule === "all" || (T.indent.rule === "afterParagraph" && afterParagraph) ? T.indent.first : 0;
         const caps = !!T.smallCapsAfterHeading && afterHeading;
         for (const line of paragraph(runs, B, T.left + indent, T.left, T.right, { justify: B.justify, smallCaps: caps })) push(line);
@@ -435,7 +453,8 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           if (k > 0 && T.blankLines) push(empty());
           const runs = toRuns(para.inline, ctx);
           // Wrapped at the right margin (Highland lets quotes run into it: a quirk we fix).
-          for (const text of plain(runs).split("\n").length > 1 ? splitLines(runs) : [runs]) for (const line of paragraph(text, spec, T.left + Q.indent, T.left + Q.indent, T.right)) push(line);
+          const lines = (plain(runs).includes("\n") ? splitLines(runs) : [runs]).flatMap((text) => paragraph(text, spec, T.left + Q.indent, T.left + Q.indent, o.quirks ? T.right + Q.indent : T.right));
+          lines.forEach((line, j) => push({ ...line, opens: false, ...(j === 0 ? { together: lines.length } : {}) }));
         });
         printed = true;
         afterParagraph = false;
@@ -462,7 +481,8 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           lines.forEach((r, k) => {
             const items: Item[] = [{ x: textX, runs: r }];
             if (k === 0) items.unshift({ x: textX - measure(markerRuns, B), runs: markerRuns });
-            push(bodyLine(items, k === 0 ? { opens: true } : {}));
+            // A list item never takes the last line's extra space (SpeechProbe; as in Manuscript).
+            push(bodyLine(items));
           });
         }
         printed = true;
@@ -508,7 +528,7 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
               const start = T.left + c * w;
               items.push({ x: head ? start + (w - measure(r, spec)) / 2 : start, runs: r });
             });
-            push(bodyLine(items, { opens: k === 0, ...(k === n - 1 ? { graphics: rule } : {}) }));
+            push(bodyLine(items, { opens: k === 0, ...(k === 0 && n > 1 ? { together: n } : {}), ...(k === n - 1 ? { graphics: rule } : {}) }));
           }
         };
         // As in Manuscript: a separator with alignment colons is not one; it prints as a row.
@@ -547,7 +567,8 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           }
           printed = true;
           afterParagraph = false;
-          prev = e;
+          // The blank line after a table of contents is not printed (BulletinProbe).
+          prev = null;
         }
         continue;
       }
@@ -563,7 +584,10 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
     }
     const range = o.sourceOf(e);
     for (const u of out.slice(before)) if (u.kind === "line") u.line.range = range;
-    if (out.length > before) prev = e;
+    if (out.length > before) {
+      if (gap > 0) out.splice(before, 0, ...Array.from({ length: gap }, (): Unit => ({ kind: "line", line: empty() })));
+      prev = e;
+    }
   }
   return out;
 }

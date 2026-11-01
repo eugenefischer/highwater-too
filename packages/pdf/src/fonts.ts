@@ -7,7 +7,7 @@ import type { Run, TextStyle } from "./types.ts";
 /**
  * Fonts for the prose templates (M10). Highland 2's templates use Courier Prime, Amiri, Lato and
  * Highland Sans, and macOS's Georgia, Times New Roman, Avenir Next, SF Pro Display and New York.
- * Courier Prime, Amiri and Lato (open licences) are bundled; the rest are used when installed,
+ * Courier Prime, Highland Sans, Amiri, Lato and Merriweather (open licences, the versions Highland ships) are bundled; the rest are used when installed,
  * and replaced by a bundled font of the same kind otherwise (EJ's decision, 2026-10-19).
  */
 export type Variant = "regular" | "bold" | "italic" | "boldItalic";
@@ -31,19 +31,19 @@ export function variantOf(style: TextStyle): Variant {
 /** The fonts shipped with Highwater Too. */
 const BUNDLED: Record<string, Record<Variant, string>> = {
   "Courier Prime": { regular: "CourierPrime-Regular.ttf", bold: "CourierPrime-Bold.ttf", italic: "CourierPrime-Italic.ttf", boldItalic: "CourierPrime-BoldItalic.ttf" },
+  "Highland Sans": { regular: "Highland Sans.ttf", bold: "Highland Sans Bold.ttf", italic: "Highland Sans Italic.ttf", boldItalic: "Highland Sans Bold Italic.ttf" },
   Amiri: { regular: "Amiri-Regular.ttf", bold: "Amiri-Bold.ttf", italic: "Amiri-Italic.ttf", boldItalic: "Amiri-BoldItalic.ttf" },
   Lato: { regular: "Lato-Regular.ttf", bold: "Lato-Bold.ttf", italic: "Lato-Italic.ttf", boldItalic: "Lato-BoldItalic.ttf" },
+  Merriweather: { regular: "Merriweather-Regular.ttf", bold: "Merriweather-Bold.ttf", italic: "Merriweather-Italic.ttf", boldItalic: "Merriweather-BoldItalic.ttf" },
 };
 
 /** What a missing font is replaced with: a bundled font of the same kind. */
 const SUBSTITUTE: Record<string, string> = {
-  Georgia: "Amiri",
+  Georgia: "Merriweather",
+  "New York Medium": "Merriweather",
   "Times New Roman": "Amiri",
-  "New York Medium": "Amiri",
-  Merriweather: "Amiri",
   "Avenir Next": "Lato",
   "SF Pro Display": "Lato",
-  "Highland Sans": "Courier Prime",
 };
 
 /** Where installed fonts are looked for, besides the bundled folder. */
@@ -99,7 +99,7 @@ function fileVariant(file: string, family: string): Variant | "all" | null {
   if (!name.startsWith(f)) return null;
   let rest = name.slice(f.length);
   if (extname(base).toLowerCase() === ".ttc" && rest === "") return "all";
-  rest = rest.replace(/^(mt|ps|psmt)/, "");
+  rest = rest.replace(/^(mt|ps|psmt)/, "").replace(/^regular(?=italic|oblique)/, "");
   if (rest === "" || rest === "regular" || rest === "roman" || rest === "book") return "regular";
   if (rest === "bold") return "bold";
   if (rest === "italic" || rest === "oblique") return "italic";

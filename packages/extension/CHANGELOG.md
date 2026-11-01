@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.19
+
+- The bundled fonts are now the exact versions Highland 2 ships, found in its app: Amiri 0.113, Lato 1.104, and two more under open licences, **Highland Sans** (Treatment) and **Merriweather** (the stand-in for Georgia and New York). Treatment now prints in its own font everywhere, and the Extension is smaller.
+- On a Mac with Highland 2 installed, SF Pro Display (Bulletin) and New York (Speech) are taken from Highland's app.
+- Closer prose layout, measured with Highland's own fonts: a link definition takes its blank line with it; a note leaves an empty line, as in Highland; the blank line after a table of contents isn't printed; a block-quote paragraph and a table row move to the next page whole; a list item never takes a page's last line on its own; a blank line at the foot of a page carries over to the next.
+- `+` starts a list item, as `*` and `-` do.
+
 ## 0.2.18
 
 - Fixed: the prose templates printed no title page for documents using Highland's Markdown title keys (TL, TR, CC, BL, BR), as manuscripts do. They are now placed as in Manuscript: TL and TR at the top corners, CC centred, BL and BR at the bottom corners, in the template's font.

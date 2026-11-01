@@ -12,10 +12,11 @@ import { extractLayout } from "./helpers.ts";
 
 const templates = fileURLToPath(new URL("../../../fixtures/generated/templates/", import.meta.url));
 const probe = (name: string) => HighlandBundle.fromZip(new Uint8Array(readFileSync(join(templates, `${name.replace(/ /g, "")}Probe.highland`)))).text;
-const lay = (name: string, fontDirs: string[] = []) => layoutProse(parse(probe(name), { mode: "markdown" }), PROSE_TEMPLATES[name]!, { fontDir: defaultFontDir(), fontDirs, date: new Date(2026, 9, 19) });
+// With Highland's quirks (quotes running into the margin), to compare line for line with its PDFs.
+const lay = (name: string, fontDirs: string[] = []) => layoutProse(parse(probe(name), { mode: "markdown" }), PROSE_TEMPLATES[name]!, { fontDir: defaultFontDir(), fontDirs, date: new Date(2026, 9, 19), highlandQuirks: true });
 const priv = process.env.HIGHWATER_PRIVATE_FIXTURES;
-/** EJ's copies of the macOS and Highland fonts, for local tests only (never in the repo). */
-const privateFonts = priv ? join(priv, "fonts (private)") : null;
+/** Highland 2's own fonts (from its app) and EJ's copies of the macOS ones, for local tests only (never in the repo). */
+const privateDirs = priv ? [join(priv, "Highland2 Package Resources", "Resources", "Fonts"), join(priv, "fonts (private)")].filter((d) => existsSync(d)) : [];
 
 /** Short lines whose text is unique in Highland's PDF, found in ours on the same page within `tolerance` points. */
 function landmarks(expected: PdfPage[], actual: PdfPage[], tolerance: number) {
@@ -36,9 +37,15 @@ function landmarks(expected: PdfPage[], actual: PdfPage[], tolerance: number) {
 }
 
 describe("prose templates (close match)", () => {
-  it("Novel: Highland's short lines land on the same page within 3 pt, with the bundled Amiri", async () => {
-    const r = landmarks(await extractPages(join(templates, "NovelProbe.pdf")), await extractLayout(lay("Novel")), 3);
-    expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(0.8);
+  // The bundled fonts are the versions Highland ships, so these templates can be checked in CI.
+  it.each([
+    ["Novel", 0.9],
+    ["Treatment", 0.95],
+  ] as const)("%s: Highland's short lines land on the same page within 3 pt, with the bundled fonts", async (name, share) => {
+    const layout = lay(name);
+    expect(layout.substituted).toEqual({});
+    const r = landmarks(await extractPages(join(templates, `${name}Probe.pdf`)), await extractLayout(layout), 3);
+    expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(share);
   });
 
   it.each(Object.keys(PROSE_TEMPLATES))("%s lays out the probe in about as many pages as Highland", async (name) => {
@@ -57,10 +64,10 @@ describe("prose templates (close match)", () => {
 });
 
 // With the real fonts (EJ's private copies), every template should land close to Highland's.
-describe.runIf(privateFonts && existsSync(privateFonts))("prose templates with the real fonts", () => {
-  it.each(Object.keys(PROSE_TEMPLATES).filter((n) => n !== "Novel"))("%s: most short lines land where Highland puts them", async (name) => {
-    const layout = lay(name, [privateFonts!]);
-    expect(layout.substituted).toEqual({});
+describe.runIf(privateDirs.length > 0)("prose templates with the real fonts", () => {
+  it.each(Object.keys(PROSE_TEMPLATES).filter((n) => n !== "Novel" && n !== "Treatment"))("%s: most short lines land where Highland puts them", async (name) => {
+    const layout = lay(name, privateDirs);
+    if (Object.keys(layout.substituted).length) return; // a macOS font not copied yet
     const r = landmarks(await extractPages(join(templates, `${name.replace(/ /g, "")}Probe.pdf`)), await extractLayout(layout), 3);
     expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(0.6);
   });
@@ -84,7 +91,8 @@ describe("prose title pages", () => {
 describe("fonts", () => {
   it("finds a family's four faces by file name, and the faces of a collection by PostScript name", async () => {
     const dir = await mkdtemp(join(tmpdir(), "highwater-fonts-"));
-    for (const f of ["Georgia.ttf", "Georgia Bold.ttf", "Georgia Italic.ttf", "Georgia Bold Italic.ttf", "GeorgiaPro-Bold.ttf", "Avenir Next.ttc"]) await writeFile(join(dir, f), "");
+    for (const f of ["Georgia.ttf", "Georgia Bold.ttf", "Georgia Italic.ttf", "Georgia Bold Italic.ttf", "GeorgiaPro-Bold.ttf", "Avenir Next.ttc", "SF-Pro-Display-Regular.otf", "SF-Pro-Display-RegularItalic.otf"]) await writeFile(join(dir, f), "");
+    expect(findFamily("SF Pro Display", [dir])!.italic.path).toMatch(/RegularItalic\.otf$/);
     const g = findFamily("Georgia", [dir])!;
     expect([g.regular.path, g.bold.path, g.italic.path, g.boldItalic.path].map((p) => p.split("/").pop())).toEqual(["Georgia.ttf", "Georgia Bold.ttf", "Georgia Italic.ttf", "Georgia Bold Italic.ttf"]);
     expect(findFamily("Avenir Next", [dir])!.boldItalic).toMatchObject({ postscriptName: "AvenirNext-BoldItalic" });
@@ -92,9 +100,10 @@ describe("fonts", () => {
   });
 
   it("uses bundled fonts, and a bundled substitute for one that is not installed", () => {
-    const r = resolveFonts(["Amiri", "Georgia", "Highland Sans"], defaultFontDir(), []);
-    expect(r.substituted).toEqual({ Georgia: "Amiri", "Highland Sans": "Courier Prime" });
-    expect(r.faces["Georgia/bold"]!.path).toMatch(/Amiri-Bold\.ttf$/);
+    const r = resolveFonts(["Amiri", "Georgia", "Highland Sans", "Times New Roman"], defaultFontDir(), []);
+    expect(r.substituted).toEqual({ Georgia: "Merriweather", "Times New Roman": "Amiri" });
+    expect(r.faces["Georgia/bold"]!.path).toMatch(/Merriweather-Bold\.ttf$/);
+    expect(r.faces["Highland Sans/italic"]!.path).toMatch(/Highland Sans Italic\.ttf$/);
   });
 
   it("wraps by measured width, hanging the space and breaking an overlong word", () => {
