@@ -9,6 +9,7 @@ import { openHighland } from "./open.ts";
 import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
+import { activeDocument } from "./surface.ts";
 
 const NEW: Record<string, { mode: DocumentMode; template: string; name: string }> = {
   screenplay: { mode: "fountain", template: "Screenplay", name: "Untitled Screenplay" },
@@ -132,7 +133,7 @@ async function newAnyDocument(kind?: NewKind, target?: vscode.Uri): Promise<void
 
 
 function defaultFolder(): string {
-  const doc = vscode.window.activeTextEditor?.document;
+  const doc = activeDocument();
   if (doc && (doc.uri.scheme === "file" || doc.uri.scheme === SCHEME)) {
     const p = splitBundlePath(doc.uri.fsPath);
     return dirname(p ? p.bundle : doc.uri.fsPath);
@@ -146,7 +147,7 @@ function defaultFolder(): string {
  * document's own "Title Page" print option. Only ever writes a .pdf on disk (file: scheme).
  */
 async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, resource?: vscode.Uri, target?: vscode.Uri): Promise<void> {
-  const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? vscode.window.activeTextEditor?.document;
+  const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? activeDocument();
   if (!doc || !doc.languageId.startsWith("highland-")) {
     void vscode.window.showInformationMessage("Open a screenplay or manuscript to export it as a PDF.");
     return;
@@ -184,7 +185,7 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
 
 /** Export Word Document: manuscripts only, laid out like their PDF. */
 async function exportDocx(context: vscode.ExtensionContext, store: BundleStore, resource?: vscode.Uri, target?: vscode.Uri): Promise<void> {
-  const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? vscode.window.activeTextEditor?.document;
+  const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? activeDocument();
   if (!doc || !doc.languageId.startsWith("highland-")) {
     void vscode.window.showInformationMessage("Open a manuscript to export it as a Word document.");
     return;

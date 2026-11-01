@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { bundleOf, onDidChangeTemplate, renderDocument, setTemplate, TEMPLATES, type Template } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
+import { activeDocument, onDidChangeActiveSurface, onDidScrollView, revealOffset, visibleTop } from "./surface.ts";
 
 /**
  * The PDF preview (M6): the export engine's real output in a pdf.js viewer beside the editor,
@@ -12,19 +13,20 @@ export function registerPreview(context: vscode.ExtensionContext, store: BundleS
   let preview: Preview | undefined;
   context.subscriptions.push(
     vscode.commands.registerCommand("highwater.preview", () => {
-      const doc = scriptOf(vscode.window.activeTextEditor?.document);
+      const doc = scriptOf(activeDocument());
       if (!preview) {
         preview = new Preview(context, store);
         preview.onDispose(() => (preview = undefined));
       }
       preview.show(doc);
     }),
-    vscode.window.onDidChangeActiveTextEditor((e) => {
-      const doc = scriptOf(e?.document);
+    onDidChangeActiveSurface(() => {
+      const doc = scriptOf(activeDocument());
       if (preview && doc) preview.follow(doc);
     }),
     vscode.workspace.onDidChangeTextDocument((e) => preview?.changed(e.document, false)),
-    vscode.window.onDidChangeTextEditorVisibleRanges((e) => preview?.editorScrolled(e.textEditor)),
+    vscode.window.onDidChangeTextEditorVisibleRanges((e) => preview?.editorScrolled(e.textEditor.document)),
+    onDidScrollView((v) => preview?.editorScrolled(v.document)),
     vscode.workspace.onDidSaveTextDocument((d) => preview?.changed(d, true)),
     { dispose: store.onExternalChange((bundle) => preview?.bundleChanged(bundle)) },
     onDidChangeTemplate((doc) => preview?.changed(doc, true)),
@@ -99,23 +101,19 @@ class Preview {
   }
 
   /** Editor scrolled: move the preview to the same place (the webview ignores it when sync is off). */
-  editorScrolled(editor: vscode.TextEditor): void {
-    if (editor.document !== this.#doc || Date.now() < this.#quietUntil) return;
-    const top = editor.visibleRanges[0];
-    if (top) void this.#panel.webview.postMessage({ type: "scrollTo", offset: editor.document.offsetAt(top.start) });
+  editorScrolled(doc: vscode.TextDocument): void {
+    if (doc !== this.#doc || Date.now() < this.#quietUntil) return;
+    const top = visibleTop(doc);
+    if (top !== undefined) void this.#panel.webview.postMessage({ type: "scrollTo", offset: top });
   }
 
   /** Preview scrolled or clicked: scroll the editor there, or (jump) put the cursor there too. */
   async #reveal(offset: number, jump: boolean): Promise<void> {
     const doc = this.#doc;
     if (!doc) return;
-    const pos = doc.positionAt(offset);
-    let editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
-    if (jump) editor = await vscode.window.showTextDocument(doc, { ...(editor?.viewColumn ? { viewColumn: editor.viewColumn } : {}), preserveFocus: false });
-    if (!editor) return;
-    if (jump) editor.selection = new vscode.Selection(pos, pos);
     this.#quietUntil = Date.now() + 400;
-    editor.revealRange(new vscode.Range(pos, pos), jump ? vscode.TextEditorRevealType.InCenterIfOutsideViewport : vscode.TextEditorRevealType.AtTop);
+    await revealOffset(doc, offset, jump ? "center" : "top", jump);
+    this.#quietUntil = Date.now() + 400;
   }
 
   bundleChanged(bundle: string): void {
@@ -138,9 +136,7 @@ class Preview {
         void this.#panel.webview.postMessage({ type: "empty", message: "Plain-text documents have no print template to preview." });
         return;
       }
-      const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
-      const top = editor?.visibleRanges[0];
-      const at = top ? doc.offsetAt(top.start) : null;
+      const at = visibleTop(doc) ?? null;
       void this.#panel.webview.postMessage({ type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, pages: rendered.pages, problems: rendered.problems, anchors: rendered.anchors, at });
     } catch (error) {
       if (version === this.#version) void this.#panel.webview.postMessage({ type: "empty", message: `Could not lay out the document: ${(error as Error).message}` });

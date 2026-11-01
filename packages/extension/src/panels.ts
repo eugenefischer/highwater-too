@@ -11,6 +11,7 @@ import { assetMarkdown, binLabel, move, uniqueName } from "./syntax/workspace.ts
 import { idNote, noteId } from "./extras-folder.ts";
 import { focusedDocument, roleOf, type FocusedDocument } from "./focus.ts";
 import { LANGUAGES } from "./language.ts";
+import { activeColumn, activeDocument, activeSelections, insertAtSelection, onDidChangeActiveSurface, revealOffset, viewOf } from "./surface.ts";
 
 /**
  * The Highland sidebar (M6): Navigator, Bin and Assets as tree views in a "Highwater Too" view
@@ -44,7 +45,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     binTree,
     assetTree,
     navTree,
-    vscode.window.onDidChangeActiveTextEditor((e) => void showSidebar(e)),
+    onDidChangeActiveSurface(() => void showSidebar()),
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document !== current.script) return;
       clearTimeout(timer);
@@ -101,14 +102,15 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     vscode.commands.registerCommand("highwater.panels.refresh", () => refreshAll()),
     vscode.commands.registerCommand("highwater.linkHistoryToFile", () => linkHistoryToFile()),
   );
-  void showSidebar(vscode.window.activeTextEditor);
+  void showSidebar();
 
   /**
    * Opening a Highland script switches the sidebar to Highwater Too, once per opening, then hands
    * the keyboard back to the editor. Setting highwater.showSidebarOnOpen turns this off.
    */
-  async function showSidebar(editor: vscode.TextEditor | undefined): Promise<void> {
-    const doc = editor?.document;
+  async function showSidebar(): Promise<void> {
+    const doc = activeDocument();
+    const column = activeColumn();
     if (!doc || !doc.languageId.startsWith("highland-")) return;
     const parts = doc.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
     if (parts && parts.entry !== "") return; // Bin items and the Scratchpad
@@ -116,30 +118,35 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     if (shown.has(key)) return;
     shown.add(key);
     if (!vscode.workspace.getConfiguration("highwater").get<boolean>("showSidebarOnOpen", true)) return;
+    const view = viewOf(doc);
     await vscode.commands.executeCommand("workbench.view.extension.highwater");
-    await vscode.window.showTextDocument(doc, { ...(editor.viewColumn ? { viewColumn: editor.viewColumn } : {}), preserveFocus: false });
+    if (view) view.panel.reveal(view.panel.viewColumn, false);
+    else await vscode.window.showTextDocument(doc, { ...(column ? { viewColumn: column } : {}), preserveFocus: false });
   }
 
   async function toBin(cut: boolean): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    const bundle = editor && editor.document.uri.scheme === SCHEME ? splitBundlePath(editor.document.uri.fsPath)?.bundle : undefined;
-    const plain = editor && extras.isPlain(editor.document) ? editor.document.uri.fsPath : undefined;
-    if (!editor || (!bundle && !plain)) {
+    const active = activeSelections();
+    const document = active?.document;
+    const bundle = document && document.uri.scheme === SCHEME ? splitBundlePath(document.uri.fsPath)?.bundle : undefined;
+    const plain = document && extras.isPlain(document) ? document.uri.fsPath : undefined;
+    if (!active || !document || (!bundle && !plain)) {
       void vscode.window.showInformationMessage("Open a document to use the Bin.");
       return;
     }
-    const ranges = editor.selections.filter((s) => !s.isEmpty);
+    const ranges = active.ranges.filter((s) => !s.isEmpty);
     if (!ranges.length) return;
-    const text = ranges.map((r) => editor.document.getText(r)).join("\n\n");
+    const text = ranges.map((r) => document.getText(r)).join("\n\n");
     if (!(await bin.add(text, bundle ? { bundle } : { plain: plain! }))) return;
-    if (cut) await editor.edit((e) => ranges.forEach((r) => e.delete(r)));
+    if (!cut) return;
+    const edit = new vscode.WorkspaceEdit();
+    for (const r of ranges) edit.delete(document.uri, r);
+    await vscode.workspace.applyEdit(edit);
   }
 
   /** Writes the ID note into a plain file, so its history and extras follow it if it moves. */
   async function linkHistoryToFile(): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    const doc = editor?.document;
-    if (!editor || !doc || !extras.isPlain(doc)) {
+    const doc = activeDocument();
+    if (!doc || !extras.isPlain(doc)) {
       void vscode.window.showInformationMessage("Open a .fountain or .md file to link it to its writing history. A .highland file is linked already.");
       return;
     }
@@ -155,7 +162,9 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     const text = doc.getText();
     const end = doc.positionAt(text.length);
     const sep = text === "" ? "" : text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
-    await editor.edit((e) => e.insert(end, `${sep}${idNote(id)}\n`));
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(doc.uri, end, `${sep}${idNote(id)}\n`);
+    await vscode.workspace.applyEdit(edit);
     void vscode.window.showInformationMessage(
       "Added a note at the end of the file naming its writing history, so its history, Bin and Scratchpad stay with it if it is moved or renamed. Notes never print.",
     );
@@ -262,11 +271,8 @@ class NavigatorView implements vscode.TreeDataProvider<NavigatorItem>, vscode.Tr
 }
 
 async function reveal(uri: vscode.Uri, offset: number): Promise<void> {
-  const doc = await vscode.workspace.openTextDocument(uri);
-  const editor = await vscode.window.showTextDocument(doc, { preserveFocus: false });
-  const pos = doc.positionAt(offset);
-  editor.selection = new vscode.Selection(pos, pos);
-  editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.AtTop);
+  // In the Highland-Style Editor if one shows the document, else in a text editor.
+  await revealOffset(await vscode.workspace.openTextDocument(uri), offset, "top", true);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -549,17 +555,15 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
 async function insertText(current: FocusedDocument, text: string): Promise<void> {
   const doc = current.script;
   if (!doc) return;
-  const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc) ?? (await vscode.window.showTextDocument(doc));
-  await editor.edit((e) => e.replace(editor.selection, text));
-  await vscode.window.showTextDocument(editor.document, editor.viewColumn);
+  await insertAtSelection(doc, text);
 }
 
 async function openScratchpad(store: BundleStore, current: FocusedDocument): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
-  const bundle = (editor?.document.uri.scheme === SCHEME ? splitBundlePath(editor.document.uri.fsPath)?.bundle : undefined) ?? current.bundle;
+  const active = activeDocument();
+  const bundle = (active?.uri.scheme === SCHEME ? splitBundlePath(active.uri.fsPath)?.bundle : undefined) ?? current.bundle;
   if (!bundle) {
     const extras = plainExtras();
-    const plain = editor && extras.isPlain(editor.document) ? editor.document.uri.fsPath : current.plain;
+    const plain = active && extras.isPlain(active) ? active.uri.fsPath : current.plain;
     if (!plain) {
       void vscode.window.showInformationMessage("Open a document to use its Scratchpad.");
       return;

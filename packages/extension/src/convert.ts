@@ -14,6 +14,7 @@ import { openHighland } from "./open.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags } from "./syntax/edits.ts";
 import { toBundle, toPlain } from "./to-bundle.ts";
+import { activeDocument } from "./surface.ts";
 
 /**
  * Converting a work between a .highland file and a plain .fountain, .md or .txt file. A conversion
@@ -40,7 +41,7 @@ const PLAIN_EXT: Record<string, string> = { [LANGUAGES.fountain]: "fountain", [L
 
 /** A plain file (the given one, else the active editor's) becomes a .highland file. */
 async function convertToHighland(uri?: vscode.Uri, chosen?: vscode.Uri): Promise<void> {
-  const source = uri ?? vscode.window.activeTextEditor?.document.uri;
+  const source = uri ?? activeDocument()?.uri;
   if (!source || source.scheme !== "file") {
     void vscode.window.showInformationMessage("Open or select a .fountain or .md file to convert it to a .highland file.");
     return;
@@ -88,7 +89,7 @@ async function convertToHighland(uri?: vscode.Uri, chosen?: vscode.Uri): Promise
  * menu was used (`uri`), else the active one.
  */
 async function convertToPlain(store: BundleStore, chosen?: vscode.Uri, uri?: vscode.Uri): Promise<void> {
-  const doc = (uri && vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString())) || vscode.window.activeTextEditor?.document;
+  const doc = (uri && vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString())) || activeDocument();
   const parts = doc?.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
   if (!doc || !parts || parts.entry !== "") {
     void vscode.window.showInformationMessage("Open a .highland document to convert it to a plain file.");
@@ -158,7 +159,7 @@ async function convertToPlain(store: BundleStore, chosen?: vscode.Uri, uri?: vsc
  * file outside the writing history: if it is edited and saved, it starts a history of its own.
  */
 async function exportText(): Promise<void> {
-  const doc = vscode.window.activeTextEditor?.document;
+  const doc = activeDocument();
   const parts = doc?.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
   const plain = doc && plainExtras().isPlain(doc) ? doc.uri.fsPath : null;
   if (!doc || (!plain && (!parts || parts.entry !== ""))) {

@@ -69,10 +69,36 @@ function start(text: string): void {
           u.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => changes.push({ from: fromA, to: toA, insert: inserted.toString() }));
           vscode.postMessage({ type: "edit", changes });
         }),
+        // After the edit, so the extension reads the offsets against the edited document.
+        EditorView.updateListener.of((u) => {
+          if (u.selectionSet || u.docChanged) vscode.postMessage({ type: "selection", ranges: u.state.selection.ranges.map((r) => ({ anchor: r.anchor, head: r.head })) });
+        }),
       ],
     }),
   });
+  view.scrollDOM.addEventListener("scroll", reportScroll);
   view.focus();
+}
+
+let scrollPending = false;
+/** Tells the extension the offset at the top of the view (once a frame), for the Preview to follow. */
+function reportScroll(): void {
+  if (scrollPending) return;
+  scrollPending = true;
+  requestAnimationFrame(() => {
+    scrollPending = false;
+    if (!view) return;
+    const visibleTop = view.scrollDOM.getBoundingClientRect().top - view.documentTop;
+    vscode.postMessage({ type: "scroll", top: view.lineBlockAtHeight(Math.max(0, visibleTop)).from });
+  });
+}
+
+/** Scrolls to an offset from the extension (Navigator, Preview); with `select`, moves the cursor there too. */
+function reveal(offset: number, how: "top" | "center", select: boolean): void {
+  if (!view) return;
+  const at = Math.min(Math.max(0, offset), view.state.doc.length);
+  view.dispatch({ ...(select ? { selection: { anchor: at } } : {}), effects: EditorView.scrollIntoView(at, { y: how === "top" ? "start" : "center" }), annotations: remote.of(true) });
+  if (select) view.focus();
 }
 
 /** Replaces the text with the document's, changing only what differs, so the cursor stays put. */
@@ -88,11 +114,12 @@ function replace(text: string): void {
 }
 
 window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as { type: string; text?: string; mode?: Mode };
+  const msg = event.data as { type: string; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean };
   if (msg.type === "init") {
     mode = msg.mode ?? "fountain";
     document.body.dataset.mode = mode;
     start(msg.text ?? "");
   } else if (msg.type === "update") replace(msg.text ?? "");
+  else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
 });
 vscode.postMessage({ type: "ready" });

@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -1300,6 +1300,16 @@
           "command": "highwater.openTextEditor",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "navigation@0"
+        },
+        {
+          "command": "highwater.preview",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "highwater.export",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "navigation@2"
         }
       ],
       "view/title": [
@@ -1534,10 +1544,22 @@
         "when": "editorTextFocus && editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-/"
       },
       {
+        "command": "highwater.cutToBin",
+        "mac": "alt+cmd+x",
+        "key": "ctrl+alt+x",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor'"
+      },
+      {
         "command": "highwater.copyToBin",
         "mac": "alt+cmd+c",
         "key": "ctrl+alt+c",
         "when": "editorTextFocus && editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-/"
+      },
+      {
+        "command": "highwater.copyToBin",
+        "mac": "alt+cmd+c",
+        "key": "ctrl+alt+c",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor'"
       },
       {
         "command": "highwater.navigator.focus",
@@ -1546,10 +1568,22 @@
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
+        "command": "highwater.navigator.focus",
+        "mac": "cmd+1",
+        "key": "ctrl+1",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+      },
+      {
         "command": "highwater.bin.focus",
         "mac": "cmd+2",
         "key": "ctrl+2",
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.bin.focus",
+        "mac": "cmd+2",
+        "key": "ctrl+2",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.assets.focus",
@@ -1558,10 +1592,22 @@
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
+        "command": "highwater.assets.focus",
+        "mac": "cmd+4",
+        "key": "ctrl+4",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+      },
+      {
         "command": "highwater.openScratchpad",
         "mac": "cmd+5",
         "key": "ctrl+5",
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.openScratchpad",
+        "mac": "cmd+5",
+        "key": "ctrl+5",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.toggleLiveMargins",
@@ -1583,9 +1629,21 @@
       },
       {
         "command": "highwater.preview",
+        "mac": "cmd+e",
+        "key": "ctrl+e",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.preview",
         "mac": "ctrl+alt+p",
         "key": "ctrl+alt+p",
         "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.preview",
+        "mac": "ctrl+alt+p",
+        "key": "ctrl+alt+p",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && !config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.insertMarker",

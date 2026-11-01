@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 (m15-editor branch, experimental)
+
+- The panes follow the Highland-Style Editor as they do the text editor: the Navigator, Bin, Assets and Writing History show its document, and so do the status bar (words, pages, selected words, template) and the Preview. Clicking a scene in the Navigator, or a place in the Preview, scrolls the Highland-Style Editor there; with scroll sync on, the Preview follows it as you scroll. Cut and Copy to Bin, inserting a Bin item or an image, the Scratchpad, Export Text and Export PDF work from it too.
+- Highland's shortcuts for the Preview (⌘E), the Navigator, Bin, Assets and Scratchpad (⌘1, ⌘2, ⌘4, ⌘5) and Cut and Copy to Bin (⌥⌘X, ⌥⌘C) work in the Highland-Style Editor. The writing keys (⌘B, ⌘I, ⌘/ and the rest), completion and markers don't yet.
+- The Preview and Export Text buttons appear in its title bar.
+
 ## 0.3.1 (m15-editor branch, experimental)
 
 - Highland-Style Editor: lines now break exactly where they do on the page. CodeMirror's own line padding took most of a character's width off every line. In a window narrower than the page the column narrows as in Highland: dialogue keeps its indent and width while the space to its right shrinks, down to a column whose right edge is dialogue's; narrower than that, the page scrolls sideways.

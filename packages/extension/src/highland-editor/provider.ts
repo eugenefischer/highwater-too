@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
+import { HIGHLAND_EDITOR, highlandViews, type HighlandView } from "../surface.ts";
 
-export const HIGHLAND_EDITOR = "highwater.highlandEditor";
+export { HIGHLAND_EDITOR };
 
 /**
  * The Highland-style editor (M15, experimental): a custom text editor over the same document as
@@ -28,15 +29,30 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     let pageText = document.getText();
     let queue: Promise<unknown> = Promise.resolve();
 
+    const view: HighlandView = {
+      document,
+      panel,
+      selections: [{ anchor: 0, head: 0 }],
+      top: 0,
+      reveal: (offset, how, select) => void panel.webview.postMessage({ type: "reveal", offset, how, select }),
+    };
+
     const send = () => {
       pageText = document.getText();
       void panel.webview.postMessage({ type: "update", text: pageText });
     };
     const subscriptions = [
-      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[] }) => {
+      highlandViews.add(view),
+      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number }) => {
         if (msg.type === "ready") {
           pageText = document.getText();
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
+        } else if (msg.type === "selection" && msg.ranges) {
+          view.selections = msg.ranges;
+          highlandViews.selected(view);
+        } else if (msg.type === "scroll" && typeof msg.top === "number") {
+          view.top = msg.top;
+          highlandViews.scrolled(view);
         } else if (msg.type === "edit" && msg.changes) {
           const changes = msg.changes;
           // The page's text after its edit; the document should match once the edit is applied.

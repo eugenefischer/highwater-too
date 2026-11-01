@@ -19,11 +19,13 @@ import { registerWritingTools } from "./writing-tools.ts";
 import { registerStatusBar } from "./status.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { registerHighlandEditor } from "./highland-editor/provider.ts";
+import { activeDocument, activeView, registerSurface } from "./surface.ts";
 
 /** VS Code glue only; all format, parsing and layout logic lives in the other packages. */
 export function activate(context: vscode.ExtensionContext): void {
   // Questions to the writer (answered by script in the end-to-end tests).
   registerAsk(context);
+  registerSurface(context);
   // The experimental Highland-style editor (M15).
   registerHighlandEditor(context);
   const store = new BundleStore({ backupFolder: () => backupFolder(context) });
@@ -31,6 +33,16 @@ export function activate(context: vscode.ExtensionContext): void {
   startPlainExtras(context, { history: currentHistory, historyRoot });
   // The document the panes show.
   focusedDocument(context);
+  if (context.extensionMode === vscode.ExtensionMode.Test) {
+    context.subscriptions.push(
+      // What the panes follow, for the end-to-end tests of the Highland-Style Editor.
+      vscode.commands.registerCommand("highwater.test.surface", () => {
+        const view = activeView();
+        return { document: activeDocument()?.uri.toString(), view: !!view, selection: view?.selections[0], focused: focusedDocument().key };
+      }),
+      vscode.commands.registerCommand("highwater.test.revealInView", (offset: number) => activeView()?.reveal(offset, "center", true)),
+    );
+  }
   const fs = new HighlandFileSystem(store);
 
   // Watch every open Highland document's file (VS Code may also ask the provider to watch).

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { SCHEME, toHighlandUri } from "./fs-provider.ts";
 import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
 import { splitBundlePath } from "./store.ts";
+import { activeDocument, onDidChangeActiveSurface } from "./surface.ts";
 
 /**
  * Editors that look at a document without being another document: a save from the writing history,
@@ -40,6 +41,7 @@ function tabUris(tab: vscode.Tab): vscode.Uri[] {
   const i = tab.input;
   if (i instanceof vscode.TabInputText) return [i.uri];
   if (i instanceof vscode.TabInputTextDiff) return [i.modified];
+  if (i instanceof vscode.TabInputCustom) return [i.uri]; // the Highland-Style Editor
   return [];
 }
 
@@ -95,17 +97,18 @@ export class FocusedDocument implements vscode.Disposable {
   constructor() {
     this.#subscriptions.push(
       this.#emitter,
-      vscode.window.onDidChangeActiveTextEditor((e) => this.follow(e?.document)),
+      // The active text editor or Highland-Style Editor.
+      onDidChangeActiveSurface(() => this.follow(activeDocument())),
       // A file whose language changed (a .md file switched to Highwater Markdown) is a new document.
       vscode.workspace.onDidOpenTextDocument((d) => {
-        if (vscode.window.activeTextEditor?.document.uri.toString() === d.uri.toString()) this.follow(d);
+        if (activeDocument()?.uri.toString() === d.uri.toString()) this.follow(d);
       }),
       vscode.workspace.onDidCloseTextDocument((d) => {
         if (d === this.script) this.script = undefined;
       }),
       vscode.window.tabGroups.onDidChangeTabs((e) => void this.#tabsClosed(e.closed).catch(() => undefined)),
     );
-    this.follow(vscode.window.activeTextEditor?.document);
+    this.follow(activeDocument());
   }
 
   /** The file the document is: the .highland file or the plain file. */

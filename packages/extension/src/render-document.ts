@@ -7,6 +7,7 @@ import { LANGUAGES } from "./language.ts";
 import { exportManuscript, exportManuscriptDocx, exportPlainText, exportProse, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
+import { activeDocument, onDidChangeActiveSurface } from "./surface.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
 export const TEMPLATES = ["Screenplay", "Multi-Cam", "Stage Play", "Graphic Novel", "Manuscript", "Novel", "Treatment", "Modern Standard", "Article", "Bulletin", "Speech", "MLA Report", "Wiki", "Plain Text"] as const;
@@ -74,9 +75,9 @@ export function registerTemplateStatus(context: vscode.ExtensionContext, store: 
   item.name = "Highwater Too: print template";
   item.command = "highwater.chooseTemplate";
   const update = async (): Promise<void> => {
-    const doc = vscode.window.activeTextEditor?.document;
+    const doc = activeDocument();
     const template = doc && doc.languageId.startsWith("highland-") ? await templateOf(context, store, doc) : null;
-    if (!doc || doc !== vscode.window.activeTextEditor?.document) return;
+    if (!doc || doc !== activeDocument()) return;
     if (!template) {
       item.hide();
       return;
@@ -87,11 +88,11 @@ export function registerTemplateStatus(context: vscode.ExtensionContext, store: 
   };
   context.subscriptions.push(
     item,
-    vscode.window.onDidChangeActiveTextEditor(() => void update()),
+    onDidChangeActiveSurface(() => void update()),
     vscode.workspace.onDidOpenTextDocument(() => void update()),
     onDidChangeTemplate(() => void update()),
     vscode.commands.registerCommand("highwater.chooseTemplate", async () => {
-      const doc = vscode.window.activeTextEditor?.document;
+      const doc = activeDocument();
       if (!doc || !doc.languageId.startsWith("highland-")) return;
       const current = await templateOf(context, store, doc);
       const picked = await pick(

@@ -423,6 +423,31 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "the panes follow the Highland-Style Editor, and it scrolls where they ask",
+    async () => {
+      const path = join(dir, "Styled.fountain");
+      await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
+      await vscode.commands.executeCommand("vscode.openWith", vscode.Uri.file(path), "highwater.highlandEditor");
+      type Surface = { document?: string; view: boolean; selection?: { anchor: number; head: number }; focused?: string };
+      const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
+      let now: Surface = { view: false };
+      const end = Date.now() + 10_000;
+      while (!(now = await surface()).view || now.focused !== path) {
+        if (Date.now() > end) throw new Error(`The panes did not follow the Highland-Style Editor: ${JSON.stringify(now)}`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      assert.equal(now.document, vscode.Uri.file(path).toString());
+      // The page answers a reveal by moving its cursor, and reports the selection back.
+      await vscode.commands.executeCommand("highwater.test.revealInView", 17);
+      const until = Date.now() + 10_000;
+      while ((now = await surface()).selection?.head !== 17) {
+        if (Date.now() > until) throw new Error(`The Highland-Style Editor did not move its cursor: ${JSON.stringify(now)}`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    },
+  ],
+  [
     "exports a manuscript as a Word document",
     async () => {
       const path = join(dir, "DocxExport.highland");
