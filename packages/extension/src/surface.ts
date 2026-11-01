@@ -82,22 +82,27 @@ export function viewOf(doc: vscode.TextDocument): HighlandView | undefined {
   return [...views].find((v) => v.document === doc && v.panel.visible);
 }
 
-/** The document being written: the active text editor's, or the active Highland-Style Editor's. */
+/**
+ * The document being written: the active Highland-Style Editor's, else the active text editor's.
+ * The view comes first: VS Code keeps `activeTextEditor` set to a text editor in another group
+ * while a custom editor has the focus.
+ */
 export function activeDocument(): vscode.TextDocument | undefined {
-  return vscode.window.activeTextEditor?.document ?? activeView()?.document;
+  return activeView()?.document ?? vscode.window.activeTextEditor?.document;
 }
 
 /** The view column of whichever editor shows the active document. */
 export function activeColumn(): vscode.ViewColumn | undefined {
-  return vscode.window.activeTextEditor?.viewColumn ?? activeView()?.panel.viewColumn;
+  return activeView()?.panel.viewColumn ?? vscode.window.activeTextEditor?.viewColumn;
 }
 
 /** The active editor's selections as ranges (non-empty ones only with `nonEmpty`). */
 export function activeSelections(): { document: vscode.TextDocument; ranges: vscode.Range[] } | undefined {
-  const editor = vscode.window.activeTextEditor;
-  if (editor) return { document: editor.document, ranges: [...editor.selections] };
   const view = activeView();
-  if (!view) return undefined;
+  if (!view) {
+    const editor = vscode.window.activeTextEditor;
+    return editor ? { document: editor.document, ranges: [...editor.selections] } : undefined;
+  }
   const doc = view.document;
   return { document: doc, ranges: view.selections.map((s) => new vscode.Range(doc.positionAt(Math.min(s.anchor, s.head)), doc.positionAt(Math.max(s.anchor, s.head)))) };
 }

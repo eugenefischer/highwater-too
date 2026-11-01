@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 (m15-editor branch, experimental)
+
+- Fixed: with a text editor open in another group, the panes, status bar and Preview followed that text editor instead of the Highland-Style Editor you were writing in.
+
 ## 0.3.2 (m15-editor branch, experimental)
 
 - The panes follow the Highland-Style Editor as they do the text editor: the Navigator, Bin, Assets and Writing History show its document, and so do the status bar (words, pages, selected words, template) and the Preview. Clicking a scene in the Navigator, or a place in the Preview, scrolls the Highland-Style Editor there; with scroll sync on, the Preview follows it as you scroll. Cut and Copy to Bin, inserting a Bin item or an image, the Scratchpad, Export Text and Export PDF work from it too.
