@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parse } from "@highwater/parser";
-import { columnWidth, DIALOGUE_WIDTH, lineStyles, PAREN_WIDTH } from "../src/highland-editor/line-styles.ts";
+import { columnMinimum, columnWidth, DIALOGUE_WIDTH, lineStyles, PAREN_WIDTH } from "../src/highland-editor/line-styles.ts";
 
 const at = (src: string, line: string) => src.indexOf(line);
 
@@ -10,6 +10,7 @@ describe("Highland-style editor line styles", () => {
     const doc = parse(src, { mode: "fountain" });
     const s = lineStyles(doc);
     expect(columnWidth(doc)).toBe(63);
+    expect(columnMinimum(doc)).toBe(46);
     expect(s.get(0)).toMatchObject({ kind: "scene", indent: 0 });
     expect(s.get(at(src, "Brenda waits"))).toMatchObject({ kind: "action", indent: 0 });
     expect(s.get(at(src, "BRENDA"))).toMatchObject({ kind: "cue", indent: 21 });
@@ -28,6 +29,7 @@ describe("Highland-style editor line styles", () => {
     const doc = parse(md, { mode: "markdown" });
     const m = lineStyles(doc);
     expect(columnWidth(doc)).toBe(65);
+    expect(columnMinimum(doc)).toBe(0);
     expect(m.get(0)).toMatchObject({ kind: "heading", level: 1, align: "center" });
     expect(m.get(at(md, "> A quote"))).toMatchObject({ kind: "quote", indent: 5 });
   });

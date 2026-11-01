@@ -48,6 +48,15 @@ export function columnWidth(doc: Document): number {
   return doc.mode === "fountain" ? MARGINS.width : MARGINS.manuscriptWidth;
 }
 
+/**
+ * The narrowest the page column may get, in characters: as in Highland, a narrow window takes the
+ * space between dialogue and the right edge first, and stops where dialogue would have to reflow.
+ * Prose has no such limit.
+ */
+export function columnMinimum(doc: Document): number {
+  return doc.mode === "fountain" ? MARGINS.dialogue + DIALOGUE_WIDTH : 0;
+}
+
 /** Each source line's style, keyed by the offset where the line starts. Lines not listed are plain. */
 export function lineStyles(doc: Document): Map<number, LineStyle> {
   const out = new Map<number, LineStyle>();

@@ -69,16 +69,20 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 @font-face { font-family: "Courier Prime"; font-weight: bold; src: url("${font("CourierPrime-Bold.ttf")}"); }
 @font-face { font-family: "Courier Prime"; font-style: italic; src: url("${font("CourierPrime-Italic.ttf")}"); }
 @font-face { font-family: "Courier Prime"; font-weight: bold; font-style: italic; src: url("${font("CourierPrime-BoldItalic.ttf")}"); }
-:root { --column: 63ch; }
+:root { --column: 63ch; --column-min: 0ch; }
 html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
 #editor, .cm-editor { height: 100%; }
 .cm-editor { font-size: calc(var(--vscode-editor-font-size, 14px) * 1.1); }
 .cm-editor.cm-focused { outline: none; }
 /* !important: CodeMirror's own theme, injected later, sets these with equal specificity. */
 .cm-editor .cm-scroller { font-family: "Courier Prime", monospace !important; line-height: 1.5; }
-/* The page column: as wide as the printed text, centred in the window. */
-.cm-editor .cm-content { flex: 0 1 var(--column) !important; width: var(--column); max-width: 100%; margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--vscode-editorCursor-foreground); }
-.cm-line { padding: 0; }
+/* The page column: as wide as the printed text, centred in the window. As in Highland, a narrower window
+   narrows it down to the right edge of dialogue (--column-min) and no further: past that the page scrolls sideways. */
+.cm-editor .cm-content { flex: 0 1 var(--column) !important; width: var(--column); max-width: calc(100% - 2ch); min-width: var(--column-min); margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--vscode-editorCursor-foreground); }
+/* More specific than CodeMirror's own line padding; each line's indent is set inline. */
+.cm-editor .cm-content .cm-line { padding: 0; }
+.cm-editor .cm-searchMatch { background: var(--vscode-editor-findMatchHighlightBackground); outline: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent); }
+.cm-editor .cm-searchMatch-selected, .cm-editor .cm-searchMatch-selected * { background: var(--vscode-editor-findMatchBackground); outline: 1px solid var(--vscode-editor-findMatchBorder, transparent); }
 .cm-selectionBackground, .cm-content ::selection { background: var(--vscode-editor-selectionBackground) !important; }
 .hl-scene { font-weight: bold; color: var(--vscode-textLink-foreground); }
 .hl-cue { }

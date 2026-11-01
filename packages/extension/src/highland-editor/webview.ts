@@ -9,7 +9,7 @@ import { search, searchKeymap } from "@codemirror/search";
 import { Annotation, EditorState, RangeSetBuilder, StateField, type Text } from "@codemirror/state";
 import { Decoration, EditorView, keymap, type DecorationSet } from "@codemirror/view";
 import { parse, type Mode } from "@highwater/parser";
-import { columnWidth, lineStyles } from "./line-styles.ts";
+import { columnMinimum, columnWidth, lineStyles } from "./line-styles.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -24,19 +24,21 @@ function decorate(doc: Text): DecorationSet {
   const styles = lineStyles(parsed);
   const column = columnWidth(parsed);
   document.documentElement.style.setProperty("--column", `${column}ch`);
+  document.documentElement.style.setProperty("--column-min", `${columnMinimum(parsed)}ch`);
   const b = new RangeSetBuilder<Decoration>();
   for (let n = 1; n <= doc.lines; n++) {
     const line = doc.line(n);
     const s = styles.get(line.from);
     if (!s) continue;
     const cls = [`hl-${s.kind}`, s.level ? `hl-level-${s.level}` : "", s.align ? `hl-${s.align}` : ""].filter(Boolean).join(" ");
-    b.add(line.from, line.from, Decoration.line({ attributes: { class: cls, ...lineCss(s.indent, s.width ? column - s.indent - s.width : 0) } }));
+    b.add(line.from, line.from, Decoration.line({ attributes: { class: cls, ...lineCss(s.indent, s.width) } }));
   }
   return b.finish();
 }
 
-function lineCss(left: number, right: number): { style?: string } {
-  const parts = [left ? `padding-left: ${left}ch` : "", right > 0 ? `padding-right: ${right}ch` : ""].filter(Boolean);
+/** A line's indent, and the width it wraps at; in a column narrower than that, it wraps at the column's edge. */
+function lineCss(left: number, width?: number): { style?: string } {
+  const parts = [left ? `padding-left: ${left}ch` : "", width ? `max-width: ${width}ch` : ""].filter(Boolean);
   return parts.length ? { style: parts.join("; ") } : {};
 }
 

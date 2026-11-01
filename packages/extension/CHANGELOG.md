@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 (m15-editor branch, experimental)
+
+- Highland-Style Editor: lines now break exactly where they do on the page. CodeMirror's own line padding took most of a character's width off every line. In a window narrower than the page the column narrows as in Highland: dialogue keeps its indent and width while the space to its right shrinks, down to a column whose right edge is dialogue's; narrower than that, the page scrolls sideways.
+- Find matches use VS Code's find colours, so they are easy to see.
+
 ## 0.3.0 (m15-editor branch, experimental)
 
 - **Highland-Style Editor** (experimental, M15): a second editor for `.highland`, `.fountain`, `.md` and `.txt` files that lays text out as Highland 2 does. The page is a column as wide as the printed text, centred in the window, in Courier Prime; cues, parentheticals and dialogue are indented on every line, so wrapped dialogue stays in its column (35 characters wide; parentheticals 28). Open it with the book button in the editor's title bar or **Reopen Editor With…**; the code button switches back to the text editor. Edits, undo, saving and search work as in any editor; the text editor and Highland-Style Editor can be open on the same file at once. Turn the button off with `highwater.highlandEditor`.
