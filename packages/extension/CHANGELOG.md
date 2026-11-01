@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4 (m15-editor branch, experimental)
+
+- Fixed: clicking a scene in the Navigator, or a place in the Preview, right after the Highland-Style Editor opened could do nothing; the editor now scrolls there once it has finished opening.
+
 ## 0.3.3 (m15-editor branch, experimental)
 
 - Fixed: with a text editor open in another group, the panes, status bar and Preview followed that text editor instead of the Highland-Style Editor you were writing in.

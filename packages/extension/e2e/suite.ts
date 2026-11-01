@@ -428,7 +428,7 @@ const tests: [string, () => Promise<void>][] = [
       const path = join(dir, "Styled.fountain");
       await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
       await vscode.commands.executeCommand("vscode.openWith", vscode.Uri.file(path), "highwater.highlandEditor");
-      type Surface = { document?: string; view: boolean; selection?: { anchor: number; head: number }; focused?: string };
+      type Surface = { document?: string; view: boolean; ready?: boolean; selection?: { anchor: number; head: number }; focused?: string };
       const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
       let now: Surface = { view: false };
       const end = Date.now() + 10_000;

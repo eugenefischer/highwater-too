@@ -17,6 +17,8 @@ export interface HighlandView {
   selections: readonly { anchor: number; head: number }[];
   /** The offset at the top of the visible text. */
   top: number;
+  /** True once the page's script has started and holds the text. */
+  ready: boolean;
   /** Scrolls to an offset (at the top, or centred if out of view); with `select`, puts the cursor there and focuses the editor. */
   reveal(offset: number, how: "top" | "center", select: boolean): void;
 }

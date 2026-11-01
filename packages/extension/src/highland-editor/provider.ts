@@ -34,8 +34,15 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       panel,
       selections: [{ anchor: 0, head: 0 }],
       top: 0,
-      reveal: (offset, how, select) => void panel.webview.postMessage({ type: "reveal", offset, how, select }),
+      ready: false,
+      reveal: (offset, how, select) => {
+        const msg = { type: "reveal", offset, how, select };
+        // The page drops messages sent before its script has started: hold the latest until it has.
+        if (view.ready) void panel.webview.postMessage(msg);
+        else pendingReveal = msg;
+      },
     };
+    let pendingReveal: object | undefined;
 
     const send = () => {
       pageText = document.getText();
@@ -47,6 +54,9 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (msg.type === "ready") {
           pageText = document.getText();
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
+          view.ready = true;
+          if (pendingReveal) void panel.webview.postMessage(pendingReveal);
+          pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
           view.selections = msg.ranges;
           highlandViews.selected(view);
