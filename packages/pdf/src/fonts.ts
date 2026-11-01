@@ -35,13 +35,17 @@ const BUNDLED: Record<string, Record<Variant, string>> = {
   Amiri: { regular: "Amiri-Regular.ttf", bold: "Amiri-Bold.ttf", italic: "Amiri-Italic.ttf", boldItalic: "Amiri-BoldItalic.ttf" },
   Lato: { regular: "Lato-Regular.ttf", bold: "Lato-Bold.ttf", italic: "Lato-Italic.ttf", boldItalic: "Lato-BoldItalic.ttf" },
   Merriweather: { regular: "Merriweather-Regular.ttf", bold: "Merriweather-Bold.ttf", italic: "Merriweather-Italic.ttf", boldItalic: "Merriweather-BoldItalic.ttf" },
+  // Free fonts with the same character widths as Georgia and Times New Roman.
+  Gelasio: { regular: "Gelasio-Regular.ttf", bold: "Gelasio-Bold.ttf", italic: "Gelasio-Italic.ttf", boldItalic: "Gelasio-BoldItalic.ttf" },
+  Tinos: { regular: "Tinos-Regular.ttf", bold: "Tinos-Bold.ttf", italic: "Tinos-Italic.ttf", boldItalic: "Tinos-BoldItalic.ttf" },
 };
 
 /** What a missing font is replaced with: a bundled font of the same kind. */
 const SUBSTITUTE: Record<string, string> = {
-  Georgia: "Merriweather",
+  // Same widths, so lines and pages break as with the real fonts.
+  Georgia: "Gelasio",
+  "Times New Roman": "Tinos",
   "New York Medium": "Merriweather",
-  "Times New Roman": "Amiri",
   "Avenir Next": "Lato",
   "SF Pro Display": "Lato",
 };

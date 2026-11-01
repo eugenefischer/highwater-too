@@ -38,13 +38,17 @@ function landmarks(expected: PdfPage[], actual: PdfPage[], tolerance: number) {
 
 describe("prose templates (close match)", () => {
   // The bundled fonts are the versions Highland ships, so these templates can be checked in CI.
+  // Article, Wiki and MLA Report print with Gelasio and Tinos, which have Georgia's and Times New Roman's widths.
   it.each([
     ["Novel", 0.9],
     ["Treatment", 0.95],
+    ["Article", 0.88],
+    ["Wiki", 0.95],
+    ["MLA Report", 0.95],
   ] as const)("%s: Highland's short lines land on the same page within 3 pt, with the bundled fonts", async (name, share) => {
     const layout = lay(name);
-    expect(layout.substituted).toEqual({});
-    const r = landmarks(await extractPages(join(templates, `${name}Probe.pdf`)), await extractLayout(layout), 3);
+    expect(Object.values(layout.substituted).every((f) => f === "Gelasio" || f === "Tinos")).toBe(true);
+    const r = landmarks(await extractPages(join(templates, `${name.replace(/ /g, "")}Probe.pdf`)), await extractLayout(layout), 3);
     expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(share);
   });
 
@@ -101,8 +105,8 @@ describe("fonts", () => {
 
   it("uses bundled fonts, and a bundled substitute for one that is not installed", () => {
     const r = resolveFonts(["Amiri", "Georgia", "Highland Sans", "Times New Roman"], defaultFontDir(), []);
-    expect(r.substituted).toEqual({ Georgia: "Merriweather", "Times New Roman": "Amiri" });
-    expect(r.faces["Georgia/bold"]!.path).toMatch(/Merriweather-Bold\.ttf$/);
+    expect(r.substituted).toEqual({ Georgia: "Gelasio", "Times New Roman": "Tinos" });
+    expect(r.faces["Georgia/bold"]!.path).toMatch(/Gelasio-Bold\.ttf$/);
     expect(r.faces["Highland Sans/italic"]!.path).toMatch(/Highland Sans Italic\.ttf$/);
   });
 

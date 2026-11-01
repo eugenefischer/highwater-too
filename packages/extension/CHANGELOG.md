@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.20
+
+- Two more bundled fonts, both free and built with the same character widths as the fonts they stand in for: **Gelasio** for Georgia (Article, Wiki) and **Tinos** for Times New Roman (MLA Report). Without the real fonts installed, these templates now break lines and pages almost exactly as Highland 2 does.
+
 ## 0.2.19
 
 - The bundled fonts are now the exact versions Highland 2 ships, found in its app: Amiri 0.113, Lato 1.104, and two more under open licences, **Highland Sans** (Treatment) and **Merriweather** (the stand-in for Georgia and New York). Treatment now prints in its own font everywhere, and the Extension is smaller.
