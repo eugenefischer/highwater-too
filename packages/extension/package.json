@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.2.20",
+  "version": "0.3.0",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -391,6 +391,18 @@
         "title": "Syntax Cheat Sheet",
         "category": "Highwater Too",
         "icon": "$(question)"
+      },
+      {
+        "command": "highwater.openHighlandEditor",
+        "title": "Open in Highland-Style Editor (experimental)",
+        "category": "Highwater Too",
+        "icon": "$(book)"
+      },
+      {
+        "command": "highwater.openTextEditor",
+        "title": "Reopen in Text Editor",
+        "category": "Highwater Too",
+        "icon": "$(code)"
       }
     ],
     "customEditors": [
@@ -403,6 +415,31 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "highwater.highlandEditor",
+        "displayName": "Highland-Style Editor (experimental)",
+        "selector": [
+          {
+            "filenamePattern": "*.highland"
+          },
+          {
+            "filenamePattern": "*.fountain"
+          },
+          {
+            "filenamePattern": "*.spmd"
+          },
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          },
+          {
+            "filenamePattern": "*.txt"
+          }
+        ],
+        "priority": "option"
       }
     ],
     "configuration": {
@@ -455,6 +492,11 @@
           "minimum": 1,
           "scope": "application",
           "markdownDescription": "A file this computer has no writing history for is recognised as a work in the history when its text is exactly one of that work's saves, but only if it has at least this many words, so empty files and templates never match. (It is always asked before anything is fetched.)"
+        },
+        "highwater.highlandEditor": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the button that opens a document in the experimental Highland-style editor (M15)."
         }
       }
     },
@@ -937,7 +979,9 @@
     "configurationDefaults": {
       "[highland-fountain]": {
         "editor.inlayHints.maximumLength": 0,
-        "editor.dropIntoEditor.preferences": ["highwater.asset"],
+        "editor.dropIntoEditor.preferences": [
+          "highwater.asset"
+        ],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -957,7 +1001,9 @@
       },
       "[highland-markdown]": {
         "editor.inlayHints.maximumLength": 0,
-        "editor.dropIntoEditor.preferences": ["highwater.asset"],
+        "editor.dropIntoEditor.preferences": [
+          "highwater.asset"
+        ],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -977,7 +1023,9 @@
       },
       "[highland-plain]": {
         "editor.inlayHints.maximumLength": 0,
-        "editor.dropIntoEditor.preferences": ["highwater.asset"],
+        "editor.dropIntoEditor.preferences": [
+          "highwater.asset"
+        ],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -1177,6 +1225,10 @@
         {
           "command": "highwater.nextMarker",
           "when": "editorLangId =~ /^highland-/"
+        },
+        {
+          "command": "highwater.openTextEditor",
+          "when": "activeCustomEditorId == highwater.highlandEditor"
         }
       ],
       "explorer/context": [
@@ -1238,6 +1290,16 @@
           "command": "highwater.export",
           "when": "editorLangId =~ /^highland-/ && resourceScheme != highwater-extras",
           "group": "navigation@2"
+        },
+        {
+          "command": "highwater.openHighlandEditor",
+          "when": "editorLangId =~ /^highland-/ && config.highwater.highlandEditor",
+          "group": "navigation@0"
+        },
+        {
+          "command": "highwater.openTextEditor",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "navigation@0"
         }
       ],
       "view/title": [
@@ -1635,6 +1697,11 @@
     ]
   },
   "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
     "@types/vscode": "^1.100.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
@@ -1642,9 +1709,9 @@
   },
   "dependencies": {
     "@highwater/bundle": "*",
+    "@highwater/history": "*",
     "@highwater/parser": "*",
-    "@highwater/pdf": "*",
-    "@highwater/history": "*"
+    "@highwater/pdf": "*"
   },
   "imports": {
     "#standard-fonts/*": "./dist/standard-fonts/*.cjs"

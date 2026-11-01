@@ -22,6 +22,8 @@ const common = {
 };
 
 await build({ ...common, entryPoints: [join(root, "src/extension.ts")], outfile: join(root, "dist/extension.cjs"), sourcemap: true });
+// The Highland-style editor's page (M15), for the webview.
+await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/webview.ts")], outfile: join(root, "dist/highland-editor.js") });
 if (e2e) await build({ ...common, entryPoints: [join(root, "e2e/suite.ts")], outfile: join(root, "dist/e2e/suite.cjs") });
 
 // Courier Prime, and PDFKit's standard-font metrics, which it loads at run time as

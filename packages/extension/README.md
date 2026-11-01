@@ -17,6 +17,7 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 - Highlighting of scene headings, characters, dialogue, transitions, notes, boneyard, directives and Markdown; outline and folding by section and scene, or heading.
 - Highland's writing keys: ⌘B, ⌘I, ⌘U, ⌃+ (highlight), ⌘/ (note), ⌘Y (omit), ⌘⇧. (centre), ⌃U and ⌃⇧U (upper and lower case).
 - **Live Margins** (⌘L): cues, parentheticals and dialogue indented and transitions right-aligned, as on the page.
+- **Highland-Style Editor** (experimental): the book button in the editor's title bar, or **Reopen Editor With…**, opens the file in a page-width column in Courier Prime with every line of dialogue indented, wrapped lines included. The code button goes back to the text editor.
 - **Completion** in screenplays: start a line after an empty one in capitals and the characters who already speak are offered (most frequent first), with scene-heading prefixes and transitions; after `INT.` or `EXT.`, the script's locations; after ` - `, times of day.
 - **Markers:** ⌃M inserts one (with an optional label, listed in the Navigator); ⌃⌥M jumps to the next.
 - **Syntax Cheat Sheet** (the ? button in the Navigator's title bar): the markup for screenplays, manuscripts and both.
@@ -71,6 +72,7 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 | `highwater.writingHistory` | on | Record saves in the writing history. |
 | `highwater.historyFolder` | (system default) | Where the writing history and session backups are kept. |
 | `highwater.historyRemote` | (none) | A git remote to mirror the writing history to. |
+| `highwater.highlandEditor` | on | Show the book button that opens the experimental Highland-Style Editor. |
 | `highwater.historyMatchMinWords` | 50 | The fewest words a file's text must have to be recognised as a save of a work, so empty files and templates never match. |
 
 ## Known limitations
