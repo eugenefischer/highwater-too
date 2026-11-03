@@ -444,6 +444,16 @@ const tests: [string, () => Promise<void>][] = [
         if (Date.now() > until) throw new Error(`The Highland-Style Editor did not move its cursor: ${JSON.stringify(now)}`);
         await new Promise((r) => setTimeout(r, 100));
       }
+      // A writing key works there: ⌘B with nothing selected adds the pair and puts the cursor inside.
+      const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === path)!;
+      await vscode.commands.executeCommand("highwater.bold");
+      assert.equal(doc.getText().slice(17, 21), "****");
+      const after = Date.now() + 10_000;
+      while ((now = await surface()).selection?.head !== 19) {
+        if (Date.now() > after) throw new Error(`The Highland-Style Editor did not put the cursor inside the bold pair: ${JSON.stringify(now)}`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      await doc.save(); // closing an unsaved editor would ask
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     },
   ],

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5 (m15-editor branch)
+
+- Highland's writing keys work in the Highland-Style Editor: ⌘B, ⌘I, ⌘U, ⌃+ (highlight), ⌘/ (note), ⌘Y (omit), ⌘⇧. (centre), ⌃U and ⌃⇧U (upper and lower case, of the selection or the word at the cursor), ⌃M (insert a marker), ⌃⌥M (next marker) and ⌘0 (sidebar). The Title Page Builder opens from it and returns to it.
+
 ## 0.3.4 (m15-editor branch, experimental)
 
 - Fixed: clicking a scene in the Navigator, or a place in the Preview, right after the Highland-Style Editor opened could do nothing; the editor now scrolls there once it has finished opening.

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse } from "@highwater/parser";
 import { describe, expect, it } from "vitest";
-import { stripRevisionTags, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "../src/syntax/edits.ts";
+import { changeCase, stripRevisionTags, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "../src/syntax/edits.ts";
 import { countWords, documentStats } from "../src/syntax/stats.ts";
 
 const generated = fileURLToPath(new URL("../../../fixtures/generated/", import.meta.url));
@@ -101,5 +101,13 @@ describe("reading time", () => {
   it("reads prose at Highland's 250 words a minute", () => {
     const prose = Array.from({ length: 2500 }, (_, i) => (i % 10 === 9 ? "word." : "word")).join(" ");
     expect(documentStats(parse(prose, { mode: "markdown" })).minutes).toBe(10);
+  });
+});
+
+describe("case keys", () => {
+  it("changes the selection, or the word at the cursor, and keeps the selection", () => {
+    expect(changeCase("she said hello", 4, 8, true)).toEqual({ start: 4, end: 8, text: "SAID", selectionStart: 4, selectionEnd: 8 });
+    expect(changeCase("INT. O’BRIEN’S BAR", 7, 7, false)).toEqual({ start: 5, end: 14, text: "o’brien’s", selectionStart: 7, selectionEnd: 7 });
+    expect(changeCase("a  b", 2, 2, true)).toEqual({ start: 2, end: 2, text: "", selectionStart: 2, selectionEnd: 2 });
   });
 });

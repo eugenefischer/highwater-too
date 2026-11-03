@@ -17,7 +17,7 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 - Highlighting of scene headings, characters, dialogue, transitions, notes, boneyard, directives and Markdown; outline and folding by section and scene, or heading.
 - Highland's writing keys: ⌘B, ⌘I, ⌘U, ⌃+ (highlight), ⌘/ (note), ⌘Y (omit), ⌘⇧. (centre), ⌃U and ⌃⇧U (upper and lower case).
 - **Live Margins** (⌘L): cues, parentheticals and dialogue indented and transitions right-aligned, as on the page.
-- **Highland-Style Editor** (experimental): the book button in the editor's title bar, or **Reopen Editor With…**, opens the file in a page-width column in Courier Prime with every line of dialogue indented, wrapped lines included. The code button goes back to the text editor.
+- **Highland-Style Editor** (experimental): the book button in the editor's title bar, or **Reopen Editor With…**, opens the file in a page-width column in Courier Prime with every line of dialogue indented, wrapped lines included. The code button goes back to the text editor. The panes, status bar, Preview and Highland's writing keys work in it; completion doesn't yet.
 - **Completion** in screenplays: start a line after an empty one in capitals and the characters who already speak are offered (most frequent first), with scene-heading prefixes and transitions; after `INT.` or `EXT.`, the script's locations; after ` - `, times of day.
 - **Markers:** ⌃M inserts one (with an optional label, listed in the Navigator); ⌃⌥M jumps to the next.
 - **Syntax Cheat Sheet** (the ? button in the Navigator's title bar): the markup for screenplays, manuscripts and both.

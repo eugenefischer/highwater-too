@@ -88,3 +88,19 @@ export function stripRevisionTags(text: string): string {
   }
   return out + text.slice(at);
 }
+
+/**
+ * Upper or lower case (⌃U, ⌃⇧U): the selection, or with nothing selected the word at the cursor,
+ * as VS Code's own commands do. The selection stays where it was.
+ */
+export function changeCase(text: string, start: number, end: number, upper: boolean): TextEdit {
+  let from = start;
+  let to = end;
+  if (from === to) {
+    const word = /[\p{L}\p{N}'’_-]/u;
+    while (from > 0 && word.test(text[from - 1]!)) from--;
+    while (to < text.length && word.test(text[to]!)) to++;
+  }
+  const inner = text.slice(from, to);
+  return { start: from, end: to, text: upper ? inner.toUpperCase() : inner.toLowerCase(), selectionStart: start, selectionEnd: end };
+}

@@ -3,6 +3,7 @@ import { askText } from "./ask.ts";
 import { join } from "node:path";
 import { LANGUAGES, type ParseCache } from "./language.ts";
 import { markerText, nextMarker, suggest, vocabulary } from "./syntax/completion.ts";
+import { activeOffsets, editActive, revealOffset } from "./surface.ts";
 
 const KINDS = {
   character: vscode.CompletionItemKind.Value,
@@ -38,24 +39,25 @@ export function registerWritingTools(context: vscode.ExtensionContext, cache: Pa
       " ",
     ),
     vscode.commands.registerCommand("highwater.insertMarker", async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) return;
+      const active = activeOffsets();
+      if (!active) return;
       const label = await askText({ title: "Insert Marker", prompt: "A label for the marker (optional); it shows in the Navigator." });
       if (label === undefined) return;
-      await editor.edit((b) => b.replace(editor.selection, markerText(label)));
+      const sel = active.selections[0] ?? { anchor: 0, head: 0 };
+      const start = Math.min(sel.anchor, sel.head);
+      const text = markerText(label);
+      await editActive(active.document, [{ start, end: Math.max(sel.anchor, sel.head), text }], [{ anchor: start + text.length, head: start + text.length }]);
     }),
-    vscode.commands.registerCommand("highwater.nextMarker", () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) return;
-      const doc = editor.document;
-      const at = nextMarker(doc.getText(), doc.offsetAt(editor.selection.active));
+    vscode.commands.registerCommand("highwater.nextMarker", async () => {
+      const active = activeOffsets();
+      if (!active) return;
+      const doc = active.document;
+      const at = nextMarker(doc.getText(), active.selections[0]?.head ?? 0);
       if (at === null) {
         void vscode.window.showInformationMessage("No markers in this document. Insert one with ⌃M.");
         return;
       }
-      const pos = doc.positionAt(at);
-      editor.selection = new vscode.Selection(pos, pos);
-      editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+      await revealOffset(doc, at, "center", true);
     }),
     vscode.commands.registerCommand("highwater.cheatSheet", () =>
       vscode.commands.executeCommand("markdown.showPreviewToSide", vscode.Uri.file(join(context.extensionPath, "media", "cheatsheet.md"))),

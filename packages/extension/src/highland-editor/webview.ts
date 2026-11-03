@@ -6,8 +6,8 @@
  */
 import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
-import { Annotation, EditorState, RangeSetBuilder, StateField, type Text } from "@codemirror/state";
-import { Decoration, EditorView, keymap, type DecorationSet } from "@codemirror/view";
+import { Annotation, EditorSelection, EditorState, RangeSetBuilder, StateField, type Text } from "@codemirror/state";
+import { Decoration, EditorView, keymap, type DecorationSet, type KeyBinding } from "@codemirror/view";
 import { parse, type Mode } from "@highwater/parser";
 import { columnMinimum, columnWidth, lineStyles } from "./line-styles.ts";
 
@@ -48,6 +48,23 @@ const styling = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
+/**
+ * Keys that belong to Highwater (bold, italic, underline, note, omit, centre, highlight, case,
+ * markers, panes, Preview): CodeMirror must leave them alone so VS Code's keybindings get them.
+ */
+const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c"]);
+const isMac = /Mac/.test(navigator.platform);
+
+/**
+ * CodeMirror's bindings minus Highwater's keys, which instead do nothing here (no browser bold for
+ * ⌘B): the webview passes every key press on to VS Code, whose keybindings run the commands.
+ */
+function withoutHighlandKeys(bindings: readonly KeyBinding[]): KeyBinding[] {
+  const used = (k: string | undefined) => k !== undefined && HIGHLAND_KEYS.has(k.replace(/^Cmd-/, "Mod-"));
+  const kept = bindings.filter((b) => !used(isMac ? (b.mac ?? b.key) : b.key));
+  return [...[...HIGHLAND_KEYS].map((key) => ({ key, run: () => true })), ...kept];
+}
+
 let view: EditorView | null = null;
 
 function start(text: string): void {
@@ -59,7 +76,7 @@ function start(text: string): void {
       extensions: [
         history(),
         search({ top: true }),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+        keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
         EditorView.lineWrapping,
         styling,
         EditorView.updateListener.of((u) => {
@@ -101,6 +118,15 @@ function reveal(offset: number, how: "top" | "center", select: boolean): void {
   if (select) view.focus();
 }
 
+/** Sets the selections after one of Highwater's writing keys (bold, centre, case…) changed the text. */
+function select(ranges: { anchor: number; head: number }[]): void {
+  if (!view || !ranges.length) return;
+  const len = view.state.doc.length;
+  const clamp = (n: number) => Math.min(Math.max(0, n), len);
+  view.dispatch({ selection: EditorSelection.create(ranges.map((r) => EditorSelection.range(clamp(r.anchor), clamp(r.head)))), annotations: remote.of(true), scrollIntoView: true });
+  view.focus();
+}
+
 /** Replaces the text with the document's, changing only what differs, so the cursor stays put. */
 function replace(text: string): void {
   if (!view) return start(text);
@@ -114,12 +140,13 @@ function replace(text: string): void {
 }
 
 window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as { type: string; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean };
+  const msg = event.data as { type: string; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
   if (msg.type === "init") {
     mode = msg.mode ?? "fountain";
     document.body.dataset.mode = mode;
     start(msg.text ?? "");
   } else if (msg.type === "update") replace(msg.text ?? "");
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
+  else if (msg.type === "select" && msg.ranges) select(msg.ranges);
 });
 vscode.postMessage({ type: "ready" });

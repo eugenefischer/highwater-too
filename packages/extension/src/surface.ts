@@ -19,6 +19,8 @@ export interface HighlandView {
   top: number;
   /** True once the page's script has started and holds the text. */
   ready: boolean;
+  /** Sets the selections (offsets in the document as it is now). */
+  select(ranges: readonly { anchor: number; head: number }[]): void;
   /** Scrolls to an offset (at the top, or centred if out of view); with `select`, puts the cursor there and focuses the editor. */
   reveal(offset: number, how: "top" | "center", select: boolean): void;
 }
@@ -151,4 +153,43 @@ export async function insertAtSelection(doc: vscode.TextDocument, text: string):
   const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc) ?? (await vscode.window.showTextDocument(doc));
   await editor.edit((e) => e.replace(editor.selection, text));
   await vscode.window.showTextDocument(editor.document, editor.viewColumn);
+}
+
+/** A replacement in a document, by offsets. */
+export interface OffsetEdit {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/**
+ * Applies non-overlapping edits to the document in the active editor (text or Highland-Style),
+ * then sets its selections, given as offsets in the edited text.
+ */
+export async function editActive(doc: vscode.TextDocument, edits: readonly OffsetEdit[], selections?: readonly { anchor: number; head: number }[]): Promise<boolean> {
+  const view = activeView();
+  if (view && view.document === doc) {
+    const edit = new vscode.WorkspaceEdit();
+    for (const e of edits) edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
+    if (!(await vscode.workspace.applyEdit(edit))) return false;
+    if (selections) view.select(selections);
+    return true;
+  }
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document !== doc) return false;
+  const ok = await editor.edit((b) => {
+    for (const e of edits) b.replace(new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
+  });
+  if (ok && selections) editor.selections = selections.map((r) => new vscode.Selection(doc.positionAt(r.anchor), doc.positionAt(r.head)));
+  return ok;
+}
+
+/** The active editor's selections as offsets, with the document. */
+export function activeOffsets(): { document: vscode.TextDocument; selections: { anchor: number; head: number }[] } | undefined {
+  const view = activeView();
+  if (view) return { document: view.document, selections: [...view.selections] };
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) return undefined;
+  const doc = editor.document;
+  return { document: doc, selections: editor.selections.map((s) => ({ anchor: doc.offsetAt(s.anchor), head: doc.offsetAt(s.active) })) };
 }

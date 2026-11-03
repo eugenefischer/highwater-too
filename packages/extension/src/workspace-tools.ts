@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { LANGUAGES, type ParseCache } from "./language.ts";
 import { liveMargins } from "./syntax/margins.ts";
 import { BUILDER_FIELDS, readBuilderValues, titlePageEdit, type BuilderValues } from "./syntax/title-builder.ts";
+import { activeColumn, activeDocument, viewOf } from "./surface.ts";
 
 const SELECTOR: vscode.DocumentSelector = Object.values(LANGUAGES).map((language) => ({ language }));
 
@@ -43,12 +44,12 @@ export function registerWorkspaceTools(context: vscode.ExtensionContext, cache: 
 // Title Page Builder: a small form like Highland's (fields, then Clear All, Cancel, Insert).
 
 async function openBuilder(context: vscode.ExtensionContext, cache: ParseCache): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor || !editor.document.languageId.startsWith("highland-")) {
+  const document = activeDocument();
+  const column = activeColumn();
+  if (!document || !document.languageId.startsWith("highland-")) {
     void vscode.window.showInformationMessage("Open a document to build its title page.");
     return;
   }
-  const document = editor.document;
   const values = readBuilderValues(cache.get(document));
   const panel = vscode.window.createWebviewPanel("highwater.titlePage", "Title Page", { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false }, { enableScripts: true });
   panel.webview.html = builderHtml(panel.webview, values);
@@ -62,7 +63,10 @@ async function openBuilder(context: vscode.ExtensionContext, cache: ParseCache):
         await vscode.workspace.applyEdit(we);
       }
       panel.dispose();
-      await vscode.window.showTextDocument(document, editor.viewColumn ? { viewColumn: editor.viewColumn } : {});
+      // Back to the editor the writer came from (the Highland-Style Editor if that was it).
+      const view = viewOf(document);
+      if (view) view.panel.reveal(view.panel.viewColumn, false);
+      else await vscode.window.showTextDocument(document, column ? { viewColumn: column } : {});
     },
     undefined,
     context.subscriptions,

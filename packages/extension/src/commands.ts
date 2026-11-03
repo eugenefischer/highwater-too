@@ -8,8 +8,8 @@ import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
 import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
-import { toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
-import { activeDocument } from "./surface.ts";
+import { changeCase, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
+import { activeDocument, activeOffsets, editActive } from "./surface.ts";
 
 const NEW: Record<string, { mode: DocumentMode; template: string; name: string }> = {
   screenplay: { mode: "fountain", template: "Screenplay", name: "Untitled Screenplay" },
@@ -27,6 +27,9 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     vscode.commands.registerCommand("highwater.note", wrap("[[", "]]")),
     vscode.commands.registerCommand("highwater.centre", () => applyToSelections(toggleCentre)),
     vscode.commands.registerCommand("highwater.omit", () => applyToSelections(toggleBoneyard)),
+    // ⌃U and ⌃⇧U: VS Code's own case commands in the text editor; these in the Highland-Style Editor.
+    vscode.commands.registerCommand("highwater.upperCase", () => applyToSelections((t, s, e) => changeCase(t, s, e, true))),
+    vscode.commands.registerCommand("highwater.lowerCase", () => applyToSelections((t, s, e) => changeCase(t, s, e, false))),
     vscode.commands.registerCommand("highwater.toggleInvisibles", toggleInvisibles),
     vscode.commands.registerCommand("highwater.newScreenplay", () => newDocument("screenplay")),
     vscode.commands.registerCommand("highwater.newManuscript", () => newDocument("manuscript")),
@@ -43,31 +46,29 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
   );
 }
 
-/** Applies a text toggle to every selection, last first so earlier offsets stay valid. */
+/** Applies a text toggle to every selection, in a text editor or the Highland-Style Editor. */
 async function applyToSelections(toggle: (text: string, start: number, end: number) => TextEdit): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) return;
-  const doc = editor.document;
+  const active = activeOffsets();
+  if (!active) return;
+  const doc = active.document;
   let text = doc.getText();
-  const sels = [...editor.selections].map((s) => ({ start: doc.offsetAt(s.start), end: doc.offsetAt(s.end) })).sort((a, b) => b.start - a.start);
+  // Last first, so each toggle sees the text as the later ones left it and earlier offsets stay valid.
+  const sels = active.selections.map((s) => ({ start: Math.min(s.anchor, s.head), end: Math.max(s.anchor, s.head) })).sort((a, b) => b.start - a.start);
   const edits: TextEdit[] = [];
   for (const s of sels) {
     const edit = toggle(text, s.start, s.end);
     edits.push(edit);
     text = text.slice(0, edit.start) + edit.text + text.slice(edit.end);
   }
-  const ok = await editor.edit((b) => {
-    for (const e of edits) b.replace(new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
-  });
-  if (!ok) return;
   // Selections in the new text: shift each edit's selection by the length changes of the edits before it.
   const ascending = [...edits].reverse();
   let shift = 0;
-  editor.selections = ascending.map((e) => {
-    const sel = new vscode.Selection(doc.positionAt(e.selectionStart + shift), doc.positionAt(e.selectionEnd + shift));
+  const selections = ascending.map((e) => {
+    const sel = { anchor: e.selectionStart + shift, head: e.selectionEnd + shift };
     shift += e.text.length - (e.end - e.start);
     return sel;
   });
+  await editActive(doc, edits, selections);
 }
 
 async function toggleInvisibles(): Promise<void> {

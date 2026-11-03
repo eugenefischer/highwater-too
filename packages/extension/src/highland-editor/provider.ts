@@ -35,6 +35,11 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       selections: [{ anchor: 0, head: 0 }],
       top: 0,
       ready: false,
+      select: (ranges) => {
+        // The page must hold the edited text before it can select in it.
+        if (document.getText() !== pageText) send();
+        if (view.ready) void panel.webview.postMessage({ type: "select", ranges });
+      },
       reveal: (offset, how, select) => {
         const msg = { type: "reveal", offset, how, select };
         // The page drops messages sent before its script has started: hold the latest until it has.
