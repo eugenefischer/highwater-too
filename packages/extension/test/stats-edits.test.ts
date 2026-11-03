@@ -104,6 +104,17 @@ describe("reading time", () => {
   });
 });
 
+describe("emphasis with spaces at the ends of the selection", () => {
+  it("leaves the spaces outside the markers, and selects the word", () => {
+    const bold = (t: string, s: number, e: number) => toggleWrap(t, s, e, "**");
+    expect(bold("a word b", 1, 7)).toEqual({ start: 2, end: 6, text: "**word**", selectionStart: 4, selectionEnd: 8 });
+    expect(bold("a **word** b", 1, 11)).toEqual({ start: 2, end: 10, text: "word", selectionStart: 2, selectionEnd: 6 });
+    expect(bold("line one\nline two", 5, 9)).toEqual({ start: 5, end: 8, text: "**one**", selectionStart: 7, selectionEnd: 10 });
+    // Only spaces selected: wrapped as they are.
+    expect(bold("a  b", 1, 3).text).toBe("**  **");
+  });
+});
+
 describe("case keys", () => {
   it("changes the selection, or the word at the cursor, and keeps the selection", () => {
     expect(changeCase("she said hello", 4, 8, true)).toEqual({ start: 4, end: 8, text: "SAID", selectionStart: 4, selectionEnd: 8 });

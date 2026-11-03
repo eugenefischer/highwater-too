@@ -12,9 +12,15 @@ export interface TextEdit {
 /**
  * Highland's emphasis keys: wraps the selection in `open`…`close`, or removes them when the
  * selection is already wrapped (inside or just outside the markers). With nothing selected,
- * inserts the pair and puts the cursor between them.
+ * inserts the pair and puts the cursor between them. Spaces at the ends of the selection are left
+ * outside the markers.
  */
 export function toggleWrap(text: string, start: number, end: number, open: string, close = open): TextEdit {
+  // Spaces or line breaks at either end of the selection stay outside the markers: "**word **" isn't bold.
+  if (/\S/.test(text.slice(start, end))) {
+    while (/\s/.test(text[start]!)) start++;
+    while (/\s/.test(text[end - 1]!)) end--;
+  }
   const inner = text.slice(start, end);
   // A single-character marker must not be half of a longer run: "*" is not part of "**".
   const single = open.length === 1 && open === close;

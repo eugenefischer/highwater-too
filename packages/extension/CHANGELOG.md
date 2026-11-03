@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6 (m15-editor branch)
+
+- Bold, italic, underline, strikethrough, highlight and notes leave spaces at either end of the selection outside the markers (`**word** `, not `**word **`, which doesn't print as bold), in both editors.
+
 ## 0.3.5 (m15-editor branch)
 
 - Highland's writing keys work in the Highland-Style Editor: ⌘B, ⌘I, ⌘U, ⌃+ (highlight), ⌘/ (note), ⌘Y (omit), ⌘⇧. (centre), ⌃U and ⌃⇧U (upper and lower case, of the selection or the word at the cursor), ⌃M (insert a marker), ⌃⌥M (next marker) and ⌘0 (sidebar). The Title Page Builder opens from it and returns to it.
