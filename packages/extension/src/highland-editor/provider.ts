@@ -124,6 +124,13 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-edito
 .hl-title { color: var(--vscode-descriptionForeground); }
 .hl-heading { font-weight: bold; }
 .hl-quote { font-style: italic; }
+/* Completion, in VS Code's suggestion colours. */
+.cm-editor .cm-tooltip { background: var(--vscode-editorSuggestWidget-background); color: var(--vscode-editorSuggestWidget-foreground); border: 1px solid var(--vscode-editorSuggestWidget-border, transparent); }
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul { font-family: "Courier Prime", monospace; max-height: 14em; }
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li { padding: 1px 6px; }
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] { background: var(--vscode-editorSuggestWidget-selectedBackground) !important; color: var(--vscode-editorSuggestWidget-selectedForeground, inherit) !important; }
+.cm-editor .cm-completionMatchedText { text-decoration: none; font-weight: bold; color: var(--vscode-editorSuggestWidget-highlightForeground); }
+.cm-editor .cm-completionDetail { margin-left: 1.5em; font-style: normal; color: var(--vscode-descriptionForeground); }
 .cm-panels { background: var(--vscode-editorWidget-background); color: var(--vscode-editorWidget-foreground); }
 </style></head>
 <body><div id="editor"></div><script nonce="${nonce}" src="${script}"></script></body></html>`;

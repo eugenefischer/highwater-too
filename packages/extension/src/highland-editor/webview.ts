@@ -8,7 +8,8 @@ import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirro
 import { search, searchKeymap } from "@codemirror/search";
 import { Annotation, EditorSelection, EditorState, RangeSetBuilder, StateField, type Text } from "@codemirror/state";
 import { Decoration, EditorView, keymap, type DecorationSet, type KeyBinding } from "@codemirror/view";
-import { parse, type Mode } from "@highwater/parser";
+import { parse, type Document, type Mode } from "@highwater/parser";
+import { screenplayCompletion } from "./complete.ts";
 import { columnMinimum, columnWidth, lineStyles } from "./line-styles.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -18,9 +19,11 @@ const vscode = acquireVsCodeApi();
 const remote = Annotation.define<boolean>();
 
 let mode: Mode = "fountain";
+/** The latest parse of the text, for completion. */
+let parsed: Document | null = null;
 
 function decorate(doc: Text): DecorationSet {
-  const parsed = parse(doc.toString(), { mode });
+  parsed = parse(doc.toString(), { mode });
   const styles = lineStyles(parsed);
   const column = columnWidth(parsed);
   document.documentElement.style.setProperty("--column", `${column}ch`);
@@ -79,6 +82,7 @@ function start(text: string): void {
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
         EditorView.lineWrapping,
         styling,
+        screenplayCompletion(() => (mode === "fountain" ? parsed : null)),
         EditorView.updateListener.of((u) => {
           if (!u.docChanged || u.transactions.some((t) => t.annotation(remote))) return;
           const changes: { from: number; to: number; insert: string }[] = [];

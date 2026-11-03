@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.7 (m15-editor branch)
+
+- Completion in the Highland-Style Editor, as in the text editor: in a screenplay, start a line after an empty one in capitals and the characters who already speak are offered (most frequent first), with scene-heading prefixes and transitions; after `INT.` or `EXT.`, the script's locations, then times of day. ↑↓ choose, Enter or Tab accepts, Escape closes, ⌃Space asks.
+- Fixed in both editors: while typing a scene heading's location, the half-typed location was offered as one of the script's locations.
+
 ## 0.3.6 (m15-editor branch)
 
 - Bold, italic, underline, strikethrough, highlight and notes leave spaces at either end of the selection outside the markers (`**word** `, not `**word **`, which doesn't print as bold), in both editors.

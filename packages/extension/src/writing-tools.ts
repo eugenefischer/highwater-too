@@ -25,6 +25,8 @@ export function registerWritingTools(context: vscode.ExtensionContext, cache: Pa
           let list = suggest(before, afterBlank, vocabulary(cache.get(document)));
           // A typed space only brings up a heading's location or time, never the cue list.
           if (context.triggerKind === vscode.CompletionTriggerKind.TriggerCharacter) list = list.filter((s) => s.kind === "location" || s.kind === "time");
+          // Not what is already typed: the line being typed is in the parse too ("INT. K" makes a location "K").
+          list = list.filter((s) => s.label !== before.slice(s.replaceFrom).trim());
           return list.map((s, i) => {
             const item = new vscode.CompletionItem({ label: s.label, description: s.kind }, KINDS[s.kind]);
             item.insertText = s.insert;
