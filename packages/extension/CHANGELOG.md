@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.5 (m15-editor branch)
+
+- The Bin and Assets panes come closer to Highland's (they stay VS Code panes, so text and images still drop onto them without holding Shift):
+  - Bin items show how many words they hold and how they go on after their first line; hovering shows the whole item.
+  - Assets are listed by name, with the file's kind, pixel size and file size beside it; hovering shows a preview of the image.
+
 ## 0.4.4 (m15-editor branch)
 
 - Fixed: dragging a scene in the Navigator out of the pane and back lost the drop line (VS Code stops passing a webview the mouse once a browser drag crosses the rest of the window). The Navigator now follows the pointer itself: the line hides while you're outside the list and comes back when you return; letting go outside the list, or pressing Escape, cancels. The list scrolls when you drag near its top or bottom edge.

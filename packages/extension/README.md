@@ -29,8 +29,8 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 Click the Highwater Too icon in the activity bar (it opens by itself when you open a document):
 
 - **Navigator** (⌘1), in Highland's style: scenes, sections, synopses, notes, images, links, includes and markers, with the one the cursor is in highlighted; click to jump. Type in the Filter box at its foot to find an item; the eye button chooses which kinds are listed. Drag a scene, section or heading to move its text (with everything under it): a line shows where it will land, before another scene, section or heading, or at the end.
-- **Bin** (⌘2): text cut or copied with ⌥⌘X or ⌥⌘C to use later; open, reorder, insert or drag back.
-- **Assets** (⌘4): images kept in the document (for a plain file, in the folder beside it); drag one into the text to insert it as an image.
+- **Bin** (⌘2): text cut or copied with ⌥⌘X or ⌥⌘C to use later, each with its word count and how it goes on; hover to read it all; open, reorder, insert or drag back.
+- **Assets** (⌘4): images kept in the document (for a plain file, in the folder beside it), with their kind, pixel size and file size; hover for a preview; drag one into the text to insert it as an image.
 - **Scratchpad** (⌘5): notes kept in the document, in their own tab.
 - For a plain `.fountain` or `.md` file, the Bin and Scratchpad are kept with the writing history (in its folder, under `extras`), not in the file.
 - **Writing History:** the document's saves (see below).

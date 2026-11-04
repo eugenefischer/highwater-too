@@ -7,7 +7,7 @@ import type { ParseCache } from "./language.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 import { NAVIGATOR_VIEW, NavigatorPane } from "./navigator-pane/pane.ts";
-import { assetMarkdown, binLabel, move, uniqueName } from "./syntax/workspace.ts";
+import { assetMarkdown, binDetail, binLabel, byteSize, imageSize, move, uniqueName } from "./syntax/workspace.ts";
 import { idNote, noteId } from "./extras-folder.ts";
 import { focusedDocument, roleOf, type FocusedDocument } from "./focus.ts";
 import { LANGUAGES } from "./language.ts";
@@ -210,8 +210,13 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
   }
 
   getTreeItem(item: BinItem): vscode.TreeItem {
-    const t = new vscode.TreeItem(binLabel(item.text));
-    t.tooltip = item.text.length > 600 ? `${item.text.slice(0, 600)}…` : item.text;
+    const t = new vscode.TreeItem(binLabel(item.text, 80));
+    // How long it is and how it goes on, as Highland's cards show more than the first line.
+    t.description = binDetail(item.text);
+    const tip = new vscode.MarkdownString();
+    tip.appendText(item.text.length > 1200 ? `${item.text.slice(0, 1200)}…` : item.text || "(empty)");
+    tip.appendMarkdown("\n\n---\n\nClick to open · the arrow inserts it at the cursor");
+    t.tooltip = tip;
     t.contextValue = "binItem";
     t.iconPath = new vscode.ThemeIcon("note");
     t.command = { command: "highwater.bin.open", title: "Open", arguments: [item] };
@@ -357,6 +362,8 @@ async function assetReferences(doc: vscode.TextDocument, uriList: string): Promi
   return refs.join("\n\n");
 }
 
+const MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "heic", "webp", "pdf"];
 
 class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragAndDropController<AssetItem> {
@@ -375,12 +382,54 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
   }
 
   getTreeItem(item: AssetItem): vscode.TreeItem {
-    const t = new vscode.TreeItem(item.name);
+    // As in Highland: the name without its extension, then the kind (and here its size).
+    const dot = item.name.lastIndexOf(".");
+    const ext = dot > 0 ? item.name.slice(dot + 1).toLowerCase() : "";
+    const t = new vscode.TreeItem(dot > 0 ? item.name.slice(0, dot) : item.name);
+    const info = this.#info.get(this.#key(item));
+    t.description = [ext, info?.dimensions, info?.size].filter(Boolean).join(" · ");
     t.contextValue = "asset";
-    t.resourceUri = assetUri(item);
-    t.tooltip = `${item.name}\nDrag into the text, or right-click to insert.`;
+    t.iconPath = new vscode.ThemeIcon(ext === "pdf" ? "file-pdf" : "file-media");
     t.command = { command: "highwater.assets.open", title: "Open", arguments: [item] };
     return t;
+  }
+
+  /** On hover: a preview of the image. */
+  async resolveTreeItem(t: vscode.TreeItem, item: AssetItem): Promise<vscode.TreeItem> {
+    const tip = new vscode.MarkdownString(undefined, true);
+    tip.supportHtml = true;
+    const bytes = await this.#read(item);
+    const mime = MIME[item.name.slice(item.name.lastIndexOf(".") + 1).toLowerCase()];
+    // Small enough to show inline (a hover holds the whole image).
+    if (bytes && mime && bytes.length <= 3 * 1024 * 1024) tip.appendMarkdown(`<img src="data:${mime};base64,${Buffer.from(bytes).toString("base64")}" width="240">\n\n`);
+    tip.appendText(item.name);
+    tip.appendMarkdown("\n\nDrag into the text, or use the arrow to insert it at the cursor.");
+    t.tooltip = tip;
+    return t;
+  }
+
+  /** Size and dimensions, found when the list is made. */
+  readonly #info = new Map<string, { size: string; dimensions: string | undefined }>();
+
+  #key(item: AssetItem): string {
+    return `${item.bundle ?? item.plain}\n${item.name}`;
+  }
+
+  async #read(item: AssetItem): Promise<Uint8Array | null> {
+    if (item.file) return readFile(item.file).catch(() => null);
+    return this.store.read(item.bundle!, `assets/${item.name}`).catch(() => null);
+  }
+
+  async #measure(items: AssetItem[]): Promise<AssetItem[]> {
+    await Promise.all(
+      items.map(async (item) => {
+        const bytes = await this.#read(item);
+        if (!bytes) return;
+        const d = imageSize(bytes);
+        this.#info.set(this.#key(item), { size: byteSize(bytes.length), dimensions: d ? `${d.width}×${d.height}` : undefined });
+      }),
+    );
+    return items;
   }
 
   async getChildren(item?: AssetItem): Promise<AssetItem[]> {
@@ -389,12 +438,12 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
     if (bundle) {
       const snap = await this.store.snapshot(bundle).catch(() => null);
       const names = (snap?.paths ?? []).filter((p) => p.startsWith("assets/") && !p.endsWith("/")).map((p) => p.slice("assets/".length));
-      return names.sort((a, b) => a.localeCompare(b)).map((name) => ({ bundle, name, folder: "assets" }));
+      return this.#measure(names.sort((a, b) => a.localeCompare(b)).map((name) => ({ bundle, name, folder: "assets" })));
     }
     if (plain) {
       const extras = plainExtras();
       const { name: folder, dir } = await extras.assetsFolder(plain);
-      return (await extras.assets(plain)).map((name) => ({ plain, name, folder, file: join(dir, name) }));
+      return this.#measure((await extras.assets(plain)).map((name) => ({ plain, name, folder, file: join(dir, name) })));
     }
     return [];
   }

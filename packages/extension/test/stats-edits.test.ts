@@ -122,3 +122,30 @@ describe("case keys", () => {
     expect(changeCase("a  b", 2, 2, true)).toEqual({ start: 2, end: 2, text: "", selectionStart: 2, selectionEnd: 2 });
   });
 });
+
+describe("Bin and Assets details", async () => {
+  const { binDetail, byteSize, imageSize } = await import("../src/syntax/workspace.ts");
+  it("describes a Bin item", () => {
+    expect(binDetail("She runs.\n\nThen stops and turns.")).toBe("6 words · Then stops and turns.");
+    expect(binDetail("One")).toBe("1 word");
+    expect(binDetail("")).toBe("0 words");
+  });
+  it("gives sizes as the Explorer does", () => {
+    expect(byteSize(500)).toBe("500 B");
+    expect(byteSize(245_000)).toBe("239 KB");
+    expect(byteSize(1_300_000)).toBe("1.2 MB");
+  });
+  it("reads image sizes from PNG, GIF and JPEG headers", () => {
+    const png = new Uint8Array(24);
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    png.set([0, 0, 4, 0xb0], 16); // 1200
+    png.set([0, 0, 3, 0x20], 20); // 800
+    expect(imageSize(png)).toEqual({ width: 1200, height: 800 });
+    const gif = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x40, 0x01, 0xf0, 0x00]);
+    expect(imageSize(gif)).toEqual({ width: 320, height: 240 });
+    // SOI, an APP0 segment of length 4, then SOF0 with height 600 and width 900.
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 17, 8, 0x02, 0x58, 0x03, 0x84, 3, 0, 0, 0]);
+    expect(imageSize(jpeg)).toEqual({ width: 900, height: 600 });
+    expect(imageSize(new Uint8Array([1, 2, 3]))).toBe(null);
+  });
+});
