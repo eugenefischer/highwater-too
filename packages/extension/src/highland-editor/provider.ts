@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
+import { HIGHLAND_THEMES, pageColors, themeFor } from "./themes.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
 import { activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
@@ -65,6 +66,11 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     let pendingReveal: object | undefined;
 
+    // A Highland theme for the page (highwater.theme), or VS Code's colours.
+    const sendTheme = () => {
+      const theme = themeFor(vscode.workspace.getConfiguration("highwater").get<string>("theme"));
+      void panel.webview.postMessage({ type: "theme", vars: theme ? pageColors(theme) : null });
+    };
     // Show Invisibles follows the text editor's whitespace setting for the document's language.
     const sendInvisibles = () =>
       void panel.webview.postMessage({ type: "invisibles", on: vscode.workspace.getConfiguration("editor", document).get<string>("renderWhitespace", "none") !== "none" });
@@ -80,6 +86,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
           sendInvisibles();
+          sendTheme();
           if (pendingReveal) void panel.webview.postMessage(pendingReveal);
           pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
@@ -106,6 +113,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (view.ready && e.affectsConfiguration("editor.renderWhitespace", document)) sendInvisibles();
+        if (view.ready && e.affectsConfiguration("highwater.theme")) sendTheme();
       }),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document !== document || e.contentChanges.length === 0) return;
@@ -127,8 +135,19 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 @font-face { font-family: "Courier Prime"; font-weight: bold; src: url("${font("CourierPrime-Bold.ttf")}"); }
 @font-face { font-family: "Courier Prime"; font-style: italic; src: url("${font("CourierPrime-Italic.ttf")}"); }
 @font-face { font-family: "Courier Prime"; font-weight: bold; font-style: italic; src: url("${font("CourierPrime-BoldItalic.ttf")}"); }
-:root { --column: 63ch; --column-min: 0ch; }
-html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
+:root {
+  --column: 63ch; --column-min: 0ch;
+  /* The page's colours: VS Code's, unless a Highland theme (highwater.theme) sets these on the page. */
+  --hl-bg: var(--vscode-editor-background); --hl-fg: var(--vscode-editor-foreground);
+  --hl-scene: var(--vscode-textLink-foreground); --hl-note: var(--vscode-descriptionForeground); --hl-muted: var(--vscode-descriptionForeground);
+  --hl-caret: var(--vscode-editorCursor-foreground); --hl-selection: var(--vscode-editor-selectionBackground);
+  --hl-match: var(--vscode-editor-findMatchHighlightBackground); --hl-match-current: var(--vscode-editor-findMatchBackground);
+  --hl-panel-bg: var(--vscode-editorWidget-background); --hl-panel-fg: var(--vscode-editorWidget-foreground);
+  --hl-input-bg: var(--vscode-input-background); --hl-border: var(--vscode-input-border, var(--vscode-editorWidget-border, transparent));
+  --hl-accent: var(--vscode-button-background); --hl-accent-fg: var(--vscode-button-foreground);
+  --hl-whitespace: var(--vscode-editorWhitespace-foreground);
+}
+html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); color: var(--hl-fg); }
 #editor, .cm-editor { height: 100%; }
 .cm-editor { font-size: calc(var(--vscode-editor-font-size, 14px) * 1.1); }
 .cm-editor.cm-focused { outline: none; }
@@ -136,19 +155,17 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-edito
 .cm-editor .cm-scroller { font-family: "Courier Prime", monospace !important; line-height: 1.5; }
 /* The page column: as wide as the printed text, centred in the window. As in Highland, a narrower window
    narrows it down to the right edge of dialogue (--column-min) and no further: past that the page scrolls sideways. */
-.cm-editor .cm-content { flex: 0 1 var(--column) !important; width: var(--column); max-width: calc(100% - 2ch); min-width: var(--column-min); margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--vscode-editorCursor-foreground); }
+.cm-editor .cm-content { flex: 0 1 var(--column) !important; width: var(--column); max-width: calc(100% - 2ch); min-width: var(--column-min); margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--hl-caret); }
 /* More specific than CodeMirror's own line padding; each line's indent is set inline. */
 .cm-editor .cm-content .cm-line { padding: 0; }
-.cm-editor .cm-searchMatch { background: var(--vscode-editor-findMatchHighlightBackground); outline: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent); }
-.cm-editor .cm-searchMatch-selected, .cm-editor .cm-searchMatch-selected * { background: var(--vscode-editor-findMatchBackground); outline: 1px solid var(--vscode-editor-findMatchBorder, transparent); }
-.cm-selectionBackground, .cm-content ::selection { background: var(--vscode-editor-selectionBackground) !important; }
-.hl-scene { font-weight: bold; color: var(--vscode-textLink-foreground); }
-.hl-cue { }
+.cm-editor .cm-searchMatch { background: var(--hl-match); outline: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent); }
+.cm-editor .cm-searchMatch-selected, .cm-editor .cm-searchMatch-selected * { background: var(--hl-match-current); outline: 1px solid var(--vscode-editor-findMatchBorder, transparent); }
+.cm-selectionBackground, .cm-content ::selection { background: var(--hl-selection) !important; }
+.hl-scene { font-weight: bold; color: var(--hl-scene); }
 .hl-right { text-align: right; }
 .hl-center { text-align: center; }
 .hl-lyric { font-style: italic; }
-.hl-section, .hl-synopsis, .hl-directive, .hl-pageBreak, .hl-boneyard { color: var(--vscode-descriptionForeground); }
-.hl-title { color: var(--vscode-descriptionForeground); }
+.hl-section, .hl-synopsis, .hl-directive, .hl-pageBreak, .hl-boneyard, .hl-title { color: var(--hl-muted); }
 .hl-heading { font-weight: bold; }
 .hl-quote { font-style: italic; }
 /* Emphasis, notes and omitted text where they stand. */
@@ -158,21 +175,33 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-edito
 .hl-underline { text-decoration: underline; }
 .hl-strike { text-decoration: line-through; }
 .hl-highlight { background: rgba(252, 255, 38, 0.35); }
-.hl-note, .hl-omitted { color: var(--vscode-descriptionForeground); }
-.hl-note { font-style: italic; }
-/* Show Invisibles, in VS Code's whitespace colour. */
-.hl-eol { color: var(--vscode-editorWhitespace-foreground); }
-.cm-editor .cm-highlightSpace { background-image: radial-gradient(circle at 50% 55%, var(--vscode-editorWhitespace-foreground) 15%, transparent 5%); }
+.hl-note { color: var(--hl-note); font-style: italic; }
+.hl-omitted { color: var(--hl-muted); }
+/* Show Invisibles. */
+.hl-eol { color: var(--hl-whitespace); }
+.cm-editor .cm-highlightSpace { background-image: radial-gradient(circle at 50% 55%, var(--hl-whitespace) 15%, transparent 5%); }
 .cm-editor .cm-highlightTab { background-image: none; position: relative; }
-.cm-editor .cm-highlightTab::before { content: "→"; position: absolute; left: 0; color: var(--vscode-editorWhitespace-foreground); }
-/* Completion, in VS Code's suggestion colours. */
-.cm-editor .cm-tooltip { background: var(--vscode-editorSuggestWidget-background); color: var(--vscode-editorSuggestWidget-foreground); border: 1px solid var(--vscode-editorSuggestWidget-border, transparent); }
+.cm-editor .cm-highlightTab::before { content: "→"; position: absolute; left: 0; color: var(--hl-whitespace); }
+/* Completion. */
+.cm-editor .cm-tooltip { background: var(--hl-panel-bg); color: var(--hl-panel-fg); border: 1px solid var(--hl-border); }
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul { font-family: "Courier Prime", monospace; max-height: 14em; }
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li { padding: 1px 6px; }
-.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] { background: var(--vscode-editorSuggestWidget-selectedBackground) !important; color: var(--vscode-editorSuggestWidget-selectedForeground, inherit) !important; }
-.cm-editor .cm-completionMatchedText { text-decoration: none; font-weight: bold; color: var(--vscode-editorSuggestWidget-highlightForeground); }
-.cm-editor .cm-completionDetail { margin-left: 1.5em; font-style: normal; color: var(--vscode-descriptionForeground); }
-.cm-panels { background: var(--vscode-editorWidget-background); color: var(--vscode-editorWidget-foreground); }
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] { background: var(--hl-selection) !important; color: inherit !important; }
+.cm-editor .cm-completionMatchedText { text-decoration: none; font-weight: bold; color: var(--hl-scene); }
+.cm-editor .cm-completionDetail { margin-left: 1.5em; font-style: normal; color: var(--hl-muted); }
+/* The Find bar, in the page's colours rather than CodeMirror's grey. */
+.cm-editor .cm-panels { background: var(--hl-panel-bg); color: var(--hl-panel-fg); border-color: var(--hl-border); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
+.cm-editor .cm-panels.cm-panels-top { border-bottom: 1px solid var(--hl-border); }
+.cm-editor .cm-panel.cm-search { padding: 6px 28px 6px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cm-editor .cm-panel.cm-search br { display: none; }
+.cm-editor .cm-panel.cm-search label { font-size: inherit; display: inline-flex; align-items: center; gap: 3px; color: var(--hl-panel-fg); }
+.cm-editor .cm-textfield { font: inherit; color: var(--hl-fg); background: var(--hl-input-bg); border: 1px solid var(--hl-border); border-radius: 3px; padding: 3px 6px; margin: 0; }
+.cm-editor .cm-textfield:focus { outline: 1px solid var(--hl-accent); outline-offset: -1px; }
+.cm-editor .cm-button { font: inherit; color: var(--hl-panel-fg); background: none; background-image: none; border: 1px solid var(--hl-border); border-radius: 3px; padding: 2px 8px; margin: 0; }
+.cm-editor .cm-button:hover { background: var(--hl-selection); }
+.cm-editor .cm-button[name="next"] { background: var(--hl-accent); color: var(--hl-accent-fg); border-color: transparent; }
+.cm-editor .cm-panel.cm-search [name="close"] { color: var(--hl-panel-fg); font-size: 1.3em; top: 4px; right: 6px; }
+.cm-editor .cm-panel.cm-search input[type="checkbox"] { accent-color: var(--hl-accent); }
 </style></head>
 <body><div id="editor"></div><script nonce="${nonce}" src="${script}"></script></body></html>`;
   }
@@ -235,6 +264,33 @@ export function registerHighlandEditor(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("highwater.openHighlandEditor", async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (target) await swapActive(target, HIGHLAND_EDITOR);
+    }),
+    // Highland's themes, tried out as you move through the list (Escape puts the old one back).
+    vscode.commands.registerCommand("highwater.chooseTheme", async () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      const before = config.get<string>("theme", "vscode");
+      const items = [
+        { label: "Match VS Code", description: "your VS Code colour theme", id: "vscode" },
+        ...Object.entries(HIGHLAND_THEMES).map(([id, t]) => ({ label: t.name, description: t.mode, id })),
+      ];
+      const quick = vscode.window.createQuickPick<(typeof items)[number]>();
+      quick.title = "Theme for the Highland-Style Editor and the Navigator";
+      quick.items = items;
+      quick.activeItems = items.filter((i) => i.id === before);
+      let chosen = false;
+      quick.onDidChangeActive((active) => {
+        const id = active[0]?.id;
+        if (id) void config.update("theme", id, vscode.ConfigurationTarget.Global);
+      });
+      quick.onDidAccept(() => {
+        chosen = true;
+        quick.hide();
+      });
+      quick.onDidHide(() => {
+        if (!chosen) void config.update("theme", before, vscode.ConfigurationTarget.Global);
+        quick.dispose();
+      });
+      quick.show();
     }),
     // ⌃G: VS Code's Go to Line only reaches text editors.
     vscode.commands.registerCommand("highwater.goToLine", async () => {

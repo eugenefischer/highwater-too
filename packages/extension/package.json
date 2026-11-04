@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -419,6 +419,11 @@
         "title": "Go to Line…",
         "category": "Highwater Too",
         "enablement": "activeCustomEditorId == highwater.highlandEditor"
+      },
+      {
+        "command": "highwater.chooseTheme",
+        "title": "Choose Theme…",
+        "category": "Highwater Too"
       }
     ],
     "customEditors": [
@@ -513,6 +518,53 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Open screenplays and manuscripts (`.highland`, `.fountain`, and `.md` files Highwater Too handles) in the Highland-Style Editor. Off: they open as text. Either way, the book and code buttons in the editor's title bar switch a document between the two."
+        },
+        "highwater.theme": {
+          "type": "string",
+          "default": "vscode",
+          "enum": [
+            "vscode",
+            "classic",
+            "clean",
+            "winter",
+            "kermit",
+            "solarized-light",
+            "dark-mode",
+            "dracula",
+            "material",
+            "monokai",
+            "solarized-dark",
+            "transit"
+          ],
+          "enumItemLabels": [
+            "Match VS Code",
+            "Classic",
+            "Clean",
+            "Winter",
+            "Kermit",
+            "Solarized Light",
+            "Dark Mode",
+            "Dracula",
+            "Material",
+            "Monokai",
+            "Solarized Dark",
+            "Transit"
+          ],
+          "enumDescriptions": [
+            "Your VS Code colour theme.",
+            "Highland 2's Classic theme (light).",
+            "Highland 2's Clean theme (light).",
+            "Highland 2's Winter theme (light).",
+            "Highland 2's Kermit theme (light).",
+            "Highland 2's Solarized Light theme (light).",
+            "Highland 2's Dark Mode theme (dark).",
+            "Highland 2's Dracula theme (dark).",
+            "Highland 2's Material theme (dark).",
+            "Highland 2's Monokai theme (dark).",
+            "Highland 2's Solarized Dark theme (dark).",
+            "Highland 2's Transit theme (dark)."
+          ],
+          "markdownDescription": "Colours for the Highland-Style Editor and the Navigator: one of Highland 2's themes, or **Match VS Code**. The rest of the window keeps VS Code's colour theme. **Highwater Too: Choose Theme…** switches it."
         }
       }
     },
@@ -1326,6 +1378,11 @@
           "command": "highwater.export",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "navigation@2"
+        },
+        {
+          "command": "highwater.chooseTheme",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "1_highwater@1"
         }
       ],
       "view/title": [

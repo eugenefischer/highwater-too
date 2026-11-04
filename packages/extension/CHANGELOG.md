@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.6 (m15-editor branch)
+
+- **Highland's themes:** Classic, Clean, Winter, Kermit, Solarized Light, Dark Mode, Dracula, Material, Monokai, Solarized Dark and Transit, with Highland 2's colours for the page, text, scene headings, notes, cursor and selection in the Highland-Style Editor, and its sidebar colours in the Navigator. **Highwater Too: Choose Theme…** (also in the Highland-Style Editor's title-bar menu) tries each as you move through the list; Escape keeps the one you had. The setting is `highwater.theme`; **Match VS Code**, the default, keeps your VS Code colours. The other panes and the rest of the window keep VS Code's theme.
+- The Find bar in the Highland-Style Editor is styled to match the page (and the theme), instead of CodeMirror's plain grey.
+
 ## 0.4.5 (m15-editor branch)
 
 - The Bin and Assets panes come closer to Highland's (they stay VS Code panes, so text and images still drop onto them without holding Shift):

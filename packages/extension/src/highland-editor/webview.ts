@@ -170,6 +170,15 @@ function reveal(offset: number, how: "top" | "center", select: boolean): void {
   if (select) view.focus();
 }
 
+let themed: string[] = [];
+/** A Highland theme's colours for the page, or none (VS Code's). */
+function applyTheme(vars: Record<string, string> | null): void {
+  const root = document.documentElement.style;
+  for (const name of themed) root.removeProperty(name);
+  themed = vars ? Object.keys(vars) : [];
+  for (const [name, value] of Object.entries(vars ?? {})) root.setProperty(name, value);
+}
+
 /** Sets the selections after one of Highwater's writing keys (bold, centre, case…) changed the text. */
 function select(ranges: { anchor: number; head: number }[]): void {
   if (!view || !ranges.length) return;
@@ -192,7 +201,7 @@ function replace(text: string): void {
 }
 
 window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as { type: string; on?: boolean; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
+  const msg = event.data as { type: string; vars?: Record<string, string> | null; on?: boolean; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
   if (msg.type === "init") {
     mode = msg.mode ?? "fountain";
     document.body.dataset.mode = mode;
@@ -200,6 +209,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   } else if (msg.type === "update") replace(msg.text ?? "");
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
+  else if (msg.type === "theme") applyTheme(msg.vars ?? null);
   else if (msg.type === "invisibles") {
     showInvisibles = !!msg.on;
     view?.dispatch({ effects: invisibles.reconfigure(invisibleMarks(showInvisibles)) });

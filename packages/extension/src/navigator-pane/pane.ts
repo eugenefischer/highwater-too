@@ -3,6 +3,7 @@ import { pick } from "../ask.ts";
 import type { FocusedDocument } from "../focus.ts";
 import type { ParseCache } from "../language.ts";
 import type { BundleStore } from "../store.ts";
+import { navigatorColors, themeFor } from "../highland-editor/themes.ts";
 import { activeOffsets, onDidChangeActiveSurface, onDidChangeViewSelection, revealOffset } from "../surface.ts";
 import { blockAt, currentRow, moveBlock, NAVIGATOR_LABELS, NAVIGATOR_TYPES, navigatorItems, navigatorRows, parseFilters, type NavigatorFilters, type NavigatorRow } from "../syntax/navigator.ts";
 
@@ -30,6 +31,7 @@ export class NavigatorPane implements vscode.WebviewViewProvider {
       onDidChangeActiveSurface(() => this.#follow()),
       onDidChangeViewSelection(() => this.#follow()),
       vscode.window.onDidChangeTextEditorSelection(() => this.#follow()),
+      vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("highwater.theme") && this.#sendTheme()),
     );
   }
 
@@ -42,6 +44,7 @@ export class NavigatorPane implements vscode.WebviewViewProvider {
     view.webview.onDidReceiveMessage((msg: { type: string; start?: number; from?: number; to?: number | null }) => {
       if (msg.type === "ready") {
         this.#ready = true;
+        this.#sendTheme();
         this.refresh();
       } else if (msg.type === "reveal" && typeof msg.start === "number") void this.#reveal(msg.start);
       else if (msg.type === "move" && typeof msg.from === "number") void this.#move(msg.from, msg.to ?? null);
@@ -49,6 +52,12 @@ export class NavigatorPane implements vscode.WebviewViewProvider {
     });
     view.onDidChangeVisibility(() => view.visible && this.refresh());
     view.onDidDispose(() => (this.#view = undefined));
+  }
+
+  /** A Highland theme's sidebar colours (highwater.theme), or VS Code's. */
+  #sendTheme(): void {
+    const theme = themeFor(vscode.workspace.getConfiguration("highwater").get<string>("theme"));
+    if (this.#view && this.#ready) void this.#view.webview.postMessage({ type: "theme", vars: theme ? navigatorColors(theme) : null });
   }
 
   /** The document or its text changed: list it again. */
@@ -141,30 +150,38 @@ export class NavigatorPane implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
 html, body { height: 100%; margin: 0; padding: 0; }
-body { display: flex; flex-direction: column; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-sideBar-foreground, var(--vscode-foreground)); }
+:root {
+  /* VS Code's sidebar colours, unless a Highland theme (highwater.theme) sets these. */
+  --nav-bg: transparent; --nav-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+  --nav-section: var(--vscode-textLink-foreground); --nav-muted: var(--vscode-descriptionForeground);
+  --nav-current: var(--vscode-list-inactiveSelectionBackground); --nav-hover: var(--vscode-list-hoverBackground);
+  --nav-accent: var(--vscode-focusBorder); --nav-input-bg: var(--vscode-input-background);
+}
+body { display: flex; flex-direction: column; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--nav-fg); background: var(--nav-bg); }
 #wrap { position: relative; flex: 1; min-height: 0; display: flex; }
 #list { flex: 1; overflow-y: auto; padding: 4px 0; outline: none; }
 .row { padding: 4px 10px; line-height: 1.35; cursor: pointer; border-radius: 3px; margin: 0 6px; overflow-wrap: anywhere; user-select: none; }
-.row:hover { background: var(--vscode-list-hoverBackground); }
-.row.current { background: var(--vscode-list-inactiveSelectionBackground); color: var(--vscode-list-inactiveSelectionForeground, inherit); }
+.row:hover { background: var(--nav-hover); }
+.row.current { background: var(--nav-current); }
 .row.dragging { opacity: 0.4; }
 body.dragging, body.dragging .row { cursor: grabbing; }
 .row[data-draggable="true"] { touch-action: none; }
 /* As in Highland: scene headings in bold capitals, sections bold, the rest quieter. */
 .sceneHeaders { font-weight: 600; font-size: 0.92em; letter-spacing: 0.02em; }
-.sectionHeaders { font-weight: 700; color: var(--vscode-textLink-foreground); }
-.synopses, .notes, .images, .links, .referenceLinks, .includedFiles { color: var(--vscode-descriptionForeground); font-size: 0.92em; }
+.sectionHeaders { font-weight: 700; color: var(--nav-section); }
+.synopses, .notes, .images, .links, .referenceLinks, .includedFiles { color: var(--nav-muted); font-size: 0.92em; }
 .synopses, .notes { font-style: italic; }
-.markers { color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground)); font-size: 0.92em; }
+.markers { color: var(--nav-muted); font-size: 0.92em; }
+.markers::before { color: var(--nav-accent); }
 .markers::before { content: "◆ "; font-size: 0.8em; }
-#drop { position: absolute; right: 6px; height: 2px; background: var(--vscode-focusBorder); pointer-events: none; }
-#drop::before { content: ""; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--vscode-focusBorder); }
-#empty { position: absolute; top: 0; left: 0; right: 0; padding: 8px 16px; color: var(--vscode-descriptionForeground); }
+#drop { position: absolute; right: 6px; height: 2px; background: var(--nav-accent); pointer-events: none; }
+#drop::before { content: ""; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--nav-accent); }
+#empty { position: absolute; top: 0; left: 0; right: 0; padding: 8px 16px; color: var(--nav-muted); }
 #foot { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-top: 1px solid var(--vscode-sideBarSectionHeader-border, transparent); }
-#filter { flex: 1; min-width: 0; font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 3px; padding: 3px 6px; }
-#filter:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
-#types { display: flex; padding: 3px; border: none; border-radius: 3px; background: none; color: var(--vscode-icon-foreground, inherit); cursor: pointer; }
-#types:hover { background: var(--vscode-toolbar-hoverBackground); }
+#filter { flex: 1; min-width: 0; font: inherit; color: var(--nav-fg); background: var(--nav-input-bg); border: 1px solid var(--vscode-input-border, transparent); border-radius: 3px; padding: 3px 6px; }
+#filter:focus { outline: 1px solid var(--nav-accent); outline-offset: -1px; }
+#types { display: flex; padding: 3px; border: none; border-radius: 3px; background: none; color: var(--nav-fg); cursor: pointer; }
+#types:hover { background: var(--nav-hover); }
 </style></head>
 <body>
 <div id="wrap"><div id="list" tabindex="0"></div><div id="empty" hidden></div><div id="drop" hidden></div></div>

@@ -14,6 +14,8 @@ const filter = document.getElementById("filter") as HTMLInputElement;
 const dropLine = document.getElementById("drop")!;
 
 let rows: NavigatorRow[] = [];
+/** The colour variables a Highland theme set, to clear when it changes. */
+let themed: string[] = [];
 let length = 0;
 let current = -1;
 let dragging: NavigatorRow | null = null;
@@ -150,13 +152,18 @@ function hideDrop(): void {
 // ---------------------------------------------------------------------------------------------
 
 window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as { type: string; rows?: NavigatorRow[]; length?: number; current?: number; empty?: string };
+  const msg = event.data as { type: string; vars?: Record<string, string> | null; rows?: NavigatorRow[]; length?: number; current?: number; empty?: string };
   if (msg.type === "rows") {
     rows = msg.rows ?? [];
     length = msg.length ?? 0;
     current = msg.current ?? -1;
     empty.textContent = msg.empty ?? "";
     if (!dragging) render();
+  } else if (msg.type === "theme") {
+    const root = document.documentElement.style;
+    for (const name of themed) root.removeProperty(name);
+    themed = msg.vars ? Object.keys(msg.vars) : [];
+    for (const [name, value] of Object.entries(msg.vars ?? {})) root.setProperty(name, value);
   } else if (msg.type === "current") {
     current = msg.current ?? -1;
     showCurrent();
