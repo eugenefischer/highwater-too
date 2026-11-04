@@ -88,12 +88,17 @@ export function viewOf(doc: vscode.TextDocument, any = false): HighlandView | un
 
 /**
  * Shows a document: in its Highland-Style Editor if it has one (one tab per document), else in a
- * text editor.
+ * new one if that is the default, else in a text editor.
  */
 export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode.ViewColumn): Promise<void> {
   const view = viewOf(doc, true);
   if (view) {
     view.panel.reveal(view.panel.viewColumn, false);
+    return;
+  }
+  // A script opens in the Highland-Style Editor when that is the default (highwater.highlandEditor).
+  if (doc.languageId.startsWith("highland-") && vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) {
+    await vscode.commands.executeCommand("vscode.openWith", doc.uri, HIGHLAND_EDITOR, { viewColumn: viewColumn ?? vscode.ViewColumn.Active, preview: false });
     return;
   }
   await vscode.window.showTextDocument(doc, { viewColumn: viewColumn ?? vscode.ViewColumn.Active, preview: false });

@@ -6,8 +6,8 @@
  */
 import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
-import { Annotation, EditorSelection, EditorState, StateField, type Range, type Text } from "@codemirror/state";
-import { Decoration, EditorView, keymap, type DecorationSet, type KeyBinding } from "@codemirror/view";
+import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder, StateField, type Range, type Text } from "@codemirror/state";
+import { Decoration, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, type InlineMark } from "./line-styles.ts";
@@ -73,6 +73,48 @@ function withoutHighlandKeys(bindings: readonly KeyBinding[]): KeyBinding[] {
   return [...[...HIGHLAND_KEYS].map((key) => ({ key, run: () => true })), ...kept];
 }
 
+/** Show Invisibles: spaces and tabs marked, and "¬" at each line's end, as the text editor's whitespace. */
+class LineEnd extends WidgetType {
+  override toDOM(): HTMLElement {
+    const mark = document.createElement("span");
+    mark.className = "hl-eol";
+    mark.textContent = "¬";
+    return mark;
+  }
+  override eq(): boolean {
+    return true;
+  }
+}
+const lineEndMark = Decoration.widget({ widget: new LineEnd(), side: 1 });
+const lineEnds = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(v: EditorView) {
+      this.decorations = this.build(v);
+    }
+    update(u: ViewUpdate): void {
+      if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view);
+    }
+    build(v: EditorView): DecorationSet {
+      const b = new RangeSetBuilder<Decoration>();
+      let last = -1;
+      for (const { from, to } of v.visibleRanges) {
+        for (let pos = from; pos <= to; ) {
+          const line = v.state.doc.lineAt(pos);
+          if (line.to > last) b.add(line.to, line.to, lineEndMark);
+          last = line.to;
+          pos = line.to + 1;
+        }
+      }
+      return b.finish();
+    }
+  },
+  { decorations: (p) => p.decorations },
+);
+const invisibles = new Compartment();
+let showInvisibles = false;
+const invisibleMarks = (on: boolean) => (on ? [highlightWhitespace(), lineEnds] : []);
+
 let view: EditorView | null = null;
 
 function start(text: string): void {
@@ -87,6 +129,7 @@ function start(text: string): void {
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
         EditorView.lineWrapping,
         styling,
+        invisibles.of(invisibleMarks(showInvisibles)),
         screenplayCompletion(() => (mode === "fountain" ? parsed : null)),
         EditorView.updateListener.of((u) => {
           if (!u.docChanged || u.transactions.some((t) => t.annotation(remote))) return;
@@ -149,7 +192,7 @@ function replace(text: string): void {
 }
 
 window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as { type: string; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
+  const msg = event.data as { type: string; on?: boolean; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
   if (msg.type === "init") {
     mode = msg.mode ?? "fountain";
     document.body.dataset.mode = mode;
@@ -157,5 +200,9 @@ window.addEventListener("message", (event: MessageEvent) => {
   } else if (msg.type === "update") replace(msg.text ?? "");
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
+  else if (msg.type === "invisibles") {
+    showInvisibles = !!msg.on;
+    view?.dispatch({ effects: invisibles.reconfigure(invisibleMarks(showInvisibles)) });
+  }
 });
 vscode.postMessage({ type: "ready" });

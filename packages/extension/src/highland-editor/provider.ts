@@ -3,6 +3,7 @@ import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { askText } from "../ask.ts";
+import { roleOf } from "../focus.ts";
 import { activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
 
 export { HIGHLAND_EDITOR };
@@ -64,6 +65,9 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     let pendingReveal: object | undefined;
 
+    // Show Invisibles follows the text editor's whitespace setting for the document's language.
+    const sendInvisibles = () =>
+      void panel.webview.postMessage({ type: "invisibles", on: vscode.workspace.getConfiguration("editor", document).get<string>("renderWhitespace", "none") !== "none" });
     const send = () => {
       pageText = pageForm(document.getText());
       void panel.webview.postMessage({ type: "update", text: pageText });
@@ -75,6 +79,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           pageText = pageForm(document.getText());
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
+          sendInvisibles();
           if (pendingReveal) void panel.webview.postMessage(pendingReveal);
           pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
@@ -98,6 +103,9 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
             if (changedElsewhere()) send();
           });
         }
+      }),
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (view.ready && e.affectsConfiguration("editor.renderWhitespace", document)) sendInvisibles();
       }),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document !== document || e.contentChanges.length === 0) return;
@@ -152,6 +160,11 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-edito
 .hl-highlight { background: rgba(252, 255, 38, 0.35); }
 .hl-note, .hl-omitted { color: var(--vscode-descriptionForeground); }
 .hl-note { font-style: italic; }
+/* Show Invisibles, in VS Code's whitespace colour. */
+.hl-eol { color: var(--vscode-editorWhitespace-foreground); }
+.cm-editor .cm-highlightSpace { background-image: radial-gradient(circle at 50% 55%, var(--vscode-editorWhitespace-foreground) 15%, transparent 5%); }
+.cm-editor .cm-highlightTab { background-image: none; position: relative; }
+.cm-editor .cm-highlightTab::before { content: "→"; position: absolute; left: 0; color: var(--vscode-editorWhitespace-foreground); }
 /* Completion, in VS Code's suggestion colours. */
 .cm-editor .cm-tooltip { background: var(--vscode-editorSuggestWidget-background); color: var(--vscode-editorSuggestWidget-foreground); border: 1px solid var(--vscode-editorSuggestWidget-border, transparent); }
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul { font-family: "Courier Prime", monospace; max-height: 14em; }
@@ -172,6 +185,8 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-edito
  */
 /** True while a swap is under way: its new tab must not be taken for a second one. */
 let swapping = false;
+/** Documents the writer switched to the text editor with the code button: left as text until closed. */
+const wantsText = new Set<string>();
 
 async function swapActive(target: vscode.Uri, viewType: string): Promise<void> {
   swapping = true;
@@ -223,7 +238,34 @@ export function registerHighlandEditor(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("highwater.openTextEditor", async (uri?: vscode.Uri) => {
       const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
       const target = uri ?? (tab?.input instanceof vscode.TabInputCustom ? tab.input.uri : undefined);
-      if (target) await swapActive(target, "default");
+      if (!target) return;
+      wantsText.add(target.toString()); // not switched back by the default below
+      await swapActive(target, "default");
+    }),
+    // The Highland-Style Editor is the default (highwater.highlandEditor): a script opened as text
+    // becomes a Highland-Style tab, unless the writer chose the text editor for it with the code button.
+    vscode.window.tabGroups.onDidChangeTabs((e) => {
+      for (const closed of e.closed) {
+        const input = closed.input;
+        if (!(input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom)) continue;
+        const uri = input.uri.toString();
+        const still = vscode.window.tabGroups.all.flatMap((g) => g.tabs).some((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri);
+        if (!still) wantsText.delete(uri);
+      }
+      if (swapping || !vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) return;
+      for (const opened of e.opened) {
+        if (!(opened.input instanceof vscode.TabInputText) || !opened.isActive) continue;
+        const uri = opened.input.uri;
+        // Once it settles: a .md file is given its Highwater language just after it opens.
+        setTimeout(() => {
+          if (swapping || wantsText.has(uri.toString())) return;
+          const active = vscode.window.tabGroups.activeTabGroup.activeTab;
+          if (!(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== uri.toString()) return;
+          const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+          if (!doc || !doc.languageId.startsWith("highland-") || roleOf(doc).kind !== "script" || viewOf(doc, true)) return;
+          void swapActive(uri, HIGHLAND_EDITOR);
+        }, 300);
+      }
     }),
     // A script opened in the text editor (from Search, say) while it is open in the Highland-Style
     // Editor: show it there instead, at the same place, so there is one tab per document. Only when it has no unsaved

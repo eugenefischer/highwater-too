@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0 (m15-editor branch)
+
+- **The Highland-Style Editor is now the default** for screenplays and manuscripts: `.highland` files, `.fountain` files and the `.md` files Highwater Too handles open in it. The code button in its title bar turns the tab into the text editor (and that document stays text until you close it); the book button turns it back. To open documents as text by default, turn off `highwater.highlandEditor`.
+- Show Invisibles works in the Highland-Style Editor: spaces and tabs are marked and each line ends with ¬. It follows the same setting as the text editor, so turning it on or off applies to both.
+
 ## 0.3.9 (m15-editor branch)
 
 - The Highland-Style Editor shows emphasis where it stands, as Highland does: **bold** in bold, *italic* in italics, underline, strikethrough and +highlight+, with [[notes]] and /* omitted */ text dimmed.

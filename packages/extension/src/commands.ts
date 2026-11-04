@@ -72,7 +72,10 @@ async function applyToSelections(toggle: (text: string, start: number, end: numb
 }
 
 async function toggleInvisibles(): Promise<void> {
-  const config = vscode.workspace.getConfiguration("editor", vscode.window.activeTextEditor?.document);
+  // The setting for the document's language: the text editor and the Highland-Style Editor both follow it.
+  const doc = activeDocument();
+  if (!doc) return;
+  const config = vscode.workspace.getConfiguration("editor", doc);
   const current = config.get<string>("renderWhitespace");
   await config.update("renderWhitespace", current === "all" ? "none" : "all", vscode.ConfigurationTarget.Global, true);
 }

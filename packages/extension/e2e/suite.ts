@@ -264,6 +264,8 @@ const tests: [string, () => Promise<void>][] = [
         }, 30_000);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
         await vscode.workspace.getConfiguration("highwater").update("historyRemote", undefined, vscode.ConfigurationTarget.Global);
       }
     },
@@ -310,6 +312,8 @@ const tests: [string, () => Promise<void>][] = [
         }, 20_000);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
   ],
@@ -355,6 +359,8 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(execFileSync("git", ["diff", `${entry.branch}~2`, entry.branch, "--", "text.fountain", "bin"], { cwd: repo, encoding: "utf8" }), "", `the text and Bin are unchanged; the branch:\n${record()}`);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
   ],
@@ -406,6 +412,8 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(await idOf(taken), id, "it keeps the work's ID");
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
   ],
@@ -482,6 +490,35 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "opens scripts in the Highland-Style Editor when it is the default, except after the code button",
+    async () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      await config.update("highlandEditor", true, vscode.ConfigurationTarget.Global);
+      try {
+        const path = join(dir, "Default.fountain");
+        await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
+        const uri = vscode.Uri.file(path).toString();
+        const kinds = () =>
+          vscode.window.tabGroups.all
+            .flatMap((g) => g.tabs)
+            .filter((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri)
+            .map((t) => (t.input instanceof vscode.TabInputCustom ? "highland" : "text"));
+        const doc = await vscode.workspace.openTextDocument(path);
+        await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
+        await vscode.window.showTextDocument(doc, { preview: false });
+        await waitFor("the Highland-Style Editor instead of text", () => kinds().join() === "highland");
+        await vscode.commands.executeCommand("highwater.openTextEditor");
+        await waitFor("the text editor", () => kinds().join() === "text");
+        // It stays text: the code button was the writer's choice.
+        await new Promise((r) => setTimeout(r, 1000));
+        assert.equal(kinds().join(), "text");
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      } finally {
+        await config.update("highlandEditor", false, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
+  [
     "exports a manuscript as a Word document",
     async () => {
       const path = join(dir, "DocxExport.highland");
@@ -499,6 +536,8 @@ const tests: [string, () => Promise<void>][] = [
 export async function run(): Promise<void> {
   // Writing history only in its own test: its info.json write would race the other tests' checks.
   await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
   const failed: string[] = [];
   for (const [name, test] of tests) {
     try {

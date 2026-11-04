@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.3.9",
+  "version": "0.4.0",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -404,7 +404,7 @@
       },
       {
         "command": "highwater.openHighlandEditor",
-        "title": "Open in Highland-Style Editor (experimental)",
+        "title": "Open in Highland-Style Editor",
         "category": "Highwater Too",
         "icon": "$(book)"
       },
@@ -434,7 +434,7 @@
       },
       {
         "viewType": "highwater.highlandEditor",
-        "displayName": "Highland-Style Editor (experimental)",
+        "displayName": "Highland-Style Editor",
         "selector": [
           {
             "filenamePattern": "*.highland"
@@ -512,7 +512,7 @@
         "highwater.highlandEditor": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show the button that opens a document in the experimental Highland-style editor (M15)."
+          "markdownDescription": "Open screenplays and manuscripts (`.highland`, `.fountain`, and `.md` files Highwater Too handles) in the Highland-Style Editor. Off: they open as text. Either way, the book and code buttons in the editor's title bar switch a document between the two."
         }
       }
     },
@@ -1309,7 +1309,7 @@
         },
         {
           "command": "highwater.openHighlandEditor",
-          "when": "editorLangId =~ /^highland-/ && config.highwater.highlandEditor",
+          "when": "editorLangId =~ /^highland-/",
           "group": "navigation@0"
         },
         {
