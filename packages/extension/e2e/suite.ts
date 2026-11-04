@@ -458,6 +458,30 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "swaps between the text editor and the Highland-Style Editor in place, unsaved changes and all",
+    async () => {
+      const path = join(dir, "Swap.fountain");
+      await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
+      const doc = await vscode.workspace.openTextDocument(path);
+      await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
+      const editor = await vscode.window.showTextDocument(doc, { preview: false });
+      await editor.edit((e) => e.insert(new vscode.Position(4, 0), "\nShe waits.\n"));
+      assert.ok(doc.isDirty);
+      const uri = doc.uri.toString();
+      const tabs = () => vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri);
+      const within = <T>(what: string, p: Thenable<T>) =>
+        Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${what} did not finish (a save-or-discard question?)`)), 10_000))]);
+      await within("Open in Highland-Style Editor", vscode.commands.executeCommand("highwater.openHighlandEditor"));
+      await waitFor("one Highland-Style tab", () => tabs().length === 1 && tabs()[0]!.input instanceof vscode.TabInputCustom);
+      assert.ok(doc.isDirty, "the unsaved changes are kept");
+      await within("Open in Text Editor", vscode.commands.executeCommand("highwater.openTextEditor"));
+      await waitFor("one text tab", () => tabs().length === 1 && tabs()[0]!.input instanceof vscode.TabInputText);
+      assert.ok(doc.getText().includes("She waits."));
+      await doc.save();
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    },
+  ],
+  [
     "exports a manuscript as a Word document",
     async () => {
       const path = join(dir, "DocxExport.highland");

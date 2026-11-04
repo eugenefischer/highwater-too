@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "./fs-provider.ts";
+import { showDocument } from "./surface.ts";
 
 export const OPEN_VIEW_TYPE = "highwater.open";
 
@@ -24,9 +25,9 @@ export class OpenRedirect implements vscode.CustomReadonlyEditorProvider {
   }
 }
 
-export async function openHighland(file: vscode.Uri, viewColumn?: vscode.ViewColumn): Promise<vscode.TextEditor> {
-  const doc = await vscode.workspace.openTextDocument(toHighlandUri(file.fsPath));
-  return vscode.window.showTextDocument(doc, { viewColumn: viewColumn ?? vscode.ViewColumn.Active, preview: false });
+/** Opens a .highland file's script: in its Highland-Style Editor if it is open in one, else as text. */
+export async function openHighland(file: vscode.Uri, viewColumn?: vscode.ViewColumn): Promise<void> {
+  await showDocument(await vscode.workspace.openTextDocument(toHighlandUri(file.fsPath)), viewColumn);
 }
 
 function escapeHtml(s: string): string {

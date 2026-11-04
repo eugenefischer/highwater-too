@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.8 (m15-editor branch)
+
+- One tab per document: the book and code buttons now switch the tab between the text editor and the Highland-Style Editor in place, as Reopen Editor With… does, keeping unsaved changes. Before, they opened a second tab, and closing either one asked to save or discard changes that the other was still showing.
+- Opening a document that's open in the Highland-Style Editor (from the Explorer, the Works panel, Search or a save conflict) goes to that tab instead of opening it again as text (unless it has unsaved changes, when VS Code's text tab is left open).
+
 ## 0.3.7 (m15-editor branch)
 
 - Completion in the Highland-Style Editor, as in the text editor: in a screenplay, start a line after an empty one in capitals and the characters who already speak are offered (most frequent first), with scene-heading prefixes and transitions; after `INT.` or `EXT.`, the script's locations, then times of day. ↑↓ choose, Enter or Tab accepts, Escape closes, ⌃Space asks.

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
-import { HIGHLAND_EDITOR, highlandViews, type HighlandView } from "../surface.ts";
+import { HIGHLAND_EDITOR, highlandViews, viewOf, type HighlandView } from "../surface.ts";
 
 export { HIGHLAND_EDITOR };
 
@@ -137,18 +137,71 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--vscode-edito
   }
 }
 
+/**
+ * Switches the active tab between the text editor and the Highland-Style Editor in place, as
+ * Reopen Editor With… does: one tab per document, and no save-or-discard question for unsaved
+ * changes (two tabs of a document in different editors would each ask on closing).
+ */
+/** True while a swap is under way: its new tab must not be taken for a second one. */
+let swapping = false;
+
+async function swapActive(target: vscode.Uri, viewType: string): Promise<void> {
+  swapping = true;
+  try {
+    await swapInPlace(target, viewType);
+  } finally {
+    // The old tab closes just after the command returns.
+    setTimeout(() => (swapping = false), 500);
+  }
+}
+
+async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> {
+  const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+  const input = tab?.input;
+  const active = input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom ? input.uri.toString() : undefined;
+  if (active === target.toString()) {
+    try {
+      await vscode.commands.executeCommand("reopenActiveEditorWith", viewType);
+      return;
+    } catch {
+      // An older VS Code without the command: open beside instead.
+    }
+  }
+  await vscode.commands.executeCommand("vscode.openWith", target, viewType);
+}
+
 /** Opens the active document in the Highland-style editor, or back in the text editor. */
 export function registerHighlandEditor(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context), { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.commands.registerCommand("highwater.openHighlandEditor", async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
-      if (target) await vscode.commands.executeCommand("vscode.openWith", target, HIGHLAND_EDITOR);
+      if (target) await swapActive(target, HIGHLAND_EDITOR);
     }),
     vscode.commands.registerCommand("highwater.openTextEditor", async (uri?: vscode.Uri) => {
       const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
       const target = uri ?? (tab?.input instanceof vscode.TabInputCustom ? tab.input.uri : undefined);
-      if (target) await vscode.commands.executeCommand("vscode.openWith", target, "default");
+      if (target) await swapActive(target, "default");
+    }),
+    // A script opened in the text editor (from Search, say) while it is open in the Highland-Style
+    // Editor: show it there instead, so there is one tab per document. Only when it has no unsaved
+    // changes, as closing a tab of a changed document asks to save or discard.
+    vscode.window.tabGroups.onDidChangeTabs((e) => {
+      if (swapping) return;
+      for (const opened of e.opened) {
+        if (!(opened.input instanceof vscode.TabInputText)) continue;
+        const uri = opened.input.uri.toString();
+        // Look again once things settle: a swap or a closing tab may be under way.
+        setTimeout(() => {
+          if (swapping) return;
+          const tab = vscode.window.tabGroups.all.flatMap((g) => g.tabs).find((t) => t.input instanceof vscode.TabInputText && t.input.uri.toString() === uri);
+          if (!tab || tab.isDirty) return;
+          const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri);
+          const view = doc && viewOf(doc, true);
+          if (!view) return;
+          void vscode.window.tabGroups.close(tab).then(() => view.panel.reveal(view.panel.viewColumn, false));
+        }, 300);
+      }
     }),
   );
 }

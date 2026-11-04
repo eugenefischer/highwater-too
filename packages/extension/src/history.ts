@@ -18,6 +18,7 @@ import { toBundle, withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
 import { focusedDocument, roleOf, scriptIsOpen } from "./focus.ts";
 import { afterPull, deletedElsewhere, revertTo, WorksView, type WorksHost } from "./works.ts";
+import { showDocument } from "./surface.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -741,7 +742,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     }
     let doc = await vscode.workspace.openTextDocument(path);
     if (/\.(md|markdown)$/i.test(path) && doc.languageId === "markdown") doc = await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown);
-    await vscode.window.showTextDocument(doc, { preview: false });
+    await showDocument(doc);
   }
 
   /**

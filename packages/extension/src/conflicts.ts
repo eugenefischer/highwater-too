@@ -5,6 +5,7 @@ import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import { openHighland } from "./open.ts";
 import { splitBundlePath } from "./store.ts";
 import { currentHistory } from "./history.ts";
+import { showDocument } from "./surface.ts";
 
 export const DISK_SCHEME = "highland-disk";
 
@@ -92,6 +93,6 @@ async function setAside(fs: HighlandFileSystem, bundle: string, note: string, yo
 }
 
 async function revert(doc: vscode.TextDocument): Promise<void> {
-  await vscode.window.showTextDocument(doc, { preview: false });
+  await showDocument(doc); // the editor it's open in, which Revert File acts on
   await vscode.commands.executeCommand("workbench.action.files.revert");
 }

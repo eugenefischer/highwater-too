@@ -79,11 +79,24 @@ export function activeView(): HighlandView | undefined {
   return matching.find((v) => v.panel.viewColumn === group.viewColumn) ?? matching[0];
 }
 
-/** A visible Highland-Style Editor showing the document (the active one first). */
-export function viewOf(doc: vscode.TextDocument): HighlandView | undefined {
+/** A visible Highland-Style Editor showing the document (the active one first); with `any`, a hidden one too. */
+export function viewOf(doc: vscode.TextDocument, any = false): HighlandView | undefined {
   const active = activeView();
   if (active?.document === doc) return active;
-  return [...views].find((v) => v.document === doc && v.panel.visible);
+  return [...views].find((v) => v.document === doc && v.panel.visible) ?? (any ? [...views].find((v) => v.document === doc) : undefined);
+}
+
+/**
+ * Shows a document: in its Highland-Style Editor if it has one (one tab per document), else in a
+ * text editor.
+ */
+export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode.ViewColumn): Promise<void> {
+  const view = viewOf(doc, true);
+  if (view) {
+    view.panel.reveal(view.panel.viewColumn, false);
+    return;
+  }
+  await vscode.window.showTextDocument(doc, { viewColumn: viewColumn ?? vscode.ViewColumn.Active, preview: false });
 }
 
 /**
