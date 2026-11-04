@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (m15-editor branch)
+
+- Fixed: with the Highland-Style Editor in front, Highwater Too's commands (Show Invisibles, Bold, Export PDF, Insert Marker and the rest) were missing from the Command Palette.
+
 ## 0.4.0 (m15-editor branch)
 
 - **The Highland-Style Editor is now the default** for screenplays and manuscripts: `.highland` files, `.fountain` files and the `.md` files Highwater Too handles open in it. The code button in its title bar turns the tab into the text editor (and that document stays text until you close it); the book button turns it back. To open documents as text by default, turn off `highwater.highlandEditor`.

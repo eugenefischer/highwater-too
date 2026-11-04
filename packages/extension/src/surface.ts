@@ -59,7 +59,19 @@ export const highlandViews = {
 
 /** Starts forwarding VS Code's own editor events. */
 export function registerSurface(context: vscode.ExtensionContext): void {
+  // highwater.docLang: the language of the document being written, in either editor, for menus
+  // (editorLangId is empty while a custom editor has the focus).
+  let lang: string | undefined;
+  const setLang = () => {
+    const now = activeDocument()?.languageId ?? "";
+    if (now === lang) return;
+    lang = now;
+    void vscode.commands.executeCommand("setContext", "highwater.docLang", now);
+  };
+  setLang();
   context.subscriptions.push(
+    activeEmitter.event(setLang),
+    vscode.workspace.onDidOpenTextDocument(setLang), // a language change reopens the document
     activeEmitter,
     selectionEmitter,
     scrollEmitter,

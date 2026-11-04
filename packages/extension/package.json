@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -1064,19 +1064,19 @@
       "commandPalette": [
         {
           "command": "highwater.export",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.convertToFountain",
-          "when": "resourceScheme == highland && editorLangId == highland-fountain"
+          "when": "resourceScheme == highland && highwater.docLang == highland-fountain"
         },
         {
           "command": "highwater.convertToMarkdown",
-          "when": "resourceScheme == highland && editorLangId == highland-markdown"
+          "when": "resourceScheme == highland && highwater.docLang == highland-markdown"
         },
         {
           "command": "highwater.convertToText",
-          "when": "resourceScheme == highland && editorLangId == highland-plain"
+          "when": "resourceScheme == highland && highwater.docLang == highland-plain"
         },
         {
           "command": "highwater.convertToHighland",
@@ -1084,43 +1084,43 @@
         },
         {
           "command": "highwater.bold",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.italic",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.underline",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.strikethrough",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.highlight",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.note",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.centre",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.omit",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.toggleInvisibles",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.exportPdf",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.navigator.reveal",
@@ -1160,11 +1160,11 @@
         },
         {
           "command": "highwater.copyToBin",
-          "when": "editorLangId =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
+          "when": "highwater.docLang =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
         },
         {
           "command": "highwater.cutToBin",
-          "when": "editorLangId =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
+          "when": "highwater.docLang =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
         },
         {
           "command": "highwater.toggleLiveMargins",
@@ -1172,15 +1172,15 @@
         },
         {
           "command": "highwater.titlePageBuilder",
-          "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
+          "when": "highwater.docLang =~ /^highland-(fountain|markdown)$/"
         },
         {
           "command": "highwater.preview",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.showHistory",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.history.compare",
@@ -1212,15 +1212,15 @@
         },
         {
           "command": "highwater.toggleDocumentHistory",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.linkHistoryToFile",
-          "when": "editorLangId =~ /^highland-/ && resourceScheme == file"
+          "when": "highwater.docLang =~ /^highland-/ && resourceScheme == file"
         },
         {
           "command": "highwater.exportHistory",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.connectToWork",
@@ -1228,19 +1228,19 @@
         },
         {
           "command": "highwater.chooseTemplate",
-          "when": "editorLangId =~ /^highland-(fountain|markdown)$/"
+          "when": "highwater.docLang =~ /^highland-(fountain|markdown)$/"
         },
         {
           "command": "highwater.exportDocx",
-          "when": "editorLangId == highland-markdown"
+          "when": "highwater.docLang == highland-markdown"
         },
         {
           "command": "highwater.insertMarker",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.nextMarker",
-          "when": "editorLangId =~ /^highland-/"
+          "when": "highwater.docLang =~ /^highland-/"
         },
         {
           "command": "highwater.openTextEditor",
