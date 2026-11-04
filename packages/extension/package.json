@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -1775,7 +1775,8 @@
         {
           "id": "highwater.navigator",
           "name": "Navigator",
-          "icon": "media/highwater.svg"
+          "icon": "media/highwater.svg",
+          "type": "webview"
         },
         {
           "id": "highwater.bin",

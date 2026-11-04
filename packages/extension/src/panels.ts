@@ -6,7 +6,7 @@ import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import type { ParseCache } from "./language.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
-import { blockAt, moveBlock, NAVIGATOR_LABELS, NAVIGATOR_TYPES, navigatorItems, parseFilters, type NavigatorFilters, type NavigatorItem, type NavigatorType } from "./syntax/navigator.ts";
+import { NAVIGATOR_VIEW, NavigatorPane } from "./navigator-pane/pane.ts";
 import { assetMarkdown, binLabel, move, uniqueName } from "./syntax/workspace.ts";
 import { idNote, noteId } from "./extras-folder.ts";
 import { focusedDocument, roleOf, type FocusedDocument } from "./focus.ts";
@@ -21,19 +21,19 @@ import { activeColumn, activeDocument, activeSelections, insertAtSelection, onDi
  */
 export function registerPanels(context: vscode.ExtensionContext, store: BundleStore, fs: HighlandFileSystem, cache: ParseCache): void {
   const current = focusedDocument(context);
-  const navigator = new NavigatorView(context, store, cache, current);
+  const navigator = new NavigatorPane(context, store, cache, current);
   const bin = new BinView(store, fs, current);
   const assets = new AssetsView(store, current);
 
   const binTree = vscode.window.createTreeView("highwater.bin", { treeDataProvider: bin, dragAndDropController: bin, canSelectMany: false });
   const assetTree = vscode.window.createTreeView("highwater.assets", { treeDataProvider: assets, dragAndDropController: assets });
-  const navTree = vscode.window.createTreeView("highwater.navigator", { treeDataProvider: navigator, dragAndDropController: navigator, showCollapseAll: true });
+  // Highland's look (M15): a webview list rather than a tree, so it can show where a drag will land.
+  const navPane = vscode.window.registerWebviewViewProvider(NAVIGATOR_VIEW, navigator, { webviewOptions: { retainContextWhenHidden: true } });
 
   const refreshAll = () => {
     navigator.refresh();
     bin.refresh();
     assets.refresh();
-    navTree.description = current.key ? basename(current.label) : "";
   };
   current.onDidChange(refreshAll);
   const extras = plainExtras();
@@ -44,7 +44,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
   context.subscriptions.push(
     binTree,
     assetTree,
-    navTree,
+    navPane,
     onDidChangeActiveSurface(() => void showSidebar()),
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document !== current.script) return;
@@ -173,102 +173,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
 
 /** The Highland script (and its bundle, or its path for a plain file) the panels show. */
 // ---------------------------------------------------------------------------------------------
-// Navigator
-
-const ICONS: Record<NavigatorType, string> = {
-  sceneHeaders: "device-camera-video",
-  sectionHeaders: "symbol-namespace",
-  synopses: "note",
-  notes: "comment",
-  images: "file-media",
-  links: "link",
-  referenceLinks: "references",
-  includedFiles: "file-symlink-file",
-  markers: "bookmark",
-};
-
-const NAV_MIME = "application/vnd.code.tree.highwater.navigator";
-
-class NavigatorView implements vscode.TreeDataProvider<NavigatorItem>, vscode.TreeDragAndDropController<NavigatorItem> {
-  readonly dragMimeTypes = [NAV_MIME];
-  readonly dropMimeTypes = [NAV_MIME];
-  readonly #changed = new vscode.EventEmitter<void>();
-  readonly onDidChangeTreeData = this.#changed.event;
-  #filters: NavigatorFilters = parseFilters(undefined);
-
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly store: BundleStore,
-    private readonly cache: ParseCache,
-    private readonly current: FocusedDocument,
-  ) {}
-
-  refresh(): void {
-    void this.#loadFilters().then(() => this.#changed.fire());
-  }
-
-  getTreeItem(item: NavigatorItem): vscode.TreeItem {
-    const t = new vscode.TreeItem(item.label, item.children.length ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
-    t.iconPath = new vscode.ThemeIcon(ICONS[item.type]);
-    t.tooltip = `${NAVIGATOR_LABELS[item.type]}: ${item.label}`;
-    const doc = this.current.script;
-    if (doc) t.command = { command: "highwater.navigator.reveal", title: "Go to", arguments: [doc.uri, item.span.start] };
-    return t;
-  }
-
-  getChildren(item?: NavigatorItem): NavigatorItem[] {
-    if (item) return item.children;
-    const doc = this.current.script;
-    return doc ? navigatorItems(this.cache.get(doc), this.#filters) : [];
-  }
-
-  /** Scenes, sections and headings drag to a new place: dropped on another, they move before it. */
-  handleDrag(items: readonly NavigatorItem[], data: vscode.DataTransfer): void {
-    const item = items.find((i) => i.type === "sceneHeaders" || i.type === "sectionHeaders");
-    if (item) data.set(NAV_MIME, new vscode.DataTransferItem(item.span.start));
-  }
-
-  async handleDrop(target: NavigatorItem | undefined, data: vscode.DataTransfer): Promise<void> {
-    const doc = this.current.script;
-    const from = data.get(NAV_MIME)?.value as number | undefined;
-    if (!doc || from === undefined) return;
-    if (target && target.type !== "sceneHeaders" && target.type !== "sectionHeaders") return;
-    const parsed = this.cache.get(doc);
-    const block = blockAt(parsed, from);
-    const move = block && moveBlock(parsed.source, block, target ? target.span.start : null);
-    if (!move) return;
-    const edit = new vscode.WorkspaceEdit();
-    edit.insert(doc.uri, doc.positionAt(move.insert.at), move.insert.text);
-    edit.delete(doc.uri, new vscode.Range(doc.positionAt(move.delete.start), doc.positionAt(move.delete.end)));
-    await vscode.workspace.applyEdit(edit);
-  }
-
-  /** Highland's per-document type toggles: from navigatorFilters.json, changed here per document. */
-  async chooseFilters(): Promise<void> {
-    await this.#loadFilters();
-    const picks = NAVIGATOR_TYPES.map((t) => ({ label: NAVIGATOR_LABELS[t], type: t, picked: this.#filters[t] }));
-    const chosen = await pick(picks, { canPickMany: true, title: "Show in the Navigator" });
-    if (!chosen) return;
-    const filters = Object.fromEntries(NAVIGATOR_TYPES.map((t) => [t, chosen.some((c) => c.type === t)])) as NavigatorFilters;
-    await this.context.workspaceState.update(this.#key(), filters);
-    this.refresh();
-  }
-
-  #key(): string {
-    return `navigatorFilters:${this.current.label}`;
-  }
-
-  async #loadFilters(): Promise<void> {
-    const saved = this.context.workspaceState.get<NavigatorFilters>(this.#key());
-    if (saved) {
-      this.#filters = { ...parseFilters(undefined), ...saved };
-      return;
-    }
-    let json: string | undefined;
-    if (this.current.bundle) json = (await this.store.snapshot(this.current.bundle).catch(() => null))?.getText("navigatorFilters.json");
-    this.#filters = parseFilters(json);
-  }
-}
+// Navigator: see navigator-pane/pane.ts.
 
 async function reveal(uri: vscode.Uri, offset: number): Promise<void> {
   // In the Highland-Style Editor if one shows the document, else in a text editor.

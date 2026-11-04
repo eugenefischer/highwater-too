@@ -90,3 +90,28 @@ describe("markers, against a file Highland saved", async () => {
     expect(markerOffsets(text)).toHaveLength(6);
   });
 });
+
+describe("navigator rows for the Highland-style pane", async () => {
+  const { navigatorItems, navigatorRows, currentRow } = await import("../src/syntax/navigator.ts");
+  const src = "# Act One\n\nINT. HOUSE - DAY\n\nShe enters. [[check]]\n\nEXT. ROAD - NIGHT\n\nRain.\n";
+  const doc = parse(src, { mode: "fountain" });
+  const rows = navigatorRows(doc, navigatorItems(doc));
+  it("lists items flat in document order, with depth and each block's end", () => {
+    expect(rows.map((r) => [r.type, r.label, r.depth])).toEqual([
+      ["sectionHeaders", "Act One", 0],
+      ["sceneHeaders", "INT. HOUSE - DAY", 1],
+      ["notes", "check", 1],
+      ["sceneHeaders", "EXT. ROAD - NIGHT", 1],
+    ]);
+    expect(rows[1]!.blockEnd).toBe(src.indexOf("EXT. ROAD"));
+    expect(rows[3]!.blockEnd).toBe(src.length);
+    expect(rows[0]!.blockEnd).toBe(src.length);
+    expect(rows[2]!.blockEnd).toBe(null);
+  });
+  it("finds the row the cursor is in", () => {
+    expect(currentRow(rows, 0)).toBe(0);
+    expect(currentRow(rows, src.indexOf("She"))).toBe(1);
+    expect(currentRow(rows, src.indexOf("Rain"))).toBe(3);
+    expect(currentRow([], 5)).toBe(-1);
+  });
+});

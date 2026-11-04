@@ -165,3 +165,38 @@ export function moveBlock(source: string, block: Block, to: number | null): { de
   const prefix = to === null && !/\n\n$/.test(source) ? (source.endsWith("\n") ? "\n" : "\n\n") : "";
   return { delete: block, insert: { at, text: prefix + text } };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Rows for the Highland-style Navigator pane (M15): the items in document order, flat, with
+// their depth, and for scenes, sections and headings the text they cover, so the pane can tell
+// which drop places would move something.
+
+export interface NavigatorRow {
+  type: NavigatorType;
+  label: string;
+  depth: number;
+  /** Where the item starts in the source. */
+  start: number;
+  /** Scenes, sections and headings: the end of the text they cover (they can be dragged, and dropped before). */
+  blockEnd: number | null;
+}
+
+export function navigatorRows(doc: Document, items: NavigatorItem[]): NavigatorRow[] {
+  const rows: NavigatorRow[] = [];
+  const visit = (list: NavigatorItem[], depth: number) => {
+    for (const item of list) {
+      const movable = item.type === "sceneHeaders" || item.type === "sectionHeaders";
+      rows.push({ type: item.type, label: item.label, depth, start: item.span.start, blockEnd: movable ? (blockAt(doc, item.span.start)?.end ?? null) : null });
+      visit(item.children, depth + 1);
+    }
+  };
+  visit(items, 0);
+  return rows;
+}
+
+/** The row the cursor is in: the last one starting at or before it (rows are in document order). */
+export function currentRow(rows: readonly NavigatorRow[], offset: number): number {
+  let found = -1;
+  for (let i = 0; i < rows.length && rows[i]!.start <= offset; i++) found = i;
+  return found;
+}

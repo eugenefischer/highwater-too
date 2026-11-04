@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3 (m15-editor branch)
+
+- **The Navigator in Highland's style:** a plain list of scenes in bold capitals, sections, synopses, notes and markers, with the one the cursor is in highlighted as you write (in either editor). Dragging a scene, section or heading shows a line where it will land; only places that would move it are offered. A Filter box at the foot finds items by their words, and the eye button beside it chooses which kinds are listed (as the title bar's filter button does).
+
 ## 0.4.2 (m15-editor branch)
 
 - ⇧⌘I toggles Show Invisibles, as in Highland 2 (in both editors; part of Highland's shortcuts, `highwater.highlandShortcuts`).
