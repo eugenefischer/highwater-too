@@ -66,7 +66,7 @@ New in Highwater Too: every save is recorded in a git repository, as a record of
 
 | Setting | Default | What it does |
 |---|---|---|
-| `highwater.highlandShortcuts` | on | Highland 2's shortcuts in documents (⌘E Preview, ⌘L Live Margins, ⌘0 sidebar, ⌘1/⌘2/⌘4/⌘5 panels) instead of VS Code's. Off: Preview is ⌃⌥P and Live Margins ⌃⌥L. |
+| `highwater.highlandShortcuts` | on | Highland 2's shortcuts in documents (⌘E Preview, ⌘L Live Margins, ⌘0 sidebar, ⌘1/⌘2/⌘4/⌘5 panels, ⇧⌘I Show Invisibles) instead of VS Code's. Off: Preview is ⌃⌥P and Live Margins ⌃⌥L. |
 | `highwater.showSidebarOnOpen` | on | Switch to the Highwater Too sidebar when a document is opened. |
 | `highwater.docxFont` | Courier New | Font for Export Word Document: Courier New, double-spaced, or Courier Prime embedded in the file, as in the PDF. |
 | `highwater.writingHistory` | on | Record saves in the writing history. |

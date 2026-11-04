@@ -213,6 +213,21 @@ async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> 
   await vscode.commands.executeCommand("vscode.openWith", target, viewType);
 }
 
+/**
+ * Turns a script's text tab into the Highland-Style Editor (the default) once things settle, if it
+ * is still the active tab: a .md file is given its Highwater language just after it opens.
+ */
+function swapSoon(uri: vscode.Uri): void {
+  setTimeout(() => {
+    if (swapping || wantsText.has(uri.toString())) return;
+    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (!(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== uri.toString()) return;
+    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+    if (!doc || !doc.languageId.startsWith("highland-") || roleOf(doc).kind !== "script" || viewOf(doc, true)) return;
+    void swapActive(uri, HIGHLAND_EDITOR);
+  }, 300);
+}
+
 /** Opens the active document in the Highland-style editor, or back in the text editor. */
 export function registerHighlandEditor(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -254,18 +269,14 @@ export function registerHighlandEditor(context: vscode.ExtensionContext): void {
       }
       if (swapping || !vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) return;
       for (const opened of e.opened) {
-        if (!(opened.input instanceof vscode.TabInputText) || !opened.isActive) continue;
-        const uri = opened.input.uri;
-        // Once it settles: a .md file is given its Highwater language just after it opens.
-        setTimeout(() => {
-          if (swapping || wantsText.has(uri.toString())) return;
-          const active = vscode.window.tabGroups.activeTabGroup.activeTab;
-          if (!(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== uri.toString()) return;
-          const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
-          if (!doc || !doc.languageId.startsWith("highland-") || roleOf(doc).kind !== "script" || viewOf(doc, true)) return;
-          void swapActive(uri, HIGHLAND_EDITOR);
-        }, 300);
+        // Not opened.isActive: a tab is usually reported active only in a later event. Checked below.
+        if (!(opened.input instanceof vscode.TabInputText)) continue;
+        swapSoon(opened.input.uri);
       }
+    }),
+    // Also when a script's text tab comes to the front: the tab events don't always say it is active.
+    vscode.window.onDidChangeActiveTextEditor((e) => {
+      if (e && vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) swapSoon(e.document.uri);
     }),
     // A script opened in the text editor (from Search, say) while it is open in the Highland-Style
     // Editor: show it there instead, at the same place, so there is one tab per document. Only when it has no unsaved

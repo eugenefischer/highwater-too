@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2 (m15-editor branch)
+
+- ⇧⌘I toggles Show Invisibles, as in Highland 2 (in both editors; part of Highland's shortcuts, `highwater.highlandShortcuts`).
+- Fixed: a `.fountain` file (or a `.md` file Highwater handles) could open as text even though the Highland-Style Editor is the default.
+
 ## 0.4.1 (m15-editor branch)
 
 - Fixed: with the Highland-Style Editor in front, Highwater Too's commands (Show Invisibles, Bold, Export PDF, Insert Marker and the rest) were missing from the Command Palette.

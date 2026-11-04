@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -470,7 +470,7 @@
         "highwater.highlandShortcuts": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Highland 2's shortcuts in documents: ⌘E for Preview, ⌘L for Live Margins, ⌘0 for the sidebar, ⌘1 for the Navigator, ⌘2 for the Bin, ⌘4 for Assets and ⌘5 for the Scratchpad, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
+          "markdownDescription": "Highland 2's shortcuts in documents: ⌘E for Preview, ⌘L for Live Margins, ⌘0 for the sidebar, ⌘1 for the Navigator, ⌘2 for the Bin, ⌘4 for Assets and ⌘5 for the Scratchpad and ⇧⌘I for Show Invisibles, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
         },
         "highwater.showSidebarOnOpen": {
           "type": "boolean",
@@ -1747,6 +1747,18 @@
         "key": "ctrl+g",
         "mac": "ctrl+g",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
+      },
+      {
+        "command": "highwater.toggleInvisibles",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i",
+        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.toggleInvisibles",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
       }
     ],
     "viewsContainers": {
