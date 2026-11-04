@@ -19,7 +19,7 @@ let themed: string[] = [];
 let length = 0;
 let current = -1;
 let dragging: NavigatorRow | null = null;
-let gap: { to: number | null; y: number; depth: number } | null = null;
+let gap: Gap | null = null;
 
 function render(): void {
   const words = filter.value.trim().toLowerCase();
@@ -97,9 +97,11 @@ list.addEventListener("pointermove", (e) => {
   if (e.clientY < box.top + 24) list.scrollTop -= 12;
   else if (e.clientY > box.bottom - 24) list.scrollTop += 12;
   const y = e.clientY - box.top + list.scrollTop;
-  let best: typeof gap = null;
+  // The nearest place, including the ones that would leave the block where it is: hovering over
+  // where it already was hides the line, and letting go there moves nothing.
+  let best: (Gap & { moves: boolean }) | null = null;
   for (const g of gaps()) if (!best || Math.abs(g.y - y) < Math.abs(best.y - y)) best = g;
-  gap = best;
+  gap = best?.moves ? best : null;
   if (!gap) return hideDrop();
   dropLine.style.top = `${gap.y - 1 - list.scrollTop + list.offsetTop}px`;
   dropLine.style.left = `${12 + gap.depth * 12}px`;
@@ -129,18 +131,23 @@ function endDrag(): void {
   hideDrop();
 }
 
-/** Where a block can go, with the line's position: before each scene, section or heading, and at the end. */
-function gaps(): { to: number | null; y: number; depth: number }[] {
+type Gap = { to: number | null; y: number; depth: number };
+
+/**
+ * The places a block could land, with the line's position: before each scene, section or heading,
+ * and at the end. Those inside the block, or just before or after it, wouldn't move it (`moves` false).
+ */
+function gaps(): (Gap & { moves: boolean })[] {
   const d = dragging!;
   const top = list.getBoundingClientRect().top - list.scrollTop;
   const moves = (at: number) => !(at >= d.start && at <= d.blockEnd!);
-  const out: { to: number | null; y: number; depth: number }[] = [];
+  const out: (Gap & { moves: boolean })[] = [];
   for (const el of list.querySelectorAll<HTMLElement>(".row")) {
     const row = rows[Number(el.dataset.index)]!;
-    if (row.blockEnd !== null && moves(row.start)) out.push({ to: row.start, y: el.getBoundingClientRect().top - top, depth: row.depth });
+    if (row.blockEnd !== null) out.push({ to: row.start, y: el.getBoundingClientRect().top - top, depth: row.depth, moves: moves(row.start) });
   }
   const last = list.lastElementChild as HTMLElement | null;
-  if (last && moves(length)) out.push({ to: null, y: last.getBoundingClientRect().bottom - top, depth: 0 });
+  if (last) out.push({ to: null, y: last.getBoundingClientRect().bottom - top, depth: 0, moves: moves(length) });
   return out;
 }
 
