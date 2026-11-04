@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parse } from "@highwater/parser";
-import { columnMinimum, columnWidth, DIALOGUE_WIDTH, lineStyles, PAREN_WIDTH } from "../src/highland-editor/line-styles.ts";
+import { columnMinimum, columnWidth, DIALOGUE_WIDTH, inlineMarks, lineStyles, PAREN_WIDTH } from "../src/highland-editor/line-styles.ts";
 
 const at = (src: string, line: string) => src.indexOf(line);
 
@@ -32,5 +32,16 @@ describe("Highland-style editor line styles", () => {
     expect(columnMinimum(doc)).toBe(0);
     expect(m.get(0)).toMatchObject({ kind: "heading", level: 1, align: "center" });
     expect(m.get(at(md, "> A quote"))).toMatchObject({ kind: "quote", indent: 5 });
+  });
+
+  it("finds emphasis, notes and omitted text by source offsets", () => {
+    const src = "Brenda **runs** and *hides* [[check this]].\n\nBOB\nI _said_ /* cut */ no.\n";
+    const marks = inlineMarks(parse(src, { mode: "fountain" }));
+    const text = (kind: string) => marks.filter((m) => m.kind === kind).map((m) => src.slice(m.from, m.to));
+    expect(text("bold")).toEqual(["**runs**"]);
+    expect(text("italic")).toEqual(["*hides*"]);
+    expect(text("note")).toEqual(["[[check this]]"]);
+    expect(text("underline")).toEqual(["_said_"]);
+    expect(text("omitted")).toEqual(["/* cut */"]);
   });
 });

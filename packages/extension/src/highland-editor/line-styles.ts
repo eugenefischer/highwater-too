@@ -139,3 +139,32 @@ export function lineStyles(doc: Document): Map<number, LineStyle> {
   }
   return out;
 }
+
+/** A run of text styled where it stands: emphasis, a note, or omitted (boneyard) text. */
+export interface InlineMark {
+  from: number;
+  to: number;
+  kind: "bold" | "italic" | "boldItalic" | "underline" | "strike" | "highlight" | "note" | "omitted";
+}
+
+/**
+ * The emphasis, notes and omitted text in the document, by source offsets, so the editor can show
+ * **bold** in bold and a [[note]] dimmed, as Highland does. Pure, for tests.
+ */
+export function inlineMarks(doc: Document): InlineMark[] {
+  const out: InlineMark[] = [];
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const v of value) visit(v);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const node = value as { kind?: string; style?: InlineMark["kind"]; span?: { start: number; end: number } };
+    if (node.kind === "styled" && node.style && node.span && node.span.end > node.span.start) out.push({ from: node.span.start, to: node.span.end, kind: node.style });
+    else if (node.kind === "note" && node.span && node.span.end > node.span.start) out.push({ from: node.span.start, to: node.span.end, kind: "note" });
+    for (const [key, v] of Object.entries(value)) if (key !== "span" && typeof v === "object") visit(v);
+  };
+  visit(doc.elements);
+  for (const b of doc.overlays.boneyard) if (b.span.end > b.span.start) out.push({ from: b.span.start, to: b.span.end, kind: "omitted" });
+  return out;
+}

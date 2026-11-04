@@ -6,11 +6,11 @@
  */
 import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
-import { Annotation, EditorSelection, EditorState, RangeSetBuilder, StateField, type Text } from "@codemirror/state";
+import { Annotation, EditorSelection, EditorState, StateField, type Range, type Text } from "@codemirror/state";
 import { Decoration, EditorView, keymap, type DecorationSet, type KeyBinding } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
-import { columnMinimum, columnWidth, lineStyles } from "./line-styles.ts";
+import { columnMinimum, columnWidth, inlineMarks, lineStyles, type InlineMark } from "./line-styles.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -19,6 +19,9 @@ const vscode = acquireVsCodeApi();
 const remote = Annotation.define<boolean>();
 
 let mode: Mode = "fountain";
+const MARKS = Object.fromEntries(
+  (["bold", "italic", "boldItalic", "underline", "strike", "highlight", "note", "omitted"] as const).map((k) => [k, Decoration.mark({ class: `hl-${k}` })]),
+) as Record<InlineMark["kind"], Decoration>;
 /** The latest parse of the text, for completion. */
 let parsed: Document | null = null;
 
@@ -28,15 +31,17 @@ function decorate(doc: Text): DecorationSet {
   const column = columnWidth(parsed);
   document.documentElement.style.setProperty("--column", `${column}ch`);
   document.documentElement.style.setProperty("--column-min", `${columnMinimum(parsed)}ch`);
-  const b = new RangeSetBuilder<Decoration>();
+  const ranges: Range<Decoration>[] = [];
   for (let n = 1; n <= doc.lines; n++) {
     const line = doc.line(n);
     const s = styles.get(line.from);
     if (!s) continue;
     const cls = [`hl-${s.kind}`, s.level ? `hl-level-${s.level}` : "", s.align ? `hl-${s.align}` : ""].filter(Boolean).join(" ");
-    b.add(line.from, line.from, Decoration.line({ attributes: { class: cls, ...lineCss(s.indent, s.width) } }));
+    ranges.push(Decoration.line({ attributes: { class: cls, ...lineCss(s.indent, s.width) } }).range(line.from));
   }
-  return b.finish();
+  // Emphasis, notes and omitted text styled where they stand.
+  for (const m of inlineMarks(parsed)) if (m.to <= doc.length) ranges.push(MARKS[m.kind].range(m.from, m.to));
+  return Decoration.set(ranges, true);
 }
 
 /** A line's indent, and the width it wraps at; in a column narrower than that, it wraps at the column's edge. */
@@ -55,7 +60,7 @@ const styling = StateField.define<DecorationSet>({
  * Keys that belong to Highwater (bold, italic, underline, note, omit, centre, highlight, case,
  * markers, panes, Preview): CodeMirror must leave them alone so VS Code's keybindings get them.
  */
-const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c"]);
+const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c", "Ctrl-g"]);
 const isMac = /Mac/.test(navigator.platform);
 
 /**

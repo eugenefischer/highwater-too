@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.9 (m15-editor branch)
+
+- The Highland-Style Editor shows emphasis where it stands, as Highland does: **bold** in bold, *italic* in italics, underline, strikethrough and +highlight+, with [[notes]] and /* omitted */ text dimmed.
+- Go to Line (⌃G) in the Highland-Style Editor.
+- A search result in a document open in the Highland-Style Editor now shows the result's line there.
+- Fixed: in a file with Windows line breaks (\r\n), typing in the Highland-Style Editor put text in the wrong place, further off the further down the file.
+
 ## 0.3.8 (m15-editor branch)
 
 - One tab per document: the book and code buttons now switch the tab between the text editor and the Highland-Style Editor in place, as Reopen Editor With… does, keeping unsaved changes. Before, they opened a second tab, and closing either one asked to save or discard changes that the other was still showing.
