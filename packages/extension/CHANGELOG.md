@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.4 (m15-editor branch)
+
+- Fixed: dragging a scene in the Navigator out of the pane and back lost the drop line (VS Code stops passing a webview the mouse once a browser drag crosses the rest of the window). The Navigator now follows the pointer itself: the line hides while you're outside the list and comes back when you return; letting go outside the list, or pressing Escape, cancels. The list scrolls when you drag near its top or bottom edge.
+
 ## 0.4.3 (m15-editor branch)
 
 - **The Navigator in Highland's style:** a plain list of scenes in bold capitals, sections, synopses, notes and markers, with the one the cursor is in highlighted as you write (in either editor). Dragging a scene, section or heading shows a line where it will land; only places that would move it are offered. A Filter box at the foot finds items by their words, and the eye button beside it chooses which kinds are listed (as the title bar's filter button does).

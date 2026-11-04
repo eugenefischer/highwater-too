@@ -148,6 +148,8 @@ body { display: flex; flex-direction: column; font-family: var(--vscode-font-fam
 .row:hover { background: var(--vscode-list-hoverBackground); }
 .row.current { background: var(--vscode-list-inactiveSelectionBackground); color: var(--vscode-list-inactiveSelectionForeground, inherit); }
 .row.dragging { opacity: 0.4; }
+body.dragging, body.dragging .row { cursor: grabbing; }
+.row[data-draggable="true"] { touch-action: none; }
 /* As in Highland: scene headings in bold capitals, sections bold, the rest quieter. */
 .sceneHeaders { font-weight: 600; font-size: 0.92em; letter-spacing: 0.02em; }
 .sectionHeaders { font-weight: 700; color: var(--vscode-textLink-foreground); }
