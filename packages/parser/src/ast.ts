@@ -72,7 +72,7 @@ export interface BoneyardRange {
 
 /** `{{REVISION: #rrggbb}} … {{/REVISION}}`; may cross line and block boundaries. */
 export interface RevisionRange {
-  /** Colour as written, e.g. "#ee2d36". */
+  /** Colour as written, e.g. "#ee2d36"; empty for a bare `{{REVISION}}`. */
   color: string;
   openTag: Span;
   /** Null when the document ends before the closing tag. */

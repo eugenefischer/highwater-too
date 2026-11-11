@@ -13,17 +13,15 @@ type PdfJs = { getDocument(o: { data: Uint8Array }): { promise: Promise<PdfDoc> 
 export interface PrintBox {
   key: string;
   label: string;
-  /** Not printed by Highwater Too yet: shown, but can't be ticked. */
-  ready: boolean;
 }
 
 export const PRINT_BOXES: PrintBox[] = [
-  { key: "printRevisionColor", label: "Color Revisions", ready: false },
-  { key: "printRevisionStars", label: "Star Revisions", ready: false },
-  { key: "printParagraphNumbers", label: "Paragraph Numbers", ready: false },
-  { key: "printSynopses", label: "Synopses", ready: false },
-  { key: "printInlineNotes", label: "Notes", ready: false },
-  { key: "printTitlePage", label: "Title Page", ready: true },
+  { key: "printRevisionColor", label: "Color Revisions" },
+  { key: "printRevisionStars", label: "Star Revisions" },
+  { key: "printParagraphNumbers", label: "Paragraph Numbers" },
+  { key: "printSynopses", label: "Synopses" },
+  { key: "printInlineNotes", label: "Notes" },
+  { key: "printTitlePage", label: "Title Page" },
 ];
 
 export interface PdfMessage {
@@ -77,8 +75,6 @@ export class Pages {
       const box = document.createElement("input");
       box.type = "checkbox";
       box.dataset.key = b.key;
-      box.disabled = !b.ready;
-      label.title = b.ready ? "" : "Not printed by Highwater Too yet";
       box.onchange = () => {
         this.#busy();
         post({ type: "printOption", key: b.key, value: box.checked });

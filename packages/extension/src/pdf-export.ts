@@ -2,8 +2,9 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type SourceRange } from "@highwater/pdf";
-import type { Element, MergedElement } from "@highwater/parser";
+import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type PrintMarks, type SourceRange } from "@highwater/pdf";
+import type { Document, Element, MergedElement } from "@highwater/parser";
+import { paragraphNumbers } from "./highland-editor/line-styles.ts";
 
 export interface ExportOptions {
   /** The script text (the editor's, so unsaved edits are included). */
@@ -12,7 +13,24 @@ export interface ExportOptions {
   path: string;
   fontDir: string;
   titlePage?: boolean;
+  /** Highland's other print options. */
+  print?: PrintFlags;
   date?: Date;
+}
+
+export interface PrintFlags {
+  notes: boolean;
+  synopses: boolean;
+  revisionColor: boolean;
+  revisionStars: boolean;
+  paragraphNumbers: boolean;
+}
+
+/** The layouts' print marks for the options that are on (none: undefined, so nothing changes). */
+function marksOf(doc: Document, print: PrintFlags | undefined): { print: PrintMarks } | Record<string, never> {
+  if (!print || !Object.values(print).some(Boolean)) return {};
+  const { paragraphNumbers: numbered, ...rest } = print;
+  return { print: { ...rest, ...(numbered ? { numbers: paragraphNumbers(doc) } : {}) } };
 }
 
 export interface ScriptExportOptions extends ExportOptions {
@@ -47,6 +65,7 @@ export async function exportScreenplay(options: ScriptExportOptions): Promise<Ex
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     template: SCRIPT_TEMPLATES[options.template ?? "Screenplay"] ?? SCREENPLAY,
+    ...marksOf(doc, options.print),
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
@@ -71,6 +90,7 @@ export async function exportProse(options: ProseExportOptions): Promise<ExportRe
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     ...(options.image ? { image: options.image } : {}),
+    ...marksOf(doc, options.print),
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
@@ -96,6 +116,7 @@ export async function exportManuscript(options: ManuscriptExportOptions): Promis
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     ...(options.image ? { image: options.image } : {}),
+    ...marksOf(doc, options.print),
   });
   const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");
   const title = cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "";

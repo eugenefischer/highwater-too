@@ -158,8 +158,9 @@ export async function renderDocx(context: vscode.ExtensionContext, store: Bundle
 async function sources(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument) {
   const bundle = bundleOf(doc);
   const path = bundle ?? doc.uri.fsPath;
-  const titlePage = (await printOptionsOf(context, store, doc)).printTitlePage;
-  const base = { text: doc.getText(), path, fontDir: join(context.extensionPath, "dist", "fonts"), titlePage };
+  const o = await printOptionsOf(context, store, doc);
+  const print = { notes: o.printInlineNotes, synopses: o.printSynopses, revisionColor: o.printRevisionColor, revisionStars: o.printRevisionStars, paragraphNumbers: o.printParagraphNumbers };
+  const base = { text: doc.getText(), path, fontDir: join(context.extensionPath, "dist", "fonts"), titlePage: o.printTitlePage, print };
   // Images: the bundle's assets, or files next to a Markdown file.
   const read = async (src: string): Promise<Uint8Array | null> => {
     const name = safeDecode(src);

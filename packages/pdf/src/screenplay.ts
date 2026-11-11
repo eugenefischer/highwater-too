@@ -1,6 +1,7 @@
 import { parseInline, seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
-import { plain, sentenceEnds, sliceRuns, toRuns, trimStartRuns, wrapRuns, type InlineContext } from "./text.ts";
-import { assignSources, CHAR, type Layout, type Page, type PlacedText, type Run, type SourceRange } from "./types.ts";
+import { addPrintMarks } from "./marks.ts";
+import { marked, onlyNotes, plain, printContext, sentenceEnds, sliceRuns, SYNOPSIS_COLOR, toRuns, trimStartRuns, wrapRuns, type InlineContext } from "./text.ts";
+import { assignSources, CHAR, type Layout, type Page, type PlacedText, type PrintMarks, type Run, type SourceRange, type TextStyle } from "./types.ts";
 
 /** A script template's measured layout (Highland 2: Screenplay, Stage Play, Graphic Novel). x values are where text starts; y values are baselines. */
 export interface ScriptTemplate {
@@ -143,6 +144,8 @@ export interface ScreenplayOptions {
   titlePage?: boolean;
   /** The script template; default Screenplay. */
   template?: ScriptTemplate;
+  /** Highland's print options other than the title page. */
+  print?: PrintMarks;
 }
 
 /** One line slot on the page: text items at their x positions. */
@@ -177,6 +180,8 @@ interface Block {
   lastLineOk?: boolean;
   /** Takes no lines but, like any paragraph, needs room for the blank line before it (notes, synopses). */
   ghost?: boolean;
+  /** A printed note on a line of its own: no blank line before it or after it (ScreenplayPrintProbe-notes). */
+  noteLine?: boolean;
   /** Splits the block so its first part fits in `available` rows; null where Highland would not split. */
   split?: (available: number) => { head: Row[]; tail: Block } | null;
 }
@@ -193,7 +198,8 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
 
 function layout(doc: Document, options: ScreenplayOptions): Layout {
   const S = active;
-  const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date() };
+  const print = printContext(doc, options.print);
+  const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), ...(print ? { print } : {}) };
   // Measured (StartTest1 vs StartTest2): when the text starts with an empty line, directive lines
   // at the top of the first page print as an empty line instead of vanishing.
   const leadingBlank = /^[ \t]*\r?\n/.test(doc.source);
@@ -357,7 +363,9 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
   }
   assignSources(printed);
   for (const it of pages[0]?.number === null ? pages[0].items : []) it.source = 0;
-  return { width: S.width, height: S.height, pages };
+  const result = { width: S.width, height: S.height, pages };
+  addPrintMarks(result, options.print, S.lineHeight);
+  return result;
 }
 
 function tag(rows: Row[], range: SourceRange | undefined): Row[] {
@@ -403,6 +411,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i]!;
     const before = out.length;
+    if (ctx.print) ctx.print.own = sourceOf(e) === e.span;
     addElement(e, i);
     // Each extra empty source line before an element is an empty paragraph to Highland: one line
     // plus its own blank (Astounding: two empty lines before ">**END**<" print as three).
@@ -413,6 +422,12 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
     for (const b of out.slice(before)) b.range = range;
     i = nextIndex;
   }
+  // A printed note on its own line sits between the paragraphs around it with no blank lines.
+  out.forEach((b, k) => {
+    if (!b.noteLine) return;
+    const next = out.slice(k + 1).find((n) => n.rows.length > 0 || n.pageBreak);
+    if (next && !next.pageBreak) next.space = 0;
+  });
   return out;
 
   function addElement(e: Element, i: number): void {
@@ -436,6 +451,13 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       }
       case "action": {
         const runs = toRuns(e.inline, ctx);
+        if (ctx.print?.marks.notes && onlyNotes(e.inline)) {
+          // Printed as its own line, after a space (ScreenplayPrintProbe-notes).
+          const lead: Run[] = [{ text: " ", style: runs[0]?.style ?? {} }];
+          out.push({ kind: e.kind, rows: wrapAt(S.action.x, [...lead, ...runs.map((r) => ({ ...r, text: r.text.replace(/\n/g, " ") }))], S.action.width), space: 0, noteLine: true });
+          printed = true;
+          break;
+        }
         if (plain(runs).trim() === "") {
           // Only notes (or inline directives): prints nothing, but still a paragraph to Highland.
           if (printed) out.push({ kind: e.kind, rows: [], space: 1, ghost: true });
@@ -457,7 +479,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       }
       case "transition": {
         const text = plain(toRuns(e.inline, ctx)).trim().toUpperCase();
-        out.push({ kind: e.kind, rows: [at(S.rightEdge - text.length * CHAR, [{ text, style: {} }])], space: 1 });
+        out.push({ kind: e.kind, rows: [at(S.rightEdge - text.length * CHAR, [{ text, style: marked(ctx.print, e.lines[0]?.content.start ?? e.span.start) }])], space: 1 });
         printed = true;
         break;
       }
@@ -481,7 +503,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
           const rows = dualRows(e, next, ctx);
           out.push({ kind: "dialogue", rows, space: 1, fitRows: rows.sumOfColumns });
           nextIndex = i + 1;
-        } else out.push(dialogueBlock(cueText(e), e.parts.map((p) => ({ kind: p.kind, runs: p.kind === "empty" ? [] : toRuns(p.inline, ctx, p.kind === "lyric" ? { italic: true } : {}) })), 1));
+        } else out.push(dialogueBlock(cueText(e), e.parts.map((p) => ({ kind: p.kind, runs: p.kind === "empty" ? [] : toRuns(p.inline, ctx, p.kind === "lyric" ? { italic: true } : {}) })), 1, marked(ctx.print, e.lines[0]?.content.start ?? e.span.start)));
         printed = true;
         break;
       }
@@ -508,12 +530,21 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
           // Graphic Novel (GraphicNovelProbe): printed in place with a blank line before and after;
           // level 1 in capitals, bold, with a 2 pt rule under it; deeper levels plain.
           const first = e.level === 1;
-          const runs: Run[] = [{ text: first ? e.text.trim().toUpperCase() : e.text.trim(), style: first ? { bold: true, rule: true } : {} }];
+          const runs: Run[] = [{ text: first ? e.text.trim().toUpperCase() : e.text.trim(), style: marked(ctx.print, e.lines[0]?.content.start ?? e.span.start, first ? { bold: true, rule: true } : {}) }];
           out.push({ kind: "section", rows: wrapAt(S.sceneHeading.x, runs, S.sceneHeading.width), space: 1, section: e.text });
           printed = true;
         } else out.push({ kind: "directives", rows: [], space: 0, section: e.text });
         break;
       case "synopsis":
+        if (ctx.print?.marks.synopses) {
+          // Grey, half an inch in from the action, a paragraph of its own (ScreenplayPrintProbe-synopses).
+          const runs = toRuns(e.inline, ctx, { color: SYNOPSIS_COLOR });
+          if (plain(runs).trim()) {
+            out.push({ kind: e.kind, rows: wrapAt(S.action.x + 36, runs, S.action.width - 5), space: 1 });
+            printed = true;
+            break;
+          }
+        }
         if (printed) out.push({ kind: e.kind, rows: [], space: 1, ghost: true });
         break;
       default:
@@ -602,9 +633,9 @@ interface Part {
  * A speech. Highland splits it only between parts or after a sentence, with at least one line
  * of dialogue before "(MORE)", and repeats the cue with "(CONT’D)" on the next page.
  */
-function dialogueBlock(cue: string, parts: Part[], space: number): Block {
+function dialogueBlock(cue: string, parts: Part[], space: number, cueStyle: TextStyle = {}): Block {
   const S = active;
-  const rows = [{ items: [{ x: S.cue.x, runs: [{ text: cue, style: {} }] }] }, ...partRows(parts, null)];
+  const rows = [{ items: [{ x: S.cue.x, runs: [{ text: cue, style: cueStyle }] }] }, ...partRows(parts, null)];
   // SpeechFitTests and Astounding: a speech may end on the page's last line only if its text starts
   // there, or a sentence ends somewhere on the line above.
   const printedRows = rows.filter((r) => r.items.length > 0);
@@ -630,11 +661,11 @@ function dialogueBlock(cue: string, parts: Part[], space: number): Block {
           // A parenthetical goes with the line after it, never just before (MORE).
           if (head.at(-1)!.kind === "parenthetical" || head.at(-1)!.kind === "empty") continue;
           const headRows = partRows(head, null);
-          if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0) };
+          if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0, cueStyle) };
           best = { head: [rows[0]!, ...headRows, { items: [{ x: S.more.x, runs: [{ text: "(MORE)", style: {} }] }] }], tail };
         }
       }
-      return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0) };
+      return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0, cueStyle) };
     },
   };
 }

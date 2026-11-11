@@ -72,3 +72,13 @@ describe("revision tags", () => {
     expect(doc.overlays.revisions).toEqual([]);
   });
 });
+
+describe("bare revision tag", () => {
+  it("opens a revision without a colour", () => {
+    const doc = parse("Plain {{REVISION}}revised{{/REVISION}} text.", { mode: "fountain" });
+    expect(doc.overlays.revisions).toHaveLength(1);
+    expect(doc.overlays.revisions[0]!.color).toBe("");
+    expect(doc.elements[0]!.kind === "action" && doc.elements[0].text).toBe("Plain revised text.");
+    expect(doc.diagnostics).toEqual([]);
+  });
+});

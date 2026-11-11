@@ -1,6 +1,7 @@
 import type { BoneyardRange, Diagnostic, Overlays, RevisionRange, Span } from "./ast.ts";
 
-const REVISION_OPEN = /\{\{\s*REVISION\s*:\s*([^}]*?)\s*\}\}/iy;
+/** `{{REVISION: #rrggbb}}`, or a bare `{{REVISION}}` (Highland writes both; the bare one has no colour). */
+const REVISION_OPEN = /\{\{\s*REVISION\s*(?::\s*([^}]*?))?\s*\}\}/iy;
 const REVISION_CLOSE = /\{\{\s*\/\s*REVISION\s*\}\}/iy;
 
 /**

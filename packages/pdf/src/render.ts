@@ -89,7 +89,9 @@ export function renderPdf(layout: Layout, options: RenderOptions = {}): Promise<
 
   /** Sets the run's font and size. */
   function select(run: Run): void {
-    if (run.style.font !== undefined) doc.font(faceKey(run.style.font, variantOf(run.style))).fontSize(run.style.size ?? 12);
+    // Helvetica (paragraph numbers): one of PDF's standard fonts, so nothing is embedded.
+    if (run.style.font === "Helvetica") doc.font("Helvetica").fontSize(run.style.size ?? 12);
+    else if (run.style.font !== undefined) doc.font(faceKey(run.style.font, variantOf(run.style))).fontSize(run.style.size ?? 12);
     else doc.font(fontFor(run.style)).fontSize(12);
   }
 

@@ -1,7 +1,8 @@
 import { seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
 import { extraBlankLines, pageText, sameParagraph, styledValue } from "./screenplay.ts";
-import { plain, toRuns, wrapRuns, type InlineContext } from "./text.ts";
-import { assignSources, CHAR, type Graphic, type Layout, type Page, type PlacedText, type Run, type SourceRange } from "./types.ts";
+import { addPrintMarks } from "./marks.ts";
+import { onlyNotes, plain, printContext, SYNOPSIS_COLOR, toRuns, wrapRuns, type InlineContext } from "./text.ts";
+import { assignSources, CHAR, type Graphic, type Layout, type Page, type PlacedText, type PrintMarks, type Run, type SourceRange } from "./types.ts";
 
 /**
  * Highland 2's Manuscript template on US Letter, measured from its PDFs (Sweet Betty, The Purity
@@ -67,6 +68,8 @@ export interface ManuscriptOptions {
    * 65 characters into the margin, text may run over the footer, %pp ignores {{PAGENUMBER}}.
    */
   highlandQuirks?: boolean;
+  /** Highland's print options other than the title page. */
+  print?: PrintMarks;
 }
 
 type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
@@ -126,7 +129,9 @@ export function layoutManuscript(doc: Document, options: ManuscriptOptions = {})
     pages.push(title);
   }
   pages.push(...second.pages);
-  return { width: MANUSCRIPT.width, height: MANUSCRIPT.height, pages };
+  const layout = { width: MANUSCRIPT.width, height: MANUSCRIPT.height, pages };
+  addPrintMarks(layout, options.print, MANUSCRIPT.pitch);
+  return layout;
 }
 
 /** The body page each heading prints on, in document order (for a {{TOC}} outside the PDF). */
@@ -139,7 +144,8 @@ export function manuscriptHeadingPages(doc: Document, options: ManuscriptOptions
 
 function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, number>) {
   const M = MANUSCRIPT;
-  const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true };
+  const print = printContext(doc, options.print);
+  const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true, ...(print ? { print } : {}) };
   // Empty lines before the text, beyond the first, print as empty lines (Sweet Betty and Purity start
   // with two and print one; ManuscriptStart2 starts with one and prints none).
   const leading = Math.max(0, (/^(?:[ \t]*\r?\n)*/.exec(doc.source)![0].match(/\n/g) ?? []).length - 1);
@@ -242,9 +248,11 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
   const pages: Page[] = body.map((p) => {
     const items: PlacedText[] = [];
     const graphics: Graphic[] = [];
+    // A paragraph opening on the page's last line gets no number (ManuscriptPrintProbe-numbers).
+    const lastLine = [...p.lines].reverse().find(({ line }) => line.items.some((it) => it.runs.length))?.line;
     for (const { line, top } of p.lines) {
       const placed: PlacedText[] = [];
-      for (const it of line.items) if (it.runs.length) placed.push({ x: it.x, y: round(top + line.ascent), runs: it.runs, highlightBox: M.highlight });
+      for (const it of line.items) if (it.runs.length) placed.push({ x: it.x, y: round(top + line.ascent), runs: it.runs, highlightBox: M.highlight, ...(line === lastLine ? { unnumbered: true } : {}) });
       if (placed.length) printed.push({ range: line.range, items: placed });
       items.push(...placed);
       if (line.graphics) graphics.push(...line.graphics(top));
@@ -289,6 +297,8 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
   let afterParagraph = false;
   let headingId = 0;
   const headings: { text: string; level: number; id: number }[] = [];
+  /** Printed notes on lines of their own: they open the next paragraph (ManuscriptPrintProbe-notes). */
+  let notes: Run[] = [];
 
   // Headings first, for the TOC.
   {
@@ -299,13 +309,26 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
 
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i]!;
+    if (ctx.print) ctx.print.own = o.sourceOf(e) === e.span;
+    if (notes.length && e.kind !== "paragraph") {
+      // No paragraph after them: they print as one.
+      const x = afterParagraph ? M.left + M.indent : M.left;
+      wrapRuns(notes, afterParagraph ? M.chars - M.indent / CHAR : M.chars, M.chars).forEach((r, k) => push(text([{ x: k === 0 ? x : M.left, runs: r }], k === 0 ? { opens: true } : {})));
+      notes = [];
+      afterParagraph = true;
+    }
     // Each extra empty source line is an empty paragraph (Sweet Betty's lyrics, Purity's chapters);
     // the blank lines after the title page are not.
     if (printed && e.kind !== "directiveLine") for (let k = extraBlankLines(source, e.span.start); k > 0; k--) push(empty());
     const before = out.length;
     switch (e.kind) {
       case "paragraph": {
-        const runs = toRuns(e.inline, ctx);
+        if (ctx.print?.marks.notes && onlyNotes(e.inline)) {
+          notes.push(...toRuns(e.inline, ctx));
+          break;
+        }
+        const runs = [...notes, ...toRuns(e.inline, ctx)];
+        notes = [];
         if (plain(runs).trim() === "") break; // only a note
         const x = afterParagraph ? M.left + M.indent : M.left;
         const lines = wrapRuns(runs, afterParagraph ? M.chars - M.indent / CHAR : M.chars, M.chars);
@@ -458,6 +481,16 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         printed = true;
         break;
       }
+      case "synopsis": {
+        if (!ctx.print?.marks.synopses) break;
+        // Grey, indented like a paragraph, but the next paragraph is indented or not as if it were
+        // not there (ManuscriptPrintProbe-synopses).
+        const runs = toRuns(e.inline, ctx, { color: SYNOPSIS_COLOR });
+        if (!plain(runs).trim()) break;
+        wrapRuns(runs, M.chars - M.indent / CHAR, M.chars).forEach((r, k) => push(text([{ x: k === 0 ? M.left + M.indent : M.left, runs: r }], k === 0 ? { opens: true } : {})));
+        printed = true;
+        break;
+      }
       default:
         break; // notes, synopses, link definitions: not printed
     }
@@ -480,6 +513,10 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         }
       }
     }
+  }
+  if (notes.length) {
+    const x = afterParagraph ? M.left + M.indent : M.left;
+    wrapRuns(notes, afterParagraph ? M.chars - M.indent / CHAR : M.chars, M.chars).forEach((r, k) => push(text([{ x: k === 0 ? x : M.left, runs: r }], k === 0 ? { opens: true } : {})));
   }
   return out;
 }

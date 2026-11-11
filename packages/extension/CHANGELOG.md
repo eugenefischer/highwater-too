@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.18 (m15-editor branch)
+
+- **All of Highland 2's print options now print,** in the preview, Export PDF and Save As PDF, matched to Highland's own PDFs:
+  - **Color Revisions:** revised text in its revision's colour (a bare `{{REVISION}}` has none).
+  - **Star Revisions:** an asterisk in the right margin beside every line with revised text.
+  - **Paragraph Numbers:** small blue numbers in the left margin, numbered as in the editor.
+  - **Synopses:** in grey, half an inch in, each a paragraph of its own.
+  - **Notes:** in blue, brackets and all. A note on a line of its own sits between the paragraphs around it in a script, and opens the next paragraph in a manuscript, as Highland prints them.
+  - Measured in the Screenplay and Manuscript templates; the other scripts and the prose templates use the same rules.
+- With notes not printed, a note between two spaces now leaves one space, not two, as in Highland.
+- A bare `{{REVISION}}` tag (no colour), which Highland writes, is now read as a revision.
+
 ## 0.4.17 (m15-editor branch)
 
 - **Preview in place, as in Highland 2:** in the Highland-Style Editor, ⌘E (or the Preview button) shows the printed pages in the same tab instead of the text, and ⌘E again goes back. Going to the pages opens them where your text was; coming back shows the text at what was on screen in the pages, with the cursor where you left it. Double-clicking a line in the pages goes back to the text with the cursor on that line.

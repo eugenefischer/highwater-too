@@ -16,6 +16,25 @@ export interface TextStyle {
   font?: string;
   size?: number;
   color?: string;
+  /** Inside a {{REVISION}} (marked with a star in the margin when revision stars are printed). */
+  revised?: boolean;
+  /**
+   * Where the run starts in the script's source: set only when paragraph numbers are printed,
+   * which go beside the first printed line of each numbered source line.
+   */
+  src?: number;
+}
+
+/**
+ * Highland's print options (its preview's bottom bar), apart from the title page. Paragraph numbers
+ * are given by the source offset where each numbered line starts.
+ */
+export interface PrintMarks {
+  notes?: boolean;
+  synopses?: boolean;
+  revisionColor?: boolean;
+  revisionStars?: boolean;
+  numbers?: Map<number, number>;
 }
 
 /** A piece of text in one style. */
@@ -35,6 +54,8 @@ export interface PlacedText {
   highlightBox?: { top: number; height: number; color: string };
   /** Justified to this width: the spaces stretch (Novel). */
   justify?: number;
+  /** Highland prints no paragraph number here (a paragraph opening on a manuscript page's last line). */
+  unnumbered?: boolean;
 }
 
 /** A filled rectangle (table rules) or an image; y is the top edge. */

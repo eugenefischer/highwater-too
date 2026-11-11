@@ -1,5 +1,56 @@
-import { formatTimestamp, inlineText, type Directive, type Inline } from "@highwater/parser";
-import type { Run, TextStyle } from "./types.ts";
+import { formatTimestamp, hiddenRanges, inlineText, type Directive, type Document, type Inline, type RevisionRange, type Span } from "@highwater/parser";
+import type { PrintMarks, Run, TextStyle } from "./types.ts";
+
+/** Inline notes as Highland prints them (ScreenplayPrintProbe-notes). */
+export const NOTE_COLOR = "#0287D0";
+/** Synopses (ScreenplayPrintProbe-synopses): 50 % grey. */
+export const SYNOPSIS_COLOR = "#808080";
+
+/** What the print options need while the script's own text (not an included file's) is turned into runs. */
+export interface PrintContext {
+  marks: PrintMarks;
+  source: string;
+  revisions: RevisionRange[];
+  hidden: Span[];
+  /** The element being printed is from the script itself (included files keep no marks). */
+  own: boolean;
+}
+
+export function printContext(doc: Document, marks: PrintMarks | undefined): PrintContext | undefined {
+  if (!marks) return undefined;
+  return { marks, source: doc.source, revisions: doc.overlays.revisions, hidden: hiddenRanges(doc.overlays), own: true };
+}
+
+/** The revision around a source offset, if any. */
+export function revisionAt(p: PrintContext | undefined, offset: number): RevisionRange | undefined {
+  if (!p?.own) return undefined;
+  return p.revisions.find((r) => r.content.start <= offset && offset < r.content.end);
+}
+
+/**
+ * The print marks for text at a source offset that is not built from inline content (a cue, a
+ * transition): its revision colour and star, and its source for paragraph numbers.
+ */
+export function marked(p: PrintContext | undefined, offset: number, style: TextStyle = {}): TextStyle {
+  if (!p?.own) return style;
+  // Past revision tags at the start of a line ("{{/REVISION}}{{REVISION: #ee2d36}}MARA": Highland
+  // closes and reopens a revision at each line).
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const h of p.hidden)
+      if (h.start <= offset && offset < h.end) {
+        offset = h.end;
+        moved = true;
+      }
+  }
+  const r = revisionAt(p, offset);
+  return {
+    ...style,
+    ...(r && p.marks.revisionColor && r.color ? { color: r.color } : {}),
+    ...(r && p.marks.revisionStars ? { revised: true } : {}),
+    ...(p.marks.numbers ? { src: offset } : {}),
+  };
+}
 
 export interface InlineContext {
   /** Numbers each {{SERIES}} in print order. */
@@ -9,20 +60,39 @@ export interface InlineContext {
   links?: boolean;
   /** Addresses of reference links (`[text][name]`), by lower-case name. */
   linkDefinitions?: Map<string, string>;
+  /** Highland's print options: inline notes, revision colours and stars, paragraph numbers. */
+  print?: PrintContext;
 }
 
 /**
- * Printable runs for inline content: notes and images are dropped (Highland keeps the spaces
- * around a note), links print as their text, {{SERIES}} and {{TIMESTAMP}} are filled in, other
+ * Printable runs for inline content: notes and images are dropped (and one of the spaces around
+ * a note), links print as their text, {{SERIES}} and {{TIMESTAMP}} are filled in, other
  * inline directives print nothing.
  */
 export function toRuns(nodes: Inline[], ctx: InlineContext, style: TextStyle = {}): Run[] {
   const out: Run[] = [];
+  const p = ctx.print?.own ? ctx.print : undefined;
+  /** After a line break, with paragraph numbers: the next source line starts a run of its own. */
+  let fresh = false;
   const push = (text: string, s: TextStyle) => {
     if (text === "") return;
     const last = out.at(-1);
-    if (last && sameStyle(last.style, s)) last.text += text;
+    if (last && !fresh && sameStyle(last.style, s)) last.text += text;
     else out.push({ text, style: s });
+    fresh = false;
+  };
+  /** Text from the source: split where revisions start and end, each piece marked. */
+  const pushText = (text: string, span: Span, s: TextStyle) => {
+    if (!p || !(p.marks.revisionColor || p.marks.revisionStars || p.marks.numbers)) return push(text, s);
+    const at = sourceOffsets(p, text, span.start);
+    let i = 0;
+    while (i < text.length) {
+      const r = revisionAt(p, at[i]!);
+      let j = i + 1;
+      while (j < text.length && revisionAt(p, at[j]!) === r) j++;
+      push(text.slice(i, j), marked(p, at[i]!, s));
+      i = j;
+    }
   };
   /** After a marker with a space before it: the space after it goes too, as if it were never there. */
   let dropSpace = false;
@@ -30,12 +100,23 @@ export function toRuns(nodes: Inline[], ctx: InlineContext, style: TextStyle = {
     for (const n of ns) {
       if (n.kind !== "text" && n.kind !== "directive") dropSpace = false;
       switch (n.kind) {
-        case "text":
-          push(dropSpace ? n.text.replace(/^[ \t]/, "") : n.text, s);
+        case "text": {
+          const drop = dropSpace && /^[ \t]/.test(n.text);
+          pushText(drop ? n.text.slice(1) : n.text, drop ? { start: n.span.start + 1, end: n.span.end } : n.span, s);
           dropSpace = false;
           break;
+        }
         case "lineBreak":
           push("\n", s);
+          if (p?.marks.numbers) fresh = true;
+          break;
+        case "note":
+          // Printed as written, brackets and all, in blue (ScreenplayPrintProbe-notes).
+          if (p?.marks.notes) push(p.source.slice(n.span.start, n.span.end), marked(p, n.span.start, { ...s, color: NOTE_COLOR }));
+          else if (ctx.print?.marks.notes) push(`[[${n.text}]]`, { ...s, color: NOTE_COLOR });
+          // Not printed: with a space before it, the space after it goes too ("logbook. [[…]] The
+          // pages" prints "logbook. The pages": ScreenplayPrintProbe-nothing).
+          else dropSpace = out.length === 0 || /[ \t]$/.test(out.at(-1)!.text);
           break;
         case "styled":
           walk(n.children, { ...s, ...STYLE[n.style] });
@@ -72,7 +153,26 @@ const STYLE: Record<string, TextStyle> = {
 };
 
 function sameStyle(a: TextStyle, b: TextStyle): boolean {
-  return !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.underline === !!b.underline && !!a.strike === !!b.strike && !!a.highlight === !!b.highlight && !!a.link === !!b.link && a.href === b.href;
+  return !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.underline === !!b.underline && !!a.strike === !!b.strike && !!a.highlight === !!b.highlight && !!a.link === !!b.link && a.href === b.href && a.color === b.color && !!a.revised === !!b.revised;
+}
+
+/** The source offset of each character of a text node's text (revision tags and escapes skipped). */
+function sourceOffsets(p: PrintContext, text: string, start: number): number[] {
+  const out: number[] = [];
+  let at = start;
+  let h = 0;
+  for (const c of text) {
+    for (;;) {
+      while (h < p.hidden.length && p.hidden[h]!.end <= at) h++;
+      const hid = p.hidden[h];
+      if (hid && hid.start <= at) at = hid.end;
+      else break;
+    }
+    if (p.source[at] === "\\" && p.source[at + 1] === c) at++;
+    for (let k = 0; k < c.length; k++) out.push(at + k);
+    at += c.length;
+  }
+  return out;
 }
 
 export function plain(runs: Run[]): string {
@@ -153,6 +253,14 @@ function slice(runs: Run[], owner: number[], text: string, a: number, b: number)
   const last = out.at(-1);
   if (last) last.text = last.text.replace(/\s+$/, "");
   return out.filter((r) => r.text !== "");
+}
+
+/** Inline content that prints nothing but notes (a note on a line of its own). */
+export function onlyNotes(nodes: Inline[]): boolean {
+  return (
+    nodes.some((n) => n.kind === "note") &&
+    nodes.every((n) => n.kind === "note" || n.kind === "lineBreak" || (n.kind === "text" && n.text.trim() === "") || (n.kind === "directive" && n.directive.kind !== "series" && n.directive.kind !== "timestamp"))
+  );
 }
 
 export function plainText(nodes: Inline[]): string {

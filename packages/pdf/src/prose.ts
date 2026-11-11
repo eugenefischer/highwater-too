@@ -2,9 +2,10 @@ import { seriesCounter, type Directive, type Document, type Element, type PageTe
 import { Measurer, resolveFonts, variantOf, type ResolvedFonts } from "./fonts.ts";
 import { imageSize } from "./manuscript.ts";
 import { extraBlankLines, sameParagraph, styledValue } from "./screenplay.ts";
-import { plain, sliceRuns, toRuns, trimStartRuns, type InlineContext } from "./text.ts";
+import { addPrintMarks } from "./marks.ts";
+import { onlyNotes, plain, printContext, sliceRuns, SYNOPSIS_COLOR, toRuns, trimStartRuns, type InlineContext } from "./text.ts";
 import type { ProseTemplate, TextSpec } from "./prose-templates.ts";
-import { assignSources, type Graphic, type Layout, type Page, type PlacedText, type Run, type SourceRange } from "./types.ts";
+import { assignSources, type Graphic, type Layout, type Page, type PlacedText, type PrintMarks, type Run, type SourceRange } from "./types.ts";
 
 /**
  * Highland 2's prose templates (M10): Novel, Treatment, Modern Standard, Article, Bulletin, Speech,
@@ -28,6 +29,8 @@ export interface ProseOptions {
   fontDirs?: string[];
   /** Reproduce Highland's quirks that we otherwise fix (for comparing with its PDFs): quotes keep the full measure and run into the right margin. */
   highlandQuirks?: boolean;
+  /** Highland's print options other than the title page (measured in the Manuscript; the same here). */
+  print?: PrintMarks;
 }
 
 type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
@@ -83,7 +86,9 @@ export function layoutProse(doc: Document, template: ProseTemplate, options: Pro
   const pages: Page[] = [];
   if (doc.titlePage && options.titlePage !== false && template.title.kind === "page") pages.push(titlePage(doc.titlePage.fields, template, second.ctx, m));
   pages.push(...second.pages);
-  return { width: 612, height: 792, pages, fonts: fonts.faces, substituted: fonts.substituted };
+  const layout = { width: 612, height: 792, pages, fonts: fonts.faces, substituted: fonts.substituted };
+  addPrintMarks(layout, options.print, template.body.pitch);
+  return layout;
 }
 
 function familiesOf(t: ProseTemplate): string[] {
@@ -93,7 +98,8 @@ function familiesOf(t: ProseTemplate): string[] {
 // ---------------------------------------------------------------------------------------------
 
 function run(doc: Document, T: ProseTemplate, options: ProseOptions, m: Measurer, tocPages: Map<number, number>) {
-  const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true };
+  const print = printContext(doc, options.print);
+  const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true, ...(print ? { print } : {}) };
   const units = toUnits(options.elements ?? doc.elements, doc, T, ctx, m, { image: options.image, sourceOf: options.sourceOf ?? ((e) => e.span), tocPages, titleFields: doc.titlePage?.fields ?? [], quirks: !!options.highlandQuirks });
 
   let header: PageTextDirective | null = null;
@@ -238,7 +244,7 @@ function pageText(slots: PageTextSlots, fill: (p: PageTextPart[] | null) => stri
 export function dress(runs: Run[], spec: TextSpec): Run[] {
   return runs.map((r) => ({
     text: r.text,
-    style: { ...r.style, font: spec.font, size: spec.size, ...(spec.bold ? { bold: true } : {}), ...(spec.italic ? { italic: true } : {}), ...(spec.color && !r.style.link ? { color: spec.color } : {}) },
+    style: { ...r.style, font: spec.font, size: spec.size, ...(spec.bold ? { bold: true } : {}), ...(spec.italic ? { italic: true } : {}), ...(spec.color && !r.style.link && !r.style.color ? { color: spec.color } : {}) },
   }));
 }
 
@@ -369,8 +375,19 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
   };
 
   let prev: Element | null = null;
+  /** Printed notes on lines of their own: they open the next paragraph (as in ManuscriptPrintProbe-notes). */
+  let notes: Run[] = [];
+  const flushNotes = () => {
+    if (!notes.length) return;
+    const indent = T.indent.rule === "all" || (T.indent.rule === "afterParagraph" && afterParagraph) ? T.indent.first : 0;
+    for (const line of paragraph(notes, B, T.left + indent, T.left, T.right)) push(line);
+    notes = [];
+    afterParagraph = true;
+  };
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i]!;
+    if (ctx.print) ctx.print.own = o.sourceOf(e) === e.span;
+    if (e.kind !== "paragraph") flushNotes();
     // The empty source lines between blocks print as empty lines, in templates that keep them;
     // added below once the element prints something (a link definition takes its blank line with
     // it: BulletinProbe).
@@ -378,7 +395,12 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
     const before = out.length;
     switch (e.kind) {
       case "paragraph": {
-        const runs = toRuns(e.inline, ctx);
+        if (ctx.print?.marks.notes && onlyNotes(e.inline)) {
+          notes.push(...toRuns(e.inline, ctx));
+          break;
+        }
+        const runs = [...notes, ...toRuns(e.inline, ctx)];
+        notes = [];
         const img = e.inline.length === 1 && e.inline[0]!.kind === "image" ? e.inline[0] : null;
         if (img && img.kind === "image") {
           const data = o.image?.(img.src) ?? null;
@@ -579,6 +601,15 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
         afterParagraph = true;
         break;
       }
+      case "synopsis": {
+        if (!ctx.print?.marks.synopses) break;
+        // Grey, half an inch in; the next paragraph is indented as if it were not there (as in the Manuscript).
+        const runs = toRuns(e.inline, ctx, { color: SYNOPSIS_COLOR });
+        if (!plain(runs).trim()) break;
+        for (const line of paragraph(runs, { ...B, color: SYNOPSIS_COLOR }, T.left + 36, T.left, T.right)) push(line);
+        printed = true;
+        break;
+      }
       default:
         break; // notes, synopses, link definitions: not printed
     }
@@ -589,6 +620,7 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
       prev = e;
     }
   }
+  flushNotes();
   return out;
 }
 
