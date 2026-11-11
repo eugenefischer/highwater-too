@@ -87,16 +87,45 @@ list.addEventListener("pointermove", (e) => {
     pressed.el.classList.add("dragging");
     document.body.classList.add("dragging");
   }
+  pointer = { x: e.clientX, y: e.clientY };
+  place();
+  // Near the top or bottom edge (or past it), keep scrolling while the pointer stays there.
+  if (edgeSpeed() !== 0 && !scrolling) scrolling = requestAnimationFrame(autoScroll);
+});
+
+let pointer = { x: 0, y: 0 };
+let scrolling = 0;
+const EDGE = 32; // pixels from the top or bottom where the list scrolls
+
+/** Pixels a frame to scroll: faster the nearer the edge, fastest past it; 0 away from the edges. */
+function edgeSpeed(): number {
+  if (!dragging) return 0;
   const box = list.getBoundingClientRect();
-  const inside = e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
-  if (!inside) {
-    hideDrop();
+  if (pointer.x < box.left || pointer.x > box.right) return 0;
+  const step = (depth: number) => Math.round(2 + 14 * Math.min(1, depth / EDGE));
+  if (pointer.y < box.top + EDGE) return -step(box.top + EDGE - pointer.y);
+  if (pointer.y > box.bottom - EDGE) return step(pointer.y - (box.bottom - EDGE));
+  return 0;
+}
+
+function autoScroll(): void {
+  const speed = edgeSpeed();
+  const before = list.scrollTop;
+  if (speed !== 0) list.scrollTop += speed;
+  if (speed === 0 || list.scrollTop === before) {
+    scrolling = 0; // at the edge of the list, or the pointer moved away
     return;
   }
-  // Near the top or bottom edge, scroll the list.
-  if (e.clientY < box.top + 24) list.scrollTop -= 12;
-  else if (e.clientY > box.bottom - 24) list.scrollTop += 12;
-  const y = e.clientY - box.top + list.scrollTop;
+  place();
+  scrolling = requestAnimationFrame(autoScroll);
+}
+
+/** The drop line at the nearest place to the pointer, or hidden outside the list. */
+function place(): void {
+  const box = list.getBoundingClientRect();
+  const inside = pointer.x >= box.left && pointer.x <= box.right && pointer.y >= box.top && pointer.y <= box.bottom;
+  if (!inside) return hideDrop();
+  const y = pointer.y - box.top + list.scrollTop;
   // The nearest place, including the ones that would leave the block where it is: hovering over
   // where it already was hides the line, and letting go there moves nothing.
   let best: (Gap & { moves: boolean }) | null = null;
@@ -106,7 +135,8 @@ list.addEventListener("pointermove", (e) => {
   dropLine.style.top = `${gap.y - 1 - list.scrollTop + list.offsetTop}px`;
   dropLine.style.left = `${12 + gap.depth * 12}px`;
   dropLine.hidden = false;
-});
+}
+
 
 list.addEventListener("pointerup", (e) => {
   if (!pressed || e.pointerId !== pressed.pointer) return;
@@ -124,6 +154,8 @@ window.addEventListener("keydown", (e) => {
 });
 
 function endDrag(): void {
+  cancelAnimationFrame(scrolling);
+  scrolling = 0;
   pressed?.el.classList.remove("dragging");
   document.body.classList.remove("dragging");
   pressed = null;

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.16 (m15-editor branch)
+
+- Navigator: holding a dragged scene near the list's top or bottom edge (or past it) keeps it scrolling, faster the nearer the edge, until you move away or reach the end. Before, it scrolled only while the mouse moved.
+
 ## 0.4.15 (m15-editor branch)
 
 - **Paragraph numbers,** as in Highland 2: **Show or Hide Paragraph Numbers** (in the Highland-Style Editor's title-bar ⋯ menu, or the Command Palette) numbers every line with text in the margin. A wrapped line counts once; a cue, a parenthetical and each line of dialogue count separately; the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers aren't numbered. The setting is `highwater.paragraphNumbers`.
