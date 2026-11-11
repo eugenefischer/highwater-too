@@ -32,8 +32,8 @@ export function registerWritingTools(context: vscode.ExtensionContext, cache: Pa
             item.insertText = s.insert;
             item.range = new vscode.Range(position.line, s.replaceFrom, position.line, position.character);
             item.sortText = String(i).padStart(4, "0");
-            // After a location, offer the times straight away.
-            if (s.kind === "location") item.command = { command: "editor.action.triggerSuggest", title: "" };
+            // After a heading's prefix, offer the script's locations; after a location, the times.
+            if (s.kind === "scene" || s.kind === "location") item.command = { command: "editor.action.triggerSuggest", title: "" };
             return item;
           });
         },

@@ -36,8 +36,8 @@ export function screenplayCompletion(current: () => Document | null) {
       boost: Math.max(-99, -i), // keep the order suggest() gives (characters by how often they speak)
       apply: (view: EditorView, _c: Completion, at: number, to: number) => {
         view.dispatch(insertCompletionText(view.state, s.insert, at, to));
-        // After a location, offer the times straight away.
-        if (s.kind === "location") startCompletion(view);
+        // After a heading's prefix, offer the script's locations; after a location, the times.
+        if (s.kind === "scene" || s.kind === "location") startCompletion(view);
       },
     }));
     return { from, options };

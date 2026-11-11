@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.12 (m15-editor branch)
+
+- Completion: choosing a scene-heading prefix (INT., EXT., INT./EXT. …) from the list now goes straight on to the script's locations, as typing the period does (both editors).
+
 ## 0.4.11 (m15-editor branch)
 
 - When a document is given its Highwater language just as it opens, VS Code replaces the document behind the editor; the Highland-Style Editor now follows the new one, so the panes can't lose track of its edits.
