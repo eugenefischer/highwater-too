@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.14 (m15-editor branch)
+
+- The Navigator's header no longer has a filter button: the eye beside the Filter field at its foot chooses which kinds are listed.
+
 ## 0.4.13 (m15-editor branch)
 
 - **Search results in `.highland` documents** go to the line you clicked: in the text editor if that's where you have the document open, otherwise in the Highland-Style Editor. Before, the click went to the `.highland` file's opener, which didn't know the line and opened a second tab at the start.
