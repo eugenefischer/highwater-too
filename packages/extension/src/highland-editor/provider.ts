@@ -277,7 +277,8 @@ body.previewing .tb-mid { display: flex; }
 .tb-icon:hover { color: var(--hl-fg); }
 .tb-icon .tb-hole { fill: var(--hl-bg); }
 body:not(.previewing) #tbtext, body.previewing #tbpages { color: var(--hl-accent); }
-body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content: ""; position: absolute; left: 50%; bottom: -3px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--hl-accent); }
+/* The dot: halfway between the icon (bottom at 29px in the 34px button) and the bar's foot (4px below the button). */
+body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content: ""; position: absolute; left: 50%; top: 31px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--hl-accent); }
 #topbar select { font: inherit; color: var(--hl-muted); background: transparent; border: 0; padding: 2px 4px; cursor: pointer; }
 #topbar select:hover { color: var(--hl-fg); }
 #topbar select option { color: var(--hl-panel-fg); background: var(--hl-panel-bg); }

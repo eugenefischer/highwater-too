@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.5
+
+- Top bar: the dot under Text or Pages sits halfway between the icon and the bar's foot (it nearly touched the foot).
+- Live Margins (⌘L, the text editor) no longer indents manuscript paragraphs, as Highland's editor doesn't (it indents them only on the page). Quotes sit three characters in, as in the Highland-Style Editor.
+
 ## 0.5.4
 
 - **Exact page counts:** the counts at the foot of the Highland-Style Editor and the status bar now show the real number of pages: the document is laid out with its print template and options (as for the PDF, but without drawing it) a second after you stop typing. Every page counts, the title page too, as in Highland (Astounding: 57). Until the first layout is done, no page count shows. Screen time follows the exact count.

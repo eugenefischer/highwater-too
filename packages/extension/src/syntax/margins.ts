@@ -1,8 +1,9 @@
-import type { Document, Element } from "@highwater/parser";
+import type { Document } from "@highwater/parser";
 
 /**
  * Live Margins: Highland shows a screenplay shaped like the page (cues, dialogue and
- * parentheticals indented, transitions right-aligned) and a manuscript with indented paragraphs.
+ * parentheticals indented, transitions right-aligned). In a manuscript it indents quotes and
+ * centres scene breaks, but not paragraphs: Highland indents those only on the page (EJ, 2026-11-11).
  * Each entry indents one source line, starting at offset `at`, by `indent` characters.
  */
 export interface MarginIndent {
@@ -16,13 +17,12 @@ export interface MarginIndent {
  * at 63; Highland's indents are not whole characters, so dialogue and parentheticals round down.
  * Lyrics sit at the dialogue indent.
  */
-export const MARGINS = { cue: 21, parenthetical: 15, dialogue: 11, width: 63, paragraph: 5, manuscriptWidth: 65 } as const;
+export const MARGINS = { cue: 21, parenthetical: 15, dialogue: 11, width: 63, quote: 3, manuscriptWidth: 65 } as const;
 
 export function liveMargins(doc: Document): MarginIndent[] {
   const out: MarginIndent[] = [];
   const src = doc.source;
   const lineText = (start: number, end: number) => src.slice(start, end).replace(/\r$/, "");
-  let afterParagraph = false;
   for (const e of doc.elements) {
     switch (e.kind) {
       case "dialogue": {
@@ -44,11 +44,8 @@ export function liveMargins(doc: Document): MarginIndent[] {
           out.push({ at: l.span.start, indent: e.kind === "centered" ? Math.floor(room / 2) : room });
         }
         break;
-      case "paragraph":
-        if (afterParagraph) out.push({ at: e.span.start, indent: MARGINS.paragraph });
-        break;
       case "blockQuote":
-        for (const l of e.lines) out.push({ at: l.span.start, indent: MARGINS.paragraph });
+        for (const l of e.lines) out.push({ at: l.span.start, indent: MARGINS.quote });
         break;
       case "sceneBreak": {
         const l = e.lines[0];
@@ -58,14 +55,6 @@ export function liveMargins(doc: Document): MarginIndent[] {
       default:
         break;
     }
-    afterParagraph = continuesParagraphs(e, afterParagraph);
   }
   return out;
-}
-
-/** As in the printed manuscript: a paragraph after a paragraph is indented; notes and directives don't interrupt. */
-function continuesParagraphs(e: Element, before: boolean): boolean {
-  if (e.kind === "paragraph") return true;
-  if (e.kind === "directiveLine" || e.kind === "linkDefinition" || e.kind === "synopsis") return before;
-  return false;
 }

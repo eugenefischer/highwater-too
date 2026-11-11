@@ -15,11 +15,11 @@ describe("live margins", () => {
     expect(at("INT.")).toBeUndefined();
   });
 
-  it("indents manuscript paragraphs after the first and centres scene breaks", () => {
-    const src = "One.\n\nTwo.\n\n* * *\n\nThree.";
+  it("leaves manuscript paragraphs alone (as Highland's editor), indents quotes and centres scene breaks", () => {
+    const src = "One.\n\nTwo.\n\n> A quote.\n\n* * *\n\nThree.";
     const m = liveMargins(parse(src, { mode: "markdown" }));
     expect(m).toEqual([
-      { at: src.indexOf("Two."), indent: 5 },
+      { at: src.indexOf("> A quote"), indent: 3 },
       { at: src.indexOf("* * *"), indent: 30 },
     ]);
   });
