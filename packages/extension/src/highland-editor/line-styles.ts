@@ -1,5 +1,5 @@
 import type { Document } from "@highwater/parser";
-import { liveMargins, MARGINS } from "../syntax/margins.ts";
+import { MARGINS } from "../syntax/margins.ts";
 
 /**
  * How the Highland-style editor (M15) shows each source line: a kind, for its look, and an indent
@@ -37,8 +37,6 @@ export interface LineStyle {
   level?: number;
   /** Right-aligned (transitions) or centred. */
   align?: "right" | "center";
-  /** The indent is the first line's only (manuscript paragraphs); otherwise every wrapped line has it. */
-  firstLine?: boolean;
 }
 
 /** Dialogue wraps after 35 characters and parentheticals after 28, as Highland's editor shows them. */
@@ -119,7 +117,7 @@ export function lineStyles(doc: Document): Map<number, LineStyle> {
         each("heading", { level: e.level, align: "center" });
         break;
       case "blockQuote":
-        each("quote", { indent: MARGINS.paragraph });
+        each("quote", { indent: 3 }); // Highland's editor (EJ's screenshot): "> " three characters in
         break;
       case "list":
         each("list", { indent: 4 });
@@ -134,11 +132,7 @@ export function lineStyles(doc: Document): Map<number, LineStyle> {
         break;
     }
   }
-  // Manuscript paragraphs after a paragraph are indented, as Live Margins shows them: the first line only.
-  if (doc.mode === "markdown") for (const m of liveMargins(doc)) {
-    const s = out.get(m.at);
-    if (s && s.kind === "paragraph") out.set(m.at, { ...s, indent: m.indent, firstLine: true });
-  }
+  // Manuscript paragraphs are not indented here: Highland indents them only on the page.
   return out;
 }
 

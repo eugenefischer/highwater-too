@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.3
+
+- **Highland's top bar** in the Highland-Style Editor:
+  - At the left, **Text** and **Pages** switch between the text and the printed pages (as ⌘E), with a dot under the one showing. They replace the Preview button in VS Code's title bar for this editor.
+  - At the right, the **template** menu (now with the text as well as the pages) and **Choose Theme** (Highland's dashed circle). Revision Mode and the Sprint timer will join them when they're built.
+  - With the pages showing, the page size and "Page x of y" sit in the middle of the same bar.
+- **Highland's counts** at the foot of the text: characters, words and pages (the page count is an estimate; the pages have the exact one).
+- Manuscripts in the Highland-Style Editor: paragraphs are no longer indented at all, as in Highland's editor (it indents them only on the page). Quotes sit three characters in, not italic, as Highland shows them.
+
 ## 0.5.2
 
 - Manuscripts in the Highland-Style Editor: an indented paragraph indents only its first line again; its wrapped lines go back to the left margin, as on the page. (Every line had been indented, so ordinary paragraphs looked like block quotes.)

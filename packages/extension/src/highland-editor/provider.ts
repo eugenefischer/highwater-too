@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
-import { onDidChangeTemplate, PRINT_OPTIONS, printOptionsOf, renderDocument, setPrintOption, setTemplate, TEMPLATES, type PrintOption, type Template } from "../render-document.ts";
+import { onDidChangeTemplate, PRINT_OPTIONS, printOptionsOf, renderDocument, setPrintOption, setTemplate, templateOf, TEMPLATES, type PrintOption, type Template } from "../render-document.ts";
+import { documentStats } from "../syntax/stats.ts";
 import type { BundleStore } from "../store.ts";
 import { parse } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
@@ -105,6 +106,20 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
     const sendNumbers = () => void panel.webview.postMessage({ type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
+    // The top bar's template menu, shown with the text too.
+    const sendTemplate = async () => {
+      const template = await templateOf(this.context, this.store(), document);
+      void panel.webview.postMessage({ type: "template", template: template ?? "", templates: template ? TEMPLATES : [] });
+    };
+    // Highland's counts at the foot of the text: characters, words and (estimated) pages.
+    let countsTimer: ReturnType<typeof setTimeout> | undefined;
+    const sendCounts = () => {
+      clearTimeout(countsTimer);
+      countsTimer = setTimeout(() => {
+        const stats = documentStats(parse(document.getText(), { mode: MODES.get(document.languageId) ?? "fountain" }));
+        void panel.webview.postMessage({ type: "counts", characters: stats.characters, words: stats.words, pages: stats.pages });
+      }, 300);
+    };
     // Check Spelling While Typing (highwater.spellCheck) and the learned words.
     const sendSpelling = () => {
       const config = vscode.workspace.getConfiguration("highwater");
@@ -137,6 +152,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendFontSize();
           sendNumbers();
           sendSpelling();
+          void sendTemplate();
+          sendCounts();
           if (pendingReveal) void panel.webview.postMessage(pendingReveal);
           pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
@@ -152,12 +169,14 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           void setPrintOption(this.context, this.store(), document, msg.key as PrintOption, !!msg.value).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the print option: ${(e as Error).message}`));
         } else if (msg.type === "previewSave") {
           void vscode.commands.executeCommand(msg.kind === "docx" ? "highwater.exportDocx" : "highwater.exportPdf", document.uri);
-      } else if (msg.type === "learnWord" && typeof msg.word === "string" && msg.word.trim()) {
+        } else if (msg.type === "chooseTheme") {
+          void vscode.commands.executeCommand("highwater.chooseTheme");
+        } else if (msg.type === "learnWord" && typeof msg.word === "string" && msg.word.trim()) {
           // Learn Spelling: kept in the writer's settings (all documents; Settings Sync carries it).
           const config = vscode.workspace.getConfiguration("highwater");
           const words = config.get<string[]>("spellingWords", []);
           if (!words.includes(msg.word)) void config.update("spellingWords", [...words, msg.word].sort((x, y) => x.localeCompare(y)), vscode.ConfigurationTarget.Global);
-      } else if (msg.type === "scroll" && typeof msg.top === "number") {
+        } else if (msg.type === "scroll" && typeof msg.top === "number") {
           view.top = toDocument(msg.top);
           highlandViews.scrolled(view);
         } else if (msg.type === "edit" && msg.changes) {
@@ -185,7 +204,9 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       }),
       // A template or print option changed (here, or in the status bar): lay the pages out again.
       onDidChangeTemplate((d) => {
-        if (previewing && d.uri.toString() === document.uri.toString()) void sendPages(null);
+        if (d.uri.toString() !== document.uri.toString()) return;
+        if (view.ready) void sendTemplate();
+        if (previewing) void sendPages(null);
       }),
       vscode.workspace.onDidOpenTextDocument((d) => {
         if (d.uri.toString() !== document.uri.toString() || d === document) return;
@@ -202,9 +223,13 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (e.document.uri.toString() !== document.uri.toString() || e.contentChanges.length === 0) return;
         if (e.document !== document) document = e.document;
         if (changedElsewhere()) send();
+        if (view.ready) sendCounts();
       }),
     ];
-    panel.onDidDispose(() => subscriptions.forEach((s) => s.dispose()));
+    panel.onDidDispose(() => {
+      clearTimeout(countsTimer);
+      subscriptions.forEach((s) => s.dispose());
+    });
   }
 
   private html(webview: vscode.Webview, dist: vscode.Uri): string {
@@ -234,7 +259,28 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
   --hl-whitespace: var(--vscode-editorWhitespace-foreground);
 }
 html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); color: var(--hl-fg); }
+body { display: flex; flex-direction: column; }
+#main { flex: 1; min-height: 0; }
 #editor, .cm-editor { height: 100%; }
+/* Highland's top bar: Text and Pages at the left; the template and the theme at the right. */
+#topbar { display: flex; align-items: center; gap: 12px; padding: 6px 14px 4px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
+.tb-side { display: flex; align-items: center; gap: 10px; flex: 1; }
+.tb-right { justify-content: flex-end; }
+.tb-mid { display: none; align-items: center; gap: 14px; }
+body.previewing .tb-mid { display: flex; }
+.tb-icon { position: relative; width: 34px; height: 34px; padding: 5px; border: 0; border-radius: 5px; background: none; color: var(--hl-muted); cursor: pointer; }
+.tb-icon svg { width: 24px; height: 24px; display: block; }
+.tb-icon:hover { color: var(--hl-fg); }
+.tb-icon .tb-hole { fill: var(--hl-bg); }
+body:not(.previewing) #tbtext, body.previewing #tbpages { color: var(--hl-accent); }
+body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content: ""; position: absolute; left: 50%; bottom: -3px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--hl-accent); }
+#topbar select { font: inherit; color: var(--hl-muted); background: transparent; border: 0; padding: 2px 4px; cursor: pointer; }
+#topbar select:hover { color: var(--hl-fg); }
+#topbar select option { color: var(--hl-panel-fg); background: var(--hl-panel-bg); }
+#ptemplate:empty { display: none; }
+/* Highland's counts at the foot of the text. */
+#counts { display: flex; justify-content: center; gap: 2em; padding: 6px 0 8px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
+#counts:empty, body.previewing #counts { display: none; }
 /* The text size: highwater.fontSize, or by default VS Code's editor size scaled to Highland 2's (about 1.4 times). */
 .cm-editor { font-size: var(--hl-font-size, calc(var(--vscode-editor-font-size, 14px) * 1.4)); }
 .cm-editor.cm-focused { outline: none; }
@@ -255,7 +301,6 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); colo
 .hl-lyric { font-style: italic; }
 .hl-section, .hl-synopsis, .hl-directive, .hl-pageBreak, .hl-boneyard, .hl-title { color: var(--hl-muted); }
 .hl-heading { font-weight: bold; }
-.hl-quote { font-style: italic; }
 /* Highland's paragraph numbers, in the margin left of the text (highwater.paragraphNumbers). */
 .cm-editor .cm-content .cm-line { position: relative; }
 .hl-numbers .cm-line[data-n]::before { content: attr(data-n); position: absolute; left: -6.5em; width: 4.5em; text-align: right; font-size: 0.65em; line-height: calc(1.3em / 0.65); color: var(--hl-muted); font-family: var(--vscode-font-family); pointer-events: none; user-select: none; }
@@ -277,11 +322,9 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); colo
 #preview { display: none; height: 100%; flex-direction: column; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-panel-fg); }
 body.previewing #editor { display: none; }
 body.previewing #preview { display: flex; }
-#ptop, #pbottom { display: flex; align-items: center; gap: 14px; padding: 6px 12px; background: var(--hl-panel-bg); }
-#ptop { border-bottom: 1px solid var(--hl-border); }
+#pbottom { display: flex; align-items: center; gap: 14px; padding: 6px 12px; background: var(--hl-panel-bg); }
 #pbottom { border-top: 1px solid var(--hl-border); justify-content: flex-end; flex-wrap: wrap; }
-#pstatus { flex: 1; text-align: center; color: var(--hl-muted); }
-#ptop select { font: inherit; color: var(--hl-panel-fg); background: var(--hl-input-bg); border: 1px solid var(--hl-border); border-radius: 3px; padding: 2px 6px; }
+#pstatus { text-align: center; color: var(--hl-muted); }
 #pboxes { display: flex; gap: 16px; flex-wrap: wrap; margin-right: auto; }
 #pboxes label { display: inline-flex; align-items: center; gap: 5px; }
 #pboxes label:has(input:disabled) { color: var(--hl-muted); }
@@ -322,16 +365,28 @@ body.previewing #preview { display: flex; }
 .hl-spellmenu hr { border: 0; border-top: 1px solid var(--vscode-menu-separatorBackground, var(--hl-muted)); margin: 4px 0; }
 </style></head>
 <body data-pdfjs="${pdfjs("pdf.min.mjs")}" data-worker="${pdfjs("pdf.worker.min.mjs")}" data-spell-worker="${webview.asWebviewUri(vscode.Uri.joinPath(dist, "spell-worker.js"))}" data-dict-aff="${dict("index.aff")}" data-dict-dic="${dict("index.dic")}">
-<div id="editor"></div>
-<div id="preview">
-  <div id="ptop">
+<div id="topbar">
+  <div class="tb-side">
+    <button id="tbtext" class="tb-icon" title="Text (⌘E)" aria-label="Text"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 9.5h12M4 14h16M4 18.5h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button id="tbpages" class="tb-icon" title="Pages (⌘E)" aria-label="Pages"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1.1" class="tb-hole"/><circle cx="8.5" cy="12" r="1.1" class="tb-hole"/><circle cx="8.5" cy="16.5" r="1.1" class="tb-hole"/></svg></button>
+  </div>
+  <div class="tb-mid">
     <select id="pzoom" aria-label="Page size"><option value="fit">Fit width</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select>
     <span id="pstatus"></span>
-    <select id="ptemplate" aria-label="Print template"></select>
   </div>
+  <div class="tb-side tb-right">
+    <select id="ptemplate" aria-label="Print template"></select>
+    <button id="tbtheme" class="tb-icon" title="Choose Theme…" aria-label="Choose Theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.3 2.6"/></svg></button>
+  </div>
+</div>
+<div id="main">
+<div id="editor"></div>
+<div id="preview">
   <div id="pages" tabindex="-1"></div>
   <div id="pbottom"><div id="pboxes"></div><button id="psaveword" hidden>Save As Word</button><button id="psave">Save As PDF</button></div>
 </div>
+</div>
+<div id="counts"></div>
 <script nonce="${nonce}" src="${script}"></script></body></html>`;
   }
 }

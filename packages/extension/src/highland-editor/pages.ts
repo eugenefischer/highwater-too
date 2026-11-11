@@ -64,7 +64,7 @@ export class Pages {
     this.#observer = new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && void this.#draw(Number((e.target as HTMLElement).dataset.index))), { root: this.#pages, rootMargin: "800px 0px" });
     this.#zoom.onchange = () => this.#layout(this.#offsetAtTop());
     this.#template.onchange = () => {
-      this.#busy();
+      if (this.shown) this.#busy();
       post({ type: "previewTemplate", template: this.#template.value });
     };
     $("psave").onclick = () => post({ type: "previewSave", kind: "pdf" });
@@ -84,6 +84,12 @@ export class Pages {
     }
     this.#pages.addEventListener("scroll", () => this.#showPage());
     window.addEventListener("resize", () => this.shown && this.#zoom.value === "fit" && this.#layout(this.#offsetAtTop()));
+  }
+
+  /** The template menu in the top bar (shown with the text as well as the pages). */
+  templates(list: string[], current: string): void {
+    this.#template.replaceChildren(...list.map((t) => new Option(t, t, false, t === current)));
+    this.#word.hidden = current !== "Manuscript";
   }
 
   /** Shows the pages, opening at `at` (the text's top line) once they arrive. */
@@ -119,8 +125,7 @@ export class Pages {
 
   async receive(msg: PdfMessage): Promise<void> {
     if (!this.shown) return;
-    this.#template.replaceChildren(...msg.templates.map((t) => new Option(t, t, false, t === msg.template)));
-    this.#word.hidden = msg.template !== "Manuscript";
+    this.templates(msg.templates, msg.template);
     for (const box of $("pboxes").querySelectorAll<HTMLInputElement>("input")) box.checked = !!msg.print[box.dataset.key!];
     try {
       this.#pdfjs ??= await this.#load();

@@ -42,7 +42,7 @@ function decorate(doc: Text): DecorationSet {
     const number = numbers.get(line.from);
     if (!s && number === undefined) continue;
     const cls = s ? [`hl-${s.kind}`, s.level ? `hl-level-${s.level}` : "", s.align ? `hl-${s.align}` : ""].filter(Boolean).join(" ") : "";
-    const attributes: Record<string, string> = { ...(cls ? { class: cls } : {}), ...(s ? lineCss(s.indent, s.width, s.firstLine) : {}), ...(number !== undefined ? { "data-n": String(number) } : {}) };
+    const attributes: Record<string, string> = { ...(cls ? { class: cls } : {}), ...(s ? lineCss(s.indent, s.width) : {}), ...(number !== undefined ? { "data-n": String(number) } : {}) };
     ranges.push(Decoration.line({ attributes }).range(line.from));
   }
   // Emphasis, notes and omitted text styled where they stand.
@@ -50,9 +50,9 @@ function decorate(doc: Text): DecorationSet {
   return Decoration.set(ranges, true);
 }
 
-/** A line's indent (every wrapped line's, or the first line's only), and the width it wraps at; in a column narrower than that, it wraps at the column's edge. */
-function lineCss(left: number, width?: number, firstLine = false): { style?: string } {
-  const parts = [left ? (firstLine ? `text-indent: ${left}ch` : `padding-left: ${left}ch`) : "", width ? `max-width: ${width}ch` : ""].filter(Boolean);
+/** A line's indent (wrapped lines too), and the width it wraps at; in a column narrower than that, it wraps at the column's edge. */
+function lineCss(left: number, width?: number): { style?: string } {
+  const parts = [left ? `padding-left: ${left}ch` : "", width ? `max-width: ${width}ch` : ""].filter(Boolean);
   return parts.length ? { style: parts.join("; ") } : {};
 }
 
@@ -201,6 +201,19 @@ const pages = new Pages(
   },
 );
 
+// The top bar: Text and Pages (as ⌘E), and Choose Theme.
+document.getElementById("tbtext")!.onclick = () => pages.shown && togglePreview();
+document.getElementById("tbpages")!.onclick = () => !pages.shown && togglePreview();
+document.getElementById("tbtheme")!.onclick = () => vscode.postMessage({ type: "chooseTheme" });
+
+/** Highland's counts at the foot of the text. */
+function showCounts(c: { characters: number; words: number; pages: number }): void {
+  const n = (x: number) => x.toLocaleString("en-US");
+  const el = document.getElementById("counts")!;
+  el.replaceChildren(...[`${n(c.characters)} characters`, `${n(c.words)} words`, `${n(c.pages)} ${c.pages === 1 ? "page" : "pages"}`].map((t) => Object.assign(document.createElement("span"), { textContent: t })));
+  el.title = "The page count is an estimate; the pages (⌘E) have the exact count.";
+}
+
 function togglePreview(): void {
   if (pages.shown) return pages.hide();
   if (!view) return;
@@ -276,6 +289,10 @@ window.addEventListener("message", (event: MessageEvent) => {
     else document.documentElement.style.removeProperty("--hl-font-size");
     view?.requestMeasure();
   }
+  else if (msg.type === "template") {
+    const t = event.data as { template: string; templates: string[] };
+    pages.templates(t.templates, t.template);
+  } else if (msg.type === "counts") showCounts(event.data as { characters: number; words: number; pages: number });
   else if (msg.type === "spelling") spelling.configure(!!msg.on, (event.data as { words?: string[] }).words ?? []);
   else if (msg.type === "nextMisspelling") {
     if (view) void nextMisspelling(view, spelling);

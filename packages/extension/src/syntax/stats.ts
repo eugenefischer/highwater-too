@@ -5,6 +5,8 @@ export const READING_WPM = 250;
 
 export interface DocumentStats {
   words: number;
+  /** Characters of printed text, spaces included (Highland's count at the foot of its editor). */
+  characters: number;
   /** Estimated printed pages (the PDF engine gives the exact count later). */
   pages: number;
   /** Screenplays: about a minute a page. Prose: reading time at 250 words a minute, as Highland counts it. */
@@ -77,7 +79,12 @@ function wrapped(text: string, width: number): number {
 
 export function documentStats(doc: Document): DocumentStats {
   let words = 0;
-  for (const e of doc.elements) for (const s of printedText(e)) words += countWords(s);
+  let characters = 0;
+  for (const e of doc.elements)
+    for (const s of printedText(e)) {
+      words += countWords(s);
+      characters += s.length;
+    }
   if (doc.mode === "fountain") {
     // Screenplay layout (measured from Highland): 54 lines a page, action 61 characters wide,
     // dialogue 35, parentheticals 28; one blank line between elements, two before scene headings.
@@ -106,7 +113,7 @@ export function documentStats(doc: Document): DocumentStats {
       }
     }
     const pages = Math.max(lines > 0 ? 1 : 0, Math.ceil(lines / 54));
-    return { words, pages, minutes: pages };
+    return { words, characters, pages, minutes: pages };
   }
   // Manuscript layout (measured): 65 characters a line, double-spaced at 28.32 pt, so 22 whole lines a page.
   let lines = 0;
@@ -120,5 +127,5 @@ export function documentStats(doc: Document): DocumentStats {
     if (e.kind === "sceneBreak") lines += 1;
   }
   const pages = Math.max(lines > 0 ? 1 : 0, Math.ceil(lines / 22));
-  return { words, pages, minutes: Math.max(words > 0 ? 1 : 0, Math.round(words / READING_WPM)) };
+  return { words, characters, pages, minutes: Math.max(words > 0 ? 1 : 0, Math.round(words / READING_WPM)) };
 }

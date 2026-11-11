@@ -31,14 +31,14 @@ describe("Highland-style editor line styles", () => {
     expect(columnWidth(doc)).toBe(65);
     expect(columnMinimum(doc)).toBe(0);
     expect(m.get(0)).toMatchObject({ kind: "heading", level: 1, align: "center" });
-    expect(m.get(at(md, "> A quote"))).toMatchObject({ kind: "quote", indent: 5 });
+    expect(m.get(at(md, "> A quote"))).toMatchObject({ kind: "quote", indent: 3 });
   });
 
-  it("indents only a manuscript paragraph's first line (wrapped lines go back to the margin)", () => {
+  it("doesn't indent manuscript paragraphs (Highland indents them only on the page)", () => {
     const md = "# Chapter\n\nFirst paragraph.\n\nSecond paragraph.\n";
     const m = lineStyles(parse(md, { mode: "markdown" }));
     expect(m.get(at(md, "First"))).toMatchObject({ kind: "paragraph", indent: 0 });
-    expect(m.get(at(md, "Second"))).toMatchObject({ kind: "paragraph", indent: 5, firstLine: true });
+    expect(m.get(at(md, "Second"))).toMatchObject({ kind: "paragraph", indent: 0 });
   });
 
   it("finds emphasis, notes and omitted text by source offsets", () => {
