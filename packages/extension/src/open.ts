@@ -5,8 +5,10 @@ import { showDocument } from "./surface.ts";
 export const OPEN_VIEW_TYPE = "highwater.open";
 
 /**
- * Opening a .highland file from the Explorer lands here (it is the default editor for *.highland).
- * It opens the script as text through the highland: file system and closes itself.
+ * Opening a .highland file from the Explorer lands here (it is the default editor for *.highland
+ * files on disk). It opens the script through the highland: file system and closes itself. Only
+ * file: URIs (package.json's pattern names the scheme): a script's own highland: URI, as a Search
+ * result gives, must reach its editor with the line clicked.
  */
 export class OpenRedirect implements vscode.CustomReadonlyEditorProvider {
   openCustomDocument(uri: vscode.Uri): vscode.CustomDocument {

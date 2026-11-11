@@ -5,7 +5,7 @@ import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { colorThemeLabel, HIGHLAND_THEMES, pageColors, themeFor } from "./themes.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
-import { activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
+import { activeOffsets, activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
 
 export { HIGHLAND_EDITOR };
 
@@ -255,15 +255,30 @@ async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> 
   const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
   const input = tab?.input;
   const active = input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom ? input.uri.toString() : undefined;
+  // Where the cursor is, to put it back in the other editor (a Search result's line, say).
+  const here = activeOffsets();
+  const at = here && here.document.uri.toString() === target.toString() ? here.selections[0]?.head : undefined;
+  let swapped = false;
   if (active === target.toString()) {
     try {
       await vscode.commands.executeCommand("reopenActiveEditorWith", viewType);
-      return;
+      swapped = true;
     } catch {
       // An older VS Code without the command: open beside instead.
     }
   }
-  await vscode.commands.executeCommand("vscode.openWith", target, viewType);
+  if (!swapped) await vscode.commands.executeCommand("vscode.openWith", target, viewType);
+  if (at === undefined || at === 0) return;
+  const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === target.toString());
+  if (!doc) return;
+  if (viewType === HIGHLAND_EDITOR) viewOf(doc, true)?.reveal(at, "center", true); // held until the page has started
+  else {
+    const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
+    if (!editor) return;
+    const pos = doc.positionAt(at);
+    editor.selection = new vscode.Selection(pos, pos);
+    editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  }
 }
 
 /** VS Code's colour theme now. */

@@ -542,6 +542,32 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "a .highland script's own URI with a line (as a Search result opens it) lands on that line, and keeps it when switched to the Highland-Style Editor",
+    async () => {
+      const path = await copyOf("SearchResult");
+      const doc = await vscode.workspace.openTextDocument(highland(path));
+      await waitFor("Fountain language", () => vscode.workspace.textDocuments.some((d) => d.uri.toString() === highland(path).toString() && d.languageId === "highland-fountain"));
+      const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === highland(path).toString())!;
+      const line = Math.min(10, live.lineCount - 1);
+      await vscode.commands.executeCommand("vscode.open", highland(path), { selection: new vscode.Range(line, 0, line, 0) });
+      await waitFor("a text editor on the result's line", () => {
+        const e = vscode.window.activeTextEditor;
+        return e?.document.uri.toString() === highland(path).toString() && e.selection.active.line === line;
+      });
+      await vscode.commands.executeCommand("highwater.openHighlandEditor");
+      type Surface = { view: boolean; selection?: { anchor: number; head: number } };
+      const want = live.offsetAt(new vscode.Position(line, 0));
+      const end = Date.now() + 10_000;
+      let now: Surface = { view: false };
+      while (!((now = await vscode.commands.executeCommand<Surface>("highwater.test.surface")).view && now.selection?.head === want)) {
+        if (Date.now() > end) throw new Error(`The Highland-Style Editor did not keep the line: ${JSON.stringify(now)} (wanted ${want})`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      void doc;
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    },
+  ],
+  [
     "exports a manuscript as a Word document",
     async () => {
       const path = join(dir, "DocxExport.highland");

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.13 (m15-editor branch)
+
+- **Search results in `.highland` documents** go to the line you clicked: in the text editor if that's where you have the document open, otherwise in the Highland-Style Editor. Before, the click went to the `.highland` file's opener, which didn't know the line and opened a second tab at the start.
+- Switching between the text editor and the Highland-Style Editor (the code and book buttons) keeps the cursor where it was.
+- Opening a document that's already open as text (from the Explorer or the Works panel) goes to that tab instead of opening another.
+
 ## 0.4.12 (m15-editor branch)
 
 - Completion: choosing a scene-heading prefix (INT., EXT., INT./EXT. …) from the list now goes straight on to the script's locations, as typing the period does (both editors).

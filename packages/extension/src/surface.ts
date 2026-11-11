@@ -103,13 +103,20 @@ export function viewOf(doc: vscode.TextDocument, any = false): HighlandView | un
 }
 
 /**
- * Shows a document: in its Highland-Style Editor if it has one (one tab per document), else in a
- * new one if that is the default, else in a text editor.
+ * Shows a document in the tab it's already open in (Highland-Style or text; one tab per document),
+ * else in a new Highland-Style Editor if that is the default, else in a text editor.
  */
 export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode.ViewColumn): Promise<void> {
   const view = viewOf(doc, true);
   if (view) {
     view.panel.reveal(view.panel.viewColumn, false);
+    return;
+  }
+  // Already open as text (the writer chose the text editor): go to that tab rather than open another.
+  const uri = doc.uri.toString();
+  const textTab = vscode.window.tabGroups.all.flatMap((g) => g.tabs).find((t) => t.input instanceof vscode.TabInputText && t.input.uri.toString() === uri);
+  if (textTab) {
+    await vscode.window.showTextDocument(doc, { viewColumn: textTab.group.viewColumn, preview: false });
     return;
   }
   // A script opens in the Highland-Style Editor when that is the default (highwater.highlandEditor).
