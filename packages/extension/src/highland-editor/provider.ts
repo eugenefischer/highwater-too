@@ -488,15 +488,33 @@ const MAX_FONT = 48;
  * Turns a script's text tab into the Highland-Style Editor (the default) once things settle, if it
  * is still the active tab: a .md file is given its Highwater language just after it opens.
  */
+const swapsPending = new Set<string>();
 function swapSoon(uri: vscode.Uri): void {
-  setTimeout(() => {
-    if (swapping || wantsText.has(uri.toString())) return;
+  const key = uri.toString();
+  if (swapsPending.has(key)) return;
+  swapsPending.add(key);
+  // VS Code reports a new tab, its activation and the document's language in separate steps, and
+  // on a slow machine (CI's macOS) not within 300 ms: keep looking for up to 3 s while the tab is open.
+  const end = Date.now() + 3000;
+  const attempt = (): void => {
+    const again = (): void => {
+      if (Date.now() < end) setTimeout(attempt, 150);
+      else swapsPending.delete(key);
+    };
+    if (wantsText.has(key)) {
+      swapsPending.delete(key);
+      return;
+    }
+    const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs);
+    if (!tabs.some((t) => t.input instanceof vscode.TabInputText && t.input.uri.toString() === key)) return again();
     const active = vscode.window.tabGroups.activeTabGroup.activeTab;
-    if (!(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== uri.toString()) return;
-    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
-    if (!doc || !doc.languageId.startsWith("highland-") || roleOf(doc).kind !== "script" || viewOf(doc, true)) return;
+    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === key);
+    if (swapping || !(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== key || !doc || !doc.languageId.startsWith("highland-")) return again();
+    swapsPending.delete(key);
+    if (roleOf(doc).kind !== "script" || viewOf(doc, true)) return;
     void swapActive(uri, HIGHLAND_EDITOR);
-  }, 300);
+  };
+  setTimeout(attempt, 300);
 }
 
 /** Opens the active document in the Highland-style editor, or back in the text editor. */
