@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
-import { HIGHLAND_THEMES, pageColors, themeFor } from "./themes.ts";
+import { colorThemeLabel, HIGHLAND_THEMES, pageColors, themeFor } from "./themes.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
 import { activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
@@ -248,6 +248,32 @@ async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> 
   await vscode.commands.executeCommand("vscode.openWith", target, viewType);
 }
 
+/** VS Code's colour theme now. */
+function windowTheme(): string | undefined {
+  return vscode.workspace.getConfiguration("workbench").get<string>("colorTheme");
+}
+
+async function setWindowTheme(label: string | undefined): Promise<void> {
+  if (label && label !== windowTheme()) await vscode.workspace.getConfiguration("workbench").update("colorTheme", label, vscode.ConfigurationTarget.Global);
+}
+
+/**
+ * Uses a theme for the page and the Navigator and, with highwater.themeWindow on, for the whole
+ * window (its "Highwater …" colour theme). The writer's own colour theme is remembered the first
+ * time it is replaced, and put back for "Match VS Code".
+ */
+async function useTheme(context: vscode.ExtensionContext, id: string): Promise<void> {
+  await vscode.workspace.getConfiguration("highwater").update("theme", id, vscode.ConfigurationTarget.Global);
+  if (!vscode.workspace.getConfiguration("highwater").get<boolean>("themeWindow", true)) return;
+  const ours = new Set(Object.values(HIGHLAND_THEMES).map(colorThemeLabel));
+  const current = windowTheme();
+  if (current && !ours.has(current)) await context.globalState.update(OWN_THEME, current);
+  const theme = HIGHLAND_THEMES[id];
+  if (theme) await setWindowTheme(colorThemeLabel(theme));
+  else if (current && ours.has(current)) await setWindowTheme(context.globalState.get<string>(OWN_THEME) ?? (vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light ? "Default Light Modern" : "Default Dark Modern"));
+}
+const OWN_THEME = "highwater.ownColorTheme";
+
 /** One step of text size, from the size shown now (VS Code's editor size × 1.4 when not set). */
 async function zoom(step: number): Promise<void> {
   const config = vscode.workspace.getConfiguration("highwater");
@@ -285,8 +311,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext): void {
     }),
     // Highland's themes, tried out as you move through the list (Escape puts the old one back).
     vscode.commands.registerCommand("highwater.chooseTheme", async () => {
-      const config = vscode.workspace.getConfiguration("highwater");
-      const before = config.get<string>("theme", "vscode");
+      const before = { theme: vscode.workspace.getConfiguration("highwater").get<string>("theme", "vscode"), window: windowTheme() };
       const items = [
         { label: "Match VS Code", description: "your VS Code colour theme", id: "vscode" },
         ...Object.entries(HIGHLAND_THEMES).map(([id, t]) => ({ label: t.name, description: t.mode, id })),
@@ -294,18 +319,24 @@ export function registerHighlandEditor(context: vscode.ExtensionContext): void {
       const quick = vscode.window.createQuickPick<(typeof items)[number]>();
       quick.title = "Theme for the Highland-Style Editor and the Navigator";
       quick.items = items;
-      quick.activeItems = items.filter((i) => i.id === before);
+      quick.activeItems = items.filter((i) => i.id === before.theme);
       let chosen = false;
+      // One change at a time: moving quickly through the list queues them.
+      let applying: Promise<void> = Promise.resolve();
       quick.onDidChangeActive((active) => {
         const id = active[0]?.id;
-        if (id) void config.update("theme", id, vscode.ConfigurationTarget.Global);
+        if (id) applying = applying.then(() => useTheme(context, id));
       });
       quick.onDidAccept(() => {
         chosen = true;
         quick.hide();
       });
       quick.onDidHide(() => {
-        if (!chosen) void config.update("theme", before, vscode.ConfigurationTarget.Global);
+        if (!chosen)
+          applying = applying.then(async () => {
+            await vscode.workspace.getConfiguration("highwater").update("theme", before.theme, vscode.ConfigurationTarget.Global);
+            if (vscode.workspace.getConfiguration("highwater").get<boolean>("themeWindow", true)) await setWindowTheme(before.window);
+          });
         quick.dispose();
       });
       quick.show();

@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -581,7 +581,7 @@
             "Highland 2's Solarized Dark theme (dark).",
             "Highland 2's Transit theme (dark)."
           ],
-          "markdownDescription": "Colours for the Highland-Style Editor and the Navigator: one of Highland 2's themes, or **Match VS Code**. The rest of the window keeps VS Code's colour theme. **Highwater Too: Choose Theme…** switches it."
+          "markdownDescription": "Colours for the Highland-Style Editor and the Navigator: one of Highland 2's themes, or **Match VS Code**. With `highwater.themeWindow` on, **Choose Theme…** also colours the whole window to match."
         },
         "highwater.fontSize": {
           "type": "number",
@@ -589,6 +589,11 @@
           "minimum": 0,
           "maximum": 48,
           "markdownDescription": "Text size in the Highland-Style Editor, in pixels. **0** follows VS Code's editor font size, scaled to Highland 2's (about 1.4 times). ⌘+ and ⌘− change it; ⌥⌘0 sets it back to 0."
+        },
+        "highwater.themeWindow": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When a theme is chosen with **Choose Theme…**, colour the whole VS Code window to match (VS Code's colour theme becomes **Highwater** + the theme's name). **Match VS Code** puts back the colour theme you had before."
         }
       }
     },
@@ -1960,6 +1965,63 @@
         "view": "highwater.history",
         "contents": "Writing history is off.\n[Turn On](command:workbench.action.openSettings?%5B%22highwater.writingHistory%22%5D)",
         "when": "!config.highwater.writingHistory"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Highwater Classic",
+        "uiTheme": "vs",
+        "path": "./themes/highwater-classic-color-theme.json"
+      },
+      {
+        "label": "Highwater Clean",
+        "uiTheme": "vs",
+        "path": "./themes/highwater-clean-color-theme.json"
+      },
+      {
+        "label": "Highwater Winter",
+        "uiTheme": "vs",
+        "path": "./themes/highwater-winter-color-theme.json"
+      },
+      {
+        "label": "Highwater Kermit",
+        "uiTheme": "vs",
+        "path": "./themes/highwater-kermit-color-theme.json"
+      },
+      {
+        "label": "Highwater Solarized Light",
+        "uiTheme": "vs",
+        "path": "./themes/highwater-solarized-light-color-theme.json"
+      },
+      {
+        "label": "Highwater Dark Mode",
+        "uiTheme": "vs-dark",
+        "path": "./themes/highwater-dark-mode-color-theme.json"
+      },
+      {
+        "label": "Highwater Dracula",
+        "uiTheme": "vs-dark",
+        "path": "./themes/highwater-dracula-color-theme.json"
+      },
+      {
+        "label": "Highwater Material",
+        "uiTheme": "vs-dark",
+        "path": "./themes/highwater-material-color-theme.json"
+      },
+      {
+        "label": "Highwater Monokai",
+        "uiTheme": "vs-dark",
+        "path": "./themes/highwater-monokai-color-theme.json"
+      },
+      {
+        "label": "Highwater Solarized Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/highwater-solarized-dark-color-theme.json"
+      },
+      {
+        "label": "Highwater Transit",
+        "uiTheme": "vs-dark",
+        "path": "./themes/highwater-transit-color-theme.json"
       }
     ]
   },

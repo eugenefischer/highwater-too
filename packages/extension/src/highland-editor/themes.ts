@@ -86,3 +86,215 @@ export function onColor(hex: string): string {
   const lum = 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
   return lum > 0.4 ? "#000000" : "#ffffff";
 }
+
+// ---------------------------------------------------------------------------------------------
+// The same themes for the whole VS Code window (contributed as colour themes, "Highwater Classic"
+// and so on), so the panes, tabs, title and status bars match the page. Generated from the table
+// above into themes/*.json by scripts/gen-themes.ts; a test keeps the files in step.
+
+/** A colour with an alpha, as #rrggbbaa. */
+function alpha(hex: string, a: number): string {
+  return `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
+}
+
+/** A mix of two colours (0: all `a`, 1: all `b`), as #rrggbb. */
+function mix(a: string, b: string, t: number): string {
+  const ca = parseInt(a.slice(1), 16);
+  const cb = parseInt(b.slice(1), 16);
+  const ch = (c: number, s: number) => (c >> s) & 255;
+  const out = [16, 8, 0].map((s) => Math.round(ch(ca, s) * (1 - t) + ch(cb, s) * t));
+  return `#${out.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** The theme's id in themes/: highwater-<id>-color-theme.json. */
+export function colorThemeFile(id: string): string {
+  return `themes/highwater-${id}-color-theme.json`;
+}
+
+/** The label VS Code shows in its theme list. */
+export function colorThemeLabel(t: HighlandTheme): string {
+  return `Highwater ${t.name}`;
+}
+
+export function colorTheme(t: HighlandTheme): object {
+  const onPrimary = onColor(t.primary);
+  const sidebarEdge = mix(t.sidebarBackground, t.sidebarText, 0.12);
+  const inputBg = t.mode === "dark" ? mix(t.sidebarBackground, t.sidebarText, 0.08) : mix(t.sidebarBackground, "#ffffff", 0.6);
+  return {
+    $schema: "vscode://schemas/color-theme",
+    name: colorThemeLabel(t),
+    type: t.mode,
+    semanticHighlighting: true,
+    colors: {
+      foreground: t.sidebarText,
+      descriptionForeground: t.inactive,
+      focusBorder: t.primary,
+      "textLink.foreground": t.primary,
+      "textLink.activeForeground": t.primary,
+      "progressBar.background": t.primary,
+      "badge.background": t.primary,
+      "badge.foreground": onPrimary,
+      "button.background": t.primary,
+      "button.foreground": onPrimary,
+      "button.hoverBackground": mix(t.primary, t.mode === "dark" ? "#ffffff" : "#000000", 0.12),
+      "input.background": inputBg,
+      "input.foreground": t.sidebarText,
+      "input.border": sidebarEdge,
+      "input.placeholderForeground": t.inactive,
+      "dropdown.background": inputBg,
+      "dropdown.foreground": t.sidebarText,
+      "dropdown.border": sidebarEdge,
+      "scrollbarSlider.background": alpha(t.inactive, 0.25),
+      "scrollbarSlider.hoverBackground": alpha(t.inactive, 0.4),
+      "scrollbarSlider.activeBackground": alpha(t.inactive, 0.55),
+      "widget.shadow": "#00000033",
+
+      "editor.background": t.background,
+      "editor.foreground": t.text,
+      "editorCursor.foreground": t.cursor,
+      "editor.selectionBackground": alpha(t.primary, 0.3),
+      "editor.inactiveSelectionBackground": alpha(t.primary, 0.18),
+      "editor.selectionHighlightBackground": alpha(t.primary, 0.15),
+      "editor.findMatchBackground": alpha(t.primary, 0.6),
+      "editor.findMatchHighlightBackground": alpha(t.primary, 0.3),
+      "editor.lineHighlightBackground": alpha(t.text, 0.04),
+      "editor.lineHighlightBorder": "#00000000",
+      "editorLineNumber.foreground": alpha(t.inactive, 0.6),
+      "editorLineNumber.activeForeground": t.inactive,
+      "editorWhitespace.foreground": alpha(t.inactive, 0.6),
+      "editorIndentGuide.background1": alpha(t.inactive, 0.15),
+      "editorInlayHint.foreground": t.inactive,
+      "editorInlayHint.background": "#00000000",
+      "editorGutter.background": t.background,
+      "editorWidget.background": t.sidebarBackground,
+      "editorWidget.foreground": t.sidebarText,
+      "editorWidget.border": sidebarEdge,
+      "editorSuggestWidget.background": t.sidebarBackground,
+      "editorSuggestWidget.foreground": t.sidebarText,
+      "editorSuggestWidget.border": sidebarEdge,
+      "editorSuggestWidget.selectedBackground": alpha(t.primary, 0.35),
+      "editorSuggestWidget.highlightForeground": t.primary,
+      "editorHoverWidget.background": t.sidebarBackground,
+      "editorHoverWidget.foreground": t.sidebarText,
+      "editorHoverWidget.border": sidebarEdge,
+
+      "editorGroupHeader.tabsBackground": t.sidebarBackground,
+      "editorGroupHeader.tabsBorder": t.sidebarBackground,
+      "editorGroup.border": sidebarEdge,
+      "tab.activeBackground": t.background,
+      "tab.activeForeground": t.text,
+      "tab.activeBorderTop": t.primary,
+      "tab.inactiveBackground": t.sidebarBackground,
+      "tab.inactiveForeground": alpha(t.sidebarText, 0.7),
+      "tab.border": t.sidebarBackground,
+      "breadcrumb.background": t.background,
+      "breadcrumb.foreground": t.inactive,
+
+      "sideBar.background": t.sidebarBackground,
+      "sideBar.foreground": t.sidebarText,
+      "sideBar.border": t.sidebarBackground,
+      "sideBarTitle.foreground": t.sidebarText,
+      "sideBarSectionHeader.background": t.sidebarBackground,
+      "sideBarSectionHeader.foreground": t.sidebarText,
+      "sideBarSectionHeader.border": sidebarEdge,
+      "list.activeSelectionBackground": alpha(t.primary, 0.4),
+      "list.activeSelectionForeground": t.sidebarText,
+      "list.inactiveSelectionBackground": alpha(t.primary, 0.25),
+      "list.inactiveSelectionForeground": t.sidebarText,
+      "list.hoverBackground": alpha(t.sidebarText, 0.08),
+      "list.hoverForeground": t.sidebarText,
+      "list.focusOutline": t.primary,
+      "list.highlightForeground": t.primary,
+      "list.dropBackground": alpha(t.primary, 0.25),
+      "tree.indentGuidesStroke": alpha(t.inactive, 0.3),
+
+      "activityBar.background": t.sidebarBackground,
+      "activityBar.foreground": t.sidebarText,
+      "activityBar.inactiveForeground": alpha(t.sidebarText, 0.5),
+      "activityBar.activeBorder": t.primary,
+      "activityBar.border": t.sidebarBackground,
+      "activityBarBadge.background": t.primary,
+      "activityBarBadge.foreground": onPrimary,
+
+      "titleBar.activeBackground": t.sidebarBackground,
+      "titleBar.activeForeground": t.sidebarText,
+      "titleBar.inactiveBackground": t.sidebarBackground,
+      "titleBar.inactiveForeground": t.inactive,
+      "titleBar.border": t.sidebarBackground,
+      "statusBar.background": t.sidebarBackground,
+      "statusBar.foreground": t.sidebarText,
+      "statusBar.border": t.sidebarBackground,
+      "statusBar.noFolderBackground": t.sidebarBackground,
+      "statusBar.debuggingBackground": t.primary,
+      "statusBar.debuggingForeground": onPrimary,
+      "statusBarItem.remoteBackground": t.primary,
+      "statusBarItem.remoteForeground": onPrimary,
+      "statusBarItem.hoverBackground": alpha(t.sidebarText, 0.12),
+
+      "panel.background": t.background,
+      "panel.border": sidebarEdge,
+      "panelTitle.activeForeground": t.text,
+      "panelTitle.activeBorder": t.primary,
+      "panelTitle.inactiveForeground": t.inactive,
+      "terminal.background": t.background,
+      "terminal.foreground": t.text,
+
+      "quickInput.background": t.sidebarBackground,
+      "quickInput.foreground": t.sidebarText,
+      "quickInputList.focusBackground": alpha(t.primary, 0.4),
+      "quickInputList.focusForeground": t.sidebarText,
+      "pickerGroup.foreground": t.primary,
+      "menu.background": t.sidebarBackground,
+      "menu.foreground": t.sidebarText,
+      "menu.selectionBackground": alpha(t.primary, 0.4),
+      "menu.selectionForeground": t.sidebarText,
+      "menu.border": sidebarEdge,
+      "notifications.background": t.sidebarBackground,
+      "notifications.foreground": t.sidebarText,
+      "toolbar.hoverBackground": alpha(t.sidebarText, 0.12),
+    },
+    // The text editor's Fountain and Markdown, as the Highland-Style Editor shows them.
+    semanticTokenColors: {
+      sceneHeading: { foreground: t.sceneHeading, bold: true },
+      sceneNumber: t.sceneHeading,
+      section: t.inactive,
+      synopsis: t.inactive,
+      heading: { foreground: t.text, bold: true },
+      note: { foreground: t.notes, italic: true },
+      directive: t.inactive,
+      markup: t.inactive,
+      revisionTag: t.inactive,
+      boneyard: t.inactive,
+      titleKey: t.inactive,
+      titleValue: t.text,
+      character: t.text,
+      parenthetical: t.text,
+      transition: t.text,
+      centered: t.text,
+      lyric: { foreground: t.text, italic: true },
+      pageBreak: t.inactive,
+      quote: { foreground: t.text, italic: true },
+      listMarker: t.inactive,
+      term: { foreground: t.text, bold: true },
+      tableHeader: { foreground: t.text, bold: true },
+      linkDefinition: t.inactive,
+      link: { foreground: t.primary, underline: true },
+      bold: { bold: true },
+      italic: { italic: true },
+      boldItalic: { bold: true, italic: true },
+      underline: { underline: true },
+      strike: { strikethrough: true },
+      highlight: { foreground: t.text },
+    },
+    tokenColors: [
+      { scope: ["comment", "punctuation.definition.comment"], settings: { foreground: t.inactive, fontStyle: "italic" } },
+      { scope: ["markup.heading", "entity.name.section"], settings: { foreground: t.sceneHeading, fontStyle: "bold" } },
+      { scope: ["string"], settings: { foreground: t.secondary } },
+      { scope: ["keyword", "storage"], settings: { foreground: t.primary } },
+      { scope: ["constant", "entity.name.function", "support.function"], settings: { foreground: t.secondary } },
+      { scope: ["markup.bold"], settings: { fontStyle: "bold" } },
+      { scope: ["markup.italic"], settings: { fontStyle: "italic" } },
+      { scope: ["markup.underline.link"], settings: { foreground: t.primary } },
+    ],
+  };
+}

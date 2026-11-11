@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.10 (m15-editor branch)
+
+- **Themes for the whole window:** each of Highland 2's themes is also a VS Code colour theme ("Highwater Classic", "Highwater Dracula" and so on), colouring the panes, tabs, title bar, status bar, menus and the text editor to match. **Choose Theme…** now switches the window's colour theme along with the page and the Navigator (try each as you move through the list; Escape puts both back). **Match VS Code** restores the colour theme you had before. To theme only the page and the Navigator, turn off `highwater.themeWindow`. The themes can also be picked from VS Code's own colour theme list.
+
 ## 0.4.9 (m15-editor branch)
 
 - Line spacing in the Highland-Style Editor matches Highland 2's (1.3 times the text size; was 1.5).

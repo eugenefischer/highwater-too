@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { HIGHLAND_THEMES, navigatorColors, onColor, pageColors, themeFor } from "../src/highland-editor/themes.ts";
+import { colorTheme, colorThemeFile, colorThemeLabel, HIGHLAND_THEMES, navigatorColors, onColor, pageColors, themeFor } from "../src/highland-editor/themes.ts";
 
 const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
-  contributes: { configuration: { properties: Record<string, { enum?: string[] }> } };
+  contributes: { configuration: { properties: Record<string, { enum?: string[] }> }; themes: { label: string; uiTheme: string; path: string }[] };
 };
 
 describe("Highland themes", () => {
@@ -29,5 +29,16 @@ describe("Highland themes", () => {
   it("puts readable text on a button", () => {
     expect(onColor("#b8c663")).toBe("#000000");
     expect(onColor("#326878")).toBe("#ffffff");
+  });
+
+  it("offers each as a VS Code colour theme, with its file up to date (run scripts/gen-themes.ts after changing the table)", () => {
+    expect(manifest.contributes.themes).toEqual(
+      Object.entries(HIGHLAND_THEMES).map(([id, t]) => ({ label: colorThemeLabel(t), uiTheme: t.mode === "dark" ? "vs-dark" : "vs", path: `./${colorThemeFile(id)}` })),
+    );
+    for (const [id, t] of Object.entries(HIGHLAND_THEMES)) {
+      const file = JSON.parse(readFileSync(new URL(`../${colorThemeFile(id)}`, import.meta.url), "utf8")) as { colors: Record<string, string> };
+      expect(file).toEqual(colorTheme(t));
+      for (const c of Object.values(file.colors)) expect(c).toMatch(/^#[0-9a-f]{6}([0-9a-f]{2})?$/);
+    }
   });
 });
