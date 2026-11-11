@@ -157,7 +157,8 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); colo
 .cm-editor { font-size: var(--hl-font-size, calc(var(--vscode-editor-font-size, 14px) * 1.4)); }
 .cm-editor.cm-focused { outline: none; }
 /* !important: CodeMirror's own theme, injected later, sets these with equal specificity. */
-.cm-editor .cm-scroller { font-family: "Courier Prime", monospace !important; line-height: 1.5; }
+/* Line spacing as Highland 2's (measured: 1.3 times the text size). */
+.cm-editor .cm-scroller { font-family: "Courier Prime", monospace !important; line-height: 1.3; }
 /* The page column: as wide as the printed text, centred in the window. As in Highland, a narrower window
    narrows it down to the right edge of dialogue (--column-min) and no further: past that the page scrolls sideways. */
 .cm-editor .cm-content { flex: 0 1 var(--column) !important; width: var(--column); max-width: calc(100% - 2ch); min-width: var(--column-min); margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--hl-caret); }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.9 (m15-editor branch)
+
+- Line spacing in the Highland-Style Editor matches Highland 2's (1.3 times the text size; was 1.5).
+
 ## 0.4.8 (m15-editor branch)
 
 - **Text size in the Highland-Style Editor:** larger by default, about the size Highland 2 shows (VS Code's editor font size × 1.4, was × 1.1). ⌘+ and ⌘− make it larger or smaller a step at a time while the Highland-Style Editor is in front (elsewhere they still zoom the window), and ⌥⌘0 goes back to the default. The page column grows with the text, so lines still break as on the page. The setting is `highwater.fontSize` (pixels; 0 for the default).
