@@ -10,6 +10,7 @@ import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder,
 import { Decoration, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
+import { Pages, type PdfMessage } from "./pages.ts";
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -160,15 +161,50 @@ function reportScroll(): void {
   scrollPending = true;
   requestAnimationFrame(() => {
     scrollPending = false;
-    if (!view) return;
-    const visibleTop = view.scrollDOM.getBoundingClientRect().top - view.documentTop;
-    vscode.postMessage({ type: "scroll", top: view.lineBlockAtHeight(Math.max(0, visibleTop)).from });
+    if (!view || pages.shown) return;
+    vscode.postMessage({ type: "scroll", top: topOffset() });
   });
+}
+
+/** The offset at the top of the visible text. */
+function topOffset(): number {
+  if (!view) return 0;
+  const visibleTop = Math.max(0, view.scrollDOM.getBoundingClientRect().top - view.documentTop);
+  const block = view.lineBlockAtHeight(visibleTop);
+  // The first line wholly in view (one cut off at the top doesn't count).
+  if (block.top < visibleTop - 2 && block.to < view.state.doc.length) return view.lineBlockAt(block.to + 1).from;
+  return block.from;
+}
+
+// Preview mode (⌘E): the printed pages in place of the text, keeping your place both ways.
+const pages = new Pages(
+  (msg) => vscode.postMessage(msg),
+  (top, cursor) => {
+    if (!view) return;
+    view.requestMeasure();
+    const len = view.state.doc.length;
+    if (cursor !== null) {
+      const at = Math.min(cursor, len);
+      view.dispatch({ selection: { anchor: at }, effects: EditorView.scrollIntoView(at, { y: "center" }), annotations: remote.of(true) });
+    } else if (top !== null) view.dispatch({ effects: EditorView.scrollIntoView(Math.min(top, len), { y: "start" }), annotations: remote.of(true) });
+    view.focus();
+  },
+);
+
+function togglePreview(): void {
+  if (pages.shown) return pages.hide();
+  if (!view) return;
+  const at = topOffset();
+  view.contentDOM.blur();
+  pages.show(at);
+  document.getElementById("pages")?.focus();
 }
 
 /** Scrolls to an offset from the extension (Navigator, Preview); with `select`, moves the cursor there too. */
 function reveal(offset: number, how: "top" | "center", select: boolean): void {
   if (!view) return;
+  // From the Navigator or a search: back to the text to show it.
+  if (select && pages.shown) pages.hide();
   const at = Math.min(Math.max(0, offset), view.state.doc.length);
   view.dispatch({ ...(select ? { selection: { anchor: at } } : {}), effects: EditorView.scrollIntoView(at, { y: how === "top" ? "start" : "center" }), annotations: remote.of(true) });
   if (select) view.focus();
@@ -213,6 +249,9 @@ window.addEventListener("message", (event: MessageEvent) => {
   } else if (msg.type === "update") replace(msg.text ?? "");
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
+  else if (msg.type === "togglePreview") togglePreview();
+  else if (msg.type === "pdf") void pages.receive(event.data as PdfMessage);
+  else if (msg.type === "previewEmpty") pages.empty(String((event.data as { message?: string }).message ?? ""));
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);
   else if (msg.type === "numbers") {
     document.documentElement.classList.toggle("hl-numbers", !!msg.on);

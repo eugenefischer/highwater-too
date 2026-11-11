@@ -19,6 +19,10 @@ export interface HighlandView {
   top: number;
   /** True once the page's script has started and holds the text. */
   ready: boolean;
+  /** Preview mode: how many times the pages were laid out and sent (for the tests). */
+  pagesSent: number;
+  /** Flips between the text and the printed pages (⌘E). */
+  togglePreview(): void;
   /** Sets the selections (offsets in the document as it is now). */
   select(ranges: readonly { anchor: number; head: number }[]): void;
   /** Scrolls to an offset (at the top, or centred if out of view); with `select`, puts the cursor there and focuses the editor. */

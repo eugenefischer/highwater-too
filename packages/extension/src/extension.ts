@@ -27,7 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerAsk(context);
   registerSurface(context);
   // The experimental Highland-style editor (M15).
-  registerHighlandEditor(context);
+  registerHighlandEditor(context, () => store);
   const store = new BundleStore({ backupFolder: () => backupFolder(context) });
   // Bin, Scratchpad and images for plain .fountain and .md files.
   startPlainExtras(context, { history: currentHistory, historyRoot });
@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // What the panes follow, for the end-to-end tests of the Highland-Style Editor.
       vscode.commands.registerCommand("highwater.test.surface", () => {
         const view = activeView();
-        return { document: activeDocument()?.uri.toString(), view: !!view, ready: view?.ready, selection: view?.selections[0], focused: focusedDocument().key, focusedText: focusedDocument().script?.getText() };
+        return { document: activeDocument()?.uri.toString(), view: !!view, ready: view?.ready, pagesSent: view?.pagesSent, selection: view?.selections[0], focused: focusedDocument().key, focusedText: focusedDocument().script?.getText() };
       }),
       vscode.commands.registerCommand("highwater.test.revealInView", (offset: number) => activeView()?.reveal(offset, "center", true)),
     );

@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { bundleOf, onDidChangeTemplate, renderDocument, setTemplate, TEMPLATES, type Template } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
-import { activeDocument, onDidChangeActiveSurface, onDidScrollView, revealOffset, visibleTop } from "./surface.ts";
+import { activeDocument, activeView, onDidChangeActiveSurface, onDidScrollView, revealOffset, visibleTop } from "./surface.ts";
 
 /**
  * The PDF preview (M6): the export engine's real output in a pdf.js viewer beside the editor,
@@ -13,6 +13,9 @@ export function registerPreview(context: vscode.ExtensionContext, store: BundleS
   let preview: Preview | undefined;
   context.subscriptions.push(
     vscode.commands.registerCommand("highwater.preview", () => {
+      // In the Highland-Style Editor, the pages show in place of the text, as in Highland 2.
+      const view = activeView();
+      if (view) return view.togglePreview();
       const doc = scriptOf(activeDocument());
       if (!preview) {
         preview = new Preview(context, store);

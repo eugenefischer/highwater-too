@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
+import { onDidChangeTemplate, PRINT_OPTIONS, printOptionsOf, renderDocument, setPrintOption, setTemplate, TEMPLATES, type PrintOption, type Template } from "../render-document.ts";
+import type { BundleStore } from "../store.ts";
 import { parse } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
@@ -17,7 +19,11 @@ export { HIGHLAND_EDITOR };
  * Reopen Editor With… or Open in Highland-Style Editor; the text editor stays one click away.
  */
 export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    /** The .highland files' store, for laying out the pages (made after this provider). */
+    private readonly store: () => BundleStore,
+  ) {}
 
   resolveCustomTextEditor(opened: vscode.TextDocument, panel: vscode.WebviewPanel): void {
     // The document, kept current: giving a script its Highwater language closes it and opens a new
@@ -60,6 +66,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       selections: [{ anchor: 0, head: 0 }],
       top: 0,
       ready: false,
+      pagesSent: 0,
+      togglePreview: () => void panel.webview.postMessage({ type: "togglePreview" }),
       select: (ranges) => {
         // The page must hold the edited text before it can select in it.
         if (changedElsewhere()) send();
@@ -73,6 +81,27 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       },
     };
     let pendingReveal: object | undefined;
+    /** Preview mode: the page shows the printed pages, laid out here. */
+    let previewing = false;
+    let layout = 0;
+    const sendPages = async (at: number | null) => {
+      const mine = ++layout;
+      try {
+        const rendered = await renderDocument(this.context, this.store(), document);
+        if (mine !== layout || !previewing) return;
+        if (!rendered) {
+          void panel.webview.postMessage({ type: "previewEmpty", message: "Plain-text documents have no print template to preview." });
+          return;
+        }
+        const print = await printOptionsOf(this.context, this.store(), document);
+        // The anchors' offsets are the document's; the page counts "\r\n" as one character.
+        const anchors = rendered.anchors.map((v, i) => (i % 3 === 2 ? toPage(v) : v));
+        void panel.webview.postMessage({ type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, anchors, problems: rendered.problems, print, at });
+        view.pagesSent++;
+      } catch (error) {
+        if (mine === layout) void panel.webview.postMessage({ type: "previewEmpty", message: `Could not lay out the document: ${(error as Error).message}` });
+      }
+    };
 
     // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
     const sendNumbers = () => void panel.webview.postMessage({ type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
@@ -92,11 +121,12 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     const subscriptions = [
       highlandViews.add(view),
-      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number }) => {
+      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean; kind?: string }) => {
         if (msg.type === "ready") {
           pageText = pageForm(document.getText());
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
+          previewing = false;
           sendInvisibles();
           sendTheme();
           sendFontSize();
@@ -106,7 +136,17 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         } else if (msg.type === "selection" && msg.ranges) {
           view.selections = msg.ranges.map((r) => ({ anchor: toDocument(r.anchor), head: toDocument(r.head) }));
           highlandViews.selected(view);
-        } else if (msg.type === "scroll" && typeof msg.top === "number") {
+        } else if (msg.type === "preview") {
+          previewing = true;
+          void sendPages(typeof msg.at === "number" ? msg.at : null);
+        } else if (msg.type === "previewClosed") previewing = false;
+        else if (msg.type === "previewTemplate" && TEMPLATES.includes(msg.template as Template)) {
+          void setTemplate(this.context, this.store(), document, msg.template as Template).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the template: ${(e as Error).message}`));
+        } else if (msg.type === "printOption" && PRINT_OPTIONS.includes(msg.key as PrintOption)) {
+          void setPrintOption(this.context, this.store(), document, msg.key as PrintOption, !!msg.value).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the print option: ${(e as Error).message}`));
+        } else if (msg.type === "previewSave") {
+          void vscode.commands.executeCommand(msg.kind === "docx" ? "highwater.exportDocx" : "highwater.exportPdf", document.uri);
+      } else if (msg.type === "scroll" && typeof msg.top === "number") {
           view.top = toDocument(msg.top);
           highlandViews.scrolled(view);
         } else if (msg.type === "edit" && msg.changes) {
@@ -131,6 +171,10 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
       }),
+      // A template or print option changed (here, or in the status bar): lay the pages out again.
+      onDidChangeTemplate((d) => {
+        if (previewing && d.uri.toString() === document.uri.toString()) void sendPages(null);
+      }),
       vscode.workspace.onDidOpenTextDocument((d) => {
         if (d.uri.toString() !== document.uri.toString() || d === document) return;
         const languageChanged = d.languageId !== document.languageId;
@@ -154,10 +198,11 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
   private html(webview: vscode.Webview, dist: vscode.Uri): string {
     const script = webview.asWebviewUri(vscode.Uri.joinPath(dist, "highland-editor.js"));
     const font = (f: string) => webview.asWebviewUri(vscode.Uri.joinPath(dist, "fonts", f));
+    const pdfjs = (f: string) => webview.asWebviewUri(vscode.Uri.joinPath(dist, "pdfjs", f));
     const nonce = Math.random().toString(36).slice(2);
     return `<!doctype html>
 <html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} blob: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; connect-src ${webview.cspSource}; worker-src blob:;">
 <style>
 @font-face { font-family: "Courier Prime"; src: url("${font("CourierPrime-Regular.ttf")}"); }
 @font-face { font-family: "Courier Prime"; font-weight: bold; src: url("${font("CourierPrime-Bold.ttf")}"); }
@@ -215,6 +260,26 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); colo
 .cm-editor .cm-highlightSpace { background-image: radial-gradient(circle at 50% 55%, var(--hl-whitespace) 15%, transparent 5%); }
 .cm-editor .cm-highlightTab { background-image: none; position: relative; }
 .cm-editor .cm-highlightTab::before { content: "→"; position: absolute; left: 0; color: var(--hl-whitespace); }
+/* Preview mode (⌘E): the printed pages in the same tab, with Highland's bars above and below. */
+#preview { display: none; height: 100%; flex-direction: column; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-panel-fg); }
+body.previewing #editor { display: none; }
+body.previewing #preview { display: flex; }
+#ptop, #pbottom { display: flex; align-items: center; gap: 14px; padding: 6px 12px; background: var(--hl-panel-bg); }
+#ptop { border-bottom: 1px solid var(--hl-border); }
+#pbottom { border-top: 1px solid var(--hl-border); justify-content: flex-end; flex-wrap: wrap; }
+#pstatus { flex: 1; text-align: center; color: var(--hl-muted); }
+#ptop select { font: inherit; color: var(--hl-panel-fg); background: var(--hl-input-bg); border: 1px solid var(--hl-border); border-radius: 3px; padding: 2px 6px; }
+#pboxes { display: flex; gap: 16px; flex-wrap: wrap; margin-right: auto; }
+#pboxes label { display: inline-flex; align-items: center; gap: 5px; }
+#pboxes label:has(input:disabled) { color: var(--hl-muted); }
+#pboxes input { accent-color: var(--hl-accent); }
+#pbottom button { font: inherit; border: 1px solid var(--hl-border); border-radius: 4px; padding: 4px 14px; cursor: pointer; color: var(--hl-panel-fg); background: none; }
+#pbottom button#psave { background: var(--hl-accent); color: var(--hl-accent-fg); border-color: transparent; }
+#pbottom button[hidden] { display: none; }
+#pages { flex: 1; overflow: auto; padding: 16px 0; outline: none; background: color-mix(in srgb, var(--hl-bg) 85%, #808080); }
+.page { margin: 0 auto 16px; background: white; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.page canvas { display: block; width: 100%; height: 100%; }
+.pmessage { padding: 24px; color: var(--hl-muted); }
 /* Completion. */
 .cm-editor .cm-tooltip { background: var(--hl-panel-bg); color: var(--hl-panel-fg); border: 1px solid var(--hl-border); }
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul { font-family: "Courier Prime", monospace; max-height: 14em; }
@@ -236,7 +301,18 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); colo
 .cm-editor .cm-panel.cm-search [name="close"] { color: var(--hl-panel-fg); font-size: 1.3em; top: 4px; right: 6px; }
 .cm-editor .cm-panel.cm-search input[type="checkbox"] { accent-color: var(--hl-accent); }
 </style></head>
-<body><div id="editor"></div><script nonce="${nonce}" src="${script}"></script></body></html>`;
+<body data-pdfjs="${pdfjs("pdf.min.mjs")}" data-worker="${pdfjs("pdf.worker.min.mjs")}">
+<div id="editor"></div>
+<div id="preview">
+  <div id="ptop">
+    <select id="pzoom" aria-label="Page size"><option value="fit">Fit width</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select>
+    <span id="pstatus"></span>
+    <select id="ptemplate" aria-label="Print template"></select>
+  </div>
+  <div id="pages" tabindex="-1"></div>
+  <div id="pbottom"><div id="pboxes"></div><button id="psaveword" hidden>Save As Word</button><button id="psave">Save As PDF</button></div>
+</div>
+<script nonce="${nonce}" src="${script}"></script></body></html>`;
   }
 }
 
@@ -344,9 +420,9 @@ function swapSoon(uri: vscode.Uri): void {
 }
 
 /** Opens the active document in the Highland-style editor, or back in the text editor. */
-export function registerHighlandEditor(context: vscode.ExtensionContext): void {
+export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore): void {
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context), { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.commands.registerCommand("highwater.openHighlandEditor", async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (target) await swapActive(target, HIGHLAND_EDITOR);

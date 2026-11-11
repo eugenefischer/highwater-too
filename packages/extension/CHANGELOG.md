@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.17 (m15-editor branch)
+
+- **Preview in place, as in Highland 2:** in the Highland-Style Editor, ⌘E (or the Preview button) shows the printed pages in the same tab instead of the text, and ⌘E again goes back. Going to the pages opens them where your text was; coming back shows the text at what was on screen in the pages, with the cursor where you left it. Double-clicking a line in the pages goes back to the text with the cursor on that line.
+  - At the top: page size (fit width or a percentage), "Page x of y" and the print template.
+  - At the foot, as Highland's: Color Revisions, Star Revisions, Paragraph Numbers, Synopses, Notes and Title Page, and Save As PDF (and Save As Word for manuscripts). The choices are saved with the document where Highland 2 keeps them. Title Page works now; the others can't be ticked yet, as Highwater Too doesn't print them yet.
+- The side-by-side Preview remains for the text editor.
+
 ## 0.4.16 (m15-editor branch)
 
 - Navigator: holding a dragged scene near the list's top or bottom edge (or past it) keeps it scrolling, faster the nearer the edge, until you move away or reach the end. Before, it scrolled only while the mouse moved.

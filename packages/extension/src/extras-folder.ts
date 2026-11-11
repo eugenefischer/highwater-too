@@ -20,6 +20,8 @@ export interface ExtrasSettings {
   templateName?: string;
   /** The images folder next to the file, by name (kept, so renaming the file does not lose it). */
   assetsFolder?: string;
+  /** Highland's print options (title page, synopses…), as a .highland file's printOptions. */
+  printOptions?: Record<string, boolean>;
   [key: string]: unknown;
 }
 
@@ -86,19 +88,24 @@ export class ExtrasFolder {
     const info = await readJson(join(this.dir, "document", "info.json"));
     const template = (info?.[HIGHLAND_KEY] as { templateName?: unknown } | undefined)?.templateName;
     if (typeof template === "string" && template) out.templateName = template;
+    const print = (info?.[HIGHLAND_KEY] as { printOptions?: unknown } | undefined)?.printOptions;
+    if (print && typeof print === "object") out.printOptions = print as Record<string, boolean>;
     const local = await readJson(join(this.dir, "local.json"));
     if (typeof local?.assetsFolder === "string" && local.assetsFolder) out.assetsFolder = local.assetsFolder;
     return out;
   }
 
-  async updateSettings(change: { templateName?: string | undefined; assetsFolder?: string | undefined }): Promise<ExtrasSettings> {
+  async updateSettings(change: { templateName?: string | undefined; assetsFolder?: string | undefined; printOptions?: Record<string, boolean> }): Promise<ExtrasSettings> {
     await mkdir(this.dir, { recursive: true });
-    if ("templateName" in change) {
+    if ("templateName" in change || "printOptions" in change) {
       const path = join(this.dir, "document", "info.json");
       const info = (await readJson(path)) ?? {};
       const block = { ...((info[HIGHLAND_KEY] as Record<string, unknown> | undefined) ?? {}) };
-      if (change.templateName === undefined) delete block.templateName;
-      else block.templateName = change.templateName;
+      if ("templateName" in change) {
+        if (change.templateName === undefined) delete block.templateName;
+        else block.templateName = change.templateName;
+      }
+      if (change.printOptions) block.printOptions = { ...((block.printOptions as object | undefined) ?? {}), ...change.printOptions };
       info[HIGHLAND_KEY] = block;
       await mkdir(dirname(path), { recursive: true });
       await writeAtomic(path, JSON.stringify(info));

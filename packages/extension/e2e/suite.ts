@@ -568,6 +568,30 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "⌘E in the Highland-Style Editor lays out the pages in place, not in a side-by-side Preview",
+    async () => {
+      const path = await copyOf("PreviewInPlace");
+      await vscode.commands.executeCommand("vscode.openWith", highland(path), "highwater.highlandEditor");
+      type Surface = { view: boolean; ready?: boolean; pagesSent?: number };
+      const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
+      const until = async (what: string, ok: (s: Surface) => boolean) => {
+        const end = Date.now() + 15_000;
+        let now: Surface;
+        while (!ok((now = await surface()))) {
+          if (Date.now() > end) throw new Error(`Timed out waiting for ${what}: ${JSON.stringify(now)}`);
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      };
+      await until("the Highland-Style Editor", (s) => s.view && s.ready === true);
+      await vscode.commands.executeCommand("highwater.preview");
+      await until("the pages", (s) => (s.pagesSent ?? 0) >= 1);
+      // The side-by-side Preview didn't open: ⌘E shows the pages in place.
+      assert.ok(!vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label.startsWith("Preview: PreviewInPlace"))));
+      await vscode.commands.executeCommand("highwater.preview");
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    },
+  ],
+  [
     "exports a manuscript as a Word document",
     async () => {
       const path = join(dir, "DocxExport.highland");

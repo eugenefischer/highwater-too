@@ -67,6 +67,47 @@ export async function setTemplate(context: vscode.ExtensionContext, store: Bundl
 }
 
 /**
+ * Highland 2's print options (its preview's bottom bar), kept where Highland keeps them: info.json's
+ * `printOptions` for .highland files, with a plain file's Bin and Scratchpad for plain files.
+ */
+export const PRINT_OPTIONS = ["printRevisionColor", "printRevisionStars", "printParagraphNumbers", "printSynopses", "printInlineNotes", "printTitlePage"] as const;
+export type PrintOption = (typeof PRINT_OPTIONS)[number];
+export type PrintOptions = Record<PrintOption, boolean>;
+/** Highland's defaults: only the title page is printed. */
+const DEFAULT_PRINT: PrintOptions = { printRevisionColor: false, printRevisionStars: false, printParagraphNumbers: false, printSynopses: false, printInlineNotes: false, printTitlePage: true };
+
+function readPrint(raw: unknown): PrintOptions {
+  const out = { ...DEFAULT_PRINT };
+  if (raw && typeof raw === "object") for (const k of PRINT_OPTIONS) if (typeof (raw as Record<string, unknown>)[k] === "boolean") out[k] = (raw as Record<string, boolean>)[k]!;
+  return out;
+}
+
+export async function printOptionsOf(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument): Promise<PrintOptions> {
+  const bundle = bundleOf(doc);
+  if (bundle) return readPrint((await store.highlandSettings(bundle).catch(() => ({}) as Record<string, unknown>)).printOptions);
+  let raw: unknown;
+  if (doc.uri.scheme === "file") raw = (await (await plainExtras().folder(doc.uri.fsPath).catch(() => null))?.settings())?.printOptions;
+  raw ??= context.workspaceState.get(`printOptions:${doc.uri.toString()}`);
+  return readPrint(raw);
+}
+
+export async function setPrintOption(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, key: PrintOption, value: boolean): Promise<void> {
+  const next = { ...(await printOptionsOf(context, store, doc)), [key]: value };
+  const bundle = bundleOf(doc);
+  const folder = !bundle && doc.uri.scheme === "file" ? await plainExtras().folder(doc.uri.fsPath, true).catch(() => null) : null;
+  if (folder) await folder.updateSettings({ printOptions: next });
+  else if (!bundle) await context.workspaceState.update(`printOptions:${doc.uri.toString()}`, next);
+  else
+    await store.update(bundle, (b) => {
+      const settings = b.highlandSettings;
+      // Keep any option Highland stores that Highwater doesn't show (printRevisionsOnly).
+      b.setHighlandSettings({ ...settings, printOptions: { ...((settings.printOptions as object | undefined) ?? {}), ...next } });
+      return ["info.json"];
+    });
+  templateChanged.fire(doc); // the preview lays the document out again
+}
+
+/**
  * The active print template in the status bar (what Export PDF and the preview will use); click to
  * change it.
  */
@@ -117,11 +158,7 @@ export async function renderDocx(context: vscode.ExtensionContext, store: Bundle
 async function sources(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument) {
   const bundle = bundleOf(doc);
   const path = bundle ?? doc.uri.fsPath;
-  let titlePage = true;
-  if (bundle) {
-    const settings = (await store.highlandSettings(bundle)) as { printOptions?: { printTitlePage?: boolean } };
-    titlePage = settings.printOptions?.printTitlePage !== false;
-  }
+  const titlePage = (await printOptionsOf(context, store, doc)).printTitlePage;
   const base = { text: doc.getText(), path, fontDir: join(context.extensionPath, "dist", "fonts"), titlePage };
   // Images: the bundle's assets, or files next to a Markdown file.
   const read = async (src: string): Promise<Uint8Array | null> => {
