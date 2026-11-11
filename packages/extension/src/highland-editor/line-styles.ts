@@ -37,6 +37,8 @@ export interface LineStyle {
   level?: number;
   /** Right-aligned (transitions) or centred. */
   align?: "right" | "center";
+  /** The indent is the first line's only (manuscript paragraphs); otherwise every wrapped line has it. */
+  firstLine?: boolean;
 }
 
 /** Dialogue wraps after 35 characters and parentheticals after 28, as Highland's editor shows them. */
@@ -132,10 +134,10 @@ export function lineStyles(doc: Document): Map<number, LineStyle> {
         break;
     }
   }
-  // Manuscript paragraphs after a paragraph are indented, as Live Margins shows them.
+  // Manuscript paragraphs after a paragraph are indented, as Live Margins shows them: the first line only.
   if (doc.mode === "markdown") for (const m of liveMargins(doc)) {
     const s = out.get(m.at);
-    if (s && s.kind === "paragraph") out.set(m.at, { ...s, indent: m.indent });
+    if (s && s.kind === "paragraph") out.set(m.at, { ...s, indent: m.indent, firstLine: true });
   }
   return out;
 }

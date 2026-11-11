@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Manuscripts in the Highland-Style Editor: an indented paragraph indents only its first line again; its wrapped lines go back to the left margin, as on the page. (Every line had been indented, so ordinary paragraphs looked like block quotes.)
+
 ## 0.5.1
 
 - **Check Spelling While Typing** in the Highland-Style Editor, as in Highland 2 (off by default; turn it on from the title bar's ⋯ menu, the Command Palette or `highwater.spellCheck`). It uses American English, with Hunspell's dictionary from SCOWL bundled.

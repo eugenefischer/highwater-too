@@ -42,7 +42,7 @@ function decorate(doc: Text): DecorationSet {
     const number = numbers.get(line.from);
     if (!s && number === undefined) continue;
     const cls = s ? [`hl-${s.kind}`, s.level ? `hl-level-${s.level}` : "", s.align ? `hl-${s.align}` : ""].filter(Boolean).join(" ") : "";
-    const attributes: Record<string, string> = { ...(cls ? { class: cls } : {}), ...(s ? lineCss(s.indent, s.width) : {}), ...(number !== undefined ? { "data-n": String(number) } : {}) };
+    const attributes: Record<string, string> = { ...(cls ? { class: cls } : {}), ...(s ? lineCss(s.indent, s.width, s.firstLine) : {}), ...(number !== undefined ? { "data-n": String(number) } : {}) };
     ranges.push(Decoration.line({ attributes }).range(line.from));
   }
   // Emphasis, notes and omitted text styled where they stand.
@@ -50,9 +50,9 @@ function decorate(doc: Text): DecorationSet {
   return Decoration.set(ranges, true);
 }
 
-/** A line's indent, and the width it wraps at; in a column narrower than that, it wraps at the column's edge. */
-function lineCss(left: number, width?: number): { style?: string } {
-  const parts = [left ? `padding-left: ${left}ch` : "", width ? `max-width: ${width}ch` : ""].filter(Boolean);
+/** A line's indent (every wrapped line's, or the first line's only), and the width it wraps at; in a column narrower than that, it wraps at the column's edge. */
+function lineCss(left: number, width?: number, firstLine = false): { style?: string } {
+  const parts = [left ? (firstLine ? `text-indent: ${left}ch` : `padding-left: ${left}ch`) : "", width ? `max-width: ${width}ch` : ""].filter(Boolean);
   return parts.length ? { style: parts.join("; ") } : {};
 }
 

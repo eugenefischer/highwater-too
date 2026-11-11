@@ -34,6 +34,13 @@ describe("Highland-style editor line styles", () => {
     expect(m.get(at(md, "> A quote"))).toMatchObject({ kind: "quote", indent: 5 });
   });
 
+  it("indents only a manuscript paragraph's first line (wrapped lines go back to the margin)", () => {
+    const md = "# Chapter\n\nFirst paragraph.\n\nSecond paragraph.\n";
+    const m = lineStyles(parse(md, { mode: "markdown" }));
+    expect(m.get(at(md, "First"))).toMatchObject({ kind: "paragraph", indent: 0 });
+    expect(m.get(at(md, "Second"))).toMatchObject({ kind: "paragraph", indent: 5, firstLine: true });
+  });
+
   it("finds emphasis, notes and omitted text by source offsets", () => {
     const src = "Brenda **runs** and *hides* [[check this]].\n\nBOB\nI _said_ /* cut */ no.\n";
     const marks = inlineMarks(parse(src, { mode: "fountain" }));
