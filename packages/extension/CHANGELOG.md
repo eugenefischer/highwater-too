@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- **M15 is on main:** the m15-editor branch (0.3.0–0.4.19) is merged, making the Highland-Style Editor the default way to open documents. It has Highland's writing keys, completion, themes, the Navigator in Highland's style, paragraph numbers, and the printed pages in place with all of Highland's print options. Nothing else changes from 0.4.19.
+
 ## 0.4.19 (m15-editor branch)
 
 - While the pages are showing in the Highland-Style Editor, clicking in the Navigator (or a search result) goes to that place in the pages instead of switching back to the text. The cursor moves there too, so ⌘E returns to the text at that place.
