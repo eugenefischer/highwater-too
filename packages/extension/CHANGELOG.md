@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.11 (m15-editor branch)
+
+- When a document is given its Highwater language just as it opens, VS Code replaces the document behind the editor; the Highland-Style Editor now follows the new one, so the panes can't lose track of its edits.
+- A marker inside a scene heading or section no longer shows as part of its name in the Navigator.
+
 ## 0.4.10 (m15-editor branch)
 
 - **Themes for the whole window:** each of Highland 2's themes is also a VS Code colour theme ("Highwater Classic", "Highwater Dracula" and so on), colouring the panes, tabs, title bar, status bar, menus and the text editor to match. **Choose Theme…** now switches the window's colour theme along with the page and the Navigator (try each as you move through the list; Escape puts both back). **Match VS Code** restores the colour theme you had before. To theme only the page and the Navigator, turn off `highwater.themeWindow`. The themes can also be picked from VS Code's own colour theme list.

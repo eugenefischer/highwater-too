@@ -17,7 +17,11 @@ export { HIGHLAND_EDITOR };
 export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
+  resolveCustomTextEditor(opened: vscode.TextDocument, panel: vscode.WebviewPanel): void {
+    // The document, kept current: giving a script its Highwater language closes it and opens a new
+    // TextDocument for the same file, and the one VS Code passed here would go stale (its text no
+    // longer changing), so the panes and the page would stop following the edits.
+    let document = opened;
     // A .highland file itself is a zip: edit its script through the highland: file system instead.
     if (document.uri.scheme === "file" && /\.highland$/i.test(document.uri.fsPath)) {
       const column = panel.viewColumn;
@@ -47,7 +51,9 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
 
     const view: HighlandView = {
-      document,
+      get document() {
+        return document;
+      },
       panel,
       selections: [{ anchor: 0, head: 0 }],
       top: 0,
@@ -119,8 +125,20 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && e.affectsConfiguration("highwater.theme")) sendTheme();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
       }),
+      vscode.workspace.onDidOpenTextDocument((d) => {
+        if (d.uri.toString() !== document.uri.toString() || d === document) return;
+        const languageChanged = d.languageId !== document.languageId;
+        document = d;
+        highlandViews.changed(view);
+        // A new language (a .md file made Highwater Markdown): the page lays the text out again.
+        if (view.ready && languageChanged) {
+          pageText = pageForm(document.getText());
+          void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
+        }
+      }),
       vscode.workspace.onDidChangeTextDocument((e) => {
-        if (e.document !== document || e.contentChanges.length === 0) return;
+        if (e.document.uri.toString() !== document.uri.toString() || e.contentChanges.length === 0) return;
+        if (e.document !== document) document = e.document;
         if (changedElsewhere()) send();
       }),
     ];

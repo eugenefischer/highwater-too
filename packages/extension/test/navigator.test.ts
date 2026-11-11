@@ -32,6 +32,11 @@ describe("navigator", () => {
     expect(tree(items)).toEqual(["sceneHeaders:INT. HOUSE - DAY"]);
   });
 
+  it("leaves a marker out of the heading it sits in", () => {
+    const items = navigatorItems(parse("INT. HALL - DAY {{%m: Fix}}\n\nShe runs.\n", { mode: "fountain" }));
+    expect(tree(items)).toEqual(["sceneHeaders:INT. HALL - DAY", "markers:Fix"]);
+  });
+
   it("reads navigatorFilters.json, keeping defaults for missing or bad values", () => {
     expect(parseFilters('{"notes": false, "images": "no"}')).toEqual({ ...DEFAULT_FILTERS, notes: false });
     expect(parseFilters("not json")).toEqual(DEFAULT_FILTERS);

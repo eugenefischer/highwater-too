@@ -55,6 +55,10 @@ export const highlandViews = {
   scrolled(view: HighlandView): void {
     scrollEmitter.fire(view);
   },
+  /** The view's document was reopened (a new language): what follows it should look again. */
+  changed(_view: HighlandView): void {
+    activeEmitter.fire();
+  },
 };
 
 /** Starts forwarding VS Code's own editor events. */

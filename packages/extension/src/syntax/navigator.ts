@@ -49,7 +49,9 @@ export function parseFilters(json: string | undefined): NavigatorFilters {
 export function navigatorItems(doc: Document, filters: NavigatorFilters = DEFAULT_FILTERS): NavigatorItem[] {
   const flat: NavigatorItem[] = [];
   const add = (type: NavigatorType, label: string, span: Span, level: number | null = null) => {
-    if (filters[type]) flat.push({ type, label: label.trim() || "(untitled)", level, span, children: [] });
+    // A marker or other {{…}} inside a heading isn't part of its name.
+    const name = type === "sceneHeaders" || type === "sectionHeaders" ? label.replace(/\{\{[^}]*\}\}/g, "").replace(/\s+/g, " ") : label;
+    if (filters[type]) flat.push({ type, label: name.trim() || "(untitled)", level, span, children: [] });
   };
   for (const e of doc.elements) {
     switch (e.kind) {

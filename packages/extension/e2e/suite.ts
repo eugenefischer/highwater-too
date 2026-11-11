@@ -519,6 +519,29 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "the panes follow edits made in the Highland-Style Editor to a .highland file (a marker reaches the Navigator's document)",
+    async () => {
+      const path = await copyOf("MarkerPanes");
+      await vscode.commands.executeCommand("vscode.openWith", highland(path), "highwater.highlandEditor");
+      type Surface = { view: boolean; ready?: boolean; focused?: string; focusedText?: string };
+      const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
+      const until = async (what: string, ok: (s: Surface) => boolean) => {
+        const end = Date.now() + 10_000;
+        let now: Surface;
+        while (!ok((now = await surface()))) {
+          if (Date.now() > end) throw new Error(`Timed out waiting for ${what}: ${JSON.stringify({ ...now, focusedText: now.focusedText?.slice(-80) })}`);
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      };
+      await until("the Highland-Style Editor", (s) => s.view && s.ready === true && s.focused === path);
+      await vscode.commands.executeCommand("highwater.test.answer", "From test");
+      await vscode.commands.executeCommand("highwater.insertMarker");
+      await until("the marker in the focused document's text", (s) => s.focusedText?.includes("{{%m: From test}}") === true);
+      await vscode.commands.executeCommand("workbench.action.files.revert");
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    },
+  ],
+  [
     "exports a manuscript as a Word document",
     async () => {
       const path = join(dir, "DocxExport.highland");
