@@ -376,7 +376,7 @@ body.previewing #preview { display: flex; }
     <button id="tbpages" class="tb-icon" title="Pages (⌘E)" aria-label="Pages"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1.1" class="tb-hole"/><circle cx="8.5" cy="12" r="1.1" class="tb-hole"/><circle cx="8.5" cy="16.5" r="1.1" class="tb-hole"/></svg></button>
   </div>
   <div class="tb-mid">
-    <select id="pzoom" aria-label="Page size"><option value="fit">Fit width</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select>
+    <select id="pzoom" aria-label="Page size"><option value="fit">Fit width</option><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select>
     <span id="pstatus"></span>
   </div>
   <div class="tb-side tb-right">

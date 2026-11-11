@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.7
+
+- The pages (⌘E) open at 100% instead of Fit Width; the size menu in the top bar still offers Fit Width and the others.
+
 ## 0.5.6
 
 - A script opened in the text editor switches to the Highland-Style Editor (when it's the default) even on a slow computer: it used to look once, 300 ms after the tab opened, and stay as text if VS Code hadn't yet made the tab active or given the document its language. It now keeps looking for up to three seconds.
