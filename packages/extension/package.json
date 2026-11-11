@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -424,6 +424,23 @@
         "command": "highwater.chooseTheme",
         "title": "Choose Theme…",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.zoomIn",
+        "title": "Larger Text",
+        "category": "Highwater Too",
+        "enablement": "activeCustomEditorId == highwater.highlandEditor"
+      },
+      {
+        "command": "highwater.zoomOut",
+        "title": "Smaller Text",
+        "category": "Highwater Too",
+        "enablement": "activeCustomEditorId == highwater.highlandEditor"
+      },
+      {
+        "command": "highwater.zoomReset",
+        "title": "Reset Text Size",
+        "category": "Highwater Too"
       }
     ],
     "customEditors": [
@@ -565,6 +582,13 @@
             "Highland 2's Transit theme (dark)."
           ],
           "markdownDescription": "Colours for the Highland-Style Editor and the Navigator: one of Highland 2's themes, or **Match VS Code**. The rest of the window keeps VS Code's colour theme. **Highwater Too: Choose Theme…** switches it."
+        },
+        "highwater.fontSize": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 48,
+          "markdownDescription": "Text size in the Highland-Style Editor, in pixels. **0** follows VS Code's editor font size, scaled to Highland 2's (about 1.4 times). ⌘+ and ⌘− change it; ⌥⌘0 sets it back to 0."
         }
       }
     },
@@ -1816,6 +1840,30 @@
         "key": "ctrl+shift+i",
         "mac": "cmd+shift+i",
         "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+      },
+      {
+        "command": "highwater.zoomIn",
+        "key": "ctrl+=",
+        "mac": "cmd+=",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor'"
+      },
+      {
+        "command": "highwater.zoomIn",
+        "key": "ctrl+=",
+        "mac": "cmd+shift+=",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor'"
+      },
+      {
+        "command": "highwater.zoomOut",
+        "key": "ctrl+-",
+        "mac": "cmd+-",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor'"
+      },
+      {
+        "command": "highwater.zoomReset",
+        "key": "ctrl+alt+0",
+        "mac": "cmd+alt+0",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor'"
       }
     ],
     "viewsContainers": {

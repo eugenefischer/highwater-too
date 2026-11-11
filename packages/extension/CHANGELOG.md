@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.8 (m15-editor branch)
+
+- **Text size in the Highland-Style Editor:** larger by default, about the size Highland 2 shows (VS Code's editor font size × 1.4, was × 1.1). ⌘+ and ⌘− make it larger or smaller a step at a time while the Highland-Style Editor is in front (elsewhere they still zoom the window), and ⌥⌘0 goes back to the default. The page column grows with the text, so lines still break as on the page. The setting is `highwater.fontSize` (pixels; 0 for the default).
+
 ## 0.4.7 (m15-editor branch)
 
 - Navigator: dragging a scene or section back over where it already is hides the drop line, and letting go there leaves it where it was. Before, the line jumped to the nearest place that would move it, so a drag couldn't be undone by dropping it back.

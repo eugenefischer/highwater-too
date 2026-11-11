@@ -66,6 +66,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     let pendingReveal: object | undefined;
 
+    // The text size (highwater.fontSize; 0 follows VS Code's editor size).
+    const sendFontSize = () => void panel.webview.postMessage({ type: "fontSize", px: vscode.workspace.getConfiguration("highwater").get<number>("fontSize", 0) || null });
     // A Highland theme for the page (highwater.theme), or VS Code's colours.
     const sendTheme = () => {
       const theme = themeFor(vscode.workspace.getConfiguration("highwater").get<string>("theme"));
@@ -87,6 +89,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           view.ready = true;
           sendInvisibles();
           sendTheme();
+          sendFontSize();
           if (pendingReveal) void panel.webview.postMessage(pendingReveal);
           pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
@@ -114,6 +117,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (view.ready && e.affectsConfiguration("editor.renderWhitespace", document)) sendInvisibles();
         if (view.ready && e.affectsConfiguration("highwater.theme")) sendTheme();
+        if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
       }),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document !== document || e.contentChanges.length === 0) return;
@@ -149,7 +153,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 }
 html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); color: var(--hl-fg); }
 #editor, .cm-editor { height: 100%; }
-.cm-editor { font-size: calc(var(--vscode-editor-font-size, 14px) * 1.1); }
+/* The text size: highwater.fontSize, or by default VS Code's editor size scaled to Highland 2's (about 1.4 times). */
+.cm-editor { font-size: var(--hl-font-size, calc(var(--vscode-editor-font-size, 14px) * 1.4)); }
 .cm-editor.cm-focused { outline: none; }
 /* !important: CodeMirror's own theme, injected later, sets these with equal specificity. */
 .cm-editor .cm-scroller { font-family: "Courier Prime", monospace !important; line-height: 1.5; }
@@ -242,6 +247,18 @@ async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> 
   await vscode.commands.executeCommand("vscode.openWith", target, viewType);
 }
 
+/** One step of text size, from the size shown now (VS Code's editor size × 1.4 when not set). */
+async function zoom(step: number): Promise<void> {
+  const config = vscode.workspace.getConfiguration("highwater");
+  const now = config.get<number>("fontSize", 0) || Math.round(vscode.workspace.getConfiguration("editor").get<number>("fontSize", 14) * DEFAULT_SCALE);
+  const next = Math.max(MIN_FONT, Math.min(MAX_FONT, now + step));
+  await config.update("fontSize", next, vscode.ConfigurationTarget.Global);
+  vscode.window.setStatusBarMessage(`Highland-Style Editor text: ${next} px (⌥⌘0 resets)`, 2500);
+}
+const DEFAULT_SCALE = 1.4;
+const MIN_FONT = 8;
+const MAX_FONT = 48;
+
 /**
  * Turns a script's text tab into the Highland-Style Editor (the default) once things settle, if it
  * is still the active tab: a .md file is given its Highwater language just after it opens.
@@ -292,6 +309,10 @@ export function registerHighlandEditor(context: vscode.ExtensionContext): void {
       });
       quick.show();
     }),
+    // ⌘+ and ⌘−: the text size, as Highland's zoom (the page column grows with it); ⌥⌘0 goes back.
+    vscode.commands.registerCommand("highwater.zoomIn", () => zoom(+1)),
+    vscode.commands.registerCommand("highwater.zoomOut", () => zoom(-1)),
+    vscode.commands.registerCommand("highwater.zoomReset", () => vscode.workspace.getConfiguration("highwater").update("fontSize", 0, vscode.ConfigurationTarget.Global)),
     // ⌃G: VS Code's Go to Line only reaches text editors.
     vscode.commands.registerCommand("highwater.goToLine", async () => {
       const view = activeView();

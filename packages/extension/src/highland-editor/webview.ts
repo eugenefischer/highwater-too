@@ -60,7 +60,7 @@ const styling = StateField.define<DecorationSet>({
  * Keys that belong to Highwater (bold, italic, underline, note, omit, centre, highlight, case,
  * markers, panes, Preview): CodeMirror must leave them alone so VS Code's keybindings get them.
  */
-const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c", "Ctrl-g", "Mod-Shift-i"]);
+const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c", "Ctrl-g", "Mod-Shift-i", "Mod-=", "Mod--", "Mod-Alt-0"]);
 const isMac = /Mac/.test(navigator.platform);
 
 /**
@@ -201,7 +201,7 @@ function replace(text: string): void {
 }
 
 window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as { type: string; vars?: Record<string, string> | null; on?: boolean; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
+  const msg = event.data as { type: string; px?: number | null; vars?: Record<string, string> | null; on?: boolean; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
   if (msg.type === "init") {
     mode = msg.mode ?? "fountain";
     document.body.dataset.mode = mode;
@@ -210,6 +210,11 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);
+  else if (msg.type === "fontSize") {
+    if (msg.px) document.documentElement.style.setProperty("--hl-font-size", `${msg.px}px`);
+    else document.documentElement.style.removeProperty("--hl-font-size");
+    view?.requestMeasure();
+  }
   else if (msg.type === "invisibles") {
     showInvisibles = !!msg.on;
     view?.dispatch({ effects: invisibles.reconfigure(invisibleMarks(showInvisibles)) });
