@@ -42,7 +42,7 @@ describe("prose templates (close match)", () => {
   it.each([
     ["Novel", 0.9],
     ["Treatment", 0.95],
-    ["Article", 0.88],
+    ["Article", 0.97],
     ["Wiki", 0.95],
     ["MLA Report", 0.95],
   ] as const)("%s: Highland's short lines land on the same page within 3 pt, with the bundled fonts", async (name, share) => {
@@ -73,7 +73,8 @@ describe.runIf(privateDirs.length > 0)("prose templates with the real fonts", ()
     const layout = lay(name, privateDirs);
     if (Object.keys(layout.substituted).length) return; // a macOS font not copied yet
     const r = landmarks(await extractPages(join(templates, `${name.replace(/ /g, "")}Probe.pdf`)), await extractLayout(layout), 3);
-    expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(0.6);
+    // The misses left: nested list items, which Highland prints flat (a quirk we fix).
+    expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(0.97);
   });
 });
 

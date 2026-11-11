@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.8
+
+- Prose templates, measured with the real macOS fonts (Georgia, Times New Roman, Avenir Next): two page rules found, so far more lines land where Highland 2 puts them:
+  - A list item after the first may start in the page's last line space, as a paragraph may; a list's first item may not. (Article, Bulletin and Modern Standard had moved a line to the next page early.)
+  - "===" after a full page leaves an empty page, as in the Manuscript; in templates that print the empty lines between paragraphs, the one before it counts. (Speech had one page too few.)
+  - Now matching Highland's probe line for line, apart from nested list items (printed flat by Highland, a quirk we fix): Speech 255 of 257 lines, Article 244/246, Modern Standard 241/243, Bulletin 240/242, MLA Report 241/243, Treatment 247/249, Wiki 242/247. Novel (232/250) is next.
+
 ## 0.5.7
 
 - The pages (⌘E) open at 100% instead of Fit Width; the size menu in the top bar still offers Fit Width and the others.

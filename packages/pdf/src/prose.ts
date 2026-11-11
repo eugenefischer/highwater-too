@@ -62,6 +62,8 @@ interface Line {
 type Unit = { kind: "line"; line: Line } | { kind: "directives"; directives: Directive[] } | { kind: "pageBreak" };
 
 interface OpenPage {
+  /** Left empty by "===" after a full page. */
+  blank?: boolean;
   lines: { line: Line; top: number }[];
   y: number;
   header: PageTextDirective | null;
@@ -133,8 +135,14 @@ function run(doc: Document, T: ProseTemplate, options: ProseOptions, m: Measurer
   for (let i = 0; i < units.length; i++) {
     const u = units[i]!;
     if (u.kind === "pageBreak") {
+      // "===" is a paragraph too: after a full page it spills onto an empty one, as in the Manuscript.
+      // In templates that print the empty lines between paragraphs, the one before it counts
+      // (SpeechProbe p. 25: a paragraph ending 20 pt above the bottom margin).
+      const p = page as OpenPage | null;
+      const opener: Line = { items: [], height: T.body.pitch, ascent: T.body.ascent, opens: true };
+      if (p && p.lines.some((l) => !l.line.empty) && !fits(p, opener, p.y + (T.blankLines ? T.body.pitch : 0))) newPage().blank = true;
       const q = page as OpenPage | null;
-      if (q && q.lines.some((l) => !l.line.empty)) newPage();
+      if (q && (q.lines.some((l) => !l.line.empty) || q.blank)) newPage();
       continue;
     }
     if (u.kind === "directives") {
@@ -495,7 +503,7 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
         break;
       }
       case "list": {
-        for (const item of e.items) {
+        e.items.forEach((item, index) => {
           const textX = T.left + (T.indent.rule === "all" ? T.indent.first : 0) + T.list.text + item.level * T.list.nested;
           const marker = item.ordered ? item.marker : item.marker === "*" ? "•" : item.marker;
           const markerRuns = dress([{ text: `${marker} `, style: {} }], B);
@@ -503,10 +511,11 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           lines.forEach((r, k) => {
             const items: Item[] = [{ x: textX, runs: r }];
             if (k === 0) items.unshift({ x: textX - measure(markerRuns, B), runs: markerRuns });
-            // A list item never takes the last line's extra space (SpeechProbe; as in Manuscript).
-            push(bodyLine(items));
+            // An item after the first may start in the last line's extra space (ArticleProbe,
+            // ModernStandardProbe, BulletinProbe); a list's first item may not (SpeechProbe).
+            push(bodyLine(items, k === 0 && index > 0 ? { opens: true } : {}));
           });
-        }
+        });
         printed = true;
         afterParagraph = false;
         afterHeading = false;
