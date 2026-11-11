@@ -572,7 +572,7 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const path = await copyOf("PreviewInPlace");
       await vscode.commands.executeCommand("vscode.openWith", highland(path), "highwater.highlandEditor");
-      type Surface = { view: boolean; ready?: boolean; pagesSent?: number };
+      type Surface = { view: boolean; ready?: boolean; pagesSent?: number; pageCount?: number };
       const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
       const until = async (what: string, ok: (s: Surface) => boolean) => {
         const end = Date.now() + 15_000;
@@ -583,6 +583,8 @@ const tests: [string, () => Promise<void>][] = [
         }
       };
       await until("the Highland-Style Editor", (s) => s.view && s.ready === true);
+      // The exact page count, laid out in the background for the counts line and status bar.
+      await until("the page count", (s) => typeof s.pageCount === "number" && s.pageCount >= 1);
       await vscode.commands.executeCommand("highwater.preview");
       await until("the pages", (s) => (s.pagesSent ?? 0) >= 1);
       // The side-by-side Preview didn't open: ⌘E shows the pages in place.

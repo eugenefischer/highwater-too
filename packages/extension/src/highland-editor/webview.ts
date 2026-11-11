@@ -207,11 +207,12 @@ document.getElementById("tbpages")!.onclick = () => !pages.shown && togglePrevie
 document.getElementById("tbtheme")!.onclick = () => vscode.postMessage({ type: "chooseTheme" });
 
 /** Highland's counts at the foot of the text. */
-function showCounts(c: { characters: number; words: number; pages: number }): void {
+function showCounts(c: { characters: number; words: number; pages: number | null }): void {
   const n = (x: number) => x.toLocaleString("en-US");
   const el = document.getElementById("counts")!;
-  el.replaceChildren(...[`${n(c.characters)} characters`, `${n(c.words)} words`, `${n(c.pages)} ${c.pages === 1 ? "page" : "pages"}`].map((t) => Object.assign(document.createElement("span"), { textContent: t })));
-  el.title = "The page count is an estimate; the pages (⌘E) have the exact count.";
+  // The page count comes from laying out the pages; until then, none.
+  const parts = [`${n(c.characters)} characters`, `${n(c.words)} words`, ...(c.pages === null ? [] : [`${n(c.pages)} ${c.pages === 1 ? "page" : "pages"}`])];
+  el.replaceChildren(...parts.map((t) => Object.assign(document.createElement("span"), { textContent: t })));
 }
 
 function togglePreview(): void {
@@ -292,7 +293,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "template") {
     const t = event.data as { template: string; templates: string[] };
     pages.templates(t.templates, t.template);
-  } else if (msg.type === "counts") showCounts(event.data as { characters: number; words: number; pages: number });
+  } else if (msg.type === "counts") showCounts(event.data as { characters: number; words: number; pages: number | null });
   else if (msg.type === "spelling") spelling.configure(!!msg.on, (event.data as { words?: string[] }).words ?? []);
   else if (msg.type === "nextMisspelling") {
     if (view) void nextMisspelling(view, spelling);

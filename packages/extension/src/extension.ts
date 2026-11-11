@@ -17,6 +17,7 @@ import { registerAsk } from "./ask.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerWritingTools } from "./writing-tools.ts";
 import { registerStatusBar } from "./status.ts";
+import { pageCountOf, registerPageCounts } from "./page-count.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { registerHighlandEditor } from "./highland-editor/provider.ts";
 import { activeDocument, activeView, registerSurface } from "./surface.ts";
@@ -38,7 +39,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // What the panes follow, for the end-to-end tests of the Highland-Style Editor.
       vscode.commands.registerCommand("highwater.test.surface", () => {
         const view = activeView();
-        return { document: activeDocument()?.uri.toString(), view: !!view, ready: view?.ready, pagesSent: view?.pagesSent, selection: view?.selections[0], focused: focusedDocument().key, focusedText: focusedDocument().script?.getText() };
+        return { document: activeDocument()?.uri.toString(), view: !!view, ready: view?.ready, pagesSent: view?.pagesSent, selection: view?.selections[0], focused: focusedDocument().key, focusedText: focusedDocument().script?.getText(), pageCount: (() => { const d = activeDocument(); return d ? pageCountOf(d) : undefined; })() };
       }),
       vscode.commands.registerCommand("highwater.test.revealInView", (offset: number) => activeView()?.reveal(offset, "center", true)),
     );
@@ -89,6 +90,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Features, each on its own: one failing to start (say, a panel VS Code has not registered yet
   // after an update without a reload) must not take the others, or file access, down with it.
   const features: [string, () => void][] = [
+    ["page counts", () => registerPageCounts(context, store)],
     ["status bar", () => registerStatusBar(context, cache)],
     ["commands", () => registerCommands(context, store)],
     ["conversions and exports", () => registerConversions(context, store)],

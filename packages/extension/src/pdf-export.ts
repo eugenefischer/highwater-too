@@ -15,6 +15,8 @@ export interface ExportOptions {
   titlePage?: boolean;
   /** Highland's other print options. */
   print?: PrintFlags;
+  /** False: lay out only, for the page count (no PDF is drawn; `pdf` comes back empty). */
+  render?: boolean;
   date?: Date;
 }
 
@@ -68,7 +70,7 @@ export async function exportScreenplay(options: ScriptExportOptions): Promise<Ex
     ...marksOf(doc, options.print),
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
-  const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
+  const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
   return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
 }
 
@@ -93,7 +95,7 @@ export async function exportProse(options: ProseExportOptions): Promise<ExportRe
     ...marksOf(doc, options.print),
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
-  const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
+  const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
   const missing = Object.entries(layout.substituted).map(([font, sub]) => `${font} isn't installed on this computer, so ${options.template} prints in ${sub} instead; lines and pages may fall differently from Highland 2's.`);
   return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missing], anchors: anchors(layout) };
 }
@@ -101,7 +103,7 @@ export async function exportProse(options: ProseExportOptions): Promise<ExportRe
 /** The Plain Text template: the text as typed (includes and directives print as written). */
 export async function exportPlainText(options: ExportOptions): Promise<ExportResult> {
   const layout = layoutPlainText(options.text);
-  const pdf = await renderPdf(layout, { fontDir: options.fontDir, title: "" });
+  const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title: "" });
   return { pdf, pages: layout.pages.length, problems: [], anchors: anchors(layout) };
 }
 
@@ -120,7 +122,7 @@ export async function exportManuscript(options: ManuscriptExportOptions): Promis
   });
   const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");
   const title = cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "";
-  const pdf = await renderPdf(layout, { fontDir: options.fontDir, title });
+  const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
   return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
 }
 

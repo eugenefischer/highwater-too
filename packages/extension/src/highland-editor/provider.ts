@@ -3,6 +3,7 @@ import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
 import { onDidChangeTemplate, PRINT_OPTIONS, printOptionsOf, renderDocument, setPrintOption, setTemplate, templateOf, TEMPLATES, type PrintOption, type Template } from "../render-document.ts";
 import { documentStats } from "../syntax/stats.ts";
+import { onDidChangePageCount, pageCountOf } from "../page-count.ts";
 import type { BundleStore } from "../store.ts";
 import { parse } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
@@ -111,13 +112,13 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       const template = await templateOf(this.context, this.store(), document);
       void panel.webview.postMessage({ type: "template", template: template ?? "", templates: template ? TEMPLATES : [] });
     };
-    // Highland's counts at the foot of the text: characters, words and (estimated) pages.
+    // Highland's counts at the foot of the text: characters, words and pages (the print layout's, page-count.ts).
     let countsTimer: ReturnType<typeof setTimeout> | undefined;
     const sendCounts = () => {
       clearTimeout(countsTimer);
       countsTimer = setTimeout(() => {
         const stats = documentStats(parse(document.getText(), { mode: MODES.get(document.languageId) ?? "fountain" }));
-        void panel.webview.postMessage({ type: "counts", characters: stats.characters, words: stats.words, pages: stats.pages });
+        void panel.webview.postMessage({ type: "counts", characters: stats.characters, words: stats.words, pages: pageCountOf(document) ?? null });
       }, 300);
     };
     // Check Spelling While Typing (highwater.spellCheck) and the learned words.
@@ -203,6 +204,9 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && (e.affectsConfiguration("highwater.spellCheck") || e.affectsConfiguration("highwater.spellingWords"))) sendSpelling();
       }),
       // A template or print option changed (here, or in the status bar): lay the pages out again.
+      onDidChangePageCount((d) => {
+        if (view.ready && d.uri.toString() === document.uri.toString()) sendCounts();
+      }),
       onDidChangeTemplate((d) => {
         if (d.uri.toString() !== document.uri.toString()) return;
         if (view.ready) void sendTemplate();

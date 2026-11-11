@@ -170,10 +170,13 @@ async function sources(context: vscode.ExtensionContext, store: BundleStore, doc
   return { base, read };
 }
 
-export async function renderDocument(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template?: Template): Promise<Rendered | null> {
+/** With `render` false, lays out only: for the exact page count, without drawing the PDF. */
+export async function renderDocument(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template?: Template, render = true): Promise<Rendered | null> {
   const chosen = template ?? (await templateOf(context, store, doc));
   if (!chosen) return null;
-  const { base, read } = await sources(context, store, doc);
+  const sourced = await sources(context, store, doc);
+  const read = sourced.read;
+  const base = { ...sourced.base, render };
   if (chosen === "Plain Text") return { ...(await exportPlainText(base)), template: chosen };
   if (PROSE.has(chosen)) return { ...(await exportProse({ ...base, template: chosen, image: await loadImages(base.text, read) })), template: chosen };
   if (chosen !== "Manuscript") return { ...(await exportScreenplay({ ...base, template: chosen })), template: chosen };

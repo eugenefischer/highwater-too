@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- **Exact page counts:** the counts at the foot of the Highland-Style Editor and the status bar now show the real number of pages: the document is laid out with its print template and options (as for the PDF, but without drawing it) a second after you stop typing. Every page counts, the title page too, as in Highland (Astounding: 57). Until the first layout is done, no page count shows. Screen time follows the exact count.
+
 ## 0.5.3
 
 - **Highland's top bar** in the Highland-Style Editor:

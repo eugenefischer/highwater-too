@@ -22,7 +22,7 @@ Write screenplays and manuscripts in VS Code, in the `.highland` files of Highla
 - **Markers:** ⌃M inserts one (with an optional label, listed in the Navigator); ⌃⌥M jumps to the next.
 - **Syntax Cheat Sheet** (the ? button in the Navigator's title bar): the markup for screenplays, manuscripts and both.
 - **Title Page Builder:** a form for the title page fields.
-- The status bar shows words (or selected words), an estimate of pages and screen or reading time (prose at 250 words a minute, as Highland states it), and the print template.
+- The status bar shows words (or selected words), the exact page count (laid out with the print template a second after typing stops) and screen or reading time (prose at 250 words a minute, as Highland states it), and the print template.
 
 ## The sidebar
 
