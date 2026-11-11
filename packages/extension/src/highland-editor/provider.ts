@@ -105,6 +105,11 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
     const sendNumbers = () => void panel.webview.postMessage({ type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
+    // Check Spelling While Typing (highwater.spellCheck) and the learned words.
+    const sendSpelling = () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      void panel.webview.postMessage({ type: "spelling", on: config.get<boolean>("spellCheck", false), words: config.get<string[]>("spellingWords", []) });
+    };
     // The text size (highwater.fontSize; 0 follows VS Code's editor size).
     const sendFontSize = () => void panel.webview.postMessage({ type: "fontSize", px: vscode.workspace.getConfiguration("highwater").get<number>("fontSize", 0) || null });
     // A Highland theme for the page (highwater.theme), or VS Code's colours.
@@ -121,7 +126,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     const subscriptions = [
       highlandViews.add(view),
-      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean; kind?: string }) => {
+      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean; kind?: string; word?: string }) => {
         if (msg.type === "ready") {
           pageText = pageForm(document.getText());
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
@@ -131,6 +136,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendTheme();
           sendFontSize();
           sendNumbers();
+          sendSpelling();
           if (pendingReveal) void panel.webview.postMessage(pendingReveal);
           pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
@@ -146,6 +152,11 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           void setPrintOption(this.context, this.store(), document, msg.key as PrintOption, !!msg.value).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the print option: ${(e as Error).message}`));
         } else if (msg.type === "previewSave") {
           void vscode.commands.executeCommand(msg.kind === "docx" ? "highwater.exportDocx" : "highwater.exportPdf", document.uri);
+      } else if (msg.type === "learnWord" && typeof msg.word === "string" && msg.word.trim()) {
+          // Learn Spelling: kept in the writer's settings (all documents; Settings Sync carries it).
+          const config = vscode.workspace.getConfiguration("highwater");
+          const words = config.get<string[]>("spellingWords", []);
+          if (!words.includes(msg.word)) void config.update("spellingWords", [...words, msg.word].sort((x, y) => x.localeCompare(y)), vscode.ConfigurationTarget.Global);
       } else if (msg.type === "scroll" && typeof msg.top === "number") {
           view.top = toDocument(msg.top);
           highlandViews.scrolled(view);
@@ -170,6 +181,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && e.affectsConfiguration("highwater.theme")) sendTheme();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
+        if (view.ready && (e.affectsConfiguration("highwater.spellCheck") || e.affectsConfiguration("highwater.spellingWords"))) sendSpelling();
       }),
       // A template or print option changed (here, or in the status bar): lay the pages out again.
       onDidChangeTemplate((d) => {
@@ -199,6 +211,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     const script = webview.asWebviewUri(vscode.Uri.joinPath(dist, "highland-editor.js"));
     const font = (f: string) => webview.asWebviewUri(vscode.Uri.joinPath(dist, "fonts", f));
     const pdfjs = (f: string) => webview.asWebviewUri(vscode.Uri.joinPath(dist, "pdfjs", f));
+    const dict = (f: string) => webview.asWebviewUri(vscode.Uri.joinPath(dist, "dictionary-en", f));
     const nonce = Math.random().toString(36).slice(2);
     return `<!doctype html>
 <html><head><meta charset="utf-8">
@@ -300,8 +313,15 @@ body.previewing #preview { display: flex; }
 .cm-editor .cm-button[name="next"] { background: var(--hl-accent); color: var(--hl-accent-fg); border-color: transparent; }
 .cm-editor .cm-panel.cm-search [name="close"] { color: var(--hl-panel-fg); font-size: 1.3em; top: 4px; right: 6px; }
 .cm-editor .cm-panel.cm-search input[type="checkbox"] { accent-color: var(--hl-accent); }
+/* Spelling (highwater.spellCheck): red dots under a misspelling, as macOS draws them in Highland 2. */
+.hl-misspelled { text-decoration: underline dotted #ff3b30; text-decoration-thickness: 2px; text-underline-offset: 3px; text-decoration-skip-ink: none; }
+.hl-spellmenu { position: fixed; z-index: 100; min-width: 12em; padding: 4px 0; background: var(--vscode-menu-background, var(--vscode-editorWidget-background, Canvas)); color: var(--vscode-menu-foreground, var(--vscode-editorWidget-foreground, CanvasText)); border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, transparent)); border-radius: 5px; box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0,0,0,.3)); font: 13px var(--vscode-font-family); }
+.hl-spellmenu button { display: block; width: 100%; padding: 3px 14px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: default; }
+.hl-spellmenu button:not(:disabled):hover { background: var(--vscode-menu-selectionBackground, var(--hl-accent)); color: var(--vscode-menu-selectionForeground, var(--hl-accent-fg)); }
+.hl-spellmenu button:disabled { opacity: .6; }
+.hl-spellmenu hr { border: 0; border-top: 1px solid var(--vscode-menu-separatorBackground, var(--hl-muted)); margin: 4px 0; }
 </style></head>
-<body data-pdfjs="${pdfjs("pdf.min.mjs")}" data-worker="${pdfjs("pdf.worker.min.mjs")}">
+<body data-pdfjs="${pdfjs("pdf.min.mjs")}" data-worker="${pdfjs("pdf.worker.min.mjs")}" data-spell-worker="${webview.asWebviewUri(vscode.Uri.joinPath(dist, "spell-worker.js"))}" data-dict-aff="${dict("index.aff")}" data-dict-dic="${dict("index.dic")}">
 <div id="editor"></div>
 <div id="preview">
   <div id="ptop">
@@ -484,6 +504,12 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       if (!answer) return;
       await revealOffset(doc, starts[+answer - 1]!, "center", true);
     }),
+    vscode.commands.registerCommand("highwater.toggleSpelling", async () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      await config.update("spellCheck", !config.get<boolean>("spellCheck", false), vscode.ConfigurationTarget.Global);
+    }),
+    // ⌘; is handled in the page itself; this is the same for the Command Palette.
+    vscode.commands.registerCommand("highwater.nextMisspelling", () => void activeView()?.panel.webview.postMessage({ type: "nextMisspelling" })),
     vscode.commands.registerCommand("highwater.toggleParagraphNumbers", async () => {
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("paragraphNumbers", !config.get<boolean>("paragraphNumbers", false), vscode.ConfigurationTarget.Global);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1
+
+- **Check Spelling While Typing** in the Highland-Style Editor, as in Highland 2 (off by default; turn it on from the title bar's ⋯ menu, the Command Palette or `highwater.spellCheck`). It uses American English, with Hunspell's dictionary from SCOWL bundled.
+  - Misspelled words get red dots under them, as Highland draws them; the word you're typing waits until you leave it.
+  - Right-click a misspelled word for guesses (closest first), **Ignore Spelling** (for this tab until it's closed) or **Learn Spelling** (kept in `highwater.spellingWords` for every document).
+  - ⌘; (Go to Next Misspelling) selects the next misspelled word.
+  - Not checked: character names (from the cues, in the cue or anywhere else), scene-heading prefixes, `{{directives}}`, title-page keys, web and e-mail addresses, link targets and omitted text.
+  - The text editor (the code button) isn't checked; use a spelling extension such as Code Spell Checker there.
+
 ## 0.5.0
 
 - **M15 is on main:** the m15-editor branch (0.3.0–0.4.19) is merged, making the Highland-Style Editor the default way to open documents. It has Highland's writing keys, completion, themes, the Navigator in Highland's style, paragraph numbers, and the printed pages in place with all of Highland's print options. Nothing else changes from 0.4.19.

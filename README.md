@@ -2,7 +2,7 @@
 
 A VS Code extension that replaces the discontinued Highland 2: it opens, edits and saves `.highland` files safely, gives screenplays and manuscripts a Highland-style workspace, exports PDFs that match Highland's, and keeps a git writing history as a record of authorship.
 
-**Status:** version 0.5.0 (with M15: the Highland-Style Editor is the default): the MVP (M0–M8) and M9 are built, with Bin, Scratchpad and Assets for plain files, conversion between `.highland` and plain files, and the second version of the writing history (a catalog of works, fetching on demand, recognising files, the Works panel, reverting, removing and deleting, offering newer saves from other computers, and connecting a file to a work by hand). M10 (more templates) built: all fourteen of Highland 2's templates, the scripts and Plain Text line for line, the eight prose templates as a close match. In real-world testing. See the spec for decisions and the build plan.
+**Status:** version 0.5.1 (with M15: the Highland-Style Editor is the default): the MVP (M0–M8) and M9 are built, with Bin, Scratchpad and Assets for plain files, conversion between `.highland` and plain files, and the second version of the writing history (a catalog of works, fetching on demand, recognising files, the Works panel, reverting, removing and deleting, offering newer saves from other computers, and connecting a file to a work by hand). M10 (more templates) built: all fourteen of Highland 2's templates, the scripts and Plain Text line for line, the eight prose templates as a close match. In real-world testing. See the spec for decisions and the build plan.
 
 ## Plain .fountain, .md and .txt files
 
@@ -66,4 +66,4 @@ The pixel comparison needs poppler's `pdftoppm` (`brew install poppler`); its te
 
 MIT. The PDF engine is our own, written against Highland 2's measured layouts; its approach to dual dialogue and (MORE)/(CONT'D) follows [Better Fountain](https://github.com/piersdeseilligny/betterfountain) (MIT, © Piers Deseilligny), but no code is copied from it.
 
-`packages/pdf/fonts` holds Courier Prime 1.203 (the version Highland 2 embeds), © The Courier Prime Project Authors, under the SIL Open Font License 1.1 (`packages/pdf/fonts/OFL.txt`).
+`packages/pdf/fonts` holds Courier Prime 1.203 (the version Highland 2 embeds), © The Courier Prime Project Authors, under the SIL Open Font License 1.1 (`packages/pdf/fonts/OFL.txt`). The Highland-Style Editor's spelling dictionary is the `dictionary-en` package (Hunspell en_US from SCOWL; MIT and BSD), bundled from `node_modules` at build time with its licence.

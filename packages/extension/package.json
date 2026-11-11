@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -426,6 +426,17 @@
         "category": "Highwater Too"
       },
       {
+        "command": "highwater.toggleSpelling",
+        "title": "Check Spelling While Typing (On or Off)",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.nextMisspelling",
+        "title": "Go to Next Misspelling",
+        "category": "Highwater Too",
+        "enablement": "activeCustomEditorId == highwater.highlandEditor && config.highwater.spellCheck"
+      },
+      {
         "command": "highwater.chooseTheme",
         "title": "Choose Theme…",
         "category": "Highwater Too"
@@ -604,6 +615,19 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Show Highland 2's paragraph numbers in the Highland-Style Editor's margin: every line with text is numbered, except the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers. **Go to Paragraph…** (⌃G) goes to a number."
+        },
+        "highwater.spellCheck": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Check spelling as you type in the Highland-Style Editor, in American English, as Highland 2 does with macOS's spelling: misspelled words get red dots under them. Right-click one for guesses, **Ignore Spelling** or **Learn Spelling**; ⌘; goes to the next misspelling. Character names (from cues), scene-heading prefixes, directives, addresses and omitted text aren't checked."
+        },
+        "highwater.spellingWords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Words **Learn Spelling** has added to the Highland-Style Editor's dictionary (any document). Add or remove words here too."
         }
       }
     },
@@ -1427,6 +1451,11 @@
           "command": "highwater.toggleParagraphNumbers",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "1_highwater@2"
+        },
+        {
+          "command": "highwater.toggleSpelling",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "1_highwater@3"
         }
       ],
       "view/title": [
@@ -2044,6 +2073,8 @@
     "@types/vscode": "^1.100.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
+    "dictionary-en": "^4.0.0",
+    "nspell": "^2.1.5",
     "pdfjs-dist": "^6.4.299"
   },
   "dependencies": {

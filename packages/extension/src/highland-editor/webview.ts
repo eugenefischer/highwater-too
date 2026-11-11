@@ -12,6 +12,7 @@ import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages, type PdfMessage } from "./pages.ts";
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
+import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -121,6 +122,12 @@ let showInvisibles = false;
 const invisibleMarks = (on: boolean) => (on ? [highlightWhitespace(), lineEnds] : []);
 
 let view: EditorView | null = null;
+const spelling = new Spelling(
+  () => view,
+  () => parsed,
+  (msg) => vscode.postMessage(msg),
+);
+const spellingMarks = spellingPlugin(spelling);
 
 function start(text: string): void {
   view?.destroy();
@@ -131,9 +138,11 @@ function start(text: string): void {
       extensions: [
         history(),
         search({ top: true }),
+        keymap.of([{ key: "Mod-;", run: (v) => (void nextMisspelling(v, spelling), true) }]),
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
         EditorView.lineWrapping,
         styling,
+        spellingMarks,
         invisibles.of(invisibleMarks(showInvisibles)),
         screenplayCompletion(() => (mode === "fountain" ? parsed : null)),
         EditorView.updateListener.of((u) => {
@@ -151,6 +160,7 @@ function start(text: string): void {
     }),
   });
   view.scrollDOM.addEventListener("scroll", reportScroll);
+  spellingMenu(view, spelling, spellingMarks);
   view.focus();
 }
 
@@ -265,6 +275,10 @@ window.addEventListener("message", (event: MessageEvent) => {
     if (msg.px) document.documentElement.style.setProperty("--hl-font-size", `${msg.px}px`);
     else document.documentElement.style.removeProperty("--hl-font-size");
     view?.requestMeasure();
+  }
+  else if (msg.type === "spelling") spelling.configure(!!msg.on, (event.data as { words?: string[] }).words ?? []);
+  else if (msg.type === "nextMisspelling") {
+    if (view) void nextMisspelling(view, spelling);
   }
   else if (msg.type === "invisibles") {
     showInvisibles = !!msg.on;
