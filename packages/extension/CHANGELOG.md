@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.19 (m15-editor branch)
+
+- While the pages are showing in the Highland-Style Editor, clicking in the Navigator (or a search result) goes to that place in the pages instead of switching back to the text. The cursor moves there too, so ⌘E returns to the text at that place.
+
 ## 0.4.18 (m15-editor branch)
 
 - **All of Highland 2's print options now print,** in the preview, Export PDF and Save As PDF, matched to Highland's own PDFs:

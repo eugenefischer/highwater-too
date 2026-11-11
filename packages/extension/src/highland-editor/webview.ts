@@ -203,9 +203,13 @@ function togglePreview(): void {
 /** Scrolls to an offset from the extension (Navigator, Preview); with `select`, moves the cursor there too. */
 function reveal(offset: number, how: "top" | "center", select: boolean): void {
   if (!view) return;
-  // From the Navigator or a search: back to the text to show it.
-  if (select && pages.shown) pages.hide();
   const at = Math.min(Math.max(0, offset), view.state.doc.length);
+  if (pages.shown) {
+    // The pages stay showing (EJ): they go to the place, and the cursor waits there in the text.
+    if (select) view.dispatch({ selection: { anchor: at }, annotations: remote.of(true) });
+    pages.reveal(at, how);
+    return;
+  }
   view.dispatch({ ...(select ? { selection: { anchor: at } } : {}), effects: EditorView.scrollIntoView(at, { y: how === "top" ? "start" : "center" }), annotations: remote.of(true) });
   if (select) view.focus();
 }

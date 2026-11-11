@@ -95,6 +95,18 @@ export class Pages {
     this.post({ type: "preview", at });
   }
 
+  /** Scrolls the pages to where the text at `offset` prints (Navigator, search results). */
+  reveal(offset: number, how: "top" | "center"): void {
+    if (!this.shown) return;
+    if (this.#pending !== null || !this.#anchors.length) {
+      this.#pending = offset; // still laying out: open there
+      return;
+    }
+    const top = this.#positionOf(offset);
+    if (top === null) return;
+    this.#pages.scrollTop = Math.max(0, how === "center" ? top - this.#pages.clientHeight / 2 : top);
+  }
+
   /** Back to the text: at what the pages showed at their top, or (double-click) a chosen place. */
   hide(cursor: number | null = null): void {
     if (!this.shown) return;
