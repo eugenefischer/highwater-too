@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.15 (m15-editor branch)
+
+- **Paragraph numbers,** as in Highland 2: **Show or Hide Paragraph Numbers** (in the Highland-Style Editor's title-bar ⋯ menu, or the Command Palette) numbers every line with text in the margin. A wrapped line counts once; a cue, a parenthetical and each line of dialogue count separately; the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers aren't numbered. The setting is `highwater.paragraphNumbers`.
+- ⌃G in the Highland-Style Editor is now **Go to Paragraph…**: type a paragraph number (whether or not the numbers are showing).
+
 ## 0.4.14 (m15-editor branch)
 
 - The Navigator's header no longer has a filter button: the eye beside the Filter field at its foot chooses which kinds are listed.

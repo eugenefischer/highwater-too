@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -416,9 +416,14 @@
       },
       {
         "command": "highwater.goToLine",
-        "title": "Go to Line…",
+        "title": "Go to Paragraph…",
         "category": "Highwater Too",
         "enablement": "activeCustomEditorId == highwater.highlandEditor"
+      },
+      {
+        "command": "highwater.toggleParagraphNumbers",
+        "title": "Show or Hide Paragraph Numbers",
+        "category": "Highwater Too"
       },
       {
         "command": "highwater.chooseTheme",
@@ -594,6 +599,11 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "When a theme is chosen with **Choose Theme…**, colour the whole VS Code window to match (VS Code's colour theme becomes **Highwater** + the theme's name). **Match VS Code** puts back the colour theme you had before."
+        },
+        "highwater.paragraphNumbers": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show Highland 2's paragraph numbers in the Highland-Style Editor's margin: every line with text is numbered, except the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers. **Go to Paragraph…** (⌃G) goes to a number."
         }
       }
     },
@@ -1412,6 +1422,11 @@
           "command": "highwater.chooseTheme",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "1_highwater@1"
+        },
+        {
+          "command": "highwater.toggleParagraphNumbers",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "1_highwater@2"
         }
       ],
       "view/title": [

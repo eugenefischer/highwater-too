@@ -10,7 +10,7 @@ import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder,
 import { Decoration, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
-import { columnMinimum, columnWidth, inlineMarks, lineStyles, type InlineMark } from "./line-styles.ts";
+import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -31,13 +31,17 @@ function decorate(doc: Text): DecorationSet {
   const column = columnWidth(parsed);
   document.documentElement.style.setProperty("--column", `${column}ch`);
   document.documentElement.style.setProperty("--column-min", `${columnMinimum(parsed)}ch`);
+  const numbers = paragraphNumbers(parsed);
   const ranges: Range<Decoration>[] = [];
   for (let n = 1; n <= doc.lines; n++) {
     const line = doc.line(n);
     const s = styles.get(line.from);
-    if (!s) continue;
-    const cls = [`hl-${s.kind}`, s.level ? `hl-level-${s.level}` : "", s.align ? `hl-${s.align}` : ""].filter(Boolean).join(" ");
-    ranges.push(Decoration.line({ attributes: { class: cls, ...lineCss(s.indent, s.width) } }).range(line.from));
+    // Highland's paragraph number, shown in the margin when numbers are on (a class on the page).
+    const number = numbers.get(line.from);
+    if (!s && number === undefined) continue;
+    const cls = s ? [`hl-${s.kind}`, s.level ? `hl-level-${s.level}` : "", s.align ? `hl-${s.align}` : ""].filter(Boolean).join(" ") : "";
+    const attributes: Record<string, string> = { ...(cls ? { class: cls } : {}), ...(s ? lineCss(s.indent, s.width) : {}), ...(number !== undefined ? { "data-n": String(number) } : {}) };
+    ranges.push(Decoration.line({ attributes }).range(line.from));
   }
   // Emphasis, notes and omitted text styled where they stand.
   for (const m of inlineMarks(parsed)) if (m.to <= doc.length) ranges.push(MARKS[m.kind].range(m.from, m.to));
@@ -210,6 +214,10 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);
+  else if (msg.type === "numbers") {
+    document.documentElement.classList.toggle("hl-numbers", !!msg.on);
+    view?.requestMeasure();
+  }
   else if (msg.type === "fontSize") {
     if (msg.px) document.documentElement.style.setProperty("--hl-font-size", `${msg.px}px`);
     else document.documentElement.style.removeProperty("--hl-font-size");

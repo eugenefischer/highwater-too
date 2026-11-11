@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
+import { parse } from "@highwater/parser";
+import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { colorThemeLabel, HIGHLAND_THEMES, pageColors, themeFor } from "./themes.ts";
 import { askText } from "../ask.ts";
@@ -72,6 +74,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     let pendingReveal: object | undefined;
 
+    // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
+    const sendNumbers = () => void panel.webview.postMessage({ type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
     // The text size (highwater.fontSize; 0 follows VS Code's editor size).
     const sendFontSize = () => void panel.webview.postMessage({ type: "fontSize", px: vscode.workspace.getConfiguration("highwater").get<number>("fontSize", 0) || null });
     // A Highland theme for the page (highwater.theme), or VS Code's colours.
@@ -96,6 +100,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendInvisibles();
           sendTheme();
           sendFontSize();
+          sendNumbers();
           if (pendingReveal) void panel.webview.postMessage(pendingReveal);
           pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
@@ -124,6 +129,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && e.affectsConfiguration("editor.renderWhitespace", document)) sendInvisibles();
         if (view.ready && e.affectsConfiguration("highwater.theme")) sendTheme();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
+        if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
       }),
       vscode.workspace.onDidOpenTextDocument((d) => {
         if (d.uri.toString() !== document.uri.toString() || d === document) return;
@@ -192,6 +198,9 @@ html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); colo
 .hl-section, .hl-synopsis, .hl-directive, .hl-pageBreak, .hl-boneyard, .hl-title { color: var(--hl-muted); }
 .hl-heading { font-weight: bold; }
 .hl-quote { font-style: italic; }
+/* Highland's paragraph numbers, in the margin left of the text (highwater.paragraphNumbers). */
+.cm-editor .cm-content .cm-line { position: relative; }
+.hl-numbers .cm-line[data-n]::before { content: attr(data-n); position: absolute; left: -6.5em; width: 4.5em; text-align: right; font-size: 0.65em; line-height: calc(1.3em / 0.65); color: var(--hl-muted); font-family: var(--vscode-font-family); pointer-events: none; user-select: none; }
 /* Emphasis, notes and omitted text where they stand. */
 .hl-bold { font-weight: bold; }
 .hl-italic { font-style: italic; }
@@ -379,18 +388,29 @@ export function registerHighlandEditor(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("highwater.zoomOut", () => zoom(-1)),
     vscode.commands.registerCommand("highwater.zoomReset", () => vscode.workspace.getConfiguration("highwater").update("fontSize", 0, vscode.ConfigurationTarget.Global)),
     // ⌃G: VS Code's Go to Line only reaches text editors.
+    // ⌃G: Go to Paragraph, by Highland's paragraph numbers (VS Code's Go to Line only reaches text editors).
     vscode.commands.registerCommand("highwater.goToLine", async () => {
       const view = activeView();
       if (!view) return;
       const doc = view.document;
-      const current = doc.positionAt(view.selections[0]?.head ?? 0).line + 1;
+      const numbers = paragraphNumbers(parse(doc.getText(), { mode: MODES.get(doc.languageId) ?? "fountain" }));
+      const starts = [...numbers.keys()];
+      const count = starts.length;
+      if (!count) return;
+      const head = view.selections[0]?.head ?? 0;
+      let current = 0;
+      for (const [at, n] of numbers) if (at <= head) current = n;
       const answer = await askText({
-        title: "Go to Line",
-        prompt: `Current line ${current}. Type a line number between 1 and ${doc.lineCount}.`,
-        validateInput: (v) => (/^\s*\d+\s*$/.test(v) && +v >= 1 && +v <= doc.lineCount ? null : `A line number between 1 and ${doc.lineCount}`),
+        title: "Go to Paragraph",
+        prompt: `${current ? `Now at paragraph ${current}. ` : ""}Type a paragraph number between 1 and ${count}.`,
+        validateInput: (v) => (/^\s*\d+\s*$/.test(v) && +v >= 1 && +v <= count ? null : `A paragraph number between 1 and ${count}`),
       });
       if (!answer) return;
-      await revealOffset(doc, doc.offsetAt(new vscode.Position(+answer - 1, 0)), "center", true);
+      await revealOffset(doc, starts[+answer - 1]!, "center", true);
+    }),
+    vscode.commands.registerCommand("highwater.toggleParagraphNumbers", async () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      await config.update("paragraphNumbers", !config.get<boolean>("paragraphNumbers", false), vscode.ConfigurationTarget.Global);
     }),
     vscode.commands.registerCommand("highwater.openTextEditor", async (uri?: vscode.Uri) => {
       const tab = vscode.window.tabGroups.activeTabGroup.activeTab;

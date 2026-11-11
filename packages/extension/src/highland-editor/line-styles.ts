@@ -168,3 +168,32 @@ export function inlineMarks(doc: Document): InlineMark[] {
   for (const b of doc.overlays.boneyard) if (b.span.end > b.span.start) out.push({ from: b.span.start, to: b.span.end, kind: "omitted" });
   return out;
 }
+
+/**
+ * Highland 2's paragraph numbers: every line with text gets the next number (a wrapped line counts
+ * once; a cue, a parenthetical and each line of dialogue count separately), except the title page,
+ * a note or omitted (boneyard) text on a line of its own, and directive lines such as {{HEADER}}
+ * and markers. Keyed by the offset where the line starts. Pure, for tests.
+ */
+export function paragraphNumbers(doc: Document): Map<number, number> {
+  const out = new Map<number, number>();
+  const src = doc.source;
+  const skip = new Set<number>();
+  for (const e of doc.elements) if (e.kind === "directiveLine") for (const l of e.lines) skip.add(l.span.start);
+  const inBoneyard = (from: number, to: number) => doc.overlays.boneyard.some((b) => b.span.start <= from && b.span.end >= to);
+  let n = 0;
+  for (let at = 0; at <= src.length; ) {
+    const nl = src.indexOf("\n", at);
+    const end = nl < 0 ? src.length : nl;
+    const text = src.slice(at, end).replace(/\r$/, "");
+    const trimmed = text.trim();
+    const first = at + text.length - text.trimStart().length;
+    const last = at + text.trimEnd().length;
+    const titlePage = doc.titlePage !== null && at >= doc.titlePage.span.start && at < doc.titlePage.span.end;
+    const noteOnly = /^\[\[[\s\S]*\]\]$/.test(trimmed) && !trimmed.slice(2, -2).includes("]]");
+    if (trimmed && !titlePage && !skip.has(at) && !noteOnly && !inBoneyard(first, last)) out.set(at, ++n);
+    if (nl < 0) break;
+    at = nl + 1;
+  }
+  return out;
+}
