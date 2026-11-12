@@ -464,6 +464,7 @@ class BinPanel {
 
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
+    this.#popover();
     $("binnew").onclick = () => {
       this.#newAt = this.#cards.length;
       deps.bin({ kind: "add", index: this.#cards.length, text: "" });
@@ -522,12 +523,10 @@ class BinPanel {
 
   show(cards: BinCard[], available: boolean): void {
     this.#available = available;
-    // Don't redraw under the writer's hands: an item being edited keeps its box.
-    if (this.#editing && cards[this.#editing.index] !== undefined && document.activeElement === this.#editing.area) {
-      this.#cards = cards;
-      return;
-    }
-    this.#editing = null;
+    // While an item is open in the popover, keep its text as typed (the saved copy may lag behind).
+    const e = this.#editing;
+    if (e && cards[e.index] !== undefined) cards[e.index] = { ...cards[e.index]!, text: e.area.value };
+    else if (e) this.#close();
     this.#cards = cards;
     if (this.#selected >= cards.length) this.#selected = -1;
     this.#render();
@@ -593,46 +592,81 @@ class BinPanel {
     if (text !== undefined) this.deps.bin({ kind: "remove", index, text });
   }
 
-  /** Opens a card for editing in place; what is typed is saved as you go. */
+  /**
+   * Opens an item in Highland's editing popover: a plain-text box beside the sidebar, its arrow
+   * pointing at the card. What is typed is saved as you go; Escape, ⌘Enter or a click outside closes it.
+   */
   #edit(index: number, el: HTMLElement): void {
     if (this.#editing?.index === index) return;
     this.#finish();
-    const area = document.createElement("textarea");
-    area.className = "bincard-edit";
+    const pop = $("binpop");
+    const area = $<HTMLTextAreaElement>("binpoptext");
     area.value = this.#cards[index]?.text ?? "";
-    area.spellcheck = false;
-    el.replaceChildren(area);
-    el.draggable = false;
-    el.classList.add("editing");
+    pop.hidden = false;
+    // Beside the sidebar, as tall as it can be up to 345 px, centred on the card where it fits.
+    const card = el.getBoundingClientRect();
+    const side = $("sidebar").getBoundingClientRect();
+    const height = Math.min(345, window.innerHeight - 24);
+    const middle = card.top + Math.min(card.height, 80) / 2;
+    const top = Math.max(12, Math.min(window.innerHeight - height - 12, middle - height / 2));
+    pop.style.left = `${Math.round(side.right + 10)}px`;
+    pop.style.top = `${Math.round(top)}px`;
+    pop.style.height = `${height}px`;
+    pop.style.setProperty("--arrow", `${Math.round(Math.max(16, Math.min(height - 16, middle - top)))}px`);
     const editing = { index, area, timer: undefined as ReturnType<typeof setTimeout> | undefined };
     this.#editing = editing;
-    const save = () => {
-      clearTimeout(editing.timer);
-      if (area.value !== this.#cards[index]?.text) {
-        this.#cards[index] = { ...this.#cards[index]!, text: area.value };
-        this.deps.post({ type: "binEdit", index, text: area.value });
-      }
-    };
-    const fit = () => {
-      area.style.height = "auto";
-      area.style.height = `${area.scrollHeight}px`;
-    };
+    this.#select(index);
+    area.focus();
+    area.setSelectionRange(area.value.length, area.value.length);
+  }
+
+  /** Saves what the popover holds (if changed). */
+  #save(): void {
+    const e = this.#editing;
+    if (!e) return;
+    clearTimeout(e.timer);
+    const text = e.area.value;
+    if (text !== this.#cards[e.index]?.text) {
+      this.#cards[e.index] = { ...this.#cards[e.index]!, text };
+      this.deps.post({ type: "binEdit", index: e.index, text });
+    }
+  }
+
+  /** Wires the popover once: saving as you type, and closing. */
+  #popover(): void {
+    const pop = $("binpop");
+    const area = $<HTMLTextAreaElement>("binpoptext");
     area.addEventListener("input", () => {
-      clearTimeout(editing.timer);
-      editing.timer = setTimeout(save, 600);
-      fit();
+      const e = this.#editing;
+      if (!e) return;
+      clearTimeout(e.timer);
+      e.timer = setTimeout(() => this.#save(), 600);
     });
     area.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && /^[biuy/.=\-]$/i.test(e.key)) e.stopPropagation();
-      if (e.key === "Escape") area.blur();
+      if (e.key === "Escape" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) {
+        e.preventDefault();
+        this.#close();
+      }
     });
-    area.addEventListener("blur", () => {
-      save();
-      this.#finish();
-      this.#render();
-    });
-    area.focus();
-    fit();
+    // A click anywhere outside it closes it.
+    window.addEventListener(
+      "mousedown",
+      (e) => {
+        if (this.#editing && !pop.contains(e.target as Node)) this.#close();
+      },
+      true,
+    );
+    window.addEventListener("blur", () => this.#save());
+  }
+
+  #close(): void {
+    if (!this.#editing) return;
+    this.#save();
+    this.#finish();
+    $("binpop").hidden = true;
+    this.#render();
+    this.#list.focus({ preventScroll: true });
   }
 
   #finish(): void {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.6 (branch m16-sidebar)
+
+- Bin items are written in Highland 2's popover: + (or double-clicking a card, or Enter on a selected one) opens a plain-text editor beside the sidebar, its arrow pointing at the card. What you type is saved as you go; Escape, ⌘Enter or a click outside closes it.
+
 ## 0.6.5 (branch m16-sidebar)
 
 - Undo and redo cover the Bin, as in Highland 2: ⌘Z puts back text dragged into the Bin (and takes the item out), puts a card dragged into the page back in the Bin, and brings back a deleted card; ⇧⌘Z does them again. Cut to Bin and Copy to Bin (⌥⌘X, ⌥⌘C), +, and reordering cards are undoable too. ⌘Z works with the text or the sidebar in front (in the Scratchpad, or a card being edited, it undoes that box's typing).

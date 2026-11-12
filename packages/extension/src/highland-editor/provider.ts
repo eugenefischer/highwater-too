@@ -353,7 +353,11 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 .bincard-delete { position: absolute; top: 5px; right: 5px; display: none; padding: 1px; }
 .bincard-delete:hover { background: none; }
 .bincard.selected .bincard-delete { display: flex; }
-.bincard.editing { cursor: text; padding: 4px; }
+/* Highland's popover for writing in a Bin item: beside the sidebar, its arrow pointing at the card. */
+#binpop { position: fixed; z-index: 40; width: min(350px, calc(100vw - var(--sb-width) - 30px)); display: flex; background: var(--hl-bg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); }
+#binpop[hidden] { display: none; }
+#binpop::before { content: ""; position: absolute; left: -7px; top: calc(var(--arrow, 50%) - 6px); width: 12px; height: 12px; background: var(--hl-bg); border-left: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); transform: rotate(45deg); }
+#binpoptext { flex: 1; resize: none; border: 0; outline: none; margin: 0; padding: 16px 16px; background: transparent; color: var(--hl-fg); font-family: var(--vscode-font-family); font-size: 1.15em; line-height: 1.35; border-radius: 10px; }
 .bincard-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 44px; }
 .bincard-detail { margin-top: 2px; color: var(--nav-muted); font-size: 0.92em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .bincard-tools { position: absolute; top: 4px; right: 4px; display: none; gap: 0; }
@@ -536,6 +540,7 @@ body.previewing #preview { display: flex; }
   </div>
   <div id="sbgrip" aria-hidden="true"></div>
 </div>
+<div id="binpop" role="dialog" aria-label="Bin item" hidden><textarea id="binpoptext" spellcheck="false" aria-label="Bin item text"></textarea></div>
 <div id="content">
 <div id="topbar">
   <div class="tb-side">
