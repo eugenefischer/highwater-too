@@ -463,7 +463,8 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
         if (S.kind === "asterism") {
           const star = dress([{ text: "*", style: {} }], B);
           const w = measure(star, B);
-          push({ items: [], height: S.height, ascent: S.ascent, graphics: () => [], opens: true });
+          // Never in the page's extra space, and its stars stay together (NovelProbe p. 4).
+          push({ items: [], height: S.height, ascent: S.ascent, graphics: () => [], together: 2 });
           const line = out.at(-1) as Extract<Unit, { kind: "line" }>;
           line.line.items = [{ x: centre - w / 2, runs: star }];
           // The two lower stars, 6.5 pt below, either side of the centre.
@@ -495,10 +496,12 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
       case "centered": {
         for (const r of wrapMeasured(dress(toRuns(e.inline, ctx), B), T.right - T.left, T.right - T.left, width(B))) {
           const w = measure(r, B);
-          push(bodyLine([{ x: e.kind === "centered" ? (T.left + T.right) / 2 - w / 2 : T.right - w, runs: r }], { opens: true }));
+          // Never in the page's extra space (WikiProbe p. 4).
+          push(bodyLine([{ x: e.kind === "centered" ? (T.left + T.right) / 2 - w / 2 : T.right - w, runs: r }]));
         }
         printed = true;
-        afterParagraph = false;
+        // Paragraphs to Highland: the next paragraph is indented (NovelProbe p. 4).
+        afterParagraph = true;
         afterHeading = false;
         break;
       }
@@ -507,7 +510,9 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           const textX = T.left + (T.indent.rule === "all" ? T.indent.first : 0) + T.list.text + item.level * T.list.nested;
           const marker = item.ordered ? item.marker : item.marker === "*" ? "•" : item.marker;
           const markerRuns = dress([{ text: `${marker} `, style: {} }], B);
-          const lines = wrapMeasured(dress(toRuns(item.inline, ctx), B), T.right - textX, T.right - textX, width(B));
+          // Lists stop as far in from the right as the left margin is beyond an inch (Novel: 468).
+          const right = T.right - (T.left - 72);
+          const lines = wrapMeasured(dress(toRuns(item.inline, ctx), B), right - textX, right - textX, width(B));
           lines.forEach((r, k) => {
             const items: Item[] = [{ x: textX, runs: r }];
             if (k === 0) items.unshift({ x: textX - measure(markerRuns, B), runs: markerRuns });
@@ -524,7 +529,8 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
       case "termList": {
         const termRight = T.left + 224;
         const defX = T.left + 244;
-        const defRight = Math.min(T.right, defX + 224);
+        // Highland's definitions are 224 pt wide even past a narrower right margin (Novel): a quirk.
+        const defRight = o.quirks ? defX + 224 : Math.min(T.right, defX + 224);
         const pitch = B.size * 1.3;
         for (const item of e.items) {
           const defs = wrapMeasured(dress(toRuns(item.definitionInline, ctx), B), defRight - defX, defRight - defX, width(B));

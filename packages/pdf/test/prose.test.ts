@@ -40,11 +40,12 @@ describe("prose templates (close match)", () => {
   // The bundled fonts are the versions Highland ships, so these templates can be checked in CI.
   // Article, Wiki and MLA Report print with Gelasio and Tinos, which have Georgia's and Times New Roman's widths.
   it.each([
-    ["Novel", 0.9],
-    ["Treatment", 0.95],
-    ["Article", 0.97],
-    ["Wiki", 0.95],
-    ["MLA Report", 0.95],
+    // The misses left: nested list items, which Highland prints flat (a quirk we fix).
+    ["Novel", 0.98],
+    ["Treatment", 0.98],
+    ["Article", 0.98],
+    ["Wiki", 0.98],
+    ["MLA Report", 0.98],
   ] as const)("%s: Highland's short lines land on the same page within 3 pt, with the bundled fonts", async (name, share) => {
     const layout = lay(name);
     expect(Object.values(layout.substituted).every((f) => f === "Gelasio" || f === "Tinos")).toBe(true);
@@ -69,12 +70,12 @@ describe("prose templates (close match)", () => {
 
 // With the real fonts (EJ's private copies), every template should land close to Highland's.
 describe.runIf(privateDirs.length > 0)("prose templates with the real fonts", () => {
-  it.each(Object.keys(PROSE_TEMPLATES).filter((n) => n !== "Novel" && n !== "Treatment"))("%s: most short lines land where Highland puts them", async (name) => {
+  it.each(Object.keys(PROSE_TEMPLATES))("%s: most short lines land where Highland puts them", async (name) => {
     const layout = lay(name, privateDirs);
     if (Object.keys(layout.substituted).length) return; // a macOS font not copied yet
     const r = landmarks(await extractPages(join(templates, `${name.replace(/ /g, "")}Probe.pdf`)), await extractLayout(layout), 3);
     // The misses left: nested list items, which Highland prints flat (a quirk we fix).
-    expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(0.97);
+    expect(r.matched / r.total, r.missed.join("\n")).toBeGreaterThan(0.98);
   });
 });
 

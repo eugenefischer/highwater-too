@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.9
+
+- Novel and Wiki now match Highland 2 too: every prose template prints its probe line for line, apart from nested list items (Highland prints them flat, a quirk we fix).
+  - Novel's scene break (three stars) moves to the next page whole instead of splitting across two; lists wrap 36 pt short of the right margin, as Highland's do; a paragraph after centred or right-aligned text is indented.
+  - Centred and right-aligned lines never start in a page's extra last-line space (Wiki).
+
 ## 0.5.8
 
 - Prose templates, measured with the real macOS fonts (Georgia, Times New Roman, Avenir Next): two page rules found, so far more lines land where Highland 2 puts them:
