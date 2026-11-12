@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.9 (branch m16-sidebar)
+
+- **Writing History** is in the Highland-Style Editor's sidebar (the clock icon; the status bar's history item opens it too): this document's saves, newest first, with when, what kind (Save, Autosave, Revert…) and the file. Click a save to compare it with the text as it is now; its ↺ reverts to it (after asking). The ⋯ at the foot has the rest: turning the history off or on for this document, Connect to a Work's History…, Open Work from History…, Export, syncing, the mirror, and the history's folder and location.
+- **Works** is in it too (the books icon): every work in the writing history, with where it is. Click a work here to open it; the arrow beside one lists its saves (click one to read it); ⋯ on a work offers Restore…, Remove from This Computer… and Delete Writing History…. The Filter narrows the list; ↻ syncs with the mirror and refreshes.
+
 ## 0.6.8 (branch m16-sidebar)
 
 - A Bin item or image dragged into the text goes in exactly where you let go, mid-sentence if that's where, as in Highland 2; the drop caret shows that spot as you drag.

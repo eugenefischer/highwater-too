@@ -371,6 +371,23 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 .sb-cards.drop-end::after { content: ""; display: block; height: 3px; border-radius: 2px; background: var(--nav-accent); }
 section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-accent) 70%, transparent); outline-offset: -4px; border-radius: 6px; }
 .assetcard { display: flex; align-items: center; gap: 10px; }
+/* Writing History and Works: rows (Highwater's own panels, in the sidebar's style). */
+.sb-head { padding: 4px 14px 2px; color: var(--nav-muted); font-size: 0.85em; letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-rows { display: flex; flex-direction: column; gap: 2px; }
+.sb-row { position: relative; padding: 5px 34px 5px 8px; border-radius: 5px; cursor: pointer; }
+.sb-row:hover { background: var(--nav-hover); }
+.sb-row-main { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.sb-row-when { font-weight: 600; flex: none; }
+.sb-row-kind { color: var(--nav-muted); font-size: 0.9em; }
+.sb-row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-row-detail { color: var(--nav-muted); font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-row .sb-row-detail { padding-left: 0; }
+.sb-row.work .sb-row-detail { padding-left: 16px; }
+.sb-row.save { padding-left: 26px; }
+.sb-row.work-remote .sb-row-title, .sb-row.work-local .sb-row-title { font-weight: 500; color: color-mix(in srgb, var(--nav-fg) 75%, var(--nav-muted)); }
+.sb-twist { flex: none; width: 10px; color: var(--nav-muted); font-size: 0.85em; }
+.sb-row-tool { position: absolute; top: 5px; right: 4px; display: none; }
+.sb-row:hover .sb-row-tool { display: flex; }
 .assetcard-pic { flex: none; width: 48px; height: 48px; border-radius: 4px; background: color-mix(in srgb, var(--nav-fg) 10%, transparent); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .assetcard-pic img { max-width: 100%; max-height: 100%; }
 .assetcard-text { min-width: 0; flex: 1; }
@@ -539,8 +556,15 @@ body.previewing #preview { display: flex; }
       <textarea id="scratch" spellcheck="false" aria-label="Scratchpad"></textarea>
       <div id="scratchfoot" class="sb-foot"><button id="scratchexport" class="sb-button" data-tip="Export Scratchpad contents to a new document" aria-label="Export Scratchpad contents to a new document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button></div>
     </section>
-    <section data-panel="history" hidden><div class="sb-empty">The Writing History moves here soon.<br><button data-view="history">Show the Writing History</button></div></section>
-    <section data-panel="works" hidden><div class="sb-empty">Works move here soon.<br><button data-view="works">Show Works</button></div></section>
+    <section data-panel="history" hidden>
+      <div class="sb-head"><span id="histtitle"></span></div>
+      <div class="sb-scroll"><div id="histlist" class="sb-rows"></div><div id="histnote" class="sb-note" hidden></div></div>
+      <div class="sb-foot sb-foot-end"><button id="histmenu" class="sb-button" data-tip="More writing history actions…" aria-label="More writing history actions…"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></div>
+    </section>
+    <section data-panel="works" hidden>
+      <div class="sb-scroll"><div id="worklist" class="sb-rows"></div><div id="worknote" class="sb-note" hidden>No works yet: each document's writing history starts with its first save.</div></div>
+      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync and refresh" aria-label="Sync and refresh"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
+    </section>
   </div>
   <div id="sbgrip" aria-hidden="true"></div>
 </div>

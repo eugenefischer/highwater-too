@@ -22,6 +22,8 @@ export interface WorksHost {
   changed(): void;
 }
 
+export type WorkNode = Node;
+
 type Node = { kind: "work"; work: WorkInfo; here: string | undefined } | { kind: "save"; work: WorkInfo; here: string | undefined; commit: CommitInfo };
 
 /**

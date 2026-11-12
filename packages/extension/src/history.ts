@@ -18,7 +18,7 @@ import { toBundle, withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
 import { focusedDocument, roleOf, scriptIsOpen } from "./focus.ts";
 import { afterPull, deletedElsewhere, revertTo, WorksView, type WorksHost } from "./works.ts";
-import { showDocument } from "./surface.ts";
+import { activeView, showDocument } from "./surface.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -70,6 +70,18 @@ async function fileId(path: string): Promise<string | null> {
  * document's branch in the history repository. Explicit saves commit at once; autosaves at most every
  * five minutes, and once more when the document closes. A failed commit never blocks a save.
  */
+/** The writing history, for the Highland-Style Editor's sidebar (set by registerHistory). */
+export let historyApi:
+  | {
+      /** A document's saves, newest first, and whether its history is on, paused, off, or not begun. */
+      saves(key: string): Promise<{ state: "on" | "paused" | "off" | "none"; commits: CommitInfo[] }>;
+      compare(key: string, hash: string): Promise<void>;
+      revert(key: string, hash: string): Promise<void>;
+      works: WorksView;
+      onDidChange(listener: () => void): vscode.Disposable;
+    }
+  | undefined;
+
 export function registerHistory(context: vscode.ExtensionContext, store: BundleStore): void {
   const reasons = new Map<string, vscode.TextDocumentSaveReason>();
   const status = vscode.window.createStatusBarItem("highwater.history", vscode.StatusBarAlignment.Left, 0);
@@ -352,6 +364,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   }
 
   async function showHistory(): Promise<void> {
+    // In the Highland-Style Editor, its sidebar's Writing History panel.
+    const hv = activeView();
+    if (hv) {
+      void hv.panel.webview.postMessage({ type: "showPanel", panel: "history" });
+      return;
+    }
     const key = focus.key;
     const doc = await focus.document();
     if (!doc || !key) {
@@ -445,6 +463,30 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     },
   };
   const works = new WorksView(worksHost);
+  // For the Highland-Style Editor's sidebar (sidebar-host.ts): the same history, for one document.
+  historyApi = {
+    async saves(key) {
+      if (!enabled()) return { state: "off", commits: [] };
+      const r = await lookup(key).catch(() => null);
+      return { state: !r ? "none" : r.paused ? "paused" : "on", commits: r ? await history().log(r.id) : [] };
+    },
+    async compare(key, hash) {
+      const r = await lookup(key);
+      const commit = r && (await history().log(r.id)).find((c) => c.hash === hash);
+      if (commit) await compare(await documentFor(key), key, commit);
+    },
+    async revert(key, hash) {
+      const r = await lookup(key);
+      const commit = r && (await history().log(r.id)).find((c) => c.hash === hash);
+      if (commit) await revertTo(worksHost, await documentFor(key), key, commit);
+    },
+    works,
+    onDidChange: (listener) => {
+      const a = view.onDidChangeTreeData(listener);
+      const b = works.onDidChangeTreeData(listener);
+      return { dispose: () => (a.dispose(), b.dispose()) };
+    },
+  };
   // Works another computer deleted, removed here whenever main comes in (pull, push or fetch).
   context.subscriptions.push(mirror.onDidRemoveDeleted((removed) => void deletedElsewhere(worksHost, removed)));
 

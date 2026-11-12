@@ -50,15 +50,18 @@ export class Sidebar {
   readonly #scratch: ScratchpadPanel;
   readonly #bin: BinPanel;
   readonly #assets: AssetsPanel;
+  readonly #history: HistoryPanel;
+  readonly #works: WorksPanel;
 
   constructor(private readonly deps: SidebarDeps) {
     this.#nav = new NavigatorPanel(deps);
     this.#scratch = new ScratchpadPanel(deps);
     this.#bin = new BinPanel(deps);
     this.#assets = new AssetsPanel(deps);
+    this.#history = new HistoryPanel(deps);
+    this.#works = new WorksPanel(deps);
     for (const b of document.querySelectorAll<HTMLButtonElement>("#sbicons [data-panel]")) b.onclick = () => this.show(b.dataset.panel as PanelName);
     $("tbsidebar").onclick = () => this.toggle();
-    for (const b of document.querySelectorAll<HTMLButtonElement>("[data-view]")) b.onclick = () => deps.post({ type: "showView", view: b.dataset.view });
     this.#resizer();
     this.#apply();
   }
@@ -107,6 +110,9 @@ export class Sidebar {
     else if (msg.type === "scratchpadSaved") this.#scratch.saved(String(msg.text ?? ""));
     else if (msg.type === "bin") this.#bin.show(msg.items as BinCard[], !!msg.available);
     else if (msg.type === "assets") this.#assets.show(msg.items as AssetCard[], !!msg.available);
+    else if (msg.type === "history") this.#history.show(msg as unknown as HistoryMessage);
+    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[]);
+    else if (msg.type === "workSaves") this.#works.saves(msg.i as number, msg.saves as WorkSaveRow[]);
     else if (msg.type === "showPanel" && PANELS.includes(msg.panel as PanelName)) this.show(msg.panel as PanelName);
     else if (msg.type === "toggleSidebar") this.toggle();
     else return false;
@@ -795,4 +801,161 @@ function button(tip: string, path: string, run: () => void, cls = ""): HTMLButto
     run();
   };
   return b;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Writing History (Highwater's, not Highland's): this document's saves, newest first. Click one to
+// compare it with the text as it is now; its ↺ reverts to it (after asking). The ⋯ at the foot holds
+// the rest: turning the history off for this document, connecting it to a work, the mirror.
+
+interface HistoryMessage {
+  title: string;
+  note: string;
+  saves: { hash: string; when: string; kind: string; text: string; tip: string }[];
+}
+
+class HistoryPanel {
+  readonly #list = $("histlist");
+  readonly #note = $("histnote");
+
+  constructor(private readonly deps: SidebarDeps) {
+    $("histmenu").onclick = () => deps.post({ type: "historyMenu" });
+  }
+
+  show(msg: HistoryMessage): void {
+    $("histtitle").textContent = msg.title;
+    this.#note.textContent = msg.note;
+    this.#note.hidden = !msg.note;
+    this.#list.replaceChildren(
+      ...msg.saves.map((save) => {
+        const row = document.createElement("div");
+        row.className = "sb-row";
+        row.title = save.tip;
+        const main = document.createElement("div");
+        main.className = "sb-row-main";
+        const when = document.createElement("span");
+        when.className = "sb-row-when";
+        when.textContent = save.when;
+        const kind = document.createElement("span");
+        kind.className = "sb-row-kind";
+        kind.textContent = save.kind;
+        main.append(when, kind);
+        const text = document.createElement("div");
+        text.className = "sb-row-detail";
+        text.textContent = save.text;
+        row.append(main, text, button("Revert to This Save…", '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>', () => this.deps.post({ type: "historyRevert", hash: save.hash }), "sb-row-tool"));
+        row.addEventListener("click", (e) => {
+          if (!(e.target as HTMLElement).closest("button")) this.deps.post({ type: "historyCompare", hash: save.hash });
+        });
+        return row;
+      }),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Works: every work in the writing history. A work here opens with a click; the arrow beside a
+// work with its history on this computer lists its saves (click one to read it); ⋯ on a work offers
+// restoring, removing from this computer and deleting. The Filter narrows the list; ↻ syncs.
+
+interface WorkRow {
+  i: number;
+  title: string;
+  detail: string;
+  tip: string;
+  kind: "here" | "local" | "remote";
+}
+
+interface WorkSaveRow {
+  j: number;
+  when: string;
+  detail: string;
+  tip: string;
+}
+
+class WorksPanel {
+  readonly #list = $("worklist");
+  readonly #filter = $<HTMLInputElement>("workfilter");
+  #rows: WorkRow[] = [];
+  readonly #open = new Set<number>();
+  readonly #saves = new Map<number, WorkSaveRow[]>();
+
+  constructor(private readonly deps: SidebarDeps) {
+    this.#filter.addEventListener("input", () => this.#render());
+    $("workrefresh").onclick = () => deps.post({ type: "worksRefresh" });
+  }
+
+  show(rows: WorkRow[]): void {
+    this.#rows = rows;
+    this.#saves.clear();
+    // Works open before stay open (their saves are asked for again).
+    for (const i of this.#open) {
+      if (rows[i]?.kind === "remote" || !rows[i]) this.#open.delete(i);
+      else this.deps.post({ type: "workSaves", i });
+    }
+    this.#render();
+    $("worknote").hidden = rows.length > 0;
+  }
+
+  saves(i: number, saves: WorkSaveRow[]): void {
+    this.#saves.set(i, saves);
+    this.#render();
+  }
+
+  #render(): void {
+    const words = this.#filter.value.trim().toLowerCase();
+    const out: HTMLElement[] = [];
+    for (const w of this.#rows) {
+      if (words && !`${w.title} ${w.detail}`.toLowerCase().includes(words)) continue;
+      const row = document.createElement("div");
+      row.className = `sb-row work work-${w.kind}`;
+      row.title = w.tip;
+      const main = document.createElement("div");
+      main.className = "sb-row-main";
+      const twist = document.createElement("span");
+      twist.className = "sb-twist";
+      twist.textContent = w.kind === "remote" ? "" : this.#open.has(w.i) ? "▾" : "▸";
+      twist.onclick = (e) => {
+        e.stopPropagation();
+        if (w.kind === "remote") return;
+        if (this.#open.has(w.i)) this.#open.delete(w.i);
+        else {
+          this.#open.add(w.i);
+          this.deps.post({ type: "workSaves", i: w.i });
+        }
+        this.#render();
+      };
+      const title = document.createElement("span");
+      title.className = "sb-row-title";
+      title.textContent = w.title;
+      main.append(twist, title);
+      const detail = document.createElement("div");
+      detail.className = "sb-row-detail";
+      detail.textContent = w.detail;
+      row.append(main, detail, button("More…", '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>', () => this.deps.post({ type: "workMenu", i: w.i }), "sb-row-tool"));
+      row.addEventListener("click", (e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        if (w.kind === "here") this.deps.post({ type: "workOpen", i: w.i });
+        else this.deps.post({ type: "workMenu", i: w.i });
+      });
+      out.push(row);
+      if (this.#open.has(w.i)) {
+        for (const save of this.#saves.get(w.i) ?? []) {
+          const r = document.createElement("div");
+          r.className = "sb-row save";
+          r.title = save.tip;
+          const m = document.createElement("div");
+          m.className = "sb-row-main";
+          m.textContent = save.when;
+          const d = document.createElement("div");
+          d.className = "sb-row-detail";
+          d.textContent = save.detail;
+          r.append(m, d);
+          r.addEventListener("click", () => this.deps.post({ type: "workSave", i: w.i, j: save.j }));
+          out.push(r);
+        }
+      }
+    }
+    this.#list.replaceChildren(...out);
+  }
 }

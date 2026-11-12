@@ -4,11 +4,14 @@
  * and saved to the .highland file or a plain file's extras.
  */
 import { writeFile } from "node:fs/promises";
+import { basename } from "node:path";
 import * as vscode from "vscode";
 import { pick } from "../ask.ts";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
 import { extrasApi, type AssetItem, type Owner } from "../panels.ts";
+import { historyApi } from "../history.ts";
+import type { WorkNode } from "../works.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
 import { NAVIGATOR_LABELS, NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
@@ -16,7 +19,6 @@ import { NAVIGATOR_LABELS, NAVIGATOR_TYPES, type NavigatorFilters } from "../syn
 const STATE_KEY = "highwater.sidebar";
 
 /** The views the sidebar's not-yet-moved panels point to, in VS Code's sidebar. */
-const VIEWS: Record<string, string> = { history: "highwater.history", works: "highwater.works" };
 
 /** Images small enough to show in the Assets panel, by extension. */
 const THUMB_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
@@ -135,7 +137,99 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     await sendFilters();
   };
 
+  // Writing History: this document's saves, newest first; click one to compare it with now.
+  const sendHistory = async () => {
+    const k = bundle() ?? plain();
+    const name = k ? basename(k) : "";
+    if (!historyApi || !k) {
+      post({ type: "history", title: name, note: "Open a saved document to see its writing history.", saves: [] });
+      return;
+    }
+    const { state, commits } = await historyApi.saves(k).catch(() => ({ state: "none" as const, commits: [] }));
+    const note =
+      state === "off"
+        ? "The writing history is off (highwater.writingHistory)."
+        : state === "paused"
+          ? "The writing history is off for this document; its earlier saves are kept."
+          : commits.length
+            ? ""
+            : "No saves yet: the history starts with the next save.";
+    const saves = commits.map((c) => {
+      const [kind, ...rest] = c.message.split(" ");
+      return { hash: c.hash, when: when(c.date), kind: kind ?? "", text: rest.slice(1).join(" ").replace(/^.*?, /, ""), tip: `${c.message}\n${c.date.toLocaleString()}\nClick to compare with the text as it is now.` };
+    });
+    post({ type: "history", title: name, note, saves, paused: state === "paused" });
+  };
+  const historyMenu = async () => {
+    const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote");
+    const k = bundle() ?? plain();
+    const paused = k && historyApi ? (await historyApi.saves(k).catch(() => null))?.state === "paused" : false;
+    const items = [
+      ...(k ? [{ label: paused ? "Turn Writing History On for This Document" : "Turn Writing History Off for This Document", command: "highwater.toggleDocumentHistory" }] : []),
+      ...(k ? [{ label: "Connect to a Work's History…", command: "highwater.connectToWork" }] : []),
+      { label: "Open Work from History…", command: "highwater.openWorkFromHistory" },
+      { label: "Export Writing History…", command: "highwater.exportHistory" },
+      ...(remote ? [{ label: "Sync Writing History Now", command: "highwater.pushHistoryNow" }] : []),
+      { label: remote ? "Change History Mirror…" : "Set Up History Mirror…", command: "highwater.setUpHistoryMirror" },
+      { label: "Show History Folder", command: "highwater.openHistoryFolder" },
+      { label: "Change History Location…", command: "highwater.changeHistoryLocation" },
+    ];
+    const chosen = await pick(items, { title: "Writing History" });
+    if (chosen) await vscode.commands.executeCommand(chosen.command);
+  };
+
+  // Works: every work in the writing history; a work here opens, others can be restored.
+  let workNodes: WorkNode[] = [];
+  const saveNodes = new Map<number, WorkNode[]>();
+  const sendWorks = async () => {
+    if (!historyApi) return post({ type: "works", items: [] });
+    workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
+    saveNodes.clear();
+    const items = workNodes.map((n, i) => {
+      const t = historyApi!.works.getTreeItem(n);
+      return { i, title: String(typeof t.label === "string" ? t.label : (t.label?.label ?? "")), detail: String(t.description ?? ""), tip: typeof t.tooltip === "string" ? t.tooltip : "", kind: t.contextValue === "work.here" ? "here" : t.contextValue === "work.local" ? "local" : "remote" };
+    });
+    post({ type: "works", items });
+  };
+  const sendWorkSaves = async (i: number) => {
+    const node = workNodes[i];
+    if (!node || !historyApi) return;
+    const saves = (await historyApi.works.getChildren(node).catch(() => [])) as WorkNode[];
+    saveNodes.set(i, saves);
+    post({
+      type: "workSaves",
+      i,
+      saves: saves.map((n, j) => {
+        const t = historyApi!.works.getTreeItem(n);
+        return { j, when: String(typeof t.label === "string" ? t.label : ""), detail: String(t.description ?? ""), tip: typeof t.tooltip === "string" ? t.tooltip : "" };
+      }),
+    });
+  };
+  const workMenu = async (i: number) => {
+    const node = workNodes[i];
+    if (!node || !historyApi) return;
+    const kind = historyApi.works.getTreeItem(node).contextValue;
+    const w = historyApi.works;
+    const items = [
+      ...(kind === "work.here" ? [{ label: "Open", run: () => w.open(node) }] : [{ label: "Restore…", run: () => w.restore(node) }]),
+      ...(kind === "work.here" || kind === "work.local" ? [{ label: "Remove from This Computer…", run: () => w.remove(node) }] : []),
+      { label: "Delete Writing History…", run: () => w.delete(node) },
+    ];
+    const chosen = await pick(items, { title: (node as { work: { title: string } }).work.title });
+    if (chosen) await chosen.run();
+  };
+  let historyTimer: ReturnType<typeof setTimeout> | undefined;
+  const historyChanged = () => {
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(() => {
+      void sendHistory();
+      void sendWorks();
+    }, 200);
+  };
+  let historyWatch: vscode.Disposable | undefined;
+
   const subscriptions: vscode.Disposable[] = [
+    { dispose: () => historyWatch?.dispose() },
     // The Scratchpad changed elsewhere (another window on the same file, a restored save).
     plainExtras().onDidChangeFile((events) => {
       const p = plain();
@@ -234,7 +328,23 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         const item = assetItems.find((a) => a.name === msg.name);
         if (item) void vscode.commands.executeCommand("highwater.assets.open", item);
       }
-      else if (msg.type === "showView" && typeof msg.view === "string" && VIEWS[msg.view]) void vscode.commands.executeCommand(`${VIEWS[msg.view]}.focus`);
+      else if (msg.type === "historyCompare" && typeof msg.hash === "string") {
+        const k = bundle() ?? plain();
+        if (k && historyApi) void historyApi.compare(k, msg.hash);
+      } else if (msg.type === "historyRevert" && typeof msg.hash === "string") {
+        const k = bundle() ?? plain();
+        if (k && historyApi) void historyApi.revert(k, msg.hash);
+      } else if (msg.type === "historyMenu") void historyMenu();
+      else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");
+      else if (msg.type === "workOpen" && typeof msg.i === "number") {
+        const node = workNodes[msg.i];
+        if (node && historyApi) void historyApi.works.open(node);
+      } else if (msg.type === "workMenu" && typeof msg.i === "number") void workMenu(msg.i);
+      else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
+      else if (msg.type === "workSave" && typeof msg.i === "number" && typeof msg.j === "number") {
+        const node = saveNodes.get(msg.i)?.[msg.j];
+        if (node && historyApi) void historyApi.works.showSave(node);
+      }
       else return false;
       return true;
     },
@@ -244,9 +354,19 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       void sendScratchpad(true);
       void sendBin();
       void sendAssets();
+      historyWatch ??= historyApi?.onDidChange(historyChanged);
+      void sendHistory();
+      void sendWorks();
     },
     dispose() {
       for (const s of subscriptions) s.dispose();
     },
   };
+}
+
+/** "14:03" today, else "11 Oct" (as the Writing History pane). */
+function when(d: Date): string {
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString([], { day: "numeric", month: "short" });
 }
