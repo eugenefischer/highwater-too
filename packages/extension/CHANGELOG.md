@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.5 (branch m16-sidebar)
+
+- Undo and redo cover the Bin, as in Highland 2: ⌘Z puts back text dragged into the Bin (and takes the item out), puts a card dragged into the page back in the Bin, and brings back a deleted card; ⇧⌘Z does them again. Cut to Bin and Copy to Bin (⌥⌘X, ⌥⌘C), +, and reordering cards are undoable too. ⌘Z works with the text or the sidebar in front (in the Scratchpad, or a card being edited, it undoes that box's typing).
+- The Bin's export button does what Highland's does: a new plain-text document with every item, in order, with a blank line, "---" and a blank line between them. The Bin keeps its items.
+
 ## 0.6.4 (branch m16-sidebar)
 
 - The Bin matched to Highland 2's selected card: a selected card is shaded lighter (no outline), with a circled × at its top right. Highland's + (a new item, opened for editing) and its export button ("Export Bin contents to a new document": every item, a blank line between) are back at the Bin's foot beside the Filter.

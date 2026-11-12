@@ -4,15 +4,24 @@
  * Highland. Edits go to the extension, which applies them to the document; changes made
  * elsewhere (the text editor, Highland 2, a revert) come back as a new text.
  */
-import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { history, defaultKeymap, historyKeymap, indentWithTab, invertedEffects, isolateHistory, redo, undo } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
-import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder, StateField, type Range, type Text } from "@codemirror/state";
+import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder, StateEffect, StateField, Transaction, type ChangeSpec, type Range, type Text } from "@codemirror/state";
 import { Decoration, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages, type PdfMessage } from "./pages.ts";
 import { TemplateWindow, type OptionValues } from "./template-window.ts";
-import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
+import { ASSET_TYPE, BIN_TYPE, Sidebar, type BinOp } from "./sidebar.ts";
+
+/**
+ * Bin changes made from the page ride in its undo history, as Highland's do: each is an effect on
+ * a transaction (with the text it cut or put in, if any), undo applies the opposite one, and every
+ * such effect, done or undone, is sent to the extension to change the Bin.
+ */
+const binEffect = StateEffect.define<BinOp>();
+const opposite = (op: BinOp): BinOp => (op.kind === "move" ? { kind: "move", from: op.to, to: op.from } : { ...op, kind: op.kind === "add" ? "remove" : "add" });
+const binHistory = invertedEffects.of((tr) => tr.effects.filter((e) => e.is(binEffect)).map((e) => binEffect.of(opposite(e.value as BinOp))));
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 
@@ -141,6 +150,7 @@ function start(text: string): void {
       doc: text,
       extensions: [
         history(),
+        binHistory,
         search({ top: true }),
         keymap.of([{ key: "Mod-;", run: (v) => (void nextMisspelling(v, spelling), true) }]),
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
@@ -168,11 +178,11 @@ function start(text: string): void {
             const before = line.text.trim() === "" || pos - line.from <= line.to - pos;
             const insert = line.text.trim() === "" ? text : before ? `${text}\n\n` : `\n\n${text}`;
             const at = before ? line.from : line.to;
-            v.dispatch({ changes: { from: at, insert }, selection: { anchor: at + insert.length - (before && line.text.trim() !== "" ? 2 : 0) }, scrollIntoView: true });
-            v.focus();
-            // A Bin item dragged into the text leaves the Bin.
+            // A Bin item dragged into the text leaves the Bin, in the same undoable step.
             const index = types.includes(BIN_TYPE) ? Number(e.dataTransfer!.getData(BIN_TYPE)) : NaN;
-            if (Number.isInteger(index)) vscode.postMessage({ type: "binTake", index });
+            const take = Number.isInteger(index) ? [binEffect.of({ kind: "remove", index, text: e.dataTransfer!.getData("text/plain") })] : [];
+            v.dispatch({ changes: { from: at, insert }, effects: take, selection: { anchor: at + insert.length - (before && line.text.trim() !== "" ? 2 : 0) }, scrollIntoView: true, userEvent: "input.drop", annotations: isolateHistory.of("full") });
+            v.focus();
             return true;
           },
         }),
@@ -191,6 +201,7 @@ function start(text: string): void {
         EditorView.updateListener.of((u) => {
           if (u.selectionSet || u.docChanged) vscode.postMessage({ type: "selection", ranges: u.state.selection.ranges.map((r) => ({ anchor: r.anchor, head: r.head })) });
           if (u.docChanged) sidebar.textChanged();
+          for (const tr of u.transactions) for (const e of tr.effects) if (e.is(binEffect)) vscode.postMessage({ type: "binOp", op: e.value });
           if (u.selectionSet || u.docChanged) sidebar.cursorMoved();
         }),
       ],
@@ -280,6 +291,21 @@ const templateWindow = new TemplateWindow(
   window.addEventListener("blur", hide);
 }
 
+// ⌘Z and ⇧⌘Z in the sidebar (outside its text boxes) undo and redo the page's history, which holds
+// the Bin's drags and deletions; in the Scratchpad or a card being edited, they stay that box's own.
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (!view || !(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "z") return;
+    const t = e.target as HTMLElement | null;
+    if (!t || !t.closest("#sidebar") || t.closest("textarea, input")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    (e.shiftKey ? redo : undo)(view);
+  },
+  true,
+);
+
 // Highland's sidebar: Navigator, Bin, Statistics, Assets, Scratchpad, Writing History, Works.
 const sidebar = new Sidebar({
   post: (msg) => vscode.postMessage(msg),
@@ -288,18 +314,22 @@ const sidebar = new Sidebar({
   head: () => view?.state.selection.main.head ?? 0,
   reveal: (offset) => reveal(offset, "top", true),
   edit: (changes) => view?.dispatch({ changes, scrollIntoView: false }),
-  cutDragged: (text) => {
+  bin: (op, cut) => {
+    if (!view) return;
+    let changes: ChangeSpec | undefined;
     const d = dragged;
     dragged = null;
-    if (!view || !d || d.text !== text || view.state.sliceDoc(d.from, d.to) !== text) return;
-    // Whole paragraphs taken out take one blank line with them, so no gap is left.
-    const doc = view.state.doc;
-    let { from, to } = d;
-    if (doc.lineAt(from).from === from && doc.lineAt(to).to === to) {
-      if (doc.sliceString(to, to + 2) === "\n\n") to += 2;
-      else if (doc.sliceString(from - 2, from) === "\n\n") from -= 2;
+    if (cut !== undefined && d && d.text === cut && view.state.sliceDoc(d.from, d.to) === cut) {
+      // Whole paragraphs taken out take one blank line with them, so no gap is left.
+      const doc = view.state.doc;
+      let { from, to } = d;
+      if (doc.lineAt(from).from === from && doc.lineAt(to).to === to) {
+        if (doc.sliceString(to, to + 2) === "\n\n") to += 2;
+        else if (doc.sliceString(from - 2, from) === "\n\n") from -= 2;
+      }
+      changes = { from, to };
     }
-    view.dispatch({ changes: { from, to } });
+    view.dispatch({ ...(changes ? { changes } : {}), effects: binEffect.of(op), userEvent: "bin", annotations: [isolateHistory.of("full"), Transaction.addToHistory.of(true)] });
   },
   insert: (text) => {
     if (!view) return;
@@ -354,6 +384,20 @@ function applyTheme(vars: Record<string, string> | null): void {
   for (const [name, value] of Object.entries(vars ?? {})) root.setProperty(name, value);
 }
 
+/** Cut to Bin (⌥⌘X) and Copy to Bin (⌥⌘C): the selection becomes a Bin item, as an undoable step of the page. */
+function toBin(cut: boolean): void {
+  if (!view) return;
+  const ranges = view.state.selection.ranges.filter((r) => !r.empty);
+  if (!ranges.length) return;
+  const text = ranges.map((r) => view!.state.sliceDoc(r.from, r.to)).join("\n\n");
+  view.dispatch({
+    ...(cut ? { changes: ranges.map((r) => ({ from: r.from, to: r.to })) } : {}),
+    effects: binEffect.of({ kind: "add", index: sidebar.binCount(), text }),
+    userEvent: "bin",
+    annotations: isolateHistory.of("full"),
+  });
+}
+
 /** Sets the selections after one of Highwater's writing keys (bold, centre, case…) changed the text. */
 function select(ranges: { anchor: number; head: number }[]): void {
   if (!view || !ranges.length) return;
@@ -386,6 +430,8 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "togglePreview") togglePreview();
+  else if (msg.type === "toBin") toBin(!!(event.data as { cut?: boolean }).cut);
+  else if (msg.type === "binRefused" && view) undo(view);
   else if (msg.type === "pdf") void pages.receive(event.data as PdfMessage);
   else if (msg.type === "previewEmpty") pages.empty(String((event.data as { message?: string }).message ?? ""));
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);

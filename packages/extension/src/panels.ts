@@ -126,6 +126,12 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
   }
 
   async function toBin(cut: boolean): Promise<void> {
+    // In the Highland-Style Editor the page does it, so ⌘Z there puts the text back and takes the item out.
+    const view = activeView();
+    if (view) {
+      void view.panel.webview.postMessage({ type: "toBin", cut });
+      return;
+    }
     const active = activeSelections();
     const document = active?.document;
     const bundle = document && document.uri.scheme === SCHEME ? splitBundlePath(document.uri.fsPath)?.bundle : undefined;

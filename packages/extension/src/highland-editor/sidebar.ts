@@ -29,9 +29,16 @@ export interface SidebarDeps {
   edit(changes: { from: number; to: number; insert: string }[]): void;
   /** Puts text in at the cursor (a Bin item, an image reference). */
   insert(text: string): void;
-  /** Takes out of the page the text being dragged from it, if this is that text (dragging to the Bin cuts). */
-  cutDragged(text: string): void;
+  /**
+   * Changes the Bin as a step of the page's undo history (Highland's: ⌘Z puts back a drag in or
+   * out, or a deleted item). With `cut`, also takes that text out of the page if it is what is being
+   * dragged from it (dragging to the Bin moves the text).
+   */
+  bin(op: BinOp, cut?: string): void;
 }
+
+/** A change to the Bin that undo can reverse: an item added or removed at an index, or moved. */
+export type BinOp = { kind: "add" | "remove"; index: number; text: string } | { kind: "move"; from: number; to: number };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MIN_WIDTH = 240;
@@ -78,6 +85,11 @@ export class Sidebar {
     this.#apply();
     this.#save();
     if (panel === "scratchpad") this.#scratch.focus();
+  }
+
+  /** How many items the Bin holds (a new one goes at the end). */
+  binCount(): number {
+    return this.#bin.count;
   }
 
   /** The text changed or the cursor moved. */
@@ -444,6 +456,9 @@ class BinPanel {
   /** The card being edited, and its edit not yet saved. */
   #editing: { index: number; area: HTMLTextAreaElement; timer: ReturnType<typeof setTimeout> | undefined } | null = null;
   #available = false;
+  get count(): number {
+    return this.#cards.length;
+  }
   /** A new item was asked for with +: open it for editing when it arrives at this index. */
   #newAt = -1;
 
@@ -451,7 +466,7 @@ class BinPanel {
     this.#filter.addEventListener("input", () => this.#render());
     $("binnew").onclick = () => {
       this.#newAt = this.#cards.length;
-      deps.post({ type: "binAdd", text: "" });
+      deps.bin({ kind: "add", index: this.#cards.length, text: "" });
     };
     $("binexport").onclick = () => deps.post({ type: "binExport" });
     const panel = $("binpanel");
@@ -475,14 +490,14 @@ class BinPanel {
         // Dropped after itself or right before itself: nothing moves.
         let to = target ?? this.#cards.length;
         if (to > from) to--;
-        if (to !== from) deps.post({ type: "binMove", from, to: Math.min(to, this.#cards.length - 1) });
+        to = Math.min(to, this.#cards.length - 1);
+        if (to !== from) deps.bin({ kind: "move", from, to });
         return;
       }
       const text = e.dataTransfer?.getData("text/plain");
       if (!text || !text.trim()) return;
-      deps.post({ type: "binAdd", text });
       // Text dragged from the page moves into the Bin, as Cut to Bin does.
-      deps.cutDragged(text);
+      deps.bin({ kind: "add", index: this.#cards.length, text }, text);
     });
     // Clicking the panel's empty space clears the selection.
     panel.addEventListener("click", (e) => {
@@ -574,7 +589,8 @@ class BinPanel {
 
   #delete(index: number): void {
     this.#selected = -1;
-    this.deps.post({ type: "binTake", index });
+    const text = this.#cards[index]?.text;
+    if (text !== undefined) this.deps.bin({ kind: "remove", index, text });
   }
 
   /** Opens a card for editing in place; what is typed is saved as you go. */

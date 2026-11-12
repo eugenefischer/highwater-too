@@ -190,15 +190,39 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
           const item = (await extrasApi!.bin.items(o))[index];
           if (item) await extrasApi!.bin.remove(item);
         });
+      } else if (msg.type === "binOp" && msg.op && typeof msg.op === "object") {
+        // A Bin change from the page, done or undone there (see webview.ts): add, remove or move.
+        const op = msg.op as { kind: string; index?: number; text?: string; from?: number; to?: number };
+        binTask(async (o) => {
+          // A plain file's first Bin item: the one-time note on where it is kept; declined, the page undoes it.
+          if (op.kind === "add" && o.plain !== undefined && !(await plainExtras().confirm(o.plain))) {
+            post({ type: "binRefused" });
+            return;
+          }
+          await extrasApi!.bin.change(o, (items) => {
+            const next = [...items];
+            if (op.kind === "add" && typeof op.text === "string") next.splice(Math.min(op.index ?? next.length, next.length), 0, op.text);
+            else if (op.kind === "remove" && typeof op.text === "string") {
+              // The item at that place, or else the first one with that text (the Bin changed meanwhile).
+              const at = next[op.index ?? -1] === op.text ? op.index! : next.indexOf(op.text);
+              if (at >= 0) next.splice(at, 1);
+            } else if (op.kind === "move" && typeof op.from === "number" && typeof op.to === "number" && op.from < next.length) {
+              const [item] = next.splice(op.from, 1);
+              next.splice(Math.min(op.to, next.length), 0, item!);
+            }
+            return next;
+          });
+        });
       } else if (msg.type === "binTake" && typeof msg.index === "number") {
         // Dragged into the text: out of the Bin, without asking.
         const index = msg.index;
         binTask((o) => extrasApi!.bin.change(o, (items) => items.filter((_, i) => i !== index)));
       } else if (msg.type === "binExport") {
-        // Like the Scratchpad's export: every item, a blank line between, in a new untitled document.
+        // Highland's "Export Bin contents to a new document": a new plain-text document with every item, in
+        // order, a blank line, "---" and a blank line between; the Bin keeps its items.
         const o = owner();
         if (o && extrasApi)
-          void extrasApi.bin.items(o).then((items) => vscode.workspace.openTextDocument({ content: items.map((i) => i.text).join("\n\n"), language: document().languageId }).then((d) => vscode.window.showTextDocument(d, { preview: false })));
+          void extrasApi.bin.items(o).then((items) => vscode.workspace.openTextDocument({ content: items.map((i) => i.text).join("\n\n---\n\n"), language: "plaintext" }).then((d) => vscode.window.showTextDocument(d, { preview: false })));
       } else if (msg.type === "assetsAdd") assetTask((o) => extrasApi!.assets.add(o));
       else if (msg.type === "assetsImport" && Array.isArray(msg.files)) {
         const files = (msg.files as { name: unknown; data: unknown }[]).filter((f): f is { name: string; data: Uint8Array } => typeof f.name === "string" && f.data instanceof Uint8Array);
