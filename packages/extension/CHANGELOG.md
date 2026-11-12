@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.8 (branch m16-sidebar)
+
+- A Bin item or image dragged into the text goes in exactly where you let go, mid-sentence if that's where, as in Highland 2; the drop caret shows that spot as you drag.
+
 ## 0.6.7 (branch m16-sidebar)
 
 - A caret shows where a Bin item (or an image from Assets) will land while you drag it over the text: at the start of the line it's over, or after its end, whichever is nearer. Text dragged within the page shows a drop caret too.

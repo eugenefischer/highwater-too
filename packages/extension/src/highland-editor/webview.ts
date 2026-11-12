@@ -134,15 +134,9 @@ const invisibleMarks = (on: boolean) => (on ? [highlightWhitespace(), lineEnds] 
 
 let view: EditorView | null = null;
 
-/**
- * Where a Bin item or image dropped at the pointer goes: a paragraph of its own, at the start of
- * the line it is over or after its end, whichever is nearer.
- */
-function dropPlace(v: EditorView, e: DragEvent): { at: number; before: boolean; line: ReturnType<Text["lineAt"]> } {
-  const pos = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
-  const line = v.state.doc.lineAt(pos);
-  const before = line.text.trim() === "" || pos - line.from <= line.to - pos;
-  return { at: before ? line.from : line.to, before, line };
+/** Where a Bin item or image dropped at the pointer goes: exactly there, mid-sentence if so (as Highland). */
+function dropPlace(v: EditorView, e: DragEvent): number {
+  return v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
 }
 
 /** The drop caret: a text cursor drawn at the place, over the page (CodeMirror's own is for its own drags). */
@@ -181,8 +175,8 @@ function start(text: string): void {
         keymap.of([{ key: "Mod-;", run: (v) => (void nextMisspelling(v, spelling), true) }]),
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
         EditorView.lineWrapping,
-        // A Bin item or an image dropped from the sidebar goes in as a paragraph of its own, before
-        // or after the line it lands on (whichever end is nearer), not in the middle of a sentence.
+        // A Bin item or an image dropped from the sidebar goes in exactly where it is let go, as in
+        // Highland, with a caret showing the place while it is dragged.
         EditorView.domEventHandlers({
           // What is dragged out of the page, so a drop on the Bin can take it out (dragend comes after the drop).
           dragstart: (_e, v) => {
@@ -201,7 +195,7 @@ function start(text: string): void {
             if (!types.includes(BIN_TYPE) && !types.includes(ASSET_TYPE)) return false;
             e.preventDefault();
             e.dataTransfer!.dropEffect = types.includes(BIN_TYPE) ? "move" : "copy";
-            showDropCaret(v, dropPlace(v, e).at);
+            showDropCaret(v, dropPlace(v, e));
             return true;
           },
           dragleave: (e, v) => {
@@ -212,14 +206,13 @@ function start(text: string): void {
             hideDropCaret();
             const types = e.dataTransfer?.types ?? [];
             if (!types.includes(BIN_TYPE) && !types.includes(ASSET_TYPE)) return false;
-            const text = e.dataTransfer!.getData("text/plain").replace(/^\n+|\n+$/g, "");
+            const insert = e.dataTransfer!.getData("text/plain");
             e.preventDefault();
-            const { at, before, line } = dropPlace(v, e);
-            const insert = line.text.trim() === "" ? text : before ? `${text}\n\n` : `\n\n${text}`;
+            const at = dropPlace(v, e);
             // A Bin item dragged into the text leaves the Bin, in the same undoable step.
             const index = types.includes(BIN_TYPE) ? Number(e.dataTransfer!.getData(BIN_TYPE)) : NaN;
             const take = Number.isInteger(index) ? [binEffect.of({ kind: "remove", index, text: e.dataTransfer!.getData("text/plain") })] : [];
-            v.dispatch({ changes: { from: at, insert }, effects: take, selection: { anchor: at + insert.length - (before && line.text.trim() !== "" ? 2 : 0) }, scrollIntoView: true, userEvent: "input.drop", annotations: isolateHistory.of("full") });
+            v.dispatch({ changes: { from: at, insert }, effects: take, selection: { anchor: at + insert.length }, scrollIntoView: true, userEvent: "input.drop", annotations: isolateHistory.of("full") });
             v.focus();
             return true;
           },
