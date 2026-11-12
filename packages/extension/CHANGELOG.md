@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.4 (branch m16-sidebar)
+
+- The Bin matched to Highland 2's selected card: a selected card is shaded lighter (no outline), with a circled × at its top right. Highland's + (a new item, opened for editing) and its export button ("Export Bin contents to a new document": every item, a blank line between) are back at the Bin's foot beside the Filter.
+
 ## 0.6.3 (branch m16-sidebar)
 
 - The Bin's cards look and work like Highland 2's: each shows the item's own text, up to six lines and then "…", in a card at least four lines tall. Click a card to select it: it is outlined, and a delete button appears at its top right (Delete or Backspace works too, and ↑↓ move the selection). Double-click (or Enter) edits it in place. The Filter at the foot narrows the cards by their words. No more arrow or + buttons.

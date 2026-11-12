@@ -346,13 +346,13 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 /* Highland's Bin cards: the item's own text in the sidebar's quieter colour, six lines at most (then "…"),
    at least four lines tall; selected, an outline and a delete button at the top right. */
 #binlist { gap: 10px; outline: none; }
-.bincard { padding: 10px 10px; border-radius: 8px; border: 1px solid transparent; }
-.bincard-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--nav-muted); font-size: 0.95em; line-height: 1.3; min-height: 5.2em; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
-.bincard.selected { border-color: var(--nav-accent); background: color-mix(in srgb, var(--nav-fg) 10%, transparent); }
-.bincard.selected .bincard-text { color: var(--nav-fg); }
-.bincard-delete { position: absolute; top: 4px; right: 4px; display: none; background: var(--nav-bg); border-radius: 50%; }
+.bincard { padding: 8px 10px; border-radius: 8px; }
+.bincard-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--nav-muted); font-size: 0.92em; line-height: 1.25; min-height: 5.2em; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.bincard.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
+.bincard.selected .bincard-text { color: color-mix(in srgb, var(--nav-fg) 45%, var(--nav-muted)); padding-right: 20px; }
+.bincard-delete { position: absolute; top: 5px; right: 5px; display: none; padding: 1px; }
+.bincard-delete:hover { background: none; }
 .bincard.selected .bincard-delete { display: flex; }
-.bincard.selected .bincard-text { padding-right: 18px; }
 .bincard.editing { cursor: text; padding: 4px; }
 .bincard-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 44px; }
 .bincard-detail { margin-top: 2px; color: var(--nav-muted); font-size: 0.92em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -520,7 +520,7 @@ body.previewing #preview { display: flex; }
     </section>
     <section data-panel="bin" id="binpanel" hidden>
       <div class="sb-scroll"><div id="binlist" class="sb-cards"></div><div id="binempty" class="sb-note" hidden></div></div>
-      <div class="sb-foot"><input id="binfilter" type="search" placeholder="Filter" aria-label="Filter the Bin"></div>
+      <div class="sb-foot"><input id="binfilter" type="search" placeholder="Filter" aria-label="Filter the Bin"><button id="binnew" class="sb-button" data-tip="New Bin item" aria-label="New Bin item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button><button id="binexport" class="sb-button" data-tip="Export Bin contents to a new document" aria-label="Export Bin contents to a new document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button></div>
     </section>
     <section data-panel="stats" hidden><div class="sb-empty">Statistics come with goals and sprints (M11).</div></section>
     <section data-panel="assets" id="assetpanel" hidden>

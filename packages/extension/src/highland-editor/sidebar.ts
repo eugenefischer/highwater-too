@@ -444,9 +444,16 @@ class BinPanel {
   /** The card being edited, and its edit not yet saved. */
   #editing: { index: number; area: HTMLTextAreaElement; timer: ReturnType<typeof setTimeout> | undefined } | null = null;
   #available = false;
+  /** A new item was asked for with +: open it for editing when it arrives at this index. */
+  #newAt = -1;
 
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
+    $("binnew").onclick = () => {
+      this.#newAt = this.#cards.length;
+      deps.post({ type: "binAdd", text: "" });
+    };
+    $("binexport").onclick = () => deps.post({ type: "binExport" });
     const panel = $("binpanel");
     panel.addEventListener("dragover", (e) => {
       const types = e.dataTransfer?.types ?? [];
@@ -509,6 +516,18 @@ class BinPanel {
     this.#cards = cards;
     if (this.#selected >= cards.length) this.#selected = -1;
     this.#render();
+    if (this.#newAt >= 0 && cards.length > this.#newAt) {
+      const at = this.#newAt;
+      this.#newAt = -1;
+      this.#filter.value = "";
+      this.#render();
+      const el = this.#list.querySelector<HTMLElement>(`[data-index="${at}"]`);
+      if (el) {
+        this.#select(at);
+        this.#edit(at, el);
+      }
+    }
+    $("binnew").hidden = $("binexport").hidden = !available;
     this.#empty.textContent = available ? "The Bin holds text you set aside. Drag text here, or use Cut to Bin (⌥⌘X) and Copy to Bin (⌥⌘C)." : "Open a document to use its Bin.";
   }
 
@@ -526,7 +545,7 @@ class BinPanel {
     const text = document.createElement("div");
     text.className = "bincard-text";
     text.textContent = c.text;
-    el.append(text, button("Delete", '<path d="M6 6l12 12M18 6 6 18"/>', () => this.#delete(index), "bincard-delete"));
+    el.append(text, button("Delete", '<circle cx="12" cy="12" r="9"/><path d="M8.8 8.8l6.4 6.4M15.2 8.8l-6.4 6.4"/>', () => this.#delete(index), "bincard-delete"));
     el.addEventListener("dragstart", (e) => {
       e.dataTransfer!.setData("text/plain", this.#cards[index]?.text ?? "");
       e.dataTransfer!.setData(BIN_TYPE, String(index));

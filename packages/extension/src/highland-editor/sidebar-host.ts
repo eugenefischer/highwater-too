@@ -194,6 +194,11 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         // Dragged into the text: out of the Bin, without asking.
         const index = msg.index;
         binTask((o) => extrasApi!.bin.change(o, (items) => items.filter((_, i) => i !== index)));
+      } else if (msg.type === "binExport") {
+        // Like the Scratchpad's export: every item, a blank line between, in a new untitled document.
+        const o = owner();
+        if (o && extrasApi)
+          void extrasApi.bin.items(o).then((items) => vscode.workspace.openTextDocument({ content: items.map((i) => i.text).join("\n\n"), language: document().languageId }).then((d) => vscode.window.showTextDocument(d, { preview: false })));
       } else if (msg.type === "assetsAdd") assetTask((o) => extrasApi!.assets.add(o));
       else if (msg.type === "assetsImport" && Array.isArray(msg.files)) {
         const files = (msg.files as { name: unknown; data: unknown }[]).filter((f): f is { name: string; data: Uint8Array } => typeof f.name === "string" && f.data instanceof Uint8Array);
