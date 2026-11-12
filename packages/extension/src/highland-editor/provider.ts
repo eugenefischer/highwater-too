@@ -342,7 +342,17 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 .sb-note { padding: 16px 10px; text-align: center; color: var(--nav-muted); line-height: 1.4; }
 .sb-note[hidden] { display: none; }
 .bincard, .assetcard { position: relative; padding: 7px 10px; border-radius: 6px; background: color-mix(in srgb, var(--nav-fg) 7%, transparent); cursor: grab; }
-.bincard:hover, .assetcard:hover { background: color-mix(in srgb, var(--nav-fg) 11%, transparent); }
+.assetcard:hover { background: color-mix(in srgb, var(--nav-fg) 11%, transparent); }
+/* Highland's Bin cards: the item's own text in the sidebar's quieter colour, six lines at most (then "…"),
+   at least four lines tall; selected, an outline and a delete button at the top right. */
+#binlist { gap: 10px; outline: none; }
+.bincard { padding: 10px 10px; border-radius: 8px; border: 1px solid transparent; }
+.bincard-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--nav-muted); font-size: 0.95em; line-height: 1.3; min-height: 5.2em; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.bincard.selected { border-color: var(--nav-accent); background: color-mix(in srgb, var(--nav-fg) 10%, transparent); }
+.bincard.selected .bincard-text { color: var(--nav-fg); }
+.bincard-delete { position: absolute; top: 4px; right: 4px; display: none; background: var(--nav-bg); border-radius: 50%; }
+.bincard.selected .bincard-delete { display: flex; }
+.bincard.selected .bincard-text { padding-right: 18px; }
 .bincard.editing { cursor: text; padding: 4px; }
 .bincard-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 44px; }
 .bincard-detail { margin-top: 2px; color: var(--nav-muted); font-size: 0.92em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -510,7 +520,7 @@ body.previewing #preview { display: flex; }
     </section>
     <section data-panel="bin" id="binpanel" hidden>
       <div class="sb-scroll"><div id="binlist" class="sb-cards"></div><div id="binempty" class="sb-note" hidden></div></div>
-      <div class="sb-foot sb-foot-end"><button id="binnew" class="sb-button" data-tip="New Bin item" aria-label="New Bin item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+      <div class="sb-foot"><input id="binfilter" type="search" placeholder="Filter" aria-label="Filter the Bin"></div>
     </section>
     <section data-panel="stats" hidden><div class="sb-empty">Statistics come with goals and sprints (M11).</div></section>
     <section data-panel="assets" id="assetpanel" hidden>

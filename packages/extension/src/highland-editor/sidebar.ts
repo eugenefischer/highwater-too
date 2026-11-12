@@ -419,9 +419,11 @@ class ScratchpadPanel {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The Bin: Highland's cards of set-aside text. Drag text from the page onto it to keep it (no
-// Shift needed: the page and the Bin are one webview), drag a card into the page to put it back,
-// drag cards to reorder them. Click a card to edit it in place; the arrow inserts it at the cursor.
+// The Bin, as Highland 2's: each item a card showing its text (six lines, then "…"). Click a card
+// to select it (a delete button appears at its top right; Delete or Backspace works too), double-
+// click to edit it in place. Drag text from the page onto the Bin to move it there (no Shift: the
+// page and the Bin are one webview); drag a card into the page to put it back; drag cards to reorder
+// them. The Filter at the foot narrows the cards by their words.
 
 interface BinCard {
   text: string;
@@ -436,13 +438,15 @@ export const ASSET_TYPE = "application/x-highwater-asset";
 class BinPanel {
   readonly #list = $("binlist");
   readonly #empty = $("binempty");
+  readonly #filter = $<HTMLInputElement>("binfilter");
   #cards: BinCard[] = [];
+  #selected = -1;
   /** The card being edited, and its edit not yet saved. */
   #editing: { index: number; area: HTMLTextAreaElement; timer: ReturnType<typeof setTimeout> | undefined } | null = null;
   #available = false;
 
   constructor(private readonly deps: SidebarDeps) {
-    $("binnew").onclick = () => deps.post({ type: "binAdd", text: "" });
+    this.#filter.addEventListener("input", () => this.#render());
     const panel = $("binpanel");
     panel.addEventListener("dragover", (e) => {
       const types = e.dataTransfer?.types ?? [];
@@ -473,6 +477,25 @@ class BinPanel {
       // Text dragged from the page moves into the Bin, as Cut to Bin does.
       deps.cutDragged(text);
     });
+    // Clicking the panel's empty space clears the selection.
+    panel.addEventListener("click", (e) => {
+      if (!(e.target as HTMLElement).closest(".bincard")) this.#select(-1);
+    });
+    this.#list.tabIndex = 0;
+    this.#list.addEventListener("keydown", (e) => {
+      if (this.#editing || this.#selected < 0) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        this.#delete(this.#selected);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        this.#select(Math.max(0, Math.min(this.#cards.length - 1, this.#selected + (e.key === "ArrowDown" ? 1 : -1))));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const el = this.#list.querySelector<HTMLElement>(`[data-index="${this.#selected}"]`);
+        if (el) this.#edit(this.#selected, el);
+      }
+    });
   }
 
   show(cards: BinCard[], available: boolean): void {
@@ -484,31 +507,26 @@ class BinPanel {
     }
     this.#editing = null;
     this.#cards = cards;
-    this.#list.replaceChildren(...cards.map((c, i) => this.#card(c, i)));
-    this.#empty.hidden = cards.length > 0;
+    if (this.#selected >= cards.length) this.#selected = -1;
+    this.#render();
     this.#empty.textContent = available ? "The Bin holds text you set aside. Drag text here, or use Cut to Bin (⌥⌘X) and Copy to Bin (⌥⌘C)." : "Open a document to use its Bin.";
-    $("binnew").hidden = !available;
+  }
+
+  #render(): void {
+    const words = this.#filter.value.trim().toLowerCase();
+    this.#list.replaceChildren(...this.#cards.flatMap((c, i) => (words && !c.text.toLowerCase().includes(words) ? [] : [this.#card(c, i)])));
+    this.#empty.hidden = this.#cards.length > 0;
   }
 
   #card(c: BinCard, index: number): HTMLElement {
     const el = document.createElement("div");
-    el.className = "bincard";
+    el.className = `bincard${index === this.#selected ? " selected" : ""}`;
     el.draggable = true;
     el.dataset.index = String(index);
-    el.title = c.text.length > 600 ? `${c.text.slice(0, 600)}…` : c.text;
-    const label = document.createElement("div");
-    label.className = "bincard-label";
-    label.textContent = c.label || "(empty)";
-    const detail = document.createElement("div");
-    detail.className = "bincard-detail";
-    detail.textContent = c.detail;
-    const tools = document.createElement("div");
-    tools.className = "bincard-tools";
-    tools.append(
-      button("Insert at the cursor", '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/>', () => this.deps.insert(this.#cards[index]?.text ?? "")),
-      button("Delete", '<path d="M6 6l12 12M18 6 6 18"/>', () => this.deps.post({ type: "binDelete", index })),
-    );
-    el.append(label, detail, tools);
+    const text = document.createElement("div");
+    text.className = "bincard-text";
+    text.textContent = c.text;
+    el.append(text, button("Delete", '<path d="M6 6l12 12M18 6 6 18"/>', () => this.#delete(index), "bincard-delete"));
     el.addEventListener("dragstart", (e) => {
       e.dataTransfer!.setData("text/plain", this.#cards[index]?.text ?? "");
       e.dataTransfer!.setData(BIN_TYPE, String(index));
@@ -516,9 +534,28 @@ class BinPanel {
     });
     el.addEventListener("click", (e) => {
       if ((e.target as HTMLElement).closest("button")) return;
+      this.#select(index);
+    });
+    el.addEventListener("dblclick", (e) => {
+      if ((e.target as HTMLElement).closest("button")) return;
       this.#edit(index, el);
     });
     return el;
+  }
+
+  #select(index: number): void {
+    if (index === this.#selected) return;
+    this.#selected = index;
+    for (const el of this.#list.querySelectorAll<HTMLElement>(".bincard")) el.classList.toggle("selected", Number(el.dataset.index) === index);
+    if (index >= 0) {
+      this.#list.focus({ preventScroll: true });
+      this.#list.querySelector(`[data-index="${index}"]`)?.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  #delete(index: number): void {
+    this.#selected = -1;
+    this.deps.post({ type: "binTake", index });
   }
 
   /** Opens a card for editing in place; what is typed is saved as you go. */
@@ -541,11 +578,14 @@ class BinPanel {
         this.deps.post({ type: "binEdit", index, text: area.value });
       }
     };
+    const fit = () => {
+      area.style.height = "auto";
+      area.style.height = `${area.scrollHeight}px`;
+    };
     area.addEventListener("input", () => {
       clearTimeout(editing.timer);
       editing.timer = setTimeout(save, 600);
-      area.style.height = "auto";
-      area.style.height = `${area.scrollHeight}px`;
+      fit();
     });
     area.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && /^[biuy/.=\-]$/i.test(e.key)) e.stopPropagation();
@@ -554,10 +594,10 @@ class BinPanel {
     area.addEventListener("blur", () => {
       save();
       this.#finish();
-      this.show(this.#cards.map((c) => ({ ...c, label: c.text.split("\n").find((l) => l.trim())?.trim().slice(0, 80) ?? "" , detail: c.detail })), this.#available);
+      this.#render();
     });
     area.focus();
-    area.style.height = `${area.scrollHeight}px`;
+    fit();
   }
 
   #finish(): void {
@@ -641,7 +681,7 @@ class AssetsPanel {
     const el = document.createElement("div");
     el.className = "assetcard";
     el.draggable = true;
-    el.title = `${c.name}\nDrag into the text, or use the arrow to insert it at the cursor.`;
+    el.title = `${c.name}\nDrag into the text to use it; double-click to open it.`;
     const pic = document.createElement("div");
     pic.className = "assetcard-pic";
     if (c.thumb) {
@@ -662,10 +702,7 @@ class AssetsPanel {
     text.append(label, detail);
     const tools = document.createElement("div");
     tools.className = "bincard-tools";
-    tools.append(
-      button("Insert at the cursor", '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/>', () => this.deps.insert(c.reference)),
-      button("Delete", '<path d="M6 6l12 12M18 6 6 18"/>', () => this.deps.post({ type: "assetDelete", name: c.name })),
-    );
+    tools.append(button("Delete", '<path d="M6 6l12 12M18 6 6 18"/>', () => this.deps.post({ type: "assetDelete", name: c.name })));
     el.append(pic, text, tools);
     el.addEventListener("dragstart", (e) => {
       e.dataTransfer!.setData("text/plain", c.reference);
@@ -678,9 +715,9 @@ class AssetsPanel {
 }
 
 /** A small icon button with a tooltip. */
-function button(tip: string, path: string, run: () => void): HTMLButtonElement {
+function button(tip: string, path: string, run: () => void, cls = ""): HTMLButtonElement {
   const b = document.createElement("button");
-  b.className = "sb-button";
+  b.className = `sb-button ${cls}`.trim();
   b.title = tip;
   b.setAttribute("aria-label", tip);
   b.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;

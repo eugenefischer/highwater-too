@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3 (branch m16-sidebar)
+
+- The Bin's cards look and work like Highland 2's: each shows the item's own text, up to six lines and then "…", in a card at least four lines tall. Click a card to select it: it is outlined, and a delete button appears at its top right (Delete or Backspace works too, and ↑↓ move the selection). Double-click (or Enter) edits it in place. The Filter at the foot narrows the cards by their words. No more arrow or + buttons.
+- Assets lose their arrow button too: drag an image into the text to use it.
+
 ## 0.6.2 (branch m16-sidebar)
 
 - Dragging, as in Highland: text dragged from the page onto the **Bin** moves there (cut; a whole paragraph takes its blank line with it, ⌘Z puts it back); a Bin card dragged into the page leaves the Bin; text dragged onto the **Scratchpad** is copied (at its cursor, or at the end), and the page keeps it.
