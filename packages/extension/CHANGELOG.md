@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.17
+
+- The Writing History and Works panels show a spinner with "Loading saves…" or "Loading works…" until the history has been read, instead of standing empty for the first few seconds.
+- The Writing History help, revised by EJ: each item in the More menu now has its own line.
+
 ## 0.6.16
 
 - Revert to This Save saves the document and records the revert straight away, so a revert in the history is exactly that save, and edits after it are ordinary saves. (It used to put the text back unsaved, recording the revert at your next save, edits and all.) With unsaved changes, it asks first: **Save and Revert** (your changes are recorded, then the revert), **Revert Without Saving** (they are left out of the history), or Cancel. A revert to a save identical to the document is recorded too. If the document can't be saved, nothing is recorded and you're told.
