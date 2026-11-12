@@ -1014,7 +1014,7 @@ const HISTORY_HELP = `
 <li><b>Save</b>: you saved.</li>
 <li><b>Autosave</b>: VS Code saved for you.</li>
 <li><b>Close</b>: saved as the document closed.</li>
-<li><b>Revert</b>: you went back to an earlier save.</li>
+<li><b>Revert</b>: you went back to an earlier save (its note says which).</li>
 <li><b>Restore</b>, <b>Convert</b>, <b>Connect</b>: the document was brought back from its history, changed to another file type, or joined to another document’s history.</li>
 </ul>
 
@@ -1022,7 +1022,7 @@ const HISTORY_HELP = `
 <p>Click a save, then:</p>
 <ul>
 <li>${icon(COMPARE_ICON)} <b>Compare</b> shows that save beside your current text, with the changes marked.</li>
-<li>${icon(REVERT_ICON)} <b>Revert</b> puts that save’s text, Bin and Scratchpad back in the document. Nothing is saved until you save, and later saves stay in the list, so you can change your mind.</li>
+<li>${icon(REVERT_ICON)} <b>Revert</b> puts that save’s text, Bin and Scratchpad back and saves the document. The revert is added to the list straight away, and later saves stay there, so you can always go back again. If you have unsaved changes, you can save them first or leave them out.</li>
 </ul>
 
 <h3>The bottom of the panel</h3>

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.16
+
+- Revert to This Save saves the document and records the revert straight away, so a revert in the history is exactly that save, and edits after it are ordinary saves. (It used to put the text back unsaved, recording the revert at your next save, edits and all.) With unsaved changes, it asks first: **Save and Revert** (your changes are recorded, then the revert), **Revert Without Saving** (they are left out of the history), or Cancel. A revert to a save identical to the document is recorded too. If the document can't be saved, nothing is recorded and you're told.
+- The Writing History help describes the new Revert.
+
 ## 0.6.15
 
 - Writing History: the selected save is let go when you switch to another panel, press Escape, or click beside the saves. Double-click and Enter no longer compare; the Compare button does.

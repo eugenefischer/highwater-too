@@ -451,6 +451,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     store,
     openFile: (path) => openFile(path),
     restoreWork: (w) => restoreWork(w),
+    settle: (key) => settle(key),
+    record: async (key, kind, note) => {
+      await inflight.get(key);
+      await commitNow(key, kind, note);
+    },
     showSave: async (path, title, commit) => {
       const left = vscode.Uri.from({ scheme: HISTORY_SCHEME, path: `/${title} (${commit.hash.slice(0, 7)})`, query: JSON.stringify({ hash: commit.hash }) });
       if (path && existsSync(path)) {

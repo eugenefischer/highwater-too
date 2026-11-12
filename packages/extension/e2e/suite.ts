@@ -271,6 +271,58 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "Revert to This Save saves the document and records the revert at once, saving unsaved changes first",
+    async () => {
+      const historyDir = join(dir, "history-revert");
+      await vscode.workspace.getConfiguration("highwater").update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
+      try {
+        const path = await copyOf("Revert");
+        const editor = await openScript(path);
+        const doc = editor.document;
+        const append = (text: string) => editor.edit((e) => e.insert(doc.lineAt(doc.lineCount - 1).range.end, text));
+        const repo = join(historyDir, "history.git");
+        const log = (): { hash: string; date: Date; message: string; text: string }[] => {
+          try {
+            const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { branch: string }> };
+            const branch = Object.values(index.documents)[0]?.branch;
+            if (!branch) return [];
+            return execFileSync("git", ["log", "--format=%H%x00%aI%x00%s", branch], { cwd: repo, encoding: "utf8" })
+              .trim()
+              .split("\n")
+              .map((l) => {
+                const [hash, date, message] = l.split("\0") as [string, string, string];
+                return { hash, date: new Date(date), message, text: execFileSync("git", ["show", `${hash}:text.fountain`], { cwd: repo, encoding: "utf8" }) };
+              });
+          } catch {
+            return [];
+          }
+        };
+        await append("\n\nFirst line.");
+        await doc.save();
+        await waitFor("the first save", () => log()[0]?.text.includes("First line.") ?? false, 20_000);
+        const first = log()[0]!;
+        await append("\n\nSecond line.");
+        await doc.save();
+        await waitFor("the second save", () => log()[0]?.text.includes("Second line.") ?? false, 20_000);
+        await append("\n\nThird line.");
+        assert.ok(doc.isDirty);
+        await vscode.commands.executeCommand("highwater.test.answer", "Save and Revert");
+        await vscode.commands.executeCommand("highwater.history.revert", { key: path, commit: { hash: first.hash, date: first.date, message: first.message } });
+        const asked = (await vscode.commands.executeCommand("highwater.test.asked")) as { message: string; choices: string[] }[];
+        assert.ok(asked.some((a) => a.message.includes("has unsaved changes") && a.choices.includes("Revert Without Saving")), JSON.stringify(asked));
+        await waitFor("the revert in the history", () => log()[0]?.message.startsWith("Revert") ?? false, 20_000);
+        const [revert, saved] = log();
+        assert.equal(revert!.text, first.text, "the revert records the earlier save's text");
+        assert.ok(saved!.message.startsWith("Save") && saved!.text.includes("Third line."), "the unsaved changes were saved first");
+        assert.equal(doc.getText(), first.text);
+        assert.ok(!doc.isDirty, "the document is saved");
+      } finally {
+        await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
+  [
     "gives a plain .fountain file a Bin and Scratchpad, kept and recorded with the writing history",
     async () => {
       const historyDir = join(dir, "history");
