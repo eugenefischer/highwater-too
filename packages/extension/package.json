@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.5.11",
+  "version": "0.5.12",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -692,6 +692,18 @@
           "default": "Courier Prime",
           "scope": "application",
           "markdownDescription": "The Manuscript template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.manuscript.indentLeading": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "Manuscript indents every paragraph, the first after a heading or scene break too (Highland 2's Indent leading paragraphs option)."
+        },
+        "highwater.templates.manuscript.spaceBeforeSections": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "Manuscript starts a heading that opens a page (the first, or one after `===`) a third of the way down it (Highland 2's Add space before section headers option)."
         },
         "highwater.templates.novel.headers": {
           "type": "string",

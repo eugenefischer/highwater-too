@@ -196,7 +196,8 @@ export async function renderDocument(context: vscode.ExtensionContext, store: Bu
     return { ...(await exportProse({ ...base, template: chosen, fonts, image: await loadImages(base.text, read) })), template: chosen };
   }
   if (chosen !== "Manuscript") return { ...(await exportScreenplay({ ...base, template: chosen, ...font, ...(o.uppercaseAction === false ? { uppercaseAction: false } : {}) })), template: chosen };
-  return { ...(await exportManuscript({ ...base, ...font, image: await loadImages(base.text, read) })), template: chosen };
+  const manuscript = { ...(o.indentLeading === true ? { indentLeading: true } : {}), ...(o.spaceBeforeSections === false ? { spaceBeforeSections: false } : {}) };
+  return { ...(await exportManuscript({ ...base, ...font, ...manuscript, image: await loadImages(base.text, read) })), template: chosen };
 }
 
 function safeDecode(src: string): string {

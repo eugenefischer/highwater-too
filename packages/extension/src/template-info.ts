@@ -43,7 +43,11 @@ export const TEMPLATE_INFO: TemplateInfo[] = [
     name: "Manuscript",
     group: "Literary",
     description: "The industry standard for book submissions.\n\nThis format automatically double-spaces. When writing, simply leave a blank line between paragraphs. Highwater Too will make the adjustment when you print or preview.",
-    options: [body(SCRIPT_FONTS, "Courier Prime")],
+    options: [
+      body(SCRIPT_FONTS, "Courier Prime"),
+      { key: "indentLeading", label: "Indent leading paragraphs", kind: "check", default: false },
+      { key: "spaceBeforeSections", label: "Add space before section headers", kind: "check", default: true },
+    ],
   },
   { name: "Novel", group: "Literary", description: "A beautiful layout for fiction inspired by author Michael Chabon.", options: [headers(NOVEL_FONTS, "Amiri"), body(NOVEL_FONTS, "Amiri")] },
   { name: "Treatment", group: "Literary", description: "A popular format for film and television pitches, with bold headings.", options: [body(["Courier Prime", "Courier", "Highland Sans"], "Highland Sans")] },

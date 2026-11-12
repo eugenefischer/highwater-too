@@ -47,6 +47,9 @@ export interface ScriptExportOptions extends ExportOptions {
 export interface ManuscriptExportOptions extends ExportOptions {
   /** The template's font option; default Courier Prime. */
   font?: string;
+  /** Highland's Indent leading paragraphs (off by default) and Add space before section headers (on) options. */
+  indentLeading?: boolean;
+  spaceBeforeSections?: boolean;
   /** Image bytes for `![alt](src)`: the bundle's assets, or files next to a plain Markdown file. */
   image?: (src: string) => Uint8Array | null;
 }
@@ -139,6 +142,8 @@ export async function exportManuscript(options: ManuscriptExportOptions): Promis
     ...(options.titlePage === false ? { titlePage: false } : {}),
     ...(options.image ? { image: options.image } : {}),
     ...(options.font ? { font: options.font, fontDir: options.fontDir } : {}),
+    ...(options.indentLeading ? { indentLeading: true } : {}),
+    ...(options.spaceBeforeSections === false ? { spaceBeforeSections: false } : {}),
     ...marksOf(doc, options.print),
   });
   const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");

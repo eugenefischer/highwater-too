@@ -72,6 +72,9 @@ export interface ManuscriptOptions {
   highlandQuirks?: boolean;
   /** Highland's print options other than the title page. */
   print?: PrintMarks;
+  /** Highland's template options: Indent leading paragraphs (off by default) and Add space before section headers (on). */
+  indentLeading?: boolean;
+  spaceBeforeSections?: boolean;
   /** The template's font (Highland's template options): Courier Prime (default), Courier, New York Medium or Times New Roman. */
   font?: string;
   /** Bundled fonts (default: this package's) and the folders installed fonts are looked for in. */
@@ -194,7 +197,7 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
   // with two and print one; ManuscriptStart2 starts with one and prints none).
   const leading = Math.max(0, (/^(?:[ \t]*\r?\n)*/.exec(doc.source)![0].match(/\n/g) ?? []).length - 1);
   const units: Unit[] = Array.from({ length: leading }, () => ({ kind: "line" as const, line: { items: [], height: M.pitch, ascent: M.ascent, opens: true, empty: true } }));
-  units.push(...toUnits(options.elements ?? doc.elements, doc.source, ctx, { hasTitle: doc.titlePage !== null, printedBefore: leading > 0, image: options.image, sourceOf: options.sourceOf ?? ((e) => e.span), tocPages, quoteChars: options.highlandQuirks ? MANUSCRIPT.chars : MANUSCRIPT.quote.chars }));
+  units.push(...toUnits(options.elements ?? doc.elements, doc.source, ctx, { hasTitle: doc.titlePage !== null, printedBefore: leading > 0, image: options.image, sourceOf: options.sourceOf ?? ((e) => e.span), tocPages, quoteChars: options.highlandQuirks ? MANUSCRIPT.chars : MANUSCRIPT.quote.chars, indentAll: options.indentLeading === true, dropHeadings: options.spaceBeforeSections !== false }));
 
   let header: PageTextDirective | null = null;
   let footer: PageTextDirective | null = null;
@@ -215,13 +218,14 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
   };
   const current = (): OpenPage => page ?? newPage();
   const footerOn = () => footer !== null && !footer.off;
-  const fits = (p: OpenPage, line: Line, used = p.used, y = p.y): boolean => {
+  const fits = (p: OpenPage, line: Line, used = p.used, y = p.y, byCount = false): boolean => {
     if (p.lines.length === 0) return true;
     const limit = M.lines + (line.opens ? 1 : 0);
     if (used + line.height / M.pitch > limit + 1e-6) return false;
-    // Taller lines also stop where the page ends: baselines down to about 734 (Courier Prime's
-    // fifteenth line after a dropped heading at 730.8; Times New Roman's at 738.5 goes over).
-    if (M.pitch !== MANUSCRIPT.pitch && line.items.length > 0 && y + line.ascent > 734) return false;
+    // Lines also stop where the page ends: baselines down to about 734 (Courier Prime's fifteenth
+    // line after a dropped heading at 730.8; Times New Roman's at 738.5 goes over; headings, whose
+    // space after doesn't count as a line, past it: ManuscriptProbe-NoSectionSpace).
+    if (!byCount && line.items.length > 0 && (M.pitch !== MANUSCRIPT.pitch || line.keepWithNext) && y + line.ascent > 734) return false;
     if (!options.highlandQuirks && footerOn() && line.items.length > 0 && y + line.ascent > M.lastBaseline + 0.5) return false;
     return true;
   };
@@ -277,7 +281,8 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
       // A heading needs a normal line (not the extra one) and room for the next line after it.
       const next = units.slice(i + 1).find((n): n is Extract<Unit, { kind: "line" }> => n.kind === "line");
       const alone = { ...line, opens: false };
-      ok = fits(p, alone) && (!next || fits(p, next.line, p.used + line.height / M.pitch, p.y + line.height + (line.after ?? 0)));
+      // (A heading after it need only fit by count: ManuscriptProbe-NoSectionSpace's Heading Five ends a page.)
+      ok = fits(p, alone) && (!next || fits(p, next.line, p.used + line.height / M.pitch, p.y + line.height + (line.after ?? 0), next.line.keepWithNext === true));
     }
     if (!ok) {
       p = newPage();
@@ -333,6 +338,10 @@ interface UnitOptions {
   sourceOf: (e: Element) => SourceRange;
   tocPages: Map<number, number>;
   quoteChars: number;
+  /** Highland's Indent leading paragraphs option: every paragraph indented, the first after a heading too. */
+  indentAll: boolean;
+  /** Highland's Add space before section headers option (on by default): a heading opening a page drops down it. */
+  dropHeadings: boolean;
 }
 
 function toUnits(elements: Element[], source: string, ctx: InlineContext, o: UnitOptions): Unit[] {
@@ -363,8 +372,8 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
     if (ctx.print) ctx.print.own = o.sourceOf(e) === e.span;
     if (notes.length && e.kind !== "paragraph") {
       // No paragraph after them: they print as one.
-      const x = afterParagraph ? M.left + M.indent : M.left;
-      wrapRuns(notes, afterParagraph ? M.chars - M.indent / CHAR : M.chars, M.chars).forEach((r, k) => push(text([{ x: k === 0 ? x : M.left, runs: r }], k === 0 ? { opens: true } : {})));
+      const x = afterParagraph || o.indentAll ? M.left + M.indent : M.left;
+      wrapRuns(notes, afterParagraph || o.indentAll ? M.chars - M.indent / CHAR : M.chars, M.chars).forEach((r, k) => push(text([{ x: k === 0 ? x : M.left, runs: r }], k === 0 ? { opens: true } : {})));
       notes = [];
       afterParagraph = true;
     }
@@ -381,8 +390,8 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         const runs = [...notes, ...toRuns(e.inline, ctx)];
         notes = [];
         if (plain(runs).trim() === "") break; // only a note
-        const x = afterParagraph ? M.left + M.indent : M.left;
-        const lines = wrapRuns(runs, afterParagraph ? M.chars - M.indent / CHAR : M.chars, M.chars);
+        const x = afterParagraph || o.indentAll ? M.left + M.indent : M.left;
+        const lines = wrapRuns(runs, afterParagraph || o.indentAll ? M.chars - M.indent / CHAR : M.chars, M.chars);
         lines.forEach((r, k) => push(text([{ x: k === 0 ? x : M.left, runs: r }], k === 0 ? { opens: true } : {})));
         printed = true;
         afterParagraph = true;
@@ -393,7 +402,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         const lines = wrapRuns(runs, M.chars);
         // A heading that opens the text (without a title page) or a page after "===" starts lower
         // (ExtraManuscriptMarkup, ManuscriptProbes L).
-        if (!printed || afterBreak) push({ items: [], height: M.dropHeading, ascent: 0 });
+        if ((!printed || afterBreak) && o.dropHeadings) push({ items: [], height: M.dropHeading, ascent: 0 });
         const h = headings[headingId++]!;
         lines.forEach((r, k) => {
           const len = runsWidth(r);
@@ -432,7 +441,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
       case "list":
         for (const item of e.items) {
           const textX = item.level === 0 ? M.list.textX : M.list.nestedX + item.level * M.list.level;
-          const marker = item.ordered ? item.marker : item.marker === "-" ? "-" : "•";
+          const marker = item.ordered ? item.marker : item.marker === "-" || item.marker === "+" ? item.marker : "•";
           const lines = wrapRuns(toRuns(item.inline, ctx), (M.list.right - textX) / CHAR);
           lines.forEach((r, k) => {
             const items: Line["items"] = [{ x: textX, runs: r }];
@@ -566,8 +575,8 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
     }
   }
   if (notes.length) {
-    const x = afterParagraph ? M.left + M.indent : M.left;
-    wrapRuns(notes, afterParagraph ? M.chars - M.indent / CHAR : M.chars, M.chars).forEach((r, k) => push(text([{ x: k === 0 ? x : M.left, runs: r }], k === 0 ? { opens: true } : {})));
+    const x = afterParagraph || o.indentAll ? M.left + M.indent : M.left;
+    wrapRuns(notes, afterParagraph || o.indentAll ? M.chars - M.indent / CHAR : M.chars, M.chars).forEach((r, k) => push(text([{ x: k === 0 ? x : M.left, runs: r }], k === 0 ? { opens: true } : {})));
   }
   return out;
 }

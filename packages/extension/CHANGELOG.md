@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.12
+
+- Tooltips on the Highland-Style Editor's top bar, in Highland 2's words: Show Editor, Show Preview, Choose the document's template, Choose a theme for the app (and Page size with the pages).
+- Manuscript's other Template Options, measured from Highland's PDFs: **Indent leading paragraphs** (every paragraph indented, the first after a heading or scene break too) and **Add space before section headers** (on by default: a heading that opens a page starts a third of the way down; off, at the top). In the Document Template window and in Settings.
+- Manuscript: a heading no longer prints below the page's last line when several come in a row; it moves to the next page, as in Highland. List items marked "+" print "+", as Highland's do.
+- Multi-Cam with Uppercase action off checked against Highland's PDF.
+
 ## 0.5.11
 
 - Highland 2's **Document Template** window: the template button in the Highland-Style Editor's top bar opens it. The templates by group on the left; on the right the chosen one's first page (your text, laid out live), its description and its **Template Options**. Picking a template changes the document's.

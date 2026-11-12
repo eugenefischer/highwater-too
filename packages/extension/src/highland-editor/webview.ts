@@ -212,6 +212,37 @@ const templateWindow = new TemplateWindow(
   () => pages.pdfjs(),
 );
 
+// Tooltips on the top bar's controls (Highland's words), shown after a moment's hover just below the
+// control, kept inside the window. Our own, as a webview's title tooltips don't always show.
+{
+  const tip = document.createElement("div");
+  tip.id = "hl-tip";
+  tip.hidden = true;
+  tip.setAttribute("role", "tooltip");
+  document.body.append(tip);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const hide = () => {
+    clearTimeout(timer);
+    tip.hidden = true;
+  };
+  for (const el of document.querySelectorAll<HTMLElement>("#topbar [data-tip]")) {
+    el.addEventListener("mouseenter", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        tip.textContent = el.dataset.tip ?? "";
+        tip.hidden = false;
+        const r = el.getBoundingClientRect();
+        const w = tip.offsetWidth;
+        tip.style.top = `${Math.round(r.bottom + 4)}px`;
+        tip.style.left = `${Math.round(Math.max(4, Math.min(window.innerWidth - w - 4, r.left + r.width / 2 - w / 2)))}px`;
+      }, 500);
+    });
+    el.addEventListener("mouseleave", hide);
+    el.addEventListener("mousedown", hide);
+  }
+  window.addEventListener("blur", hide);
+}
+
 // The top bar: Text and Pages (as ⌘E), and Choose Theme.
 document.getElementById("tbtext")!.onclick = () => pages.shown && togglePreview();
 document.getElementById("tbpages")!.onclick = () => !pages.shown && togglePreview();

@@ -1,6 +1,6 @@
 import { parse } from "@highwater/parser";
 import { describe, expect, it } from "vitest";
-import { defaultFontDir, layoutManuscript, layoutProse, layoutScreenplay, NOVEL, renderPdf, runsText, STAGE_PLAY } from "../src/index.ts";
+import { defaultFontDir, layoutManuscript, layoutProse, layoutScreenplay, MULTI_CAM, NOVEL, renderPdf, runsText, STAGE_PLAY } from "../src/index.ts";
 
 // Highland 2's template font options (the <Name>Probe-<Font> exports in the private fixtures).
 const script = (text: string) => parse(text, { mode: "fountain" });
@@ -47,5 +47,19 @@ describe("template fonts", () => {
     const para = (l: typeof amiri) => l.pages.flatMap((p) => p.items).find((i) => /^a paragraph/i.test(runsText(i.runs)))!.y;
     // TeX Gyre Schola sits 2 pt lower than Amiri at 13 pt (NovelProbe-Schola).
     expect(para(schola) - para(amiri)).toBeCloseTo(2 + 0, 0);
+  });
+
+  it("has Highland's other template options: Manuscript's indents and heading space, Multi-Cam's capitals", () => {
+    const doc = parse("# Chapter\n\nFirst paragraph.\n\nSecond paragraph.\n", { mode: "markdown" });
+    const at = (l: ReturnType<typeof layoutManuscript>, text: string) => l.pages.flatMap((p) => p.items).find((i) => runsText(i.runs) === text)!;
+    // ManuscriptProbe-IndentLeading: the first paragraph after a heading is indented too.
+    expect(at(layoutManuscript(doc), "First paragraph.").x).toBe(72);
+    expect(at(layoutManuscript(doc, { indentLeading: true }), "First paragraph.").x).toBe(108);
+    // ManuscriptProbe-NoSectionSpace: an opening heading starts at the top, not 192 pt down.
+    expect(at(layoutManuscript(doc), "Chapter").y - at(layoutManuscript(doc, { spaceBeforeSections: false }), "Chapter").y).toBeCloseTo(192, 0);
+    const script = parse("INT. ROOM - DAY\n\nBob waves.\n", { mode: "fountain" });
+    const texts = (t: typeof MULTI_CAM) => layoutScreenplay(script, { template: t }).pages[0]!.items.map((i) => runsText(i.runs));
+    expect(texts(MULTI_CAM)).toContain("BOB WAVES.");
+    expect(texts({ ...MULTI_CAM, uppercaseAction: false })).toContain("Bob waves.");
   });
 });
