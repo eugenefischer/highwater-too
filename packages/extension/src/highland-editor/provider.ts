@@ -10,6 +10,7 @@ import { parse } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { colorThemeLabel, HIGHLAND_THEMES, navigatorColors, pageColors, themeFor } from "./themes.ts";
+import { editorFocused, registerSidebarNote } from "./sidebar-note.ts";
 import { sidebarHost } from "./sidebar-host.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
@@ -151,6 +152,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       sidebar,
       panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean | string; kind?: string; word?: string }) => {
         if (sidebar.handle(msg as { type: string } & Record<string, unknown>)) return;
+        if (msg.type === "pageFocus") return editorFocused();
         if (msg.type === "ready") {
           sidebar.ready();
           pageText = pageForm(document.getText());
@@ -722,6 +724,7 @@ function swapSoon(uri: vscode.Uri): void {
 
 /** Opens the active document in the Highland-style editor, or back in the text editor. */
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore): void {
+  registerSidebarNote(context);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
     // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highland-Style Editor.

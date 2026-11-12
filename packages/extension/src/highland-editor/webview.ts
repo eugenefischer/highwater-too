@@ -27,6 +27,8 @@ import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spell
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
+// The page was given focus: the extension closes VS Code's Highwater Too sidebar if it is open.
+window.addEventListener("focus", () => vscode.postMessage({ type: "pageFocus" }));
 
 /** Marks transactions that came from the extension, so they are not sent back. */
 const remote = Annotation.define<boolean>();

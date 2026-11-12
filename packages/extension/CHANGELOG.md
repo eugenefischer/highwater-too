@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.12 (branch m16-sidebar)
+
+- The Highwater Too icon stays in the activity bar while the Highland-Style Editor is in front (EJ preferred it to coming and going): a sixth view, **Highland-Style Editor**, shows there in place of the five hidden ones, with a note that they are in the editor's own sidebar and a link to show or hide it (⌘0).
+- Whenever a Highland-Style Editor is given focus (switching to its tab, or clicking back into the page), VS Code's Highwater Too sidebar closes if it is open. Other sidebars (the Explorer, Search…) are left alone.
+
 ## 0.6.11 (branch m16-sidebar)
 
 - VS Code's own Highwater Too views (Navigator, Bin, Assets, Writing History, Works) are hidden while the Highland-Style Editor is in front, since its sidebar has them all; with every view hidden, VS Code also hides the Highwater Too icon in the activity bar. They come back for the text editor (the code button) and other files.

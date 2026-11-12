@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.6.11",
+  "version": "0.6.12",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -523,7 +523,7 @@
         "highwater.showSidebarOnOpen": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened in the text editor. (The Highland-Style Editor has these panels in its own sidebar, and VS Code's Highwater Too views are hidden while it is in front.)"
+          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened in the text editor. (The Highland-Style Editor has these panels in its own sidebar; VS Code's Highwater Too sidebar closes when it is given focus.)"
         },
         "highwater.docxFont": {
           "type": "string",
@@ -2180,10 +2180,19 @@
           "when": "activeCustomEditorId != 'highwater.highlandEditor'",
           "name": "Works",
           "icon": "media/highwater.svg"
+        },
+        {
+          "id": "highwater.inEditor",
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'",
+          "name": "Highland-Style Editor"
         }
       ]
     },
     "viewsWelcome": [
+      {
+        "view": "highwater.inEditor",
+        "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highland-Style Editor's own sidebar, at the left of the page.\n[Show or Hide the Sidebar (⌘0)](command:highwater.toggleEditorSidebar)\nThis sidebar closes whenever you go back to the page. Switch the tab to the text editor (the code button) to use VS Code's versions of these views."
+      },
       {
         "view": "highwater.works",
         "contents": "Every work in your writing history appears here, including works saved only on another computer and kept on the mirror. Save a document to start.\n[Open Work from History…](command:highwater.openWorkFromHistory)",
