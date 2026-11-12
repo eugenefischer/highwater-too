@@ -11,6 +11,7 @@ import { Decoration, EditorView, highlightWhitespace, keymap, ViewPlugin, Widget
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages, type PdfMessage } from "./pages.ts";
+import { TemplateWindow, type OptionValues } from "./template-window.ts";
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 
@@ -199,6 +200,16 @@ const pages = new Pages(
     } else if (top !== null) view.dispatch({ effects: EditorView.scrollIntoView(Math.min(top, len), { y: "start" }), annotations: remote.of(true) });
     view.focus();
   },
+  (current) => templateWindow.open(current),
+);
+
+// Highland's Document Template window, from the template button in the top bar.
+const templateWindow = new TemplateWindow(
+  (msg) => {
+    if ((msg as { type: string }).type === "previewTemplate" || (msg as { type: string }).type === "templateOption") pages.relayout();
+    vscode.postMessage(msg);
+  },
+  () => pages.pdfjs(),
 );
 
 // The top bar: Text and Pages (as ⌘E), and Choose Theme.
@@ -293,6 +304,11 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "template") {
     const t = event.data as { template: string; templates: string[] };
     pages.templates(t.templates, t.template);
+    templateWindow.template(t.template);
+  } else if (msg.type === "templateValues") templateWindow.values((event.data as { values: OptionValues }).values);
+  else if (msg.type === "templateThumb") {
+    const t = event.data as { template: string; data: Uint8Array | null; message?: string };
+    void templateWindow.thumbnail(t.template, t.data, t.message ?? "");
   } else if (msg.type === "counts") showCounts(event.data as { characters: number; words: number; pages: number | null });
   else if (msg.type === "spelling") spelling.configure(!!msg.on, (event.data as { words?: string[] }).words ?? []);
   else if (msg.type === "nextMisspelling") {

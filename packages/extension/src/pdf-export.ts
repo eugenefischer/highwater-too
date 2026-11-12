@@ -38,9 +38,15 @@ function marksOf(doc: Document, print: PrintFlags | undefined, prose = false): {
 export interface ScriptExportOptions extends ExportOptions {
   /** A script template's name (Screenplay, Stage Play, Graphic Novel); default Screenplay. */
   template?: string;
+  /** The template's font option; default Courier Prime. */
+  font?: string;
+  /** Multi-Cam's Uppercase action option (on by default). */
+  uppercaseAction?: boolean;
 }
 
 export interface ManuscriptExportOptions extends ExportOptions {
+  /** The template's font option; default Courier Prime. */
+  font?: string;
   /** Image bytes for `![alt](src)`: the bundle's assets, or files next to a plain Markdown file. */
   image?: (src: string) => Uint8Array | null;
 }
@@ -66,17 +72,30 @@ export async function exportScreenplay(options: ScriptExportOptions): Promise<Ex
     sourceOf: sourceMap(merged.elements, root),
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
-    template: SCRIPT_TEMPLATES[options.template ?? "Screenplay"] ?? SCREENPLAY,
+    template: script(options),
+    ...(options.font ? { font: options.font, fontDir: options.fontDir } : {}),
     ...marksOf(doc, options.print),
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
-  return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
+  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missingFonts(layout.substituted, options.template ?? "Screenplay")], anchors: anchors(layout) };
+}
+
+function script(options: ScriptExportOptions) {
+  const t = SCRIPT_TEMPLATES[options.template ?? "Screenplay"] ?? SCREENPLAY;
+  return options.uppercaseAction === false ? { ...t, uppercaseAction: false } : t;
+}
+
+/** A warning for each template font that isn't installed. */
+function missingFonts(substituted: Record<string, string>, template: string): string[] {
+  return Object.entries(substituted).map(([font, sub]) => `${font} isn't installed on this computer, so ${template} prints in ${sub} instead; lines and pages may fall differently from Highland 2's.`);
 }
 
 export interface ProseExportOptions extends ExportOptions {
   /** A prose template's name (Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report, Wiki). */
   template: string;
+  /** The template's font options. */
+  fonts?: { headers?: string; body?: string };
   image?: (src: string) => Uint8Array | null;
 }
 
@@ -89,6 +108,7 @@ export async function exportProse(options: ProseExportOptions): Promise<ExportRe
     elements: merged.elements.map((m) => m.element),
     sourceOf: sourceMap(merged.elements, root),
     fontDir: options.fontDir,
+    ...(options.fonts ? { fonts: options.fonts } : {}),
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     ...(options.image ? { image: options.image } : {}),
@@ -96,7 +116,7 @@ export async function exportProse(options: ProseExportOptions): Promise<ExportRe
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
-  const missing = Object.entries(layout.substituted).map(([font, sub]) => `${font} isn't installed on this computer, so ${options.template} prints in ${sub} instead; lines and pages may fall differently from Highland 2's.`);
+  const missing = missingFonts(layout.substituted, options.template);
   return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missing], anchors: anchors(layout) };
 }
 
@@ -118,12 +138,13 @@ export async function exportManuscript(options: ManuscriptExportOptions): Promis
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     ...(options.image ? { image: options.image } : {}),
+    ...(options.font ? { font: options.font, fontDir: options.fontDir } : {}),
     ...marksOf(doc, options.print),
   });
   const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");
   const title = cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "";
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
-  return { pdf, pages: layout.pages.length, problems: merged.problems.map((p) => p.message), anchors: anchors(layout) };
+  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missingFonts(layout.substituted, "Manuscript")], anchors: anchors(layout) };
 }
 
 /** A Word document of a manuscript, with {{INCLUDE}} files merged in. */

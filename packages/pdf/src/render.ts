@@ -91,6 +91,8 @@ export function renderPdf(layout: Layout, options: RenderOptions = {}): Promise<
   function select(run: Run): void {
     // Helvetica (paragraph numbers): one of PDF's standard fonts, so nothing is embedded.
     if (run.style.font === "Helvetica") doc.font("Helvetica").fontSize(run.style.size ?? 12);
+    // Courier (a template option): PDF's own, like Helvetica.
+    else if (run.style.font === "Courier") doc.font(COURIER[variantOf(run.style)]).fontSize(run.style.size ?? 12);
     else if (run.style.font !== undefined) doc.font(faceKey(run.style.font, variantOf(run.style))).fontSize(run.style.size ?? 12);
     else doc.font(fontFor(run.style)).fontSize(12);
   }
@@ -106,6 +108,8 @@ export function renderPdf(layout: Layout, options: RenderOptions = {}): Promise<
     doc.save().lineWidth(weight).strokeColor(color).moveTo(x, y).lineTo(x + width, y).stroke().restore();
   }
 }
+
+const COURIER = { regular: "Courier", bold: "Courier-Bold", italic: "Courier-Oblique", boldItalic: "Courier-BoldOblique" } as const;
 
 /** Links in Highland's manuscript PDFs. */
 const LINK = "#0000FF";

@@ -1,5 +1,5 @@
 import { formatTimestamp, hiddenRanges, inlineText, type Directive, type Document, type Inline, type RevisionRange, type Span } from "@highwater/parser";
-import type { PrintMarks, Run, TextStyle } from "./types.ts";
+import { CHAR, type PrintMarks, type Run, type TextStyle } from "./types.ts";
 
 /** Inline notes as Highland prints them (ScreenplayPrintProbe-notes). */
 export const NOTE_COLOR = "#0287D0";
@@ -189,6 +189,10 @@ export function mapRuns(runs: Run[], f: (text: string) => string): Run[] {
  * Spaces at a break are dropped.
  */
 export function wrapRuns(runs: Run[], width: number, restWidth = width): Run[][] {
+  if (measureHook) return wrapByWidth(runs, width * CHAR, restWidth * CHAR, measureHook);
+  // Widths in characters (a template may give a fraction for measured fonts).
+  width = Math.floor(width + 0.01);
+  restWidth = Math.floor(restWidth + 0.01);
   // Flatten to characters with their run index, then work on the plain text.
   const text = plain(runs);
   const owner: number[] = [];
@@ -253,6 +257,86 @@ function slice(runs: Run[], owner: number[], text: string, a: number, b: number)
   const last = out.at(-1);
   if (last) last.text = last.text.replace(/\s+$/, "");
   return out.filter((r) => r.text !== "");
+}
+
+/**
+ * The width in points runs print at. Scripts and manuscripts are laid out in Courier Prime, where
+ * every character is 7.2 pt; with another font chosen (Highland's template options), the layout
+ * sets a measure for the time it runs, and widths and line breaks follow the font.
+ */
+let measureHook: ((runs: Run[]) => number) | null = null;
+
+/** Sets (or, with null, clears) the measure; returns the previous one. */
+export function setMeasure(m: ((runs: Run[]) => number) | null): ((runs: Run[]) => number) | null {
+  const previous = measureHook;
+  measureHook = m;
+  return previous;
+}
+
+/** Whether a proportional font is being measured. */
+export function measuring(): boolean {
+  return measureHook !== null;
+}
+
+export function runsWidth(runs: Run[]): number {
+  return measureHook ? measureHook(runs) : plain(runs).length * CHAR;
+}
+
+/**
+ * wrapRuns with a measured font: the line takes as many words as fit in the width (trailing
+ * spaces hang); breaks as wrapRuns makes them; a word longer than the line is split.
+ */
+function wrapByWidth(runs: Run[], first: number, rest: number, width: (runs: Run[]) => number): Run[][] {
+  const text = plain(runs);
+  const lines: Run[][] = [];
+  let pos = 0;
+  for (const para of text.split("\n")) {
+    const end = pos + para.length;
+    let start = pos;
+    pos = end + 1;
+    if (start === end) {
+      lines.push([]);
+      continue;
+    }
+    while (start < end) {
+      const max = lines.length === 0 ? first : rest;
+      const fitsTo = (e: number) => width(trimEnd(sliceRuns(runs, start, e))) <= max + 0.01;
+      if (fitsTo(end)) {
+        lines.push(trimEnd(sliceRuns(runs, start, end)));
+        break;
+      }
+      let best = -1;
+      for (let i = start + 1; i < end; i++) {
+        const c = text[i]!;
+        const prev = text[i - 1]!;
+        const ok = (c === " " && prev !== " ") || ((prev === "-" || prev === "—") && c !== "-" && c !== " " && i - 1 > start) || ((prev === "!" || prev === "?") && /[\p{L}\p{N}]/u.test(c) && i - 1 > start);
+        if (!ok) continue;
+        if (!fitsTo(i)) break;
+        best = i;
+      }
+      let stop: number;
+      if (best > start) stop = best;
+      else {
+        stop = start + 1;
+        while (stop < end && fitsTo(stop + 1)) stop++;
+      }
+      lines.push(trimEnd(sliceRuns(runs, start, stop)));
+      start = stop;
+      while (start < end && text[start] === " ") start++;
+    }
+  }
+  return lines;
+}
+
+function trimEnd(runs: Run[]): Run[] {
+  const out = runs.map((r) => ({ ...r }));
+  while (out.length) {
+    const last = out.at(-1)!;
+    last.text = last.text.replace(/\s+$/, "");
+    if (last.text !== "") break;
+    out.pop();
+  }
+  return out;
 }
 
 /** Inline content that prints nothing but notes (a note on a line of its own). */

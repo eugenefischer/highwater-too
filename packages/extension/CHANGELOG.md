@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.11
+
+- Highland 2's **Document Template** window: the template button in the Highland-Style Editor's top bar opens it. The templates by group on the left; on the right the chosen one's first page (your text, laid out live), its description and its **Template Options**. Picking a template changes the document's.
+- Template Options, as in Highland: each template's fonts (Headers and Body), and Multi-Cam's Uppercase action. Like Highland's they apply to every document, so they are settings too (`highwater.templates.<template>.<option>`); changing one lays open pages out again.
+  - Scripts and the Manuscript in Courier, Highland Sans, New York or Times New Roman, measured against Highland's PDFs of the probes in each font: Courier's characters are a hair wider than Courier Prime's (a 65-character manuscript line wraps), Times New Roman's lines are 12.51 pt, widths are Highland's in points.
+  - Prose templates in any of their fonts: lines move with the font's height, and Times New Roman's line gap makes taller lines.
+  - TeX Gyre Schola, Cormorant Garamond and Spectral now come with Highwater Too (open licences, the versions Highland ships). Baskerville and Avenir Next Condensed (macOS) print when installed, else in Tinos and Lato.
+  - Known differences: list markers in fonts other than the template's own sit a few points off Highland's; in Times New Roman, some script pages break a line differently (Highland lets speeches run a line or two lower).
+- Manuscript's Indent leading paragraphs and Add space before section headers options aren't there yet (they await Highland's PDFs).
+
 ## 0.5.10
 
 - Print options checked against Highland 2 in every template (each probe exported with every option ticked):

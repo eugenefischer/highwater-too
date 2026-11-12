@@ -31,6 +31,8 @@ export interface ProseOptions {
   highlandQuirks?: boolean;
   /** Highland's print options other than the title page (measured in the Manuscript; the same here). */
   print?: PrintMarks;
+  /** The template's fonts (Highland's template options): headings, and everything else. */
+  fonts?: { headers?: string; body?: string };
 }
 
 type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
@@ -78,7 +80,8 @@ export interface ProseLayout extends Layout {
   substituted: Record<string, string>;
 }
 
-export function layoutProse(doc: Document, template: ProseTemplate, options: ProseOptions): ProseLayout {
+export function layoutProse(doc: Document, chosen: ProseTemplate, options: ProseOptions): ProseLayout {
+  const template = withFonts(chosen, options);
   const fonts = resolveFonts(familiesOf(template), options.fontDir, options.fontDirs);
   const m = new Measurer(fonts.faces);
   const first = run(doc, template, options, m, new Map());
@@ -93,8 +96,50 @@ export function layoutProse(doc: Document, template: ProseTemplate, options: Pro
   return layout;
 }
 
+/**
+ * The template with Highland's font options (the <Name>Probe-<Font> exports): Headers sets the
+ * headings, Body the rest (in templates with only Body, the headings too); text the template keeps
+ * in its own font (Bulletin's quotes and running heads) names it. A font with a line gap (Times New
+ * Roman's) makes lines that much taller (NovelProbe-TimesNewRoman: 21.35 pt, not 20.8).
+ */
+function withFonts(t: ProseTemplate, options: ProseOptions): ProseTemplate {
+  const { headers, body } = options.fonts ?? {};
+  if (!headers && !body) return t;
+  const metrics = (font: string) => new Measurer(resolveFonts([font], options.fontDir, options.fontDirs).faces).metrics(font);
+  // Baselines move by half the change in ascender + descender, rounded (NovelProbe-Schola: +4 at 24 pt, +2 at 13).
+  const shift = (from: string, to: string, size: number) => {
+    const a = metrics(from);
+    const b = metrics(to);
+    return Math.round((((b.ascender + b.descender) - (a.ascender + a.descender)) * size) / 2000);
+  };
+  const gap = (font: string, size: number) => (metrics(font).lineGap * size) / 1000;
+  const out: ProseTemplate = { ...t, body: { ...t.body }, headings: t.headings.map((h) => ({ ...h })) as ProseTemplate["headings"] };
+  if (body && body !== t.body.font) {
+    const extra = gap(body, t.body.size) - gap(t.body.font, t.body.size);
+    for (const h of out.headings) if (h.height === t.body.pitch) h.height += extra;
+    const down = shift(t.body.font, body, t.body.size);
+    out.body = { ...out.body, font: body, pitch: t.body.pitch + extra, ascent: t.body.ascent + down, leading: extra };
+    // Paragraph numbers keep their place in the line.
+    out.numberRise = (t.numberRise ?? 3) + down;
+    if (t.header.font === undefined) out.header = { ...t.header, y: t.header.y + shift(t.body.font, body, t.header.size) };
+    if (t.footer.font === undefined) out.footer = { ...t.footer, y: t.footer.y + shift(t.body.font, body, t.footer.size) };
+    if (t.title.kind === "page") {
+      const T = t.title;
+      const from = T.font ?? t.body.font;
+      out.title = { ...T, ys: T.ys.map((y, k) => y + shift(from, body, k === 0 ? (T.titleSize ?? T.size) : T.size)) as typeof T.ys, bottom: T.bottom + shift(from, body, T.size) };
+    }
+  }
+  t.headings.forEach((h, k) => {
+    const from = h.font ?? t.body.font;
+    const to = headers ?? (h.font === undefined ? body : undefined);
+    if (!to || to === from) return;
+    out.headings[k] = { ...out.headings[k]!, font: to, ascent: h.ascent + shift(from, to, h.size) };
+  });
+  return out;
+}
+
 function familiesOf(t: ProseTemplate): string[] {
-  return [t.body.font, ...t.headings.map((h) => h.font ?? t.body.font), t.header.font ?? t.body.font, t.footer.font ?? t.body.font, (t.title.kind === "page" ? t.title.font : undefined) ?? t.body.font];
+  return [t.body.font, ...t.headings.map((h) => h.font ?? t.body.font), t.header.font ?? t.body.font, t.footer.font ?? t.body.font, t.quote.font ?? t.body.font, (t.title.kind === "page" ? t.title.font : undefined) ?? t.body.font];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -544,7 +589,7 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
         const defX = T.left + 244;
         // Highland's definitions are 224 pt wide even past a narrower right margin (Novel): a quirk.
         const defRight = o.quirks ? defX + 224 : Math.min(T.right, defX + 224);
-        const pitch = B.size * 1.3;
+        const pitch = B.size * 1.3 + (B.leading ?? 0);
         for (const item of e.items) {
           const defs = wrapMeasured(dress(toRuns(item.definitionInline, ctx), B), defRight - defX, defRight - defX, width(B));
           const terms = wrapMeasured(dress(toRuns(item.termInline, ctx), B), termRight - T.left, termRight - T.left, width(B));

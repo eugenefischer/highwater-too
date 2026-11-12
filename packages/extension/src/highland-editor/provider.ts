@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
 import { MODES } from "../language.ts";
+import { SETTINGS_PREFIX, setTemplateOption, TEMPLATE_INFO, templateOptions } from "../template-options.ts";
 import { onDidChangeTemplate, PRINT_OPTIONS, printOptionsOf, renderDocument, setPrintOption, setTemplate, templateOf, TEMPLATES, type PrintOption, type Template } from "../render-document.ts";
 import { documentStats } from "../syntax/stats.ts";
 import { onDidChangePageCount, pageCountOf } from "../page-count.ts";
@@ -107,6 +108,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
     const sendNumbers = () => void panel.webview.postMessage({ type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
+    // The template window's options (settings for every document).
+    const sendTemplateValues = () => void panel.webview.postMessage({ type: "templateValues", values: Object.fromEntries(TEMPLATE_INFO.map((t) => [t.name, templateOptions(t.name)])) });
     // The top bar's template menu, shown with the text too.
     const sendTemplate = async () => {
       const template = await templateOf(this.context, this.store(), document);
@@ -142,7 +145,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     const subscriptions = [
       highlandViews.add(view),
-      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean; kind?: string; word?: string }) => {
+      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean | string; kind?: string; word?: string }) => {
         if (msg.type === "ready") {
           pageText = pageForm(document.getText());
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
@@ -166,6 +169,16 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         } else if (msg.type === "previewClosed") previewing = false;
         else if (msg.type === "previewTemplate" && TEMPLATES.includes(msg.template as Template)) {
           void setTemplate(this.context, this.store(), document, msg.template as Template).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the template: ${(e as Error).message}`));
+        } else if (msg.type === "templateWindow") sendTemplateValues();
+        else if (msg.type === "templateOption" && typeof msg.template === "string" && typeof msg.key === "string" && (typeof msg.value === "string" || typeof msg.value === "boolean")) {
+          void setTemplateOption(msg.template, msg.key, msg.value).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the template option: ${(e as Error).message}`));
+        } else if (msg.type === "templateThumb" && TEMPLATES.includes(msg.template as Template)) {
+          // The template window's page: the text's first page in that template (no title page).
+          const template = msg.template as Template;
+          void renderDocument(this.context, this.store(), document, template, true, false).then(
+            (r) => void panel.webview.postMessage({ type: "templateThumb", template, data: r?.pdf ?? null, message: r ? "" : "No pages to show." }),
+            (e: unknown) => void panel.webview.postMessage({ type: "templateThumb", template, data: null, message: `Could not lay out the text: ${(e as Error).message}` }),
+          );
         } else if (msg.type === "printOption" && PRINT_OPTIONS.includes(msg.key as PrintOption)) {
           void setPrintOption(this.context, this.store(), document, msg.key as PrintOption, !!msg.value).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the print option: ${(e as Error).message}`));
         } else if (msg.type === "previewSave") {
@@ -199,6 +212,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (view.ready && e.affectsConfiguration("editor.renderWhitespace", document)) sendInvisibles();
         if (view.ready && e.affectsConfiguration("highwater.theme")) sendTheme();
+        if (view.ready && e.affectsConfiguration(SETTINGS_PREFIX)) sendTemplateValues();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
         if (view.ready && (e.affectsConfiguration("highwater.spellCheck") || e.affectsConfiguration("highwater.spellingWords"))) sendSpelling();
@@ -282,7 +296,36 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 #topbar select { font: inherit; color: var(--hl-muted); background: transparent; border: 0; padding: 2px 4px; cursor: pointer; }
 #topbar select:hover { color: var(--hl-fg); }
 #topbar select option { color: var(--hl-panel-fg); background: var(--hl-panel-bg); }
-#ptemplate:empty { display: none; }
+#ptemplate { font: inherit; color: var(--hl-muted); background: transparent; border: 0; padding: 2px 4px; cursor: pointer; }
+#ptemplate:hover { color: var(--hl-fg); }
+#ptemplate::after { content: " ▾"; font-size: 0.8em; }
+/* Highland's Document Template window: a sheet over the editor. */
+#tplwin { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; background: rgba(0, 0, 0, 0.35); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
+#tplwin[hidden] { display: none; }
+.tw-sheet { display: flex; flex-direction: column; width: min(720px, 100%); max-height: 100%; background: var(--hl-panel-bg); color: var(--hl-panel-fg); border: 1px solid var(--hl-border); border-radius: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35); overflow: hidden; }
+.tw-head { position: relative; display: flex; align-items: center; justify-content: center; padding: 14px 16px 10px; }
+.tw-head h1 { margin: 0; font-size: 1.6em; font-weight: 600; color: var(--hl-muted); }
+.tw-done { position: absolute; right: 14px; font: inherit; padding: 4px 14px; border: 0; border-radius: 5px; background: var(--hl-accent); color: var(--hl-accent-fg); cursor: pointer; }
+.tw-body { display: flex; gap: 20px; min-height: 0; padding: 0 20px 20px; }
+.tw-list { flex: 0 0 210px; overflow-y: auto; padding-right: 8px; border-right: 1px solid var(--hl-border); }
+.tw-group { margin: 12px 0 4px; padding-top: 8px; border-top: 1px solid var(--hl-border); font-size: 0.8em; font-weight: 600; letter-spacing: 0.06em; color: var(--hl-muted); }
+.tw-group:first-child { margin-top: 0; }
+.tw-item { display: block; width: 100%; text-align: left; font: inherit; font-size: 1.15em; padding: 5px 10px; margin: 1px 0; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; }
+.tw-item:hover { background: var(--vscode-list-hoverBackground); }
+.tw-item.tw-selected { background: var(--hl-accent); color: var(--hl-accent-fg); }
+.tw-item:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+.tw-detail { flex: 1; min-width: 0; overflow-y: auto; }
+.tw-thumb { position: relative; display: inline-block; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3); }
+.tw-thumb canvas { display: block; width: 216px; }
+.tw-thumb-note { position: absolute; inset: 40% 12px auto; text-align: center; color: #555; }
+.tw-name { margin: 14px 0 4px; font-size: 1.9em; }
+.tw-description p { margin: 0 0 8px; line-height: 1.4; }
+.tw-options { margin-top: 10px; border-top: 1px solid var(--hl-border); padding-top: 10px; }
+.tw-options-head { font-size: 0.8em; font-weight: 600; letter-spacing: 0.06em; color: var(--hl-muted); margin-bottom: 8px; }
+.tw-option { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.tw-font span { width: 5em; text-align: right; }
+.tw-font select { flex: 1; max-width: 240px; font: inherit; padding: 3px 6px; color: var(--vscode-dropdown-foreground); background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border, var(--hl-border)); border-radius: 4px; }
+@media (max-width: 560px) { .tw-body { flex-direction: column; } .tw-list { flex: none; max-height: 30vh; border-right: 0; } }
 /* Highland's counts at the foot of the text. */
 #counts { display: flex; justify-content: center; gap: 2em; padding: 6px 0 8px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
 #counts:empty, body.previewing #counts { display: none; }
@@ -380,7 +423,7 @@ body.previewing #preview { display: flex; }
     <span id="pstatus"></span>
   </div>
   <div class="tb-side tb-right">
-    <select id="ptemplate" aria-label="Print template"></select>
+    <button id="ptemplate" title="Document Template…" aria-haspopup="dialog" hidden></button>
     <button id="tbtheme" class="tb-icon" title="Choose Theme…" aria-label="Choose Theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.3 2.6"/></svg></button>
   </div>
 </div>

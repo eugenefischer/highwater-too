@@ -8,6 +8,7 @@ import { exportManuscript, exportManuscriptDocx, exportPlainText, exportProse, e
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 import { activeDocument, onDidChangeActiveSurface } from "./surface.ts";
+import { SETTINGS_PREFIX, templateOptions } from "./template-options.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
 export const TEMPLATES = ["Screenplay", "Multi-Cam", "Stage Play", "Graphic Novel", "Manuscript", "Novel", "Treatment", "Modern Standard", "Article", "Bulletin", "Speech", "MLA Report", "Wiki", "Plain Text"] as const;
@@ -44,6 +45,16 @@ export async function templateOf(context: vscode.ExtensionContext, store: Bundle
 const templateChanged = new vscode.EventEmitter<vscode.TextDocument>();
 /** Fires when a document's template is changed (from the preview or the status bar). */
 export const onDidChangeTemplate = templateChanged.event;
+
+/** A template option changed (they are settings, for every document): lay open documents out again. */
+export function watchTemplateOptions(context: vscode.ExtensionContext): void {
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (!e.affectsConfiguration(SETTINGS_PREFIX)) return;
+      for (const doc of vscode.workspace.textDocuments) if (doc.languageId.startsWith("highland-")) templateChanged.fire(doc);
+    }),
+  );
+}
 
 /**
  * Saves the template choice: in info.json for .highland files (as Highland does), with a plain
@@ -171,16 +182,21 @@ async function sources(context: vscode.ExtensionContext, store: BundleStore, doc
 }
 
 /** With `render` false, lays out only: for the exact page count, without drawing the PDF. */
-export async function renderDocument(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template?: Template, render = true): Promise<Rendered | null> {
+export async function renderDocument(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument, template?: Template, render = true, titlePage?: boolean): Promise<Rendered | null> {
   const chosen = template ?? (await templateOf(context, store, doc));
   if (!chosen) return null;
   const sourced = await sources(context, store, doc);
   const read = sourced.read;
-  const base = { ...sourced.base, render };
+  const base = { ...sourced.base, render, ...(titlePage !== undefined ? { titlePage } : {}) };
+  const o = templateOptions(chosen);
+  const font = typeof o.body === "string" ? { font: o.body } : {};
   if (chosen === "Plain Text") return { ...(await exportPlainText(base)), template: chosen };
-  if (PROSE.has(chosen)) return { ...(await exportProse({ ...base, template: chosen, image: await loadImages(base.text, read) })), template: chosen };
-  if (chosen !== "Manuscript") return { ...(await exportScreenplay({ ...base, template: chosen })), template: chosen };
-  return { ...(await exportManuscript({ ...base, image: await loadImages(base.text, read) })), template: chosen };
+  if (PROSE.has(chosen)) {
+    const fonts = { ...(typeof o.headers === "string" ? { headers: o.headers } : {}), ...(typeof o.body === "string" ? { body: o.body } : {}) };
+    return { ...(await exportProse({ ...base, template: chosen, fonts, image: await loadImages(base.text, read) })), template: chosen };
+  }
+  if (chosen !== "Manuscript") return { ...(await exportScreenplay({ ...base, template: chosen, ...font, ...(o.uppercaseAction === false ? { uppercaseAction: false } : {}) })), template: chosen };
+  return { ...(await exportManuscript({ ...base, ...font, image: await loadImages(base.text, read) })), template: chosen };
 }
 
 function safeDecode(src: string): string {

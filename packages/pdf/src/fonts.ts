@@ -7,7 +7,8 @@ import type { Run, TextStyle } from "./types.ts";
 /**
  * Fonts for the prose templates (M10). Highland 2's templates use Courier Prime, Amiri, Lato and
  * Highland Sans, and macOS's Georgia, Times New Roman, Avenir Next, SF Pro Display and New York.
- * Courier Prime, Highland Sans, Amiri, Lato and Merriweather (open licences, the versions Highland ships) are bundled; the rest are used when installed,
+ * Courier Prime, Highland Sans, Amiri, Lato, Merriweather, and the template options TeX Gyre Schola, Cormorant Garamond and
+ * Spectral (open licences, the versions Highland ships) are bundled; the rest are used when installed,
  * and replaced by a bundled font of the same kind otherwise (EJ's decision, 2026-10-19).
  */
 export type Variant = "regular" | "bold" | "italic" | "boldItalic";
@@ -38,6 +39,10 @@ const BUNDLED: Record<string, Record<Variant, string>> = {
   // Free fonts with the same character widths as Georgia and Times New Roman.
   Gelasio: { regular: "Gelasio-Regular.ttf", bold: "Gelasio-Bold.ttf", italic: "Gelasio-Italic.ttf", boldItalic: "Gelasio-BoldItalic.ttf" },
   Tinos: { regular: "Tinos-Regular.ttf", bold: "Tinos-Bold.ttf", italic: "Tinos-Italic.ttf", boldItalic: "Tinos-BoldItalic.ttf" },
+  // Template font options (open licences, the versions Highland ships).
+  "TeX Gyre Schola": { regular: "texgyreschola-regular.otf", bold: "texgyreschola-bold.otf", italic: "texgyreschola-italic.otf", boldItalic: "texgyreschola-bolditalic.otf" },
+  "Cormorant Garamond": { regular: "CormorantGaramond-Regular.ttf", bold: "CormorantGaramond-Bold.ttf", italic: "CormorantGaramond-Italic.ttf", boldItalic: "CormorantGaramond-BoldItalic.ttf" },
+  Spectral: { regular: "Spectral-Regular.ttf", bold: "Spectral-Bold.ttf", italic: "Spectral-Italic.ttf", boldItalic: "Spectral-BoldItalic.ttf" },
 };
 
 /** What a missing font is replaced with: a bundled font of the same kind. */
@@ -48,6 +53,8 @@ const SUBSTITUTE: Record<string, string> = {
   "New York Medium": "Merriweather",
   "Avenir Next": "Lato",
   "SF Pro Display": "Lato",
+  Baskerville: "Tinos",
+  "Avenir Next Condensed": "Lato",
 };
 
 /** Where installed fonts are looked for, besides the bundled folder. */
@@ -147,6 +154,8 @@ export function resolveFonts(families: string[], bundledDir: string, dirs: strin
   const substituted: Record<string, string> = {};
   const bundled = (family: string) => Object.fromEntries(VARIANTS.map((v) => [v, { path: join(bundledDir, BUNDLED[family]![v]) }])) as Record<Variant, FontFace>;
   for (const family of new Set(families)) {
+    // PDF's own Courier needs no file (see Measurer and renderPdf).
+    if (family === "Courier") continue;
     let set = BUNDLED[family] ? bundled(family) : findFamily(family, dirs);
     if (!set) {
       const sub = SUBSTITUTE[family] ?? "Lato";
@@ -173,6 +182,8 @@ export class Measurer {
   /** Width in points of one run of text in a family, variant and size. */
   width(text: string, family: string, variant: Variant, size: number): number {
     if (text === "") return 0;
+    // Courier: macOS's, whose characters are 1229/2048 em (PDF's own is 0.6 em, which prints it).
+    if (family === "Courier") return (text.length * size * 1229) / 2048;
     const key = faceKey(family, variant);
     const id = `${key}|${size}|${text}`;
     const hit = this.#cache.get(id);
@@ -188,6 +199,14 @@ export class Measurer {
     if (this.#cache.size > 20000) this.#cache.clear();
     this.#cache.set(id, w);
     return w;
+  }
+
+  /** A family's vertical metrics in 1000ths of the font size (hhea: ascender, descender below zero, line gap). */
+  metrics(family: string): { ascender: number; descender: number; lineGap: number } {
+    if (family === "Courier") return { ascender: 629, descender: -157, lineGap: 0 };
+    this.width("x", family, "regular", 12);
+    const f = (this.#doc.font(faceKey(family, "regular")) as unknown as { _font: { ascender: number; descender: number; lineGap: number } })._font;
+    return { ascender: f.ascender, descender: f.descender, lineGap: f.lineGap };
   }
 
   /** Width of styled runs (each run's font and size from its style, else `base`). */

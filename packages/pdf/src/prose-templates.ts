@@ -32,7 +32,8 @@ export interface ProseTemplate {
   right: number;
   top: number;
   bottom: number;
-  body: TextSpec & { pitch: number; ascent: number; justify?: boolean };
+  /** `leading`: the body font's line gap beyond the template's own font's (added to single-spaced lines). */
+  body: TextSpec & { pitch: number; ascent: number; justify?: boolean; leading?: number };
   /** Empty source lines print as empty lines (the space between paragraphs); else they are dropped. */
   blankLines: boolean;
   indent: { first: number; rule: "none" | "afterParagraph" | "all" };
@@ -132,8 +133,9 @@ export const MODERN_STANDARD: ProseTemplate = {
   quote: { indent: 36, italic: true },
   list: { text: 26.4, nested: 18 },
   sceneBreak: { kind: "rule", height: 16.5, rule: 8 },
-  header: { y: 45.5, size: 8, bold: true, caps: true },
-  footer: { y: 739.5, size: 8, bold: true },
+  // Running heads stay in Avenir Next whatever the Body font (ModernStandardProbe-Spectral).
+  header: { y: 45.5, size: 8, bold: true, caps: true, font: "Avenir Next" },
+  footer: { y: 739.5, size: 8, bold: true, font: "Avenir Next" },
   pageNumber: { where: "footer", format: "N" },
   title: { kind: "page", ys: [230.8, 301.6, 343.6, 414.4], bottom: 716.8, size: 11 },
 };
@@ -186,11 +188,12 @@ export const BULLETIN: ProseTemplate = {
     { size: 11, bold: true, italic: true, align: "left", ...BOX(16.5, 12) },
     { size: 11, bold: true, align: "centre", ...BOX(16.5, 12) },
   ],
-  quote: { indent: 36, size: 10 },
+  // Quotes and running heads stay in SF Pro Display whatever the Body font (BulletinProbe-NewYork).
+  quote: { indent: 36, size: 10, font: "SF Pro Display" },
   list: { text: 25.81, nested: 18 },
   sceneBreak: { kind: "rule", height: 16.5, rule: 8 },
-  header: { y: 46.5, size: 8, bold: true, caps: true },
-  footer: { y: 740.5, size: 8, bold: true },
+  header: { y: 46.5, size: 8, bold: true, caps: true, font: "SF Pro Display" },
+  footer: { y: 740.5, size: 8, bold: true, font: "SF Pro Display" },
   pageNumber: { where: "footer", format: "N" },
   title: { kind: "page", ys: [230.8, 301.6, 343.6, 414.4], bottom: 716.8, size: 11 },
 };

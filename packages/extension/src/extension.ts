@@ -9,7 +9,7 @@ import { registerConversions } from "./convert.ts";
 import { registerLanguageFeatures } from "./language.ts";
 import { registerPanels } from "./panels.ts";
 import { registerPreview } from "./preview.ts";
-import { registerTemplateStatus } from "./render-document.ts";
+import { registerTemplateStatus, watchTemplateOptions } from "./render-document.ts";
 import { currentHistory, historyRoot, registerHistory } from "./history.ts";
 import { startPlainExtras } from "./extras.ts";
 import { focusedDocument } from "./focus.ts";
@@ -99,6 +99,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ["completion, markers and cheat sheet", () => registerWritingTools(context, cache)],
     ["preview", () => registerPreview(context, store)],
     ["template indicator", () => registerTemplateStatus(context, store)],
+    ["template options", () => watchTemplateOptions(context)],
     ["writing history", () => registerHistory(context, store)],
   ];
   for (const [name, start] of features) {

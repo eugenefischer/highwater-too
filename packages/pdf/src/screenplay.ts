@@ -1,6 +1,8 @@
 import { parseInline, seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
-import { addPrintMarks } from "./marks.ts";
-import { marked, onlyNotes, plain, printContext, sentenceEnds, sliceRuns, SYNOPSIS_COLOR, toRuns, trimStartRuns, wrapRuns, type InlineContext } from "./text.ts";
+import { addPrintMarks, NUMBER } from "./marks.ts";
+import { Measurer, resolveFonts, type FontFaces } from "./fonts.ts";
+import { defaultFontDir } from "./render.ts";
+import { marked, measuring, onlyNotes, plain, printContext, runsWidth, sentenceEnds, setMeasure, sliceRuns, SYNOPSIS_COLOR, toRuns, trimStartRuns, wrapRuns, type InlineContext } from "./text.ts";
 import { assignSources, CHAR, type Layout, type Page, type PlacedText, type PrintMarks, type Run, type SourceRange, type TextStyle } from "./types.ts";
 
 /** A script template's measured layout (Highland 2: Screenplay, Stage Play, Graphic Novel). x values are where text starts; y values are baselines. */
@@ -21,8 +23,6 @@ export interface ScriptTemplate {
   /** Wrapped parenthetical lines indent one character and are one character narrower. */
   parenthetical: { x: number; width: number };
   dialogue: { x: number; width: number };
-  /** (MORE) at a dialogue page break. */
-  more: { x: number };
   dual: {
     left: { cue: number; parenthetical: number; dialogue: number; dialogueWidth: number; parentheticalWidth: number };
     right: { cue: number; parenthetical: number; dialogue: number; dialogueWidth: number; parentheticalWidth: number };
@@ -57,18 +57,20 @@ export const SCREENPLAY: ScriptTemplate = {
   lineHeight: 12,
   /** 55 lines, or 54 when the page has a footer (ScreenplayEdgeCases vs Astounding). */
   linesPerPage: 55,
-  action: { x: 108, width: 63 },
-  sceneHeading: { x: 108, width: 63 },
+  // Widths in Courier Prime characters; Highland's are in points, so they may hold a fraction more
+  // (wrapping in Courier Prime uses the whole characters). The fractions are from the probes in
+  // Times New Roman and New York; where none was measured, half a character.
+  action: { x: 108, width: 456 / CHAR },
+  sceneHeading: { x: 108, width: 456 / CHAR },
   sceneNumberLeft: 54,
   sceneNumberRight: 540,
-  cue: { x: 249, width: 38 },
-  parenthetical: { x: 207, width: 29 },
-  dialogue: { x: 179, width: 34 },
-  more: { x: 214.2 },
+  cue: { x: 249, width: 38.5 },
+  parenthetical: { x: 207, width: 29.5 },
+  dialogue: { x: 179, width: 249.1 / CHAR },
   /** Measured with FirstLineTests: the right column is wider than the left. */
   dual: {
-    left: { cue: 179, parenthetical: 137, dialogue: 109, dialogueWidth: 28, parentheticalWidth: 23 },
-    right: { cue: 403.8, parenthetical: 361.3, dialogue: 333.8, dialogueWidth: 29, parentheticalWidth: 25 },
+    left: { cue: 179, parenthetical: 137, dialogue: 109, dialogueWidth: 28.5, parentheticalWidth: 23.5 },
+    right: { cue: 403.8, parenthetical: 361.3, dialogue: 333.8, dialogueWidth: 29.5, parentheticalWidth: 25.5 },
   },
   rightEdge: 564,
   centre: 336,
@@ -88,15 +90,16 @@ export const GRAPHIC_NOVEL: ScriptTemplate = { ...SCREENPLAY, name: "Graphic Nov
 export const STAGE_PLAY: ScriptTemplate = {
   ...SCREENPLAY,
   name: "Stage Play",
-  action: { x: 288, width: 35 },
-  cue: { x: 215, width: 38 },
-  parenthetical: { x: 215, width: 33 },
-  dialogue: { x: 124.28, width: 46 },
-  more: { x: 222.2 },
+  action: { x: 288, width: 253.3 / CHAR },
+  cue: { x: 215, width: 38.5 },
+  // (aaaa bbbbbbbbbbbbb cccccccccccccccccccccccc) wraps in Times New Roman (241.2 pt).
+  parenthetical: { x: 215, width: 33.2 },
+  // Just over 46 characters: 46 of Courier (331.25 pt, a hair wider than Courier Prime) wrap (StagePlayProbe-Courier).
+  dialogue: { x: 124.28, width: 331.22 / CHAR },
   // Dialogue widths from the probe's wrapping (left exactly 29; right 29 to 34); parenthetical widths not probed.
   dual: {
-    left: { cue: 145, parenthetical: 145, dialogue: 54.28, dialogueWidth: 29, parentheticalWidth: 23 },
-    right: { cue: 323, parenthetical: 349, dialogue: 286.95, dialogueWidth: 29, parentheticalWidth: 25 },
+    left: { cue: 145, parenthetical: 145, dialogue: 54.28, dialogueWidth: 29.5, parentheticalWidth: 23.5 },
+    right: { cue: 323, parenthetical: 349, dialogue: 286.95, dialogueWidth: 29.5, parentheticalWidth: 25.5 },
   },
 };
 
@@ -148,6 +151,33 @@ export interface ScreenplayOptions {
   template?: ScriptTemplate;
   /** Highland's print options other than the title page. */
   print?: PrintMarks;
+  /** The template's font (Highland's template options): Courier Prime (default), Courier, Highland Sans, New York Medium or Times New Roman. */
+  font?: string;
+  /** Bundled fonts (default: this package's) and the folders installed fonts are looked for in. */
+  fontDir?: string;
+  fontDirs?: string[];
+}
+
+/** The fonts printed in the same widths as Courier Prime (7.2 pt a character at 12 pt). */
+const MONOSPACED = new Set(["Courier Prime", "Courier", "Highland Sans"]);
+
+/**
+ * A script template set in another font (ScriptProbe exports in Courier, Highland Sans, New York
+ * and Times New Roman): lines are 12 pt plus the font's line gap (Times: 12.51), the first
+ * baseline sits the font's descent above the line's foot, rounded up (Courier Prime 9 pt below
+ * its top, the others 10).
+ */
+function withFont(t: ScriptTemplate, family: string, options: ScreenplayOptions): { template: ScriptTemplate; measure: ((runs: Run[]) => number) | null; faces: FontFaces; substituted: Record<string, string> } {
+  if (family === "Courier Prime") return { template: t, measure: null, faces: {}, substituted: {} };
+  // macOS's Courier is a hair wider than Courier Prime (1229/2048 em, not 0.6), and widths are
+  // Courier Prime's in points, so a line that fills a width in Courier Prime wraps (StagePlayProbe-Courier).
+  if (family === "Courier") return { template: shifted(t, t.lineHeight, 1), measure: (runs) => (plain(runs).length * 12 * 1229) / 2048, faces: {}, substituted: {} };
+  const fonts = resolveFonts([family], options.fontDir ?? defaultFontDir(), options.fontDirs);
+  const m = new Measurer(fonts.faces);
+  const { descender, lineGap } = m.metrics(family);
+  const lineHeight = t.lineHeight + (lineGap * 12) / 1000;
+  const template = shifted(t, lineHeight, Math.ceil(12 + (descender * 12) / 1000 - 1e-6) - 9);
+  return { template, measure: MONOSPACED.has(family) ? null : (runs) => m.runs(runs, { font: family, size: 12 }), faces: fonts.faces, substituted: fonts.substituted };
 }
 
 /** One line slot on the page: text items at their x positions. */
@@ -186,22 +216,43 @@ interface Block {
   noteLine?: boolean;
   /** Blank lines before it that aren't printed (around a printed note on its own line). */
   unprinted?: number;
+  /** How many of the blank lines before it are 12 pt in any font: empty paragraphs (see extraBlankLines), a scene heading's second. */
+  empty?: number;
 
   /** Splits the block so its first part fits in `available` rows; null where Highland would not split. */
   split?: (available: number) => { head: Row[]; tail: Block } | null;
 }
 
-export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {}): Layout {
+/** The template with another line height, and baselines (and header and footer) moved down by `drop`. */
+function shifted(t: ScriptTemplate, lineHeight: number, drop: number): ScriptTemplate {
+  return {
+    ...t,
+    lineHeight,
+    firstLineY: t.firstLineY + drop,
+    // As many lines as fit in Courier Prime's 55 (Times New Roman: 52; a speech may end on line 52).
+    linesPerPage: Math.floor((t.linesPerPage * t.lineHeight) / lineHeight + 1e-6),
+    header: { ...t.header, y: t.header.y + drop },
+    footer: { ...t.footer, y: t.footer.y + drop },
+  };
+}
+
+export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {}): Layout & { substituted: Record<string, string> } {
+  const family = options.font ?? "Courier Prime";
+  const set = withFont(options.template ?? SCREENPLAY, family, options);
   const previous = active;
-  active = options.template ?? SCREENPLAY;
+  const previousMeasure = setMeasure(set.measure);
+  active = set.template;
   try {
-    return layout(doc, options);
+    const result: Layout = layout(doc, options, family);
+    if (family !== "Courier Prime") result.fonts = { ...set.faces, ...result.fonts };
+    return { ...result, substituted: set.substituted };
   } finally {
     active = previous;
+    setMeasure(previousMeasure);
   }
 }
 
-function layout(doc: Document, options: ScreenplayOptions): Layout {
+function layout(doc: Document, options: ScreenplayOptions, family: string): Layout {
   const S = active;
   const print = printContext(doc, options.print);
   const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), ...(print ? { print } : {}) };
@@ -245,15 +296,30 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
     }
     if (b.section !== undefined) section = b.section;
   };
-  const capacity = (_p: OpenPage): number => (footer !== null && !footer.off ? S.linesPerPage - 1 : S.linesPerPage);
+  const hasFooter = (): boolean => {
+    const f = footer as PageTextDirective | null;
+    return f !== null && !f.off;
+  };
+  const capacity = (p: OpenPage): number => {
+    const lines = footer !== null && !footer.off ? S.linesPerPage - 1 : S.linesPerPage;
+    if (S.lineHeight === SCREENPLAY.lineHeight) return lines;
+    // With taller lines the page holds what fits in its height, rows without text being 12 pt
+    // (GraphicNovelProbe-TimesNewRoman: a header's empty row and 51 lines fit above a footer).
+    const short = p.rows.filter((r) => r !== null && r.items.length === 0).length;
+    // Bounds from Courier Prime (55 lines, 54 above a footer) and Times New Roman (52 lines, or an empty row
+    // and 51 above a footer, but not 52): 660 to 663 pt, and 650 to 650.5 above a footer.
+    const height = footer !== null && !footer.off ? 650.2 : 661;
+    return Math.max(lines, short + Math.floor((height - short * SCREENPLAY.lineHeight) / S.lineHeight + 1e-6));
+  };
   const start = (p: OpenPage): void => {
     if (p.started) return;
     p.started = true;
     p.header = header;
     p.section = section;
   };
-  const push = (p: OpenPage, rows: Row[], space: number, content: boolean): void => {
-    if (p.content) for (let k = 0; k < space; k++) p.rows.push(null);
+  const push = (p: OpenPage, rows: Row[], space: number, content: boolean, empty = 0): void => {
+    // Empty paragraphs' lines are rows without text (12 pt in any font, see below); blank lines are null.
+    if (p.content) for (let k = 0; k < space; k++) p.rows.push(k < empty ? { items: [] } : null);
     for (const row of rows) {
       // A page's header and footer are the ones in effect at its first printed line.
       if (row.items.length) start(p);
@@ -306,9 +372,11 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
       // An action after an action never starts on line 55 (GraphicNovelProbe and StagePlayProbe,
       // page D: a run of one-line actions stops at line 54; with a footer, line 54 is fine). After a
       // speech it may (Astounding p. 28). The rule behind this is not known; this is what was seen.
-      const startsOnLast = b.kind === "action" && previousKind === "action" && p.content && p.rows.length + space === S.linesPerPage - 1;
+      // In Times New Roman (12.51 pt lines) it doesn't start on lines 50 or 51 of 52 either (StagePlayProbe-
+      // and GraphicNovelProbe-TimesNewRoman, pages C and D).
+      const startsOnLast = b.kind === "action" && previousKind === "action" && p.content && (S.lineHeight > 12 ? !hasFooter() && p.rows.length + space >= S.linesPerPage - 3 : p.rows.length + space === S.linesPerPage - 1);
       if (need <= available && !lastLine && !startsOnLast) {
-        push(p, b.rows, space, true);
+        push(p, b.rows, space, true, b.empty);
         if (p.content) p.unprinted += b.unprinted ?? 0;
         previousKind = b.kind;
         break;
@@ -316,7 +384,7 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
       const room = lastLine || startsOnLast ? available - 1 : available;
       const split = p.content && room > 0 ? b.split?.(room) : null;
       if (split) {
-        push(p, tag(split.head, b.range), space, true);
+        push(p, tag(split.head, b.range), space, true, b.empty);
         previousKind = b.kind;
         newPage();
         split.tail.range = b.range;
@@ -351,10 +419,14 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
   const printed: { range: SourceRange | undefined; items: PlacedText[] }[] = [];
   for (const p of body) {
     const items: PlacedText[] = [];
+    // Rows without text (a directive's paragraph) are 12 pt in any font; others take the font's
+    // line height (StagePlayProbe-TimesNewRoman: 24.51 pt from "CUT TO:" to the next heading).
+    let y = S.firstLineY;
     p.rows.forEach((row, k) => {
+      if (k > 0) y += p.rows[k - 1] !== null && p.rows[k - 1]!.items.length === 0 ? SCREENPLAY.lineHeight : S.lineHeight;
       if (!row) return;
       const line: PlacedText[] = [];
-      for (const it of row.items) if (it.runs.length) line.push({ x: it.x, y: S.firstLineY + k * S.lineHeight + (it.dy ?? 0), runs: it.runs });
+      for (const it of row.items) if (it.runs.length) line.push({ x: it.x, y: y + (it.dy ?? 0), runs: it.runs });
       if (line.length) printed.push({ range: row.range, items: line });
       items.push(...line);
     });
@@ -372,8 +444,11 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
   }
   assignSources(printed);
   for (const it of pages[0]?.number === null ? pages[0].items : []) it.source = 0;
+  // Runs print in the chosen font (Courier Prime is the renderer's own).
+  if (family !== "Courier Prime") for (const p of pages) for (const it of p.items) for (const r of it.runs) if (r.style.font === undefined) r.style = { ...r.style, font: family };
   const result = { width: S.width, height: S.height, pages };
-  addPrintMarks(result, options.print, S.lineHeight);
+  // Paragraph numbers sit 6 pt below the line's top whatever the font (3 pt above a Courier Prime baseline).
+  addPrintMarks(result, options.print, S.lineHeight, NUMBER.rise + S.firstLineY - SCREENPLAY.firstLineY);
   return result;
 }
 
@@ -401,8 +476,8 @@ export function pageText(slots: PageTextSlots, fill: (p: PageTextPart[] | null) 
   const c = fill(slots.center);
   const r = fill(slots.right);
   add(l, pos.left);
-  add(c, pos.centre - (c.length * CHAR) / 2);
-  add(r, pos.right - r.length * CHAR);
+  add(c, pos.centre - runsWidth([{ text: c, style: {} }]) / 2);
+  add(r, pos.right - runsWidth([{ text: r, style: {} }]));
   return out;
 }
 
@@ -425,7 +500,11 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
     // Each extra empty source line before an element is an empty paragraph to Highland: one line
     // plus its own blank (Astounding: two empty lines before ">**END**<" print as three).
     const added = out[before];
-    if (added && added.rows.length > 0 && !added.filler && e.span.start <= source.length) added.space += 2 * extraBlankLines(source, e.span.start);
+    if (added && added.rows.length > 0 && !added.filler && e.span.start <= source.length) {
+      const extra = extraBlankLines(source, e.span.start);
+      added.space += 2 * extra;
+      added.empty = (added.empty ?? 0) + extra;
+    }
     const first = sourceOf(e);
     const range = nextIndex > i ? { start: first.start, end: sourceOf(elements[nextIndex]!).end } : first;
     for (const b of out.slice(before)) b.range = range;
@@ -458,7 +537,8 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
         // without a blank line in the source (">CUT TO:" directly above it, in Astounding).
         const prevEl = elements[i - 1];
         const joined = prevEl !== undefined && sameParagraph(source, prevEl, e);
-        out.push({ kind: e.kind, rows, space: joined ? 1 : 2, keepWithNext: true });
+        // The second blank line before a scene heading is 12 pt in any font (GraphicNovelProbe-TimesNewRoman).
+        out.push({ kind: e.kind, rows, space: joined ? 1 : 2, empty: joined ? 0 : 1, keepWithNext: true });
         printed = true;
         break;
       }
@@ -493,7 +573,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       }
       case "transition": {
         const text = plain(toRuns(e.inline, ctx)).trim().toUpperCase();
-        out.push({ kind: e.kind, rows: [at(S.rightEdge - text.length * CHAR, [{ text, style: marked(ctx.print, e.lines[0]?.content.start ?? e.span.start) }])], space: 1 });
+        out.push({ kind: e.kind, rows: [at(S.rightEdge - runsWidth([{ text, style: {} }]), [{ text, style: marked(ctx.print, e.lines[0]?.content.start ?? e.span.start) }])], space: 1 });
         printed = true;
         break;
       }
@@ -501,7 +581,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       case "rightAligned": {
         const runs = caps(toRuns(e.inline, ctx));
         const rows = wrapRuns(runs, S.sceneHeading.width).map((r) => {
-          const len = plain(r).length * CHAR;
+          const len = runsWidth(r);
           return at(e.kind === "centered" ? S.centre - len / 2 : S.rightEdge - len, r);
         });
         const prev = out.at(-1);
@@ -594,7 +674,8 @@ function actionBlock(runs: Run[], space: number): Block {
   // Highland decides whether an action fits as if words longer than the line were not broken
   // (StagePlayProbe, page C: an action that prints as four lines, with a broken word, counted as
   // three and ended on line 55).
-  const counted = unbrokenLines(text, S.action.width);
+  // (In another font, as printed: GraphicNovelProbe-TimesNewRoman's long action.)
+  const counted = measuring() ? rows.length : unbrokenLines(text, S.action.width);
   return {
     kind: "action",
     rows,
@@ -676,7 +757,7 @@ function dialogueBlock(cue: string, parts: Part[], space: number, cueStyle: Text
           if (head.at(-1)!.kind === "parenthetical" || head.at(-1)!.kind === "empty") continue;
           const headRows = partRows(head, null);
           if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0, cueStyle) };
-          best = { head: [rows[0]!, ...headRows, { items: [{ x: S.more.x, runs: [{ text: "(MORE)", style: {} }] }] }], tail };
+          best = { head: [rows[0]!, ...headRows, { items: [{ x: S.parenthetical.x + runsWidth([{ text: " ", style: {} }]), runs: [{ text: "(MORE)", style: {} }] }] }], tail };
         }
       }
       return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0, cueStyle) };
@@ -708,7 +789,7 @@ function partRows(parts: Part[], side: "left" | "right" | null): Row[] {
       continue;
     }
     if (p.kind === "parenthetical") {
-      wrapRuns(p.runs, pos.parentheticalWidth, pos.parentheticalWidth - 1).forEach((line, k) => rows.push({ items: [{ x: pos.parenthetical + (k > 0 ? CHAR : 0), runs: line }] }));
+      wrapRuns(p.runs, pos.parentheticalWidth, pos.parentheticalWidth - 1).forEach((line, k) => rows.push({ items: [{ x: pos.parenthetical + (k > 0 ? runsWidth([{ text: "(", style: {} }]) : 0), runs: line }] }));
     } else lines(p.runs, pos.dialogue, pos.dialogueWidth);
   }
   return rows;
@@ -778,7 +859,7 @@ function titlePage(fields: TitleField[], ctx: InlineContext): Page {
     while (ls.length && ls[0]!.length === 0) ls = ls.slice(1);
     ls.forEach((runs, k) => {
       if (k > 0) y += ls[k - 1]!.length === 0 ? T.blank : T.pitch;
-      const len = plain(runs).length * CHAR;
+      const len = runsWidth(runs);
       if (runs.length) items.push({ x: T.centre - len / 2, y, runs });
     });
     prev = name;
@@ -786,7 +867,7 @@ function titlePage(fields: TitleField[], ctx: InlineContext): Page {
   const stack = (names: string[], x: (len: number) => number) => {
     const ls = names.flatMap((n) => (get(n) ? lines(get(n)!).filter((r) => r.length) : []));
     ls.forEach((runs, k) => {
-      const len = plain(runs).length * CHAR;
+      const len = runsWidth(runs);
       items.push({ x: x(len), y: T.bottomY - (ls.length - 1 - k) * T.pitch, runs });
     });
   };

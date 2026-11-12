@@ -1,7 +1,9 @@
 import { seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
 import { extraBlankLines, pageText, sameParagraph, styledValue } from "./screenplay.ts";
 import { addPrintMarks } from "./marks.ts";
-import { onlyNotes, plain, printContext, SYNOPSIS_COLOR, toRuns, wrapRuns, type InlineContext } from "./text.ts";
+import { onlyNotes, plain, printContext, runsWidth, setMeasure, SYNOPSIS_COLOR, toRuns, wrapRuns, type InlineContext } from "./text.ts";
+import { Measurer, resolveFonts, type FontFaces } from "./fonts.ts";
+import { defaultFontDir } from "./render.ts";
 import { assignSources, CHAR, type Graphic, type Layout, type Page, type PlacedText, type PrintMarks, type Run, type SourceRange } from "./types.ts";
 
 /**
@@ -70,6 +72,30 @@ export interface ManuscriptOptions {
   highlandQuirks?: boolean;
   /** Highland's print options other than the title page. */
   print?: PrintMarks;
+  /** The template's font (Highland's template options): Courier Prime (default), Courier, New York Medium or Times New Roman. */
+  font?: string;
+  /** Bundled fonts (default: this package's) and the folders installed fonts are looked for in. */
+  fontDir?: string;
+  fontDirs?: string[];
+}
+
+type ManuscriptTemplate = Omit<typeof MANUSCRIPT, "pitch"> & { pitch: number };
+
+/** The template being laid out (layout is synchronous; set by layoutManuscript). */
+let active: ManuscriptTemplate = MANUSCRIPT;
+
+/**
+ * The Manuscript in another font (ManuscriptProbe in Courier, New York and Times New Roman): lines
+ * are 28.32 pt plus the font's line gap (Times: 28.83), widths follow the font, and lines hold
+ * what fits in 468 pt (65 characters of Courier Prime; 64 of Courier, which is a hair wider).
+ */
+function withFont(family: string, options: ManuscriptOptions): { template: ManuscriptTemplate; measure: ((runs: Run[]) => number) | null; faces: FontFaces; substituted: Record<string, string> } {
+  if (family === "Courier Prime") return { template: MANUSCRIPT, measure: null, faces: {}, substituted: {} };
+  if (family === "Courier") return { template: MANUSCRIPT, measure: (runs) => (plain(runs).length * 12 * 1229) / 2048, faces: {}, substituted: {} };
+  const fonts = resolveFonts([family], options.fontDir ?? defaultFontDir(), options.fontDirs);
+  const m = new Measurer(fonts.faces);
+  const { lineGap } = m.metrics(family);
+  return { template: { ...MANUSCRIPT, pitch: MANUSCRIPT.pitch + (lineGap * 12) / 1000 }, measure: (runs) => m.runs(runs, { font: family, size: 12 }), faces: fonts.faces, substituted: fonts.substituted };
 }
 
 type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
@@ -116,7 +142,27 @@ interface OpenPage {
   number: number;
 }
 
-export function layoutManuscript(doc: Document, options: ManuscriptOptions = {}): Layout {
+export function layoutManuscript(doc: Document, options: ManuscriptOptions = {}): Layout & { substituted: Record<string, string> } {
+  const family = options.font ?? "Courier Prime";
+  const set = withFont(family, options);
+  const previous = active;
+  const previousMeasure = setMeasure(set.measure);
+  active = set.template;
+  try {
+    const layout: Layout = layoutWith(doc, options);
+    if (family !== "Courier Prime") {
+      for (const p of layout.pages) for (const it of p.items) for (const r of it.runs) if (r.style.font === undefined) r.style = { ...r.style, font: family };
+      layout.fonts = { ...set.faces, ...layout.fonts };
+    }
+    addPrintMarks(layout, options.print, active.pitch);
+    return { ...layout, substituted: set.substituted };
+  } finally {
+    active = previous;
+    setMeasure(previousMeasure);
+  }
+}
+
+function layoutWith(doc: Document, options: ManuscriptOptions): Layout {
   // Two passes: the first finds the page of each heading for {{TOC}}.
   const first = run(doc, options, new Map());
   const pagesOf = new Map<number, number>();
@@ -129,9 +175,7 @@ export function layoutManuscript(doc: Document, options: ManuscriptOptions = {})
     pages.push(title);
   }
   pages.push(...second.pages);
-  const layout = { width: MANUSCRIPT.width, height: MANUSCRIPT.height, pages };
-  addPrintMarks(layout, options.print, MANUSCRIPT.pitch);
-  return layout;
+  return { width: MANUSCRIPT.width, height: MANUSCRIPT.height, pages };
 }
 
 /** The body page each heading prints on, in document order (for a {{TOC}} outside the PDF). */
@@ -143,7 +187,7 @@ export function manuscriptHeadingPages(doc: Document, options: ManuscriptOptions
 }
 
 function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, number>) {
-  const M = MANUSCRIPT;
+  const M = active;
   const print = printContext(doc, options.print);
   const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true, ...(print ? { print } : {}) };
   // Empty lines before the text, beyond the first, print as empty lines (Sweet Betty and Purity start
@@ -175,6 +219,9 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
     if (p.lines.length === 0) return true;
     const limit = M.lines + (line.opens ? 1 : 0);
     if (used + line.height / M.pitch > limit + 1e-6) return false;
+    // Taller lines also stop where the page ends: baselines down to about 734 (Courier Prime's
+    // fifteenth line after a dropped heading at 730.8; Times New Roman's at 738.5 goes over).
+    if (M.pitch !== MANUSCRIPT.pitch && line.items.length > 0 && y + line.ascent > 734) return false;
     if (!options.highlandQuirks && footerOn() && line.items.length > 0 && y + line.ascent > M.lastBaseline + 0.5) return false;
     return true;
   };
@@ -289,7 +336,7 @@ interface UnitOptions {
 }
 
 function toUnits(elements: Element[], source: string, ctx: InlineContext, o: UnitOptions): Unit[] {
-  const M = MANUSCRIPT;
+  const M = active;
   const out: Unit[] = [];
   const text = (items: Line["items"], extra: Partial<Line> = {}): Line => ({ items, height: M.pitch, ascent: M.ascent, ...extra });
   const empty = (): Line => text([], { opens: true, empty: true });
@@ -349,7 +396,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         if (!printed || afterBreak) push({ items: [], height: M.dropHeading, ascent: 0 });
         const h = headings[headingId++]!;
         lines.forEach((r, k) => {
-          const len = plain(r).length * CHAR;
+          const len = runsWidth(r);
           const lastLine = k === lines.length - 1;
           push(text([{ x: M.centre - len / 2, runs: r }], { keepWithNext: true, ...(k === 0 ? { heading: h } : {}), ...(lastLine ? { after: M.headingAfter } : {}) }));
         });
@@ -358,7 +405,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         break;
       }
       case "sceneBreak":
-        push({ items: [{ x: M.centre - CHAR / 2, runs: [{ text: "#", style: {} }] }], height: M.pitch, ascent: M.ascent + M.sceneBreakDrop });
+        push({ items: [{ x: M.centre - runsWidth([{ text: "#", style: {} }]) / 2, runs: [{ text: "#", style: {} }] }], height: M.pitch, ascent: M.ascent + M.sceneBreakDrop });
         printed = true;
         afterParagraph = false;
         break;
@@ -375,7 +422,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
       case "rightAligned":
       case "centered": {
         for (const r of wrapRuns(toRuns(e.inline, ctx), M.chars)) {
-          const len = plain(r).length * CHAR;
+          const len = runsWidth(r);
           push(text([{ x: e.kind === "centered" ? M.centre - len / 2 : M.right - len, runs: r }]));
         }
         printed = true;
@@ -386,10 +433,10 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         for (const item of e.items) {
           const textX = item.level === 0 ? M.list.textX : M.list.nestedX + item.level * M.list.level;
           const marker = item.ordered ? item.marker : item.marker === "-" ? "-" : "•";
-          const lines = wrapRuns(toRuns(item.inline, ctx), Math.floor((M.list.right - textX) / CHAR + 1e-6));
+          const lines = wrapRuns(toRuns(item.inline, ctx), (M.list.right - textX) / CHAR);
           lines.forEach((r, k) => {
             const items: Line["items"] = [{ x: textX, runs: r }];
-            if (k === 0) items.unshift({ x: textX - (marker.length + 1) * CHAR, runs: [{ text: marker, style: {} }] });
+            if (k === 0) items.unshift({ x: textX - runsWidth([{ text: `${marker} `, style: {} }]), runs: [{ text: marker, style: {} }] });
             push(text(items, k === 0 ? { together: lines.length } : {}));
           });
         }
@@ -400,13 +447,13 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         const T = M.terms;
         for (const item of e.items) {
           const term = toRuns(item.termInline, ctx);
-          const defs = wrapRuns(toRuns(item.definitionInline, ctx), Math.floor((M.right - T.definitionX) / CHAR));
-          const termLines = wrapRuns(term, Math.floor((T.termRight - M.left) / CHAR));
+          const defs = wrapRuns(toRuns(item.definitionInline, ctx), (M.right - T.definitionX) / CHAR);
+          const termLines = wrapRuns(term, (T.termRight - M.left) / CHAR);
           const n = Math.max(defs.length, termLines.length);
           for (let k = 0; k < n; k++) {
             const items: Line["items"] = [];
             const t = termLines[k];
-            if (t) items.push({ x: T.termRight - plain(t).length * CHAR, runs: t });
+            if (t) items.push({ x: T.termRight - runsWidth(t), runs: t });
             if (defs[k]) items.push({ x: T.definitionX, runs: defs[k]! });
             push({ items, height: T.height, ascent: T.ascent });
           }
@@ -418,7 +465,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
       case "table": {
         const cols = Math.max(e.header.length, ...e.rows.map((r) => r.length), 1);
         const w = (M.right - M.left) / cols;
-        const width = Math.floor(w / CHAR);
+        const width = w / CHAR;
         const T = M.table;
         const rule = (top: number): Graphic[] => [{ kind: "rect", x: M.left, y: top + M.pitch - T.ruleRise, width: M.right - M.left, height: T.rule, gray: T.color }];
         const row = (cells: { inline: Parameters<typeof toRuns>[0] }[], head: boolean) => {
@@ -429,7 +476,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
             wrapped.forEach((ls, c) => {
               const r = ls[k];
               if (!r) return;
-              const len = plain(r).length * CHAR;
+              const len = runsWidth(r);
               const start = M.left + c * w;
               // Header cells centred, the rest left-aligned (Highland ignores alignment colons).
               const x = head ? start + (w - len) / 2 : start;
@@ -467,7 +514,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
             if (toc.levels && !toc.levels.includes(h.level)) continue;
             const n = String(o.tocPages.get(h.id) ?? "");
             const title = wrapRuns([{ text: h.text, style: {} }], M.chars - n.length - 1)[0] ?? [];
-            push({ items: [{ x: M.left, runs: title }, { x: M.right - n.length * CHAR, runs: [{ text: n, style: {} }] }], height: M.toc.height, ascent: M.ascent });
+            push({ items: [{ x: M.left, runs: title }, { x: M.right - runsWidth([{ text: n, style: {} }]), runs: [{ text: n, style: {} }] }], height: M.toc.height + M.pitch - MANUSCRIPT.pitch, ascent: M.ascent });
           }
           push(empty());
           printed = true;
@@ -546,7 +593,7 @@ export function imageSize(data: Uint8Array): { width: number; height: number } |
 // Title page: TL top left, TR top right, CC centred, BL / BR bottom corners.
 
 function titlePage(fields: TitleField[], ctx: InlineContext): Page {
-  const T = MANUSCRIPT.title;
+  const T = active.title;
   const items: PlacedText[] = [];
   const get = (name: string) => fields.find((f) => f.name === name);
   const lines = (f: TitleField | undefined): Run[][] => (f ? f.values.flatMap((v) => (v.text.trim() === "" ? [[]] : wrapRuns(styledValue(v.text, { ...ctx, links: false }), MANUSCRIPT.chars))) : []);
@@ -561,7 +608,7 @@ function titlePage(fields: TitleField[], ctx: InlineContext): Page {
   const column = (ls: Run[][], y: number, x: (len: number) => number) => {
     ls.forEach((runs, k) => {
       if (k > 0) y += ls[k - 1]!.length === 0 ? T.blank : T.pitch;
-      if (runs.length) items.push({ x: x(plain(runs).length * CHAR), y, runs });
+      if (runs.length) items.push({ x: x(runsWidth(runs)), y, runs });
     });
   };
   const height = (ls: Run[][]) => ls.slice(0, -1).reduce((h, r) => h + (r.length === 0 ? T.blank : T.pitch), 0);

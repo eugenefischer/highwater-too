@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.5.10",
+  "version": "0.5.11",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -628,6 +628,199 @@
           },
           "default": [],
           "markdownDescription": "Words **Learn Spelling** has added to the Highland-Style Editor's dictionary (any document). Add or remove words here too."
+        },
+        "highwater.templates.screenplay.body": {
+          "type": "string",
+          "enum": [
+            "Courier Prime",
+            "Courier",
+            "Highland Sans"
+          ],
+          "default": "Courier Prime",
+          "scope": "application",
+          "markdownDescription": "The Screenplay template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.multiCam.body": {
+          "type": "string",
+          "enum": [
+            "Courier Prime",
+            "Courier",
+            "Highland Sans"
+          ],
+          "default": "Courier Prime",
+          "scope": "application",
+          "markdownDescription": "The Multi-Cam template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.multiCam.uppercaseAction": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "Multi-Cam prints action, lyrics and centred text in capitals (Highland 2's Uppercase action option)."
+        },
+        "highwater.templates.stagePlay.body": {
+          "type": "string",
+          "enum": [
+            "Courier Prime",
+            "Courier",
+            "New York Medium",
+            "Times New Roman"
+          ],
+          "default": "Courier Prime",
+          "scope": "application",
+          "markdownDescription": "The Stage Play template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.graphicNovel.body": {
+          "type": "string",
+          "enum": [
+            "Courier Prime",
+            "Courier",
+            "New York Medium",
+            "Times New Roman"
+          ],
+          "default": "Courier Prime",
+          "scope": "application",
+          "markdownDescription": "The Graphic Novel template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.manuscript.body": {
+          "type": "string",
+          "enum": [
+            "Courier Prime",
+            "Courier",
+            "New York Medium",
+            "Times New Roman"
+          ],
+          "default": "Courier Prime",
+          "scope": "application",
+          "markdownDescription": "The Manuscript template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.novel.headers": {
+          "type": "string",
+          "enum": [
+            "Amiri",
+            "TeX Gyre Schola",
+            "Baskerville",
+            "Cormorant Garamond",
+            "Times New Roman"
+          ],
+          "default": "Amiri",
+          "scope": "application",
+          "markdownDescription": "The Novel template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.novel.body": {
+          "type": "string",
+          "enum": [
+            "Amiri",
+            "TeX Gyre Schola",
+            "Baskerville",
+            "Cormorant Garamond",
+            "Times New Roman"
+          ],
+          "default": "Amiri",
+          "scope": "application",
+          "markdownDescription": "The Novel template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.treatment.body": {
+          "type": "string",
+          "enum": [
+            "Courier Prime",
+            "Courier",
+            "Highland Sans"
+          ],
+          "default": "Highland Sans",
+          "scope": "application",
+          "markdownDescription": "The Treatment template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.modernStandard.headers": {
+          "type": "string",
+          "enum": [
+            "Avenir Next",
+            "Spectral"
+          ],
+          "default": "Avenir Next",
+          "scope": "application",
+          "markdownDescription": "The Modern Standard template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.modernStandard.body": {
+          "type": "string",
+          "enum": [
+            "Avenir Next",
+            "Spectral"
+          ],
+          "default": "Avenir Next",
+          "scope": "application",
+          "markdownDescription": "The Modern Standard template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.article.headers": {
+          "type": "string",
+          "enum": [
+            "Lato",
+            "Merriweather",
+            "Avenir Next Condensed"
+          ],
+          "default": "Lato",
+          "scope": "application",
+          "markdownDescription": "The Article template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.article.body": {
+          "type": "string",
+          "enum": [
+            "Georgia",
+            "Merriweather",
+            "Lato"
+          ],
+          "default": "Georgia",
+          "scope": "application",
+          "markdownDescription": "The Article template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.bulletin.body": {
+          "type": "string",
+          "enum": [
+            "SF Pro Display",
+            "New York Medium"
+          ],
+          "default": "SF Pro Display",
+          "scope": "application",
+          "markdownDescription": "The Bulletin template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.speech.headers": {
+          "type": "string",
+          "enum": [
+            "New York Medium",
+            "SF Pro Display"
+          ],
+          "default": "New York Medium",
+          "scope": "application",
+          "markdownDescription": "The Speech template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.speech.body": {
+          "type": "string",
+          "enum": [
+            "New York Medium",
+            "SF Pro Display"
+          ],
+          "default": "New York Medium",
+          "scope": "application",
+          "markdownDescription": "The Speech template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.wiki.headers": {
+          "type": "string",
+          "enum": [
+            "Georgia",
+            "SF Pro Display"
+          ],
+          "default": "Georgia",
+          "scope": "application",
+          "markdownDescription": "The Wiki template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.templates.wiki.body": {
+          "type": "string",
+          "enum": [
+            "Georgia",
+            "SF Pro Display"
+          ],
+          "default": "Georgia",
+          "scope": "application",
+          "markdownDescription": "The Wiki template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         }
       }
     },

@@ -52,7 +52,8 @@ export class Pages {
   readonly #pages = $("pages");
   readonly #status = $("pstatus");
   readonly #zoom = $<HTMLSelectElement>("pzoom");
-  readonly #template = $<HTMLSelectElement>("ptemplate");
+  readonly #template = $<HTMLButtonElement>("ptemplate");
+  #templateName = "";
   readonly #word = $<HTMLButtonElement>("psaveword");
   shown = false;
 
@@ -60,13 +61,12 @@ export class Pages {
     private readonly post: (msg: unknown) => void,
     /** Leaving the pages: the source offset at their top, and (double-click) where to put the cursor. */
     private readonly onLeave: (top: number | null, cursor: number | null) => void,
+    private readonly onTemplate: (current: string) => void,
   ) {
     this.#observer = new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && void this.#draw(Number((e.target as HTMLElement).dataset.index))), { root: this.#pages, rootMargin: "800px 0px" });
     this.#zoom.onchange = () => this.#layout(this.#offsetAtTop());
-    this.#template.onchange = () => {
-      if (this.shown) this.#busy();
-      post({ type: "previewTemplate", template: this.#template.value });
-    };
+    // The template button opens the Document Template window (template-window.ts).
+    this.#template.onclick = () => this.onTemplate(this.#templateName);
     $("psave").onclick = () => post({ type: "previewSave", kind: "pdf" });
     this.#word.onclick = () => post({ type: "previewSave", kind: "docx" });
     const boxes = $("pboxes");
@@ -88,8 +88,20 @@ export class Pages {
 
   /** The template menu in the top bar (shown with the text as well as the pages). */
   templates(list: string[], current: string): void {
-    this.#template.replaceChildren(...list.map((t) => new Option(t, t, false, t === current)));
+    this.#templateName = list.length ? current : "";
+    this.#template.textContent = this.#templateName;
+    this.#template.hidden = !this.#templateName;
     this.#word.hidden = current !== "Manuscript";
+  }
+
+  /** pdf.js, loaded once (the template window draws its page with it too). */
+  async pdfjs(): Promise<PdfJs> {
+    return (this.#pdfjs ??= await this.#load());
+  }
+
+  /** The pages are laid out again (a template or option changed in the template window). */
+  relayout(): void {
+    if (this.shown) this.#busy();
   }
 
   /** Shows the pages, opening at `at` (the text's top line) once they arrive. */
