@@ -7,7 +7,7 @@
 import { history, defaultKeymap, historyKeymap, indentWithTab, invertedEffects, isolateHistory, redo, undo } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
 import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder, StateEffect, StateField, Transaction, type ChangeSpec, type Range, type Text } from "@codemirror/state";
-import { Decoration, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
+import { Decoration, dropCursor, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages, type PdfMessage } from "./pages.ts";
@@ -133,6 +133,32 @@ let showInvisibles = false;
 const invisibleMarks = (on: boolean) => (on ? [highlightWhitespace(), lineEnds] : []);
 
 let view: EditorView | null = null;
+
+/**
+ * Where a Bin item or image dropped at the pointer goes: a paragraph of its own, at the start of
+ * the line it is over or after its end, whichever is nearer.
+ */
+function dropPlace(v: EditorView, e: DragEvent): { at: number; before: boolean; line: ReturnType<Text["lineAt"]> } {
+  const pos = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
+  const line = v.state.doc.lineAt(pos);
+  const before = line.text.trim() === "" || pos - line.from <= line.to - pos;
+  return { at: before ? line.from : line.to, before, line };
+}
+
+/** The drop caret: a text cursor drawn at the place, over the page (CodeMirror's own is for its own drags). */
+let dropCaret: HTMLElement | null = null;
+function showDropCaret(v: EditorView, at: number): void {
+  const c = v.coordsAtPos(at, 1) ?? v.coordsAtPos(at, -1);
+  if (!c) return hideDropCaret();
+  dropCaret ??= Object.assign(document.body.appendChild(document.createElement("div")), { className: "hl-dropcaret" });
+  dropCaret.style.left = `${Math.round(c.left)}px`;
+  dropCaret.style.top = `${Math.round(c.top)}px`;
+  dropCaret.style.height = `${Math.round(c.bottom - c.top)}px`;
+  dropCaret.hidden = false;
+}
+function hideDropCaret(): void {
+  if (dropCaret) dropCaret.hidden = true;
+}
 /** The text being dragged out of the page, while the drag lasts. */
 let dragged: { from: number; to: number; text: string } | null = null;
 const spelling = new Spelling(
@@ -166,18 +192,30 @@ function start(text: string): void {
           },
           dragend: () => {
             dragged = null;
+            hideDropCaret();
+            return false;
+          },
+          // While a Bin item or image is over the text, a caret shows where it will go.
+          dragover: (e, v) => {
+            const types = e.dataTransfer?.types ?? [];
+            if (!types.includes(BIN_TYPE) && !types.includes(ASSET_TYPE)) return false;
+            e.preventDefault();
+            e.dataTransfer!.dropEffect = types.includes(BIN_TYPE) ? "move" : "copy";
+            showDropCaret(v, dropPlace(v, e).at);
+            return true;
+          },
+          dragleave: (e, v) => {
+            if (!v.dom.contains(e.relatedTarget as Node | null)) hideDropCaret();
             return false;
           },
           drop: (e, v) => {
+            hideDropCaret();
             const types = e.dataTransfer?.types ?? [];
             if (!types.includes(BIN_TYPE) && !types.includes(ASSET_TYPE)) return false;
             const text = e.dataTransfer!.getData("text/plain").replace(/^\n+|\n+$/g, "");
-            const pos = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
             e.preventDefault();
-            const line = v.state.doc.lineAt(pos);
-            const before = line.text.trim() === "" || pos - line.from <= line.to - pos;
+            const { at, before, line } = dropPlace(v, e);
             const insert = line.text.trim() === "" ? text : before ? `${text}\n\n` : `\n\n${text}`;
-            const at = before ? line.from : line.to;
             // A Bin item dragged into the text leaves the Bin, in the same undoable step.
             const index = types.includes(BIN_TYPE) ? Number(e.dataTransfer!.getData(BIN_TYPE)) : NaN;
             const take = Number.isInteger(index) ? [binEffect.of({ kind: "remove", index, text: e.dataTransfer!.getData("text/plain") })] : [];
@@ -186,6 +224,8 @@ function start(text: string): void {
             return true;
           },
         }),
+        // After the handlers above, so a Bin item shows only its own caret.
+        dropCursor(),
         styling,
         spellingMarks,
         invisibles.of(invisibleMarks(showInvisibles)),

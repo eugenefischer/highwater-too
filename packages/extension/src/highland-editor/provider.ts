@@ -363,6 +363,10 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 .bincard-tools { position: absolute; top: 4px; right: 4px; display: none; gap: 0; }
 .bincard:hover .bincard-tools, .assetcard:hover .bincard-tools { display: flex; }
 .bincard-edit { width: 100%; box-sizing: border-box; min-height: 4em; resize: none; overflow: hidden; border: 0; outline: 1px solid var(--nav-accent); border-radius: 4px; padding: 6px; background: var(--nav-input-bg); color: var(--nav-fg); font-family: var(--vscode-editor-font-family, monospace); font-size: var(--vscode-editor-font-size, 13px); line-height: 1.4; }
+/* Where a Bin item or image will land in the text, and CodeMirror's own drop cursor for text dragged within it. */
+.hl-dropcaret { position: fixed; z-index: 30; width: 2px; margin-left: -1px; pointer-events: none; background: var(--hl-caret); }
+.hl-dropcaret[hidden] { display: none; }
+.cm-editor .cm-dropCursor { border-left: 2px solid var(--hl-caret); margin-left: -1px; }
 .bincard.drop-before { box-shadow: 0 -3px 0 0 var(--nav-accent); }
 .sb-cards.drop-end::after { content: ""; display: block; height: 3px; border-radius: 2px; background: var(--nav-accent); }
 section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-accent) 70%, transparent); outline-offset: -4px; border-radius: 6px; }

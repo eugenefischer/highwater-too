@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.7 (branch m16-sidebar)
+
+- A caret shows where a Bin item (or an image from Assets) will land while you drag it over the text: at the start of the line it's over, or after its end, whichever is nearer. Text dragged within the page shows a drop caret too.
+
 ## 0.6.6 (branch m16-sidebar)
 
 - Bin items are written in Highland 2's popover: + (or double-clicking a card, or Enter on a selected one) opens a plain-text editor beside the sidebar, its arrow pointing at the card. What you type is saved as you go; Escape, ⌘Enter or a click outside closes it.
