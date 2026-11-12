@@ -11,7 +11,7 @@ import { assetMarkdown, binDetail, binLabel, byteSize, imageSize, move, uniqueNa
 import { idNote, noteId } from "./extras-folder.ts";
 import { focusedDocument, roleOf, type FocusedDocument } from "./focus.ts";
 import { LANGUAGES } from "./language.ts";
-import { activeColumn, activeDocument, activeSelections, insertAtSelection, onDidChangeActiveSurface, revealOffset, viewOf } from "./surface.ts";
+import { activeColumn, activeDocument, activeSelections, activeView, insertAtSelection, onDidChangeActiveSurface, revealOffset, viewOf } from "./surface.ts";
 
 /**
  * The Highland sidebar (M6): Navigator, Bin and Assets as tree views in a "Highwater Too" view
@@ -513,6 +513,12 @@ async function insertText(current: FocusedDocument, text: string): Promise<void>
 }
 
 async function openScratchpad(store: BundleStore, current: FocusedDocument): Promise<void> {
+  // In the Highland-Style Editor, the Scratchpad is a panel of its sidebar.
+  const view = activeView();
+  if (view) {
+    void view.panel.webview.postMessage({ type: "showPanel", panel: "scratchpad" });
+    return;
+  }
   const active = activeDocument();
   const bundle = (active?.uri.scheme === SCHEME ? splitBundlePath(active.uri.fsPath)?.bundle : undefined) ?? current.bundle;
   if (!bundle) {

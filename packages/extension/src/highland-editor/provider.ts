@@ -9,7 +9,8 @@ import type { BundleStore } from "../store.ts";
 import { parse } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
-import { colorThemeLabel, HIGHLAND_THEMES, pageColors, themeFor } from "./themes.ts";
+import { colorThemeLabel, HIGHLAND_THEMES, navigatorColors, pageColors, themeFor } from "./themes.ts";
+import { sidebarHost } from "./sidebar-host.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
 import { activeOffsets, activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
@@ -134,7 +135,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     // A Highland theme for the page (highwater.theme), or VS Code's colours.
     const sendTheme = () => {
       const theme = themeFor(vscode.workspace.getConfiguration("highwater").get<string>("theme"));
-      void panel.webview.postMessage({ type: "theme", vars: theme ? pageColors(theme) : null });
+      void panel.webview.postMessage({ type: "theme", vars: theme ? { ...pageColors(theme), ...navigatorColors(theme) } : null });
     };
     // Show Invisibles follows the text editor's whitespace setting for the document's language.
     const sendInvisibles = () =>
@@ -143,10 +144,15 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       pageText = pageForm(document.getText());
       void panel.webview.postMessage({ type: "update", text: pageText });
     };
+    // Highland's sidebar: the Navigator, the Scratchpad and the rest (sidebar-host.ts).
+    const sidebar = sidebarHost(this.context, this.store, panel, () => document);
     const subscriptions = [
       highlandViews.add(view),
+      sidebar,
       panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean | string; kind?: string; word?: string }) => {
+        if (sidebar.handle(msg as { type: string } & Record<string, unknown>)) return;
         if (msg.type === "ready") {
+          sidebar.ready();
           pageText = pageForm(document.getText());
           void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
@@ -275,10 +281,61 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
   --hl-input-bg: var(--vscode-input-background); --hl-border: var(--vscode-input-border, var(--vscode-editorWidget-border, transparent));
   --hl-accent: var(--vscode-button-background); --hl-accent-fg: var(--vscode-button-foreground);
   --hl-whitespace: var(--vscode-editorWhitespace-foreground);
+  /* The sidebar's colours: VS Code's sidebar, unless a Highland theme sets these. */
+  --nav-bg: var(--vscode-sideBar-background, var(--hl-panel-bg)); --nav-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+  --nav-section: var(--vscode-textLink-foreground); --nav-muted: var(--vscode-descriptionForeground);
+  --nav-current: var(--vscode-list-inactiveSelectionBackground); --nav-hover: var(--vscode-list-hoverBackground);
+  --nav-accent: var(--vscode-focusBorder); --nav-input-bg: var(--vscode-input-background);
+  --sb-width: 264px;
 }
 html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); color: var(--hl-fg); }
-body { display: flex; flex-direction: column; }
+body { display: flex; flex-direction: row; }
+#content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 #main { flex: 1; min-height: 0; }
+/* Highland's sidebar (sidebar.ts): icons at the top, one panel below, a grip on its right edge to resize it. */
+#sidebar { position: relative; flex: 0 0 var(--sb-width); width: var(--sb-width); display: flex; flex-direction: column; min-height: 0; background: var(--nav-bg); color: var(--nav-fg); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); border-right: 1px solid color-mix(in srgb, var(--nav-muted) 25%, transparent); }
+body.sb-closed #sidebar { display: none; }
+#sbicons { display: flex; align-items: center; gap: 1px; padding: 6px 8px 4px; }
+#sbicons .tb-icon { width: 30px; padding: 4px 3px; flex: none; }
+#sbicons .tb-icon.sb-on::after { top: 31px; }
+#sbicons .tb-icon { color: var(--nav-muted); }
+#sbicons .tb-icon:hover { color: var(--nav-fg); }
+#sbicons .tb-icon.sb-on { color: var(--nav-accent); }
+#sbicons .tb-icon.sb-on::after { content: ""; position: absolute; left: 50%; top: 31px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--nav-accent); }
+#sbicons .sb-ours { margin-left: auto; }
+#sbicons .sb-ours::before { content: ""; position: absolute; left: -6px; top: 9px; height: 16px; border-left: 1px solid color-mix(in srgb, var(--nav-muted) 40%, transparent); }
+#sbpanels { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#sbpanels > section { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#sbpanels > section[hidden] { display: none; }
+#sbgrip { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 5; }
+body.sb-resizing, body.sb-resizing * { cursor: col-resize !important; user-select: none; }
+.sb-empty { margin: auto 16px; text-align: center; color: var(--nav-muted); line-height: 1.4; }
+.sb-empty button { margin-top: 10px; font: inherit; padding: 4px 12px; border: 1px solid color-mix(in srgb, var(--nav-muted) 50%, transparent); border-radius: 4px; background: none; color: var(--nav-fg); cursor: pointer; }
+.sb-foot { display: flex; gap: 6px; align-items: center; padding: 8px 10px; }
+.sb-foot input { flex: 1; min-width: 0; font: inherit; color: var(--nav-fg); background: var(--nav-input-bg); border: 0; border-radius: 4px; padding: 4px 8px; }
+.sb-foot input:focus { outline: 1px solid var(--nav-accent); outline-offset: -1px; }
+.sb-button { display: flex; padding: 3px; border: none; border-radius: 3px; background: none; color: var(--nav-muted); cursor: pointer; }
+.sb-button:hover { color: var(--nav-fg); background: var(--nav-hover); }
+/* The Navigator. */
+#navwrap { position: relative; flex: 1; min-height: 0; display: flex; }
+#navlist { flex: 1; overflow-y: auto; padding: 8px 0 4px; outline: none; }
+#navlist .row { padding: 4px 10px; line-height: 1.35; cursor: pointer; border-radius: 3px; margin: 0 6px; overflow-wrap: anywhere; user-select: none; }
+#navlist .row:hover { background: var(--nav-hover); }
+#navlist .row.current { background: var(--nav-current); }
+#navlist .row.dragging { opacity: 0.4; }
+body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
+#navlist .sceneHeaders { font-weight: 600; font-size: 0.92em; letter-spacing: 0.02em; }
+#navlist .sectionHeaders { font-weight: 700; color: var(--nav-section); }
+#navlist .synopses, #navlist .notes, #navlist .images, #navlist .links, #navlist .referenceLinks, #navlist .includedFiles, #navlist .markers { color: var(--nav-muted); font-size: 0.92em; }
+#navlist .synopses, #navlist .notes { font-style: italic; }
+#navlist .markers::before { content: "◆ "; font-size: 0.8em; color: var(--nav-accent); }
+#navdrop { position: absolute; right: 6px; height: 2px; background: var(--nav-accent); pointer-events: none; }
+#navdrop::before { content: ""; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--nav-accent); }
+#navempty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 24px; text-align: center; color: var(--nav-muted); pointer-events: none; }
+#navempty[hidden] { display: none; }
+/* The Scratchpad: plain text, Highland's export button at the bottom right. */
+#scratch { flex: 1; min-height: 0; resize: none; border: 0; outline: none; margin: 0; padding: 12px 14px; background: transparent; color: var(--nav-fg); font-family: var(--vscode-editor-font-family, monospace); font-size: var(--vscode-editor-font-size, 13px); line-height: 1.45; }
+#scratchfoot { justify-content: flex-end; }
 #editor, .cm-editor { height: 100%; }
 /* Highland's top bar: Text and Pages at the left; the template and the theme at the right. */
 #topbar { display: flex; align-items: center; gap: 12px; padding: 6px 14px 4px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
@@ -416,8 +473,37 @@ body.previewing #preview { display: flex; }
 .hl-spellmenu hr { border: 0; border-top: 1px solid var(--vscode-menu-separatorBackground, var(--hl-muted)); margin: 4px 0; }
 </style></head>
 <body data-pdfjs="${pdfjs("pdf.min.mjs")}" data-worker="${pdfjs("pdf.worker.min.mjs")}" data-spell-worker="${webview.asWebviewUri(vscode.Uri.joinPath(dist, "spell-worker.js"))}" data-dict-aff="${dict("index.aff")}" data-dict-dic="${dict("index.dic")}">
+<div id="sidebar">
+  <div id="sbicons" role="toolbar" aria-label="Sidebar">
+    <button class="tb-icon" data-panel="navigator" data-tip="Navigator" aria-label="Navigator"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="6" r="1.4"/><circle cx="5" cy="12" r="1.4"/><circle cx="5" cy="18" r="1.4"/><rect x="8.5" y="5" width="11" height="2" rx="1"/><rect x="8.5" y="11" width="11" height="2" rx="1"/><rect x="8.5" y="17" width="11" height="2" rx="1"/></svg></button>
+    <button class="tb-icon" data-panel="bin" data-tip="Bin" aria-label="Bin"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5V9H4zM4 10.5h16v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zm4 3v1.5h8V13.5z" fill-rule="evenodd"/></svg></button>
+    <button class="tb-icon" data-panel="stats" data-tip="Statistics" aria-label="Statistics"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="10" width="2.2" height="10" rx="1"/><rect x="8.6" y="5" width="2.2" height="15" rx="1"/><rect x="13.2" y="8" width="2.2" height="12" rx="1"/><rect x="17.8" y="4" width="2.2" height="16" rx="1"/></svg></button>
+    <button class="tb-icon" data-panel="assets" data-tip="Assets" aria-label="Assets"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5l2 2h8A1.5 1.5 0 0 1 21 8.5V9H6.2a1.5 1.5 0 0 0-1.4 1L3 15zM6.3 10.5H22l-2.6 8.4a1.5 1.5 0 0 1-1.4 1.1H4.2z"/></svg></button>
+    <button class="tb-icon" data-panel="scratchpad" data-tip="Scratchpad" aria-label="Scratchpad"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5V15l-6 6H6.5A1.5 1.5 0 0 1 5 19.5zM8 7v1.6h8V7zm0 3.5v1.6h8v-1.6zm0 3.5v1.6h5V14zm5 7v-4.5a1.5 1.5 0 0 1 1.5-1.5H19z" fill-rule="evenodd"/></svg></button>
+    <button class="tb-icon sb-ours" data-panel="history" data-tip="Writing History" aria-label="Writing History"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/><path d="M12 8v4l3 2"/></svg></button>
+    <button class="tb-icon" data-panel="works" data-tip="Works" aria-label="Works"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="4" height="16" rx="1"/><rect x="9.5" y="4" width="4" height="16" rx="1"/><path d="M15.2 5.3l3.6-1 3.8 14.6-3.6 1z"/></svg></button>
+  </div>
+  <div id="sbpanels">
+    <section data-panel="navigator">
+      <div id="navwrap"><div id="navlist" tabindex="0"></div><div id="navempty" hidden>The Navigator panel shows an outline of your document.</div><div id="navdrop" hidden></div></div>
+      <div class="sb-foot"><input id="navfilter" type="search" placeholder="Filter" aria-label="Filter the Navigator"><button id="navtypes" class="sb-button" data-tip="Choose what the Navigator shows" aria-label="Choose what the Navigator shows"><svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3C4.4 3 1.6 5.4.5 8c1.1 2.6 3.9 5 7.5 5s6.4-2.4 7.5-5C14.4 5.4 11.6 3 8 3zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></button></div>
+    </section>
+    <section data-panel="bin" hidden><div class="sb-empty">The Bin moves here next.<br><button data-view="bin">Show the Bin</button></div></section>
+    <section data-panel="stats" hidden><div class="sb-empty">Statistics come with goals and sprints (M11).</div></section>
+    <section data-panel="assets" hidden><div class="sb-empty">Assets move here next.<br><button data-view="assets">Show Assets</button></div></section>
+    <section data-panel="scratchpad" hidden>
+      <textarea id="scratch" spellcheck="false" aria-label="Scratchpad"></textarea>
+      <div id="scratchfoot" class="sb-foot"><button id="scratchexport" class="sb-button" data-tip="Export Scratchpad contents to a new document" aria-label="Export Scratchpad contents to a new document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button></div>
+    </section>
+    <section data-panel="history" hidden><div class="sb-empty">The Writing History moves here soon.<br><button data-view="history">Show the Writing History</button></div></section>
+    <section data-panel="works" hidden><div class="sb-empty">Works move here soon.<br><button data-view="works">Show Works</button></div></section>
+  </div>
+  <div id="sbgrip" aria-hidden="true"></div>
+</div>
+<div id="content">
 <div id="topbar">
   <div class="tb-side">
+    <button id="tbsidebar" class="tb-icon" data-tip="Show or hide the sidebar" aria-label="Show or hide the sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M9.5 5v14"/></svg></button>
     <button id="tbtext" class="tb-icon" data-tip="Show Editor" aria-label="Show Editor (⌘E)"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 9.5h12M4 14h16M4 18.5h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button id="tbpages" class="tb-icon" data-tip="Show Preview" aria-label="Show Preview (⌘E)"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1.1" class="tb-hole"/><circle cx="8.5" cy="12" r="1.1" class="tb-hole"/><circle cx="8.5" cy="16.5" r="1.1" class="tb-hole"/></svg></button>
   </div>
@@ -438,6 +524,7 @@ body.previewing #preview { display: flex; }
 </div>
 </div>
 <div id="counts"></div>
+</div>
 <script nonce="${nonce}" src="${script}"></script></body></html>`;
   }
 }
@@ -567,6 +654,11 @@ function swapSoon(uri: vscode.Uri): void {
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore): void {
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
+    // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highland-Style Editor.
+    vscode.commands.registerCommand("highwater.toggleEditorSidebar", () => void activeView()?.panel.webview.postMessage({ type: "toggleSidebar" })),
+    vscode.commands.registerCommand("highwater.showSidebarPanel", (panel: unknown) => {
+      if (typeof panel === "string") void activeView()?.panel.webview.postMessage({ type: "showPanel", panel });
+    }),
     vscode.commands.registerCommand("highwater.openHighlandEditor", async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (target) await swapActive(target, HIGHLAND_EDITOR);

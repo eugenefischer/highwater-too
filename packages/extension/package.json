@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.5.12",
+  "version": "0.6.0",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -456,6 +456,16 @@
       {
         "command": "highwater.zoomReset",
         "title": "Reset Text Size",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.toggleEditorSidebar",
+        "title": "Show or Hide the Sidebar",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.showSidebarPanel",
+        "title": "Show a Sidebar Panel",
         "category": "Highwater Too"
       }
     ],
@@ -1565,6 +1575,14 @@
         {
           "command": "highwater.openTextEditor",
           "when": "activeCustomEditorId == highwater.highlandEditor"
+        },
+        {
+          "command": "highwater.showSidebarPanel",
+          "when": "false"
+        },
+        {
+          "command": "highwater.toggleEditorSidebar",
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         }
       ],
       "explorer/context": [
@@ -1930,7 +1948,7 @@
         "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
-        "command": "workbench.action.toggleSidebarVisibility",
+        "command": "highwater.toggleEditorSidebar",
         "key": "ctrl+0",
         "mac": "cmd+0",
         "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
@@ -1966,10 +1984,11 @@
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
-        "command": "highwater.navigator.focus",
+        "command": "highwater.showSidebarPanel",
         "mac": "cmd+1",
         "key": "ctrl+1",
-        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts",
+        "args": "navigator"
       },
       {
         "command": "highwater.bin.focus",
@@ -2002,10 +2021,11 @@
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
-        "command": "highwater.openScratchpad",
+        "command": "highwater.showSidebarPanel",
         "mac": "cmd+5",
         "key": "ctrl+5",
-        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts",
+        "args": "scratchpad"
       },
       {
         "command": "highwater.toggleLiveMargins",

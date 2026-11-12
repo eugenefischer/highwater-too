@@ -12,6 +12,7 @@ import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages, type PdfMessage } from "./pages.ts";
 import { TemplateWindow, type OptionValues } from "./template-window.ts";
+import { Sidebar } from "./sidebar.ts";
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 
@@ -156,6 +157,8 @@ function start(text: string): void {
         // After the edit, so the extension reads the offsets against the edited document.
         EditorView.updateListener.of((u) => {
           if (u.selectionSet || u.docChanged) vscode.postMessage({ type: "selection", ranges: u.state.selection.ranges.map((r) => ({ anchor: r.anchor, head: r.head })) });
+          if (u.docChanged) sidebar.textChanged();
+          if (u.selectionSet || u.docChanged) sidebar.cursorMoved();
         }),
       ],
     }),
@@ -163,6 +166,7 @@ function start(text: string): void {
   view.scrollDOM.addEventListener("scroll", reportScroll);
   spellingMenu(view, spelling, spellingMarks);
   view.focus();
+  sidebar.textChanged();
 }
 
 let scrollPending = false;
@@ -225,7 +229,7 @@ const templateWindow = new TemplateWindow(
     clearTimeout(timer);
     tip.hidden = true;
   };
-  for (const el of document.querySelectorAll<HTMLElement>("#topbar [data-tip]")) {
+  for (const el of document.querySelectorAll<HTMLElement>("[data-tip]")) {
     el.addEventListener("mouseenter", () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
@@ -242,6 +246,16 @@ const templateWindow = new TemplateWindow(
   }
   window.addEventListener("blur", hide);
 }
+
+// Highland's sidebar: Navigator, Bin, Statistics, Assets, Scratchpad, Writing History, Works.
+const sidebar = new Sidebar({
+  post: (msg) => vscode.postMessage(msg),
+  parsed: () => parsed,
+  length: () => view?.state.doc.length ?? 0,
+  head: () => view?.state.selection.main.head ?? 0,
+  reveal: (offset) => reveal(offset, "top", true),
+  edit: (changes) => view?.dispatch({ changes, scrollIntoView: false }),
+});
 
 // The top bar: Text and Pages (as ⌘E), and Choose Theme.
 document.getElementById("tbtext")!.onclick = () => pages.shown && togglePreview();
@@ -312,6 +326,7 @@ function replace(text: string): void {
 
 window.addEventListener("message", (event: MessageEvent) => {
   const msg = event.data as { type: string; px?: number | null; vars?: Record<string, string> | null; on?: boolean; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
+  if (sidebar.receive(event.data as { type: string } & Record<string, unknown>)) return;
   if (msg.type === "init") {
     mode = msg.mode ?? "fountain";
     document.body.dataset.mode = mode;

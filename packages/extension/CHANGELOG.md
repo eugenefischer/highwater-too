@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 (branch m16-sidebar)
+
+- Highland 2's sidebar, inside the Highland-Style Editor: its row of icons at the top (Navigator, Bin, Statistics, Assets, Scratchpad, then Highwater's Writing History and Works) and one panel below. Drag its right edge to make it wider or narrower; the button at the top bar's left, or ⌘0, shows or hides it. Where you left it is kept for every document.
+- The **Navigator** is in it, working on the page's own text: click to go there, drag a scene or section to move it (⌘Z puts it back), filter at the foot, and choose what it lists with the eye. ⌘1 shows it.
+- The **Scratchpad** is in it, as in Highland: plain text beside the script, saved as you type (in the .highland file, or with a plain file's writing history), with Highland's button at the bottom right to export it to a new document. ⌘5 shows it (Open Scratchpad too).
+- The Bin, Assets, Writing History and Works panels point to VS Code's sidebar for now; they move into this one next. Statistics come with M11.
+
 ## 0.5.12
 
 - Tooltips on the Highland-Style Editor's top bar, in Highland 2's words: Show Editor, Show Preview, Choose the document's template, Choose a theme for the app (and Page size with the pages).
