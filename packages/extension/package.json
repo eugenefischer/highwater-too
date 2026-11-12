@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.6.10",
+  "version": "0.6.11",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -523,7 +523,7 @@
         "highwater.showSidebarOnOpen": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened."
+          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened in the text editor. (The Highland-Style Editor has these panels in its own sidebar, and VS Code's Highwater Too views are hidden while it is in front.)"
         },
         "highwater.docxFont": {
           "type": "string",
@@ -2152,27 +2152,32 @@
       "highwater": [
         {
           "id": "highwater.navigator",
+          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
           "name": "Navigator",
           "icon": "media/highwater.svg",
           "type": "webview"
         },
         {
           "id": "highwater.bin",
+          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
           "name": "Bin",
           "icon": "media/highwater.svg"
         },
         {
           "id": "highwater.assets",
+          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
           "name": "Assets",
           "icon": "media/highwater.svg"
         },
         {
           "id": "highwater.history",
+          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
           "name": "Writing History",
           "icon": "media/highwater.svg"
         },
         {
           "id": "highwater.works",
+          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
           "name": "Works",
           "icon": "media/highwater.svg"
         }

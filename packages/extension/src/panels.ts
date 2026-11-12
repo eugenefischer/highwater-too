@@ -119,10 +119,10 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     if (shown.has(key)) return;
     shown.add(key);
     if (!vscode.workspace.getConfiguration("highwater").get<boolean>("showSidebarOnOpen", true)) return;
-    const view = viewOf(doc);
+    // The Highland-Style Editor has these panels in its own sidebar (and VS Code's are hidden there).
+    if (viewOf(doc)) return;
     await vscode.commands.executeCommand("workbench.view.extension.highwater");
-    if (view) view.panel.reveal(view.panel.viewColumn, false);
-    else await vscode.window.showTextDocument(doc, { ...(column ? { viewColumn: column } : {}), preserveFocus: false });
+    await vscode.window.showTextDocument(doc, { ...(column ? { viewColumn: column } : {}), preserveFocus: false });
   }
 
   async function toBin(cut: boolean): Promise<void> {

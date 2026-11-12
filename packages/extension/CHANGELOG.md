@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.11 (branch m16-sidebar)
+
+- VS Code's own Highwater Too views (Navigator, Bin, Assets, Writing History, Works) are hidden while the Highland-Style Editor is in front, since its sidebar has them all; with every view hidden, VS Code also hides the Highwater Too icon in the activity bar. They come back for the text editor (the code button) and other files.
+- Opening a document in the Highland-Style Editor no longer switches VS Code's sidebar to Highwater Too (highwater.showSidebarOnOpen now applies to the text editor only); "Show History" in the first-run notice opens the editor's Writing History panel there.
+
 ## 0.6.10 (branch m16-sidebar)
 
 - Dragging a Bin card (or an image) as in Highland 2: what follows the pointer is a small, nearly invisible outline, so the drop caret shows through; and dropping it leaves the typing cursor where it was.

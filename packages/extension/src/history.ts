@@ -255,7 +255,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       "Change Location…",
       "Turn Off",
     );
-    if (choice === "Show History") await vscode.commands.executeCommand("highwater.history.focus");
+    if (choice === "Show History") await showHistory();
     else if (choice === "Change Location…") await changeLocation();
     else if (choice === "Turn Off") await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
   }
