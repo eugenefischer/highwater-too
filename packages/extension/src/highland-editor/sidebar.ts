@@ -570,6 +570,7 @@ class BinPanel {
       e.dataTransfer!.setData("text/plain", this.#cards[index]?.text ?? "");
       e.dataTransfer!.setData(BIN_TYPE, String(index));
       e.dataTransfer!.effectAllowed = "copyMove";
+      faintDragImage(e, this.#cards[index]?.text ?? "");
     });
     el.addEventListener("click", (e) => {
       if ((e.target as HTMLElement).closest("button")) return;
@@ -783,6 +784,7 @@ class AssetsPanel {
       e.dataTransfer!.setData("text/plain", c.reference);
       e.dataTransfer!.setData(ASSET_TYPE, c.name);
       e.dataTransfer!.effectAllowed = "copy";
+      faintDragImage(e, c.label);
     });
     el.addEventListener("dblclick", () => this.deps.post({ type: "assetOpen", name: c.name }));
     return el;
@@ -958,4 +960,19 @@ class WorksPanel {
     }
     this.#list.replaceChildren(...out);
   }
+}
+
+/**
+ * What follows the pointer while a card is dragged: as in Highland, a small, nearly invisible
+ * outline of it, so the drop caret in the text shows through (the browser's own picture is the
+ * whole card).
+ */
+function faintDragImage(e: DragEvent, text: string): void {
+  const ghost = document.createElement("div");
+  ghost.className = "sb-dragghost";
+  ghost.textContent = text.split("\n").find((l) => l.trim())?.trim().slice(0, 60) ?? "";
+  document.body.append(ghost);
+  e.dataTransfer?.setDragImage(ghost, 40, 12);
+  // The picture is taken now; the element itself can go.
+  requestAnimationFrame(() => ghost.remove());
 }

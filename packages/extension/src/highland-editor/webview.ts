@@ -212,7 +212,8 @@ function start(text: string): void {
             // A Bin item dragged into the text leaves the Bin, in the same undoable step.
             const index = types.includes(BIN_TYPE) ? Number(e.dataTransfer!.getData(BIN_TYPE)) : NaN;
             const take = Number.isInteger(index) ? [binEffect.of({ kind: "remove", index, text: e.dataTransfer!.getData("text/plain") })] : [];
-            v.dispatch({ changes: { from: at, insert }, effects: take, selection: { anchor: at + insert.length }, scrollIntoView: true, userEvent: "input.drop", annotations: isolateHistory.of("full") });
+            // The typing cursor stays where it was (as Highland), moved along by the insertion if after it.
+            v.dispatch({ changes: { from: at, insert }, effects: take, userEvent: "input.drop", annotations: isolateHistory.of("full") });
             v.focus();
             return true;
           },

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.10 (branch m16-sidebar)
+
+- Dragging a Bin card (or an image) as in Highland 2: what follows the pointer is a small, nearly invisible outline, so the drop caret shows through; and dropping it leaves the typing cursor where it was.
+
 ## 0.6.9 (branch m16-sidebar)
 
 - **Writing History** is in the Highland-Style Editor's sidebar (the clock icon; the status bar's history item opens it too): this document's saves, newest first, with when, what kind (Save, Autosave, Revert…) and the file. Click a save to compare it with the text as it is now; its ↺ reverts to it (after asking). The ⋯ at the foot has the rest: turning the history off or on for this document, Connect to a Work's History…, Open Work from History…, Export, syncing, the mirror, and the history's folder and location.
