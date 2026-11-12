@@ -757,7 +757,7 @@ class AssetsPanel {
     const el = document.createElement("div");
     el.className = "assetcard";
     el.draggable = true;
-    el.title = `${c.name}\nDrag into the text to use it; double-click to open it.`;
+    el.dataset.tip = `${c.name}\nDrag into the text to use it; double-click to open it.`;
     const pic = document.createElement("div");
     pic.className = "assetcard-pic";
     if (c.thumb) {
@@ -795,7 +795,7 @@ class AssetsPanel {
 function button(tip: string, path: string, run: () => void, cls = ""): HTMLButtonElement {
   const b = document.createElement("button");
   b.className = `sb-button ${cls}`.trim();
-  b.title = tip;
+  b.dataset.tip = tip;
   b.setAttribute("aria-label", tip);
   b.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
   b.onclick = (e) => {
@@ -852,6 +852,8 @@ class HistoryPanel {
     const run = (command: string) => deps.post({ type: "historyCommand", command });
     this.#record.onclick = () => run("highwater.toggleDocumentHistory");
     $("histexport").onclick = () => run("highwater.exportHistory");
+    const help = $("histhelp");
+    help.onclick = () => openHelp(help, HISTORY_HELP);
     const gear = $("histgear");
     gear.onclick = () => openMenu(gear, this.#menu, run);
     $("histmirror").onclick = () => {
@@ -894,7 +896,7 @@ class HistoryPanel {
       row.className = "sb-row hist-row";
       row.dataset.hash = save.hash;
       row.setAttribute("role", "option");
-      row.title = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.words ? `\n${save.words} words` : ""}\nDouble-click to compare with the text as it is now.`;
+      row.dataset.tip = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.words ? `\n${save.words} words` : ""}\nDouble-click to compare with the text as it is now.`;
       const main = document.createElement("div");
       main.className = "sb-row-main";
       const time = document.createElement("span");
@@ -974,7 +976,8 @@ class HistoryPanel {
     const mirror = $("histmirror");
     mirror.hidden = !msg.mirror || msg.state === "off";
     mirror.classList.toggle("attention", !!msg.mirror?.signIn);
-    mirror.title = msg.mirror?.error ?? "";
+    if (msg.mirror?.error) mirror.dataset.tip = msg.mirror.error;
+    else delete mirror.dataset.tip;
     mirror.textContent = !msg.mirror
       ? ""
       : msg.mirror.signIn
@@ -986,6 +989,43 @@ class HistoryPanel {
             : "Mirror set up";
   }
 }
+
+const icon = (path: string) => `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+
+/** The Writing History's ? button: what it is and what each control does (it is not Highland's). */
+const HISTORY_HELP = `
+<h2>Writing History</h2>
+<p class="lead">Highwater Too's own addition: Highland 2 has nothing like it.</p>
+<p>Each time you save, Highwater Too records the document as it was then, in a git repository on this computer (the history folder). Each document, a <em>work</em>, has its own history. Saves that change nothing are not recorded. A .highland file carries its work's ID, so its history follows it when it is renamed or moved.</p>
+<h3>The list</h3>
+<ul>
+<li>This document's saves, newest first, under a heading for each day: the time, the kind of save, and how many words it added or removed. Hover over one for its full date and word count.</li>
+<li><b>Save</b>: you saved. <b>Autosave</b>: VS Code saved it for you (recorded at most every so often). <b>Close</b>: recorded as the document closed. <b>Revert</b>: an older save was brought back. <b>Restore</b>: the work was written out from its history. <b>Convert</b>: it became another kind of file. <b>Connect</b>: it was joined to another work's history.</li>
+</ul>
+<h3>A save</h3>
+<ul>
+<li>Click a save to select it; <kbd>↑</kbd> and <kbd>↓</kbd> move the selection.</li>
+<li>${icon(COMPARE_ICON)} <b>Compare with Now</b> (or double-click, or Enter): shows the save beside the text as it is now, with the differences marked.</li>
+<li>${icon(REVERT_ICON)} <b>Revert to This Save…</b>: after asking, makes the document's text that save's. The revert is recorded as a save of its own, so nothing later is lost: you can go back to any save after it, too.</li>
+</ul>
+<h3>The foot</h3>
+<ul>
+<li><b>Recording · last save</b> …, <b>Paused for this document</b>, or <b>Writing history is off</b> (the setting <code>highwater.writingHistory</code>, for every document).</li>
+<li>With a mirror: <b>Mirrored</b> and when; <b>Not mirrored yet</b> (hover for why; it is tried again later and after the next save); or <b>Mirror needs you to sign in</b> (click it to sign in).</li>
+<li>${icon('<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>')} <b>Record</b>: turns the history off for this document, or back on. Its earlier saves are kept.</li>
+<li>${icon('<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>')} <b>Export Writing History…</b>: writes this document's history to a single file (a git bundle) that anyone can open with <code>git clone</code>.</li>
+<li>${icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>')} <b>More</b>: the rest.
+<ul>
+<li><b>Connect to a Work's History…</b>: joins this document to another work's history, for a file that lost its connection (copied, or renamed after Highland 2 removed its ID). It is permanent, so it is explained and asked first.</li>
+<li><b>Link Writing History to This File</b> (.fountain and .md files): adds a short note with the work's ID at the end of the file, so its history and its Bin, Scratchpad and assets follow it if it moves.</li>
+<li><b>Set Up History Mirror…</b> (or <b>Change</b>): keeps a second copy of the whole history on a git server you choose, such as a private GitHub repository. It is sent there after saves and never overwritten, and other computers can restore your works from it (see Works).</li>
+<li><b>Sync Writing History Now</b>, <b>Sign In to History Mirror…</b> and <b>Forget History Mirror Sign-In</b> (the sign-in is kept in VS Code's secure storage).</li>
+<li><b>Reveal Writing History Folder</b> and <b>Change Writing History Location…</b></li>
+</ul></li>
+</ul>
+<h3>Works</h3>
+<p>The Works panel, beside this one, lists every work in the history, including those on the mirror from other computers.</p>
+`;
 
 /** TODAY, YESTERDAY, then NOV 10, 2026. */
 function dayHeading(d: Date): string {
@@ -1001,6 +1041,47 @@ function shortWhen(d: Date): string {
   const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
 }
+
+/**
+ * Help for one of Highwater's own panels: a popover beside the sidebar, its arrow at the ? button.
+ * Escape, a click elsewhere or the ? again closes it.
+ */
+function openHelp(anchor: HTMLElement, html: string): void {
+  const pop = $("sbhelp");
+  if (!pop.hidden) return closeHelp();
+  $("sbhelptext").innerHTML = html;
+  pop.hidden = false;
+  const a = anchor.getBoundingClientRect();
+  const side = $("sidebar").getBoundingClientRect();
+  const height = Math.min(560, window.innerHeight - 24);
+  const middle = a.top + a.height / 2;
+  const top = Math.max(12, Math.min(window.innerHeight - height - 12, middle - 24));
+  pop.style.left = `${Math.round(side.right + 10)}px`;
+  pop.style.top = `${Math.round(top)}px`;
+  pop.style.height = `${height}px`;
+  pop.style.setProperty("--arrow", `${Math.round(Math.max(16, Math.min(height - 16, middle - top)))}px`);
+  $("sbhelptext").scrollTop = 0;
+  pop.focus();
+  const away = (e: MouseEvent) => {
+    if (!pop.contains(e.target as Node) && !anchor.contains(e.target as Node)) closeHelp();
+  };
+  const keys = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeHelp();
+      anchor.focus();
+    }
+  };
+  document.addEventListener("mousedown", away, true);
+  pop.addEventListener("keydown", keys);
+  closeHelp = () => {
+    pop.hidden = true;
+    document.removeEventListener("mousedown", away, true);
+    pop.removeEventListener("keydown", keys);
+    closeHelp = () => {};
+  };
+}
+let closeHelp: () => void = () => {};
 
 /**
  * The sidebar's popup menu, above (or below) the button that opened it, like Highland's own

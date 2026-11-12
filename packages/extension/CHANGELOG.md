@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.14
+
+- The Writing History panel has a ? button at its top: help on what the history is and what every control does, in a popover beside the sidebar (Escape or a click elsewhere closes it). It is Highwater's own feature, so there is no Highland 2 documentation for it.
+- Tooltips on the buttons that appear on a selected save (Compare with Now, Revert to This Save…), and on every other button made by the sidebar (the Bin's, Assets', the history's): the page's own tooltips now reach controls added after it opened, since a webview's title tooltips don't always show.
+
 ## 0.6.13
 
 - The Writing History panel, redone in Highland's way: saves under a heading for each day (TODAY, YESTERDAY, NOV 10, 2026), each with its time, kind and change in words. A click selects a save, which shows Compare and Revert in place of its word change; a double-click or Enter compares, and the arrow keys move through the saves.

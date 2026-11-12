@@ -393,6 +393,22 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 #histrecord { color: var(--nav-accent); }
 #histrecord.paused { color: var(--nav-muted); }
 #histrecord.paused .hist-dot { display: none; }
+.sb-head-help { display: flex; align-items: center; gap: 6px; padding-right: 6px; }
+.sb-head-help > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sb-help { padding: 2px; }
+/* Help for Highwater's own panels: a popover beside the sidebar, its arrow at the ? button. */
+#sbhelp { position: fixed; z-index: 42; width: min(420px, calc(100vw - var(--sb-width) - 30px)); display: flex; background: var(--hl-bg); color: var(--hl-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); outline: none; }
+#sbhelp[hidden] { display: none; }
+#sbhelp::before { content: ""; position: absolute; left: -7px; top: calc(var(--arrow, 24px) - 6px); width: 12px; height: 12px; background: var(--hl-bg); border-left: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); transform: rotate(45deg); }
+#sbhelptext { flex: 1; overflow-y: auto; padding: 14px 18px 16px; font-family: var(--vscode-font-family); font-size: 13px; line-height: 1.45; border-radius: 10px; }
+#sbhelptext h2 { margin: 0 0 4px; font-size: 1.15em; }
+#sbhelptext h3 { margin: 14px 0 4px; font-size: 0.82em; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in srgb, var(--hl-fg) 60%, transparent); }
+#sbhelptext p { margin: 4px 0; }
+#sbhelptext ul { margin: 4px 0; padding-left: 18px; }
+#sbhelptext li { margin: 3px 0; }
+#sbhelptext .lead { color: color-mix(in srgb, var(--hl-fg) 70%, transparent); }
+#sbhelptext code { font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; }
+#sbhelptext svg { vertical-align: -3px; }
 /* The sidebar's menus (the Writing History's gear): a small popup above the button. */
 #sbmenu { position: fixed; z-index: 45; min-width: 200px; max-width: calc(var(--sb-width) + 120px); padding: 4px; background: var(--hl-bg); color: var(--nav-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-family: var(--vscode-font-family); font-size: 13px; }
 #sbmenu[hidden] { display: none; }
@@ -436,7 +452,7 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 #topbar select:hover { color: var(--hl-fg); }
 #topbar select option { color: var(--hl-panel-fg); background: var(--hl-panel-bg); }
 /* Tooltips for the top bar, as Highland's: a small dark label just below the control (webview.ts places it). */
-#hl-tip { position: fixed; z-index: 60; pointer-events: none; padding: 3px 7px; border-radius: 4px; font-family: var(--vscode-font-family); font-size: 12px; white-space: nowrap; color: var(--vscode-editorHoverWidget-foreground, #ddd); background: var(--vscode-editorHoverWidget-background, #252526); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+#hl-tip { position: fixed; z-index: 60; pointer-events: none; padding: 3px 7px; border-radius: 4px; font-family: var(--vscode-font-family); font-size: 12px; white-space: pre; max-width: 420px; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-editorHoverWidget-foreground, #ddd); background: var(--vscode-editorHoverWidget-background, #252526); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
 #hl-tip[hidden] { display: none; }
 #ptemplate { font: inherit; color: var(--hl-muted); background: transparent; border: 0; padding: 2px 4px; cursor: pointer; }
 #ptemplate:hover { color: var(--hl-fg); }
@@ -584,7 +600,7 @@ body.previewing #preview { display: flex; }
       <div id="scratchfoot" class="sb-foot"><button id="scratchexport" class="sb-button" data-tip="Export Scratchpad contents to a new document" aria-label="Export Scratchpad contents to a new document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button></div>
     </section>
     <section data-panel="history" hidden>
-      <div class="sb-head"><span id="histtitle"></span></div>
+      <div class="sb-head sb-head-help"><span id="histtitle"></span><button id="histhelp" class="sb-button sb-help" data-tip="How the Writing History works" aria-label="How the Writing History works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
       <div class="sb-scroll"><div id="histlist" class="sb-rows" tabindex="0" role="listbox" aria-label="Saves"></div><div id="histnote" class="sb-note" hidden></div></div>
       <div class="sb-foot">
         <div id="histstatus"><div id="histstate"></div><div id="histmirror" hidden></div></div>
@@ -601,6 +617,7 @@ body.previewing #preview { display: flex; }
   <div id="sbgrip" aria-hidden="true"></div>
 </div>
 <div id="sbmenu" role="menu" hidden></div>
+<div id="sbhelp" role="dialog" aria-label="Help" tabindex="-1" hidden><div id="sbhelptext"></div></div>
 <div id="binpop" role="dialog" aria-label="Bin item" hidden><textarea id="binpoptext" spellcheck="false" aria-label="Bin item text"></textarea></div>
 <div id="content">
 <div id="topbar">
