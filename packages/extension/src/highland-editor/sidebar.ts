@@ -29,6 +29,8 @@ export interface SidebarDeps {
   edit(changes: { from: number; to: number; insert: string }[]): void;
   /** Puts text in at the cursor (a Bin item, an image reference). */
   insert(text: string): void;
+  /** Takes out of the page the text being dragged from it, if this is that text (dragging to the Bin cuts). */
+  cutDragged(text: string): void;
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -360,6 +362,26 @@ class ScratchpadPanel {
       this.#timer = setTimeout(() => this.#flush(), 600);
     });
     this.#area.addEventListener("blur", () => this.#flush());
+    // Text dragged in from the page is copied, not moved out of it.
+    this.#area.addEventListener("dragover", (e) => {
+      if (!e.dataTransfer) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    });
+    // Put in by hand, so the page keeps its text: at the cursor if the Scratchpad has one, else at the end.
+    this.#area.addEventListener("drop", (e) => {
+      const text = e.dataTransfer?.getData("text/plain");
+      e.preventDefault();
+      if (!text) return;
+      const area = this.#area;
+      const focused = document.activeElement === area;
+      const at = focused ? area.selectionStart : area.value.length;
+      const end = focused ? area.selectionEnd : at;
+      const lead = !focused && area.value && !area.value.endsWith("\n") ? "\n" : "";
+      area.setRangeText(lead + text, at, end, "end");
+      area.focus();
+      area.dispatchEvent(new Event("input"));
+    });
     window.addEventListener("blur", () => this.#flush());
     $("scratchexport").onclick = () => {
       this.#flush();
@@ -446,7 +468,10 @@ class BinPanel {
         return;
       }
       const text = e.dataTransfer?.getData("text/plain");
-      if (text && text.trim()) deps.post({ type: "binAdd", text });
+      if (!text || !text.trim()) return;
+      deps.post({ type: "binAdd", text });
+      // Text dragged from the page moves into the Bin, as Cut to Bin does.
+      deps.cutDragged(text);
     });
   }
 

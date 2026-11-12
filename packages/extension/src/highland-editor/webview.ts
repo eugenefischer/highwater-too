@@ -124,6 +124,8 @@ let showInvisibles = false;
 const invisibleMarks = (on: boolean) => (on ? [highlightWhitespace(), lineEnds] : []);
 
 let view: EditorView | null = null;
+/** The text being dragged out of the page, while the drag lasts. */
+let dragged: { from: number; to: number; text: string } | null = null;
 const spelling = new Spelling(
   () => view,
   () => parsed,
@@ -146,6 +148,16 @@ function start(text: string): void {
         // A Bin item or an image dropped from the sidebar goes in as a paragraph of its own, before
         // or after the line it lands on (whichever end is nearer), not in the middle of a sentence.
         EditorView.domEventHandlers({
+          // What is dragged out of the page, so a drop on the Bin can take it out (dragend comes after the drop).
+          dragstart: (_e, v) => {
+            const r = v.state.selection.main;
+            dragged = r.empty ? null : { from: r.from, to: r.to, text: v.state.sliceDoc(r.from, r.to) };
+            return false;
+          },
+          dragend: () => {
+            dragged = null;
+            return false;
+          },
           drop: (e, v) => {
             const types = e.dataTransfer?.types ?? [];
             if (!types.includes(BIN_TYPE) && !types.includes(ASSET_TYPE)) return false;
@@ -158,6 +170,9 @@ function start(text: string): void {
             const at = before ? line.from : line.to;
             v.dispatch({ changes: { from: at, insert }, selection: { anchor: at + insert.length - (before && line.text.trim() !== "" ? 2 : 0) }, scrollIntoView: true });
             v.focus();
+            // A Bin item dragged into the text leaves the Bin.
+            const index = types.includes(BIN_TYPE) ? Number(e.dataTransfer!.getData(BIN_TYPE)) : NaN;
+            if (Number.isInteger(index)) vscode.postMessage({ type: "binTake", index });
             return true;
           },
         }),
@@ -273,6 +288,19 @@ const sidebar = new Sidebar({
   head: () => view?.state.selection.main.head ?? 0,
   reveal: (offset) => reveal(offset, "top", true),
   edit: (changes) => view?.dispatch({ changes, scrollIntoView: false }),
+  cutDragged: (text) => {
+    const d = dragged;
+    dragged = null;
+    if (!view || !d || d.text !== text || view.state.sliceDoc(d.from, d.to) !== text) return;
+    // Whole paragraphs taken out take one blank line with them, so no gap is left.
+    const doc = view.state.doc;
+    let { from, to } = d;
+    if (doc.lineAt(from).from === from && doc.lineAt(to).to === to) {
+      if (doc.sliceString(to, to + 2) === "\n\n") to += 2;
+      else if (doc.sliceString(from - 2, from) === "\n\n") from -= 2;
+    }
+    view.dispatch({ changes: { from, to } });
+  },
   insert: (text) => {
     if (!view) return;
     view.dispatch(view.state.replaceSelection(text));

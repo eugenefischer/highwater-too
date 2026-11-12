@@ -190,6 +190,10 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
           const item = (await extrasApi!.bin.items(o))[index];
           if (item) await extrasApi!.bin.remove(item);
         });
+      } else if (msg.type === "binTake" && typeof msg.index === "number") {
+        // Dragged into the text: out of the Bin, without asking.
+        const index = msg.index;
+        binTask((o) => extrasApi!.bin.change(o, (items) => items.filter((_, i) => i !== index)));
       } else if (msg.type === "assetsAdd") assetTask((o) => extrasApi!.assets.add(o));
       else if (msg.type === "assetsImport" && Array.isArray(msg.files)) {
         const files = (msg.files as { name: unknown; data: unknown }[]).filter((f): f is { name: string; data: Uint8Array } => typeof f.name === "string" && f.data instanceof Uint8Array);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2 (branch m16-sidebar)
+
+- Dragging, as in Highland: text dragged from the page onto the **Bin** moves there (cut; a whole paragraph takes its blank line with it, ⌘Z puts it back); a Bin card dragged into the page leaves the Bin; text dragged onto the **Scratchpad** is copied (at its cursor, or at the end), and the page keeps it.
+
 ## 0.6.1 (branch m16-sidebar)
 
 - The **Bin** is in the Highland-Style Editor's sidebar (⌘2): Highland's cards, each with its first line and how it goes on.
