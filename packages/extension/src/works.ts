@@ -71,7 +71,7 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
   async getChildren(node?: Node): Promise<Node[]> {
     const h = this.#host.history();
     if (!node) {
-      const works = await h.works().catch(() => []);
+      const works = await h.works({ wait: false }).catch(() => []);
       return works.map((work) => ({ kind: "work", work, here: work.paths.slice().reverse().find((p) => existsSync(p)) }));
     }
     if (node.kind === "save" || !node.work.local) return [];

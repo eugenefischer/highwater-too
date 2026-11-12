@@ -31,6 +31,27 @@ describe("History: one repository, one branch per document", () => {
     expect(gitIn(h.repo, "rev-parse", "--is-bare-repository")).toBe("true");
   });
 
+  it("shows the history without waiting for slow work on it (a mirror's pull)", async () => {
+    const h = new History(await folder());
+    const doc = { id: null, path: "/w/Slow.highland", text: script };
+    const { id } = await h.resolve(doc);
+    await h.commit(id, { scriptName: "text.fountain", script }, "save", new Date(), undefined, { form: "highland", file: "Slow.highland" });
+    let release!: () => void;
+    const busy = h.exclusive(() => new Promise<void>((r) => (release = r)));
+    const found = await h.find(doc, { wait: false });
+    expect(found?.id).toBe(id);
+    expect((await h.works({ wait: false })).map((w) => w.title)).toEqual(["Slow"]);
+    // The waiting kind still queues behind it.
+    let waited = false;
+    const queued = h.find(doc).then(() => (waited = true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(waited).toBe(false);
+    release();
+    await busy;
+    await queued;
+    expect(waited).toBe(true);
+  });
+
   it("keeps works on independent branches that share no history", async () => {
     const h = new History(await folder());
     const a = await h.resolve({ id: null, path: "/w/A.highland", text: script });

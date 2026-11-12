@@ -274,15 +274,20 @@ export class History {
     });
   }
 
-  /** Like `resolve`, but only looks: creates nothing and writes nothing. */
-  find(doc: { id: string | null; path: string; text: string }): Promise<{ id: string; branch: string; paused: boolean; copyOf: string | null } | null> {
-    return this.#serial(async () => {
+  /**
+   * Like `resolve`, but only looks: creates nothing and writes nothing. With `wait: false` it does
+   * not queue behind other work on the history (a mirror's pull or push can take seconds over the
+   * network), for showing the history: it reads what is there now, from a copy of the index.
+   */
+  find(doc: { id: string | null; path: string; text: string }, { wait = true }: { wait?: boolean } = {}): Promise<{ id: string; branch: string; paused: boolean; copyOf: string | null } | null> {
+    const run = async () => {
       if (!existsSync(this.repo)) return null;
-      const index = await this.#load();
+      const index = wait ? await this.#load() : structuredClone(await this.#load());
       const matched = await this.#match(index, doc);
       const entry = matched ? index.documents[matched.id] : undefined;
       return matched && entry ? { id: matched.id, branch: entry.branch, paused: entry.paused === true, copyOf: matched.copyOf } : null;
-    });
+    };
+    return wait ? this.#serial(run) : run();
   }
 
   /** Commits the document's files to its branch; returns null when nothing changed. */
@@ -354,9 +359,12 @@ export class History {
     });
   }
 
-  /** Every work: those on this computer, and those only in the catalog; most recently saved first. */
-  works(): Promise<WorkInfo[]> {
-    return this.#serial(async () => {
+  /**
+   * Every work: those on this computer, and those only in the catalog; most recently saved first.
+   * With `wait: false`, read as things are now, not queued behind other work (see `find`).
+   */
+  works({ wait = true }: { wait?: boolean } = {}): Promise<WorkInfo[]> {
+    const run = async () => {
       if (!existsSync(this.repo)) return [];
       const index = await this.#load();
       const catalog = new Map((await this.#catalog()).map((e) => [e.branch, e]));
@@ -371,17 +379,20 @@ export class History {
       for (const [id, e] of Object.entries(index.documents)) add(id, e.branch, e.paths);
       for (const o of await this.#unindexed(index)) add(o.id, o.branch, []);
       for (const c of catalog.values()) add(c.id, c.branch, []);
-      for (const w of out) {
-        w.latest = (await this.#branchLog(w.branch, 1))[0] ?? null;
+      // Each work's latest save, read side by side (one git call each).
+      const latest = await Promise.all(out.map((w) => this.#branchLog(w.branch, 1)));
+      out.forEach((w, i) => {
+        w.latest = latest[i]![0] ?? null;
         w.local = w.latest !== null;
         if (w.latest) {
           w.lastSave = w.latest.date;
           w.form = w.latest.form ?? w.form;
           w.file = w.latest.file ?? w.file;
         }
-      }
+      });
       return out.filter((w) => w.lastSave).sort((a, b) => b.lastSave!.getTime() - a.lastSave!.getTime());
-    });
+    };
+    return wait ? this.#serial(run) : run();
   }
 
   /** The catalog: every work any computer has recorded (with this computer's saves not yet on main). */

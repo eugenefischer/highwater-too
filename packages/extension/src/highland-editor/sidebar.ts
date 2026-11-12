@@ -1039,7 +1039,7 @@ const HISTORY_HELP = `
 <li><b>Connect to a Work’s History</b>: if a copied or renamed file lost its history, joins it back up. You’ll be asked to confirm.</li>
 <li><b>Link Writing History to This File</b> (.fountain and .md files): adds a short line at the end of the file so its history, Bin and Scratchpad follow it if you move or rename it. .highland files don’t need this.</li>
 <li><b>Set Up History Mirror</b>: keeps a backup of all your history on a remote git server you choose, such as a private GitHub repository. Your other computers can then see and restore your work.</li>
-<li><b>Sync Writing History Now</b>: syncs this work’s local writing history with the history mirror.</li>
+<li><b>Sync Writing History Now</b>: syncs your local writing history with the history mirror.</li>
 <li><b>Sign In to History Mirror</b>: signs in to your history mirror. Highwater Too saves your sign-in credentials so you only need to do this once.</li>
 <li><b>Forget History Mirror Sign-In</b>: forgets the saved history mirror sign-in credentials.</li>
 <li><b>Reveal Writing History Folder</b>: shows where writing histories are stored on this computer.</li>

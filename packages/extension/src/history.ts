@@ -301,9 +301,15 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     return history().find({ id, path: key, text: files.script });
   }
 
+  /** For showing the history (the panels, the status bar): as it is now, not after a pull in progress. */
+  async function peek(key: string) {
+    const { id, files } = await snapshot(key);
+    return history().find({ id, path: key, text: files.script }, { wait: false });
+  }
+
   async function latest(key: string): Promise<CommitInfo | undefined> {
     try {
-      const found = await lookup(key);
+      const found = await peek(key);
       return found ? (await history().log(found.id, 1))[0] : undefined;
     } catch {
       return undefined;
@@ -433,7 +439,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   const view = new HistoryView(async () => {
     const key = focus.key;
     if (!key || !enabled()) return null;
-    const r = await lookup(key);
+    const r = await peek(key);
     void vscode.commands.executeCommand("setContext", "highwater.historyPaused", r?.paused ?? false);
     return r ? { key, commits: await history().log(r.id) } : null;
   });
@@ -474,7 +480,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   historyApi = {
     async saves(key) {
       if (!enabled()) return { state: "off", commits: [] };
-      const r = await lookup(key).catch(() => null);
+      const r = await peek(key).catch(() => null);
       return { state: !r ? "none" : r.paused ? "paused" : "on", commits: r ? await history().log(r.id) : [] };
     },
     async compare(key, hash) {
