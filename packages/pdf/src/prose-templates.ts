@@ -24,6 +24,10 @@ export interface HeadingSpec {
 
 export interface ProseTemplate {
   name: string;
+  /** Highland ignores the print options but Title Page (MLA Report: MLAReportProbe-Default). */
+  noPrintOptions?: boolean;
+  /** Paragraph numbers' baselines this far above the body text's (measured in <Name>Probe-Default; default 3). */
+  numberRise?: number;
   left: number;
   right: number;
   top: number;
@@ -51,6 +55,7 @@ const BOX = (pitch: number, ascent: number) => ({ ascent, height: pitch });
 /** Novel: Amiri, justified, indented paragraphs with no space between; centred headings. */
 export const NOVEL: ProseTemplate = {
   name: "Novel",
+  numberRise: 4,
   left: 108,
   right: 504,
   top: 72,
@@ -80,6 +85,7 @@ export const NOVEL: ProseTemplate = {
 /** Treatment: Highland Sans, single-spaced, plain headings. */
 export const TREATMENT: ProseTemplate = {
   name: "Treatment",
+  numberRise: 3,
   left: 72,
   right: 540,
   top: 72,
@@ -107,6 +113,7 @@ export const TREATMENT: ProseTemplate = {
 /** Modern Standard: Avenir Next, bold headings, the page number centred at the foot. */
 export const MODERN_STANDARD: ProseTemplate = {
   name: "Modern Standard",
+  numberRise: 2,
   left: 72,
   right: 540,
   top: 72,
@@ -134,6 +141,7 @@ export const MODERN_STANDARD: ProseTemplate = {
 /** Article: Georgia, Lato headings, grey italic quotes. */
 export const ARTICLE: ProseTemplate = {
   name: "Article",
+  numberRise: 4,
   left: 72,
   right: 540,
   top: 72,
@@ -162,6 +170,7 @@ export const ARTICLE: ProseTemplate = {
 /** Bulletin: SF Pro Display, a very large first heading. */
 export const BULLETIN: ProseTemplate = {
   name: "Bulletin",
+  numberRise: 2,
   left: 72,
   right: 540,
   top: 72,
@@ -189,6 +198,7 @@ export const BULLETIN: ProseTemplate = {
 /** Speech: New York, 18 pt on a 32.4 pt line, for reading aloud. */
 export const SPEECH: ProseTemplate = {
   name: "Speech",
+  numberRise: 12,
   left: 72,
   right: 540,
   top: 84,
@@ -217,6 +227,7 @@ export const SPEECH: ProseTemplate = {
 /** MLA Report: Times New Roman, double-spaced, every paragraph indented; the heading block on page 1. */
 export const MLA_REPORT: ProseTemplate = {
   name: "MLA Report",
+  noPrintOptions: true,
   left: 72,
   right: 540,
   top: 72,
@@ -244,6 +255,7 @@ export const MLA_REPORT: ProseTemplate = {
 /** Wiki: Georgia, graded headings, reference style. */
 export const WIKI: ProseTemplate = {
   name: "Wiki",
+  numberRise: 4,
   left: 72,
   right: 540,
   top: 72,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.10
+
+- Print options checked against Highland 2 in every template (each probe exported with every option ticked):
+  - Scripts: inline notes and synopses print at the scene heading margin; the blank lines around a printed note still count when deciding whether a page break (`===`) spills a blank page. Screenplay, Stage Play and Graphic Novel now match line for line with every option on.
+  - Manuscript title page: Source sits two lines lower after the author, and the bottom-right shows Date only when there is no Draft Date. The first chapter heading drops down the page even after a title page.
+  - Prose: printed notes go on their own line at the left margin and are numbered; synopses never start in a page's extra last-line space; paragraph numbers sit at each template's own height beside the text. MLA Report ignores every print option but Title Page, as Highland's does.
+  - Paragraph numbers: a paragraph that starts on a page's last line (or below the margin) and carries over gets no number; link definitions are not numbered; a quote or a run of lyric lines is numbered once.
+  - Known differences: Highland numbers each table row (including the `:---` row) and the scene break, numbers no large headings in Wiki, Bulletin (H3) and Manuscript chapters, and leaves term definitions unnumbered; we don't copy these yet.
+
 ## 0.5.9
 
 - Novel and Wiki now match Highland 2 too: every prose template prints its probe line for line, apart from nested list items (Highland prints them flat, a quirk we fix).

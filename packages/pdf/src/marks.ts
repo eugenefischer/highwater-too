@@ -1,6 +1,6 @@
 import type { Layout, PlacedText, PrintMarks } from "./types.ts";
 
-/** Paragraph numbers (ScreenplayPrintProbe, ManuscriptPrintProbe): Helvetica 9 pt in blue, right edge 36 pt from the page's left edge, 3 pt above the line's baseline. */
+/** Paragraph numbers (ScreenplayPrintProbe, ManuscriptPrintProbe): Helvetica 9 pt in blue, right edge 36 pt from the page's left edge, 3 pt above the line's baseline (in Courier Prime; prose templates give their own rise). */
 export const NUMBER = { font: "Helvetica", size: 9, color: "#000CCC", right: 36, rise: 3 } as const;
 
 /**
@@ -10,9 +10,9 @@ export const NUMBER = { font: "Helvetica", size: 9, color: "#000CCC", right: 36,
  * 12 pt spacing and 6.32 pt below it at the Manuscript's 28.32 pt (measured), so in between it
  * moves with the spacing.
  */
-export function addPrintMarks(layout: Layout, marks: PrintMarks | undefined, pitch: number): void {
+export function addPrintMarks(layout: Layout, marks: PrintMarks | undefined, pitch: number, rise: number = NUMBER.rise): void {
   if (!marks) return;
-  if (marks.numbers?.size) addNumbers(layout, marks.numbers);
+  if (marks.numbers?.size) addNumbers(layout, marks.numbers, rise);
   if (marks.revisionStars) {
     const dy = -1 + (pitch - 12) * (7.32 / 16.32);
     for (const page of layout.pages) {
@@ -24,7 +24,7 @@ export function addPrintMarks(layout: Layout, marks: PrintMarks | undefined, pit
   }
 }
 
-function addNumbers(layout: Layout, numbers: Map<number, number>): void {
+function addNumbers(layout: Layout, numbers: Map<number, number>, rise: number): void {
   // Source lines in order, with where each ends (the next one's start bounds it).
   const starts = [...numbers.keys()].sort((a, b) => a - b);
   const lineOf = (src: number): number | undefined => {
@@ -55,7 +55,7 @@ function addNumbers(layout: Layout, numbers: Map<number, number>): void {
         rowsDone.add(it.y);
         const text = String(numbers.get(line));
         // Helvetica's digits are 0.556 em wide.
-        add.push({ x: NUMBER.right - text.length * 0.556 * NUMBER.size, y: it.y - NUMBER.rise, runs: [{ text, style: { font: NUMBER.font, size: NUMBER.size, color: NUMBER.color } }] });
+        add.push({ x: NUMBER.right - text.length * 0.556 * NUMBER.size, y: it.y - rise, runs: [{ text, style: { font: NUMBER.font, size: NUMBER.size, color: NUMBER.color } }] });
       }
     }
     page.items.push(...add);

@@ -245,11 +245,15 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
 
   const last = options.highlandQuirks ? body.length : (body.at(-1)?.number ?? 0);
   const printed: { range: SourceRange | undefined; items: PlacedText[] }[] = [];
-  const pages: Page[] = body.map((p) => {
+  const pages: Page[] = body.map((p, index) => {
     const items: PlacedText[] = [];
     const graphics: Graphic[] = [];
-    // A paragraph opening on the page's last line gets no number (ManuscriptPrintProbe-numbers).
-    const lastLine = [...p.lines].reverse().find(({ line }) => line.items.some((it) => it.runs.length))?.line;
+    // A paragraph that starts on the page's last line and goes on over the page gets no number
+    // (ManuscriptPrintProbe-numbers; SpeechProbe- and ArticleProbe-Default; one ending there does).
+    const printedLine = (q: OpenPage | undefined, fromEnd: boolean) => (fromEnd ? [...(q?.lines ?? [])].reverse() : (q?.lines ?? [])).find(({ line }) => line.items.some((it) => it.runs.length))?.line;
+    const tail = printedLine(p, true);
+    const overleaf = printedLine(body[index + 1], false);
+    const lastLine = tail?.range && overleaf?.range === tail.range ? tail : undefined;
     for (const { line, top } of p.lines) {
       const placed: PlacedText[] = [];
       for (const it of line.items) if (it.runs.length) placed.push({ x: it.x, y: round(top + line.ascent), runs: it.runs, highlightBox: M.highlight, ...(line === lastLine ? { unnumbered: true } : {}) });
@@ -342,7 +346,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         const lines = wrapRuns(runs, M.chars);
         // A heading that opens the text (without a title page) or a page after "===" starts lower
         // (ExtraManuscriptMarkup, ManuscriptProbes L).
-        if ((!printed && !o.hasTitle) || afterBreak) push({ items: [], height: M.dropHeading, ascent: 0 });
+        if (!printed || afterBreak) push({ items: [], height: M.dropHeading, ascent: 0 });
         const h = headings[headingId++]!;
         lines.forEach((r, k) => {
           const len = plain(r).length * CHAR;
@@ -573,12 +577,15 @@ function titlePage(fields: TitleField[], ctx: InlineContext): Page {
     for (const name of ["title", "credit", "author", "authors", "source"]) {
       const ls = trim(lines(get(name)));
       if (!ls.length) continue;
+      // Source sits five lines below the author, the rest three apart (ManuscriptProbe-Default).
+      if (name === "source" && y > T.centreY) y += 2 * T.pitch;
       column(ls, y, (len) => T.centre - len / 2);
       y += height(ls) + 3 * T.pitch;
     }
   }
   const bl = any("bl", "notes", "copyright");
-  const br = any("br", "draft date", "date", "revision");
+  // A Date prints only without a Draft date (ManuscriptProbe-Default).
+  const br = any("br", get("draft date") ? "draft date" : "date", "revision");
   column(bl, T.bottomY - height(bl), () => T.left);
   column(br, T.bottomY - height(br), (len) => T.right - len);
   return { number: null, items };

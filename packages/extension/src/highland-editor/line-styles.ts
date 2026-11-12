@@ -171,11 +171,26 @@ export function inlineMarks(doc: Document): InlineMark[] {
  * a note or omitted (boneyard) text on a line of its own, and directive lines such as {{HEADER}}
  * and markers. Keyed by the offset where the line starts. Pure, for tests.
  */
-export function paragraphNumbers(doc: Document): Map<number, number> {
+export function paragraphNumbers(doc: Document, options: { notes?: boolean } = {}): Map<number, number> {
   const out = new Map<number, number>();
   const src = doc.source;
   const skip = new Set<number>();
-  for (const e of doc.elements) if (e.kind === "directiveLine") for (const l of e.lines) skip.add(l.span.start);
+  // Directive lines, and link definitions ([ref]: url), which Highland doesn't number (NovelProbe-Default).
+  doc.elements.forEach((e, i) => {
+    // Lines of lyrics typed one after another are one paragraph to Highland (ScreenplayProbe-Default).
+    const before = doc.elements[i - 1];
+    if (e.kind === "lyric" && before?.kind === "lyric" && !/\n[ \t]*\r?\n/.test(src.slice(before.span.end, e.span.start)))
+      for (const l of e.lines) skip.add(l.span.start);
+    if (e.kind === "directiveLine" || e.kind === "linkDefinition") for (const l of e.lines) skip.add(l.span.start);
+    // Each paragraph of a quote is numbered once, however many lines it's typed on (an empty ">"
+    // line separates them, and isn't numbered): WikiProbe-Default.
+    if (doc.mode === "markdown" && e.kind === "blockQuote")
+      e.lines.forEach((l, k) => {
+        const quoted = (line: typeof l) => src.slice(line.content.start, line.content.end).replace(/^\s*>/, "").trim();
+        const prev = e.lines[k - 1];
+        if (quoted(l) === "" || (prev && quoted(prev) !== "")) skip.add(l.span.start);
+      });
+  });
   const inBoneyard = (from: number, to: number) => doc.overlays.boneyard.some((b) => b.span.start <= from && b.span.end >= to);
   let n = 0;
   for (let at = 0; at <= src.length; ) {
@@ -187,7 +202,8 @@ export function paragraphNumbers(doc: Document): Map<number, number> {
     const last = at + text.trimEnd().length;
     const titlePage = doc.titlePage !== null && at >= doc.titlePage.span.start && at < doc.titlePage.span.end;
     const noteOnly = /^\[\[[\s\S]*\]\]$/.test(trimmed) && !trimmed.slice(2, -2).includes("]]");
-    if (trimmed && !titlePage && !skip.has(at) && !noteOnly && !inBoneyard(first, last)) out.set(at, ++n);
+    // A printed note on a line of its own is numbered in the prose templates (SpeechProbe-Default).
+    if (trimmed && !titlePage && !skip.has(at) && (!noteOnly || options.notes) && !inBoneyard(first, last)) out.set(at, ++n);
     if (nl < 0) break;
     at = nl + 1;
   }

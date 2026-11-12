@@ -131,6 +131,8 @@ interface OpenPage {
   touched: boolean;
   /** Something printable is on the page (blank lines before the next block apply). */
   content: boolean;
+  /** Blank lines around printed notes that aren't printed (they count for "===" only). */
+  unprinted: number;
 }
 
 export interface ScreenplayOptions {
@@ -182,6 +184,9 @@ interface Block {
   ghost?: boolean;
   /** A printed note on a line of its own: no blank line before it or after it (ScreenplayPrintProbe-notes). */
   noteLine?: boolean;
+  /** Blank lines before it that aren't printed (around a printed note on its own line). */
+  unprinted?: number;
+
   /** Splits the block so its first part fits in `available` rows; null where Highland would not split. */
   split?: (available: number) => { head: Row[]; tail: Block } | null;
 }
@@ -219,7 +224,7 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
   const newPage = (): OpenPage => {
     // The page being left gets the footer in effect at its end (FirstLineTests case K).
     if (page !== null) (page as OpenPage).footer = footer;
-    const p: OpenPage = { rows: [], header, footer, section, number: nextNumber++, started: false, touched: false, content: false };
+    const p: OpenPage = { rows: [], header, footer, section, number: nextNumber++, started: false, touched: false, content: false, unprinted: 0 };
     page = p;
     body.push(p);
     return p;
@@ -263,8 +268,11 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
     let b = blocks[i]!;
     if (b.pageBreak) {
       // "===" is a paragraph too: after a full page it first spills onto an empty page (SpeechFitTests).
+      // Here the blank lines a printed note on its own line doesn't print still count (ScreenplayProbe
+      // and StagePlayProbe with the print options on), though they don't when a block is placed
+      // (GraphicNovelProbe's transition on line 54).
       const p = page as OpenPage | null;
-      if (p !== null && p.content && p.rows.length + 1 > capacity(p)) newPage().touched = true;
+      if (p !== null && p.content && p.rows.length + p.unprinted + 1 > capacity(p)) newPage().touched = true;
       const q = page as OpenPage | null;
       if (q !== null && (q.rows.length > 0 || q.touched)) newPage();
       continue;
@@ -301,6 +309,7 @@ function layout(doc: Document, options: ScreenplayOptions): Layout {
       const startsOnLast = b.kind === "action" && previousKind === "action" && p.content && p.rows.length + space === S.linesPerPage - 1;
       if (need <= available && !lastLine && !startsOnLast) {
         push(p, b.rows, space, true);
+        if (p.content) p.unprinted += b.unprinted ?? 0;
         previousKind = b.kind;
         break;
       }
@@ -425,8 +434,12 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
   // A printed note on its own line sits between the paragraphs around it with no blank lines.
   out.forEach((b, k) => {
     if (!b.noteLine) return;
+    b.unprinted = 1;
     const next = out.slice(k + 1).find((n) => n.rows.length > 0 || n.pageBreak);
-    if (next && !next.pageBreak) next.space = 0;
+    if (next && !next.pageBreak) {
+      next.unprinted = next.space;
+      next.space = 0;
+    }
   });
   return out;
 
@@ -454,7 +467,8 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
         if (ctx.print?.marks.notes && onlyNotes(e.inline)) {
           // Printed as its own line, after a space (ScreenplayPrintProbe-notes).
           const lead: Run[] = [{ text: " ", style: runs[0]?.style ?? {} }];
-          out.push({ kind: e.kind, rows: wrapAt(S.action.x, [...lead, ...runs.map((r) => ({ ...r, text: r.text.replace(/\n/g, " ") }))], S.action.width), space: 0, noteLine: true });
+          // At the page's left margin in every script template (Stage Play's action is far right).
+          out.push({ kind: e.kind, rows: wrapAt(S.sceneHeading.x, [...lead, ...runs.map((r) => ({ ...r, text: r.text.replace(/\n/g, " ") }))], S.sceneHeading.width), space: 0, noteLine: true });
           printed = true;
           break;
         }
@@ -540,7 +554,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
           // Grey, half an inch in from the action, a paragraph of its own (ScreenplayPrintProbe-synopses).
           const runs = toRuns(e.inline, ctx, { color: SYNOPSIS_COLOR });
           if (plain(runs).trim()) {
-            out.push({ kind: e.kind, rows: wrapAt(S.action.x + 36, runs, S.action.width - 5), space: 1 });
+            out.push({ kind: e.kind, rows: wrapAt(S.sceneHeading.x + 36, runs, S.sceneHeading.width - 5), space: 1 });
             printed = true;
             break;
           }

@@ -29,10 +29,10 @@ export interface PrintFlags {
 }
 
 /** The layouts' print marks for the options that are on (none: undefined, so nothing changes). */
-function marksOf(doc: Document, print: PrintFlags | undefined): { print: PrintMarks } | Record<string, never> {
+function marksOf(doc: Document, print: PrintFlags | undefined, prose = false): { print: PrintMarks } | Record<string, never> {
   if (!print || !Object.values(print).some(Boolean)) return {};
   const { paragraphNumbers: numbered, ...rest } = print;
-  return { print: { ...rest, ...(numbered ? { numbers: paragraphNumbers(doc) } : {}) } };
+  return { print: { ...rest, ...(numbered ? { numbers: paragraphNumbers(doc, { notes: prose && print.notes }) } : {}) } };
 }
 
 export interface ScriptExportOptions extends ExportOptions {
@@ -92,7 +92,7 @@ export async function exportProse(options: ProseExportOptions): Promise<ExportRe
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     ...(options.image ? { image: options.image } : {}),
-    ...marksOf(doc, options.print),
+    ...marksOf(doc, options.print, true),
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });

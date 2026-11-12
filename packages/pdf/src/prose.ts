@@ -89,7 +89,7 @@ export function layoutProse(doc: Document, template: ProseTemplate, options: Pro
   if (doc.titlePage && options.titlePage !== false && template.title.kind === "page") pages.push(titlePage(doc.titlePage.fields, template, second.ctx, m));
   pages.push(...second.pages);
   const layout = { width: 612, height: 792, pages, fonts: fonts.faces, substituted: fonts.substituted };
-  addPrintMarks(layout, options.print, template.body.pitch);
+  addPrintMarks(layout, template.noPrintOptions ? undefined : options.print, template.body.pitch, template.numberRise);
   return layout;
 }
 
@@ -100,7 +100,7 @@ function familiesOf(t: ProseTemplate): string[] {
 // ---------------------------------------------------------------------------------------------
 
 function run(doc: Document, T: ProseTemplate, options: ProseOptions, m: Measurer, tocPages: Map<number, number>) {
-  const print = printContext(doc, options.print);
+  const print = printContext(doc, T.noPrintOptions ? undefined : options.print);
   const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true, ...(print ? { print } : {}) };
   const units = toUnits(options.elements ?? doc.elements, doc, T, ctx, m, { image: options.image, sourceOf: options.sourceOf ?? ((e) => e.span), tocPages, titleFields: doc.titlePage?.fields ?? [], quirks: !!options.highlandQuirks });
 
@@ -197,12 +197,19 @@ function run(doc: Document, T: ProseTemplate, options: ProseOptions, m: Measurer
   const pages: Page[] = body.map((p, index) => {
     const items: PlacedText[] = [];
     const graphics: Graphic[] = [];
+    // A paragraph that starts on the page's last line and goes on over the page gets no number
+    // (ManuscriptPrintProbe-numbers; SpeechProbe- and ArticleProbe-Default; one ending there does),
+    // nor does a line in the page's extra space below the margin (BulletinProbe-Default).
+    const printedLine = (q: OpenPage | undefined, fromEnd: boolean) => (fromEnd ? [...(q?.lines ?? [])].reverse() : (q?.lines ?? [])).find(({ line }) => line.items.some((it) => it.runs.length))?.line;
+    const tail = printedLine(p, true);
+    const overleaf = printedLine(body[index + 1], false);
+    const lastLine = tail?.range && overleaf?.range === tail.range ? tail : undefined;
     for (const { line, top } of p.lines) {
       const placed: PlacedText[] = [];
       for (const it of line.items) {
         if (!it.runs.length) continue;
         const box = line.highlight ?? { top: -line.ascent, height: line.height };
-        placed.push({ x: it.x, y: round(top + line.ascent), runs: it.runs, highlightBox: { ...box, color: "#FCFF26" }, ...(it.justify !== undefined ? { justify: it.justify } : {}) });
+        placed.push({ x: it.x, y: round(top + line.ascent), runs: it.runs, highlightBox: { ...box, color: "#FCFF26" }, ...(it.justify !== undefined ? { justify: it.justify } : {}), ...(line === lastLine || top + line.height > T.bottom + 0.01 ? { unnumbered: true } : {}) });
       }
       if (placed.length) printed.push({ range: line.range, items: placed });
       items.push(...placed);
@@ -385,21 +392,27 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
   let prev: Element | null = null;
   /** Printed notes on lines of their own: they open the next paragraph (as in ManuscriptPrintProbe-notes). */
   let notes: Run[] = [];
-  const flushNotes = () => {
-    if (!notes.length) return;
-    const indent = T.indent.rule === "all" || (T.indent.rule === "afterParagraph" && afterParagraph) ? T.indent.first : 0;
-    for (const line of paragraph(notes, B, T.left + indent, T.left, T.right)) push(line);
+  /**
+   * Printed notes on lines of their own with no paragraph after them: a line of their own at the
+   * margin, after the empty line between blocks, with the next block straight after them
+   * (MS, Bulletin, Speech, Wiki, Novel: NovelProbe-Default etc.). Returns whether any were printed.
+   */
+  const flushNotes = (gap: number): boolean => {
+    if (!notes.length) return false;
+    for (let k = 0; k < gap; k++) push(empty());
+    const caps = !!T.smallCapsAfterHeading && afterHeading;
+    for (const line of paragraph(notes, B, T.left, T.left, T.right, { smallCaps: caps })) push(line);
     notes = [];
-    afterParagraph = true;
+    return true;
   };
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i]!;
     if (ctx.print) ctx.print.own = o.sourceOf(e) === e.span;
-    if (e.kind !== "paragraph") flushNotes();
     // The empty source lines between blocks print as empty lines, in templates that keep them;
     // added below once the element prints something (a link definition takes its blank line with
     // it: BulletinProbe).
-    const gap = printed && prev && e.kind !== "directiveLine" && e.kind !== "pageBreak" && T.blankLines ? (sameParagraph(source, prev, e) ? 0 : 1 + extraBlankLines(source, e.span.start)) : 0;
+    let gap = printed && prev && e.kind !== "directiveLine" && e.kind !== "pageBreak" && T.blankLines ? (sameParagraph(source, prev, e) ? 0 : 1 + extraBlankLines(source, e.span.start)) : 0;
+    if (e.kind !== "paragraph" && flushNotes(gap)) gap = 0;
     const before = out.length;
     switch (e.kind) {
       case "paragraph": {
@@ -621,7 +634,8 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
         // Grey, half an inch in; the next paragraph is indented as if it were not there (as in the Manuscript).
         const runs = toRuns(e.inline, ctx, { color: SYNOPSIS_COLOR });
         if (!plain(runs).trim()) break;
-        for (const line of paragraph(runs, { ...B, color: SYNOPSIS_COLOR }, T.left + 36, T.left, T.right)) push(line);
+        // Never in the page's extra space (ArticleProbe-Default p. 4).
+        for (const line of paragraph(runs, { ...B, color: SYNOPSIS_COLOR }, T.left + 36, T.left, T.right)) push({ ...line, opens: false });
         printed = true;
         break;
       }
@@ -635,7 +649,7 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
       prev = e;
     }
   }
-  flushNotes();
+  flushNotes(0);
   return out;
 }
 
