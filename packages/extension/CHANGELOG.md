@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.15
+
+- Writing History: the selected save is let go when you switch to another panel, press Escape, or click beside the saves. Double-click and Enter no longer compare; the Compare button does.
+- The Writing History's help is rewritten: shorter, in plain words, and organised by task (the list, comparing or going back, the bottom of the panel, more actions). It now explains what +0 means: the word count didn't change, though something else did (a word swapped for another, punctuation, the Bin, the Scratchpad, an image or the template). Saves that change nothing at all are still not recorded.
+
 ## 0.6.14
 
 - The Writing History panel has a ? button at its top: help on what the history is and what every control does, in a popover beside the sidebar (Escape or a click elsewhere closes it). It is Highwater's own feature, so there is no Highland 2 documentation for it.

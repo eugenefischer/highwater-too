@@ -84,6 +84,8 @@ export class Sidebar {
 
   /** Shows a panel (opening the sidebar if it is hidden). */
   show(panel: PanelName): void {
+    // Leaving the Writing History lets go of its selected save.
+    if (panel !== this.#state.panel) this.#history.deselect();
     this.#state = { ...this.#state, panel, open: true };
     this.#apply();
     this.#save();
@@ -808,7 +810,7 @@ function button(tip: string, path: string, run: () => void, cls = ""): HTMLButto
 // ---------------------------------------------------------------------------------------------
 // Writing History (Highwater's, not Highland's): this document's saves, newest first, under a
 // heading for each day. A click selects a save, which shows Compare and Revert where its word change
-// was; a double-click or Enter compares. The foot shows whether the history is recording and how the
+// was; Escape, a click beside the saves or leaving the panel lets go of it. The foot shows whether the history is recording and how the
 // mirror is doing, with the record (off or on for this document), export and gear (the rest) buttons.
 
 interface HistorySave {
@@ -865,10 +867,14 @@ class HistoryPanel {
         e.preventDefault();
         const next = this.#saves[Math.max(0, Math.min(this.#saves.length - 1, i < 0 ? 0 : i + (e.key === "ArrowDown" ? 1 : -1)))];
         if (next) this.#select(next.hash, true);
-      } else if (e.key === "Enter" && this.#selected) {
+      } else if (e.key === "Escape" && this.#selected) {
         e.preventDefault();
-        this.#compare(this.#selected);
+        this.deselect();
       }
+    });
+    // A click in the list but not on a save lets go of the selection.
+    this.#list.addEventListener("mousedown", (e) => {
+      if (!(e.target as HTMLElement).closest(".hist-row")) this.deselect();
     });
   }
 
@@ -896,7 +902,7 @@ class HistoryPanel {
       row.className = "sb-row hist-row";
       row.dataset.hash = save.hash;
       row.setAttribute("role", "option");
-      row.dataset.tip = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.words ? `\n${save.words} words` : ""}\nDouble-click to compare with the text as it is now.`;
+      row.dataset.tip = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.words ? `\n${save.words} words` : ""}`;
       const main = document.createElement("div");
       main.className = "sb-row-main";
       const time = document.createElement("span");
@@ -927,12 +933,16 @@ class HistoryPanel {
         if ((e.target as HTMLElement).closest("button")) return;
         this.#select(save.hash, false);
       });
-      row.addEventListener("dblclick", (e) => {
-        if (!(e.target as HTMLElement).closest("button")) this.#compare(save.hash);
-      });
       rows.push(row);
     }
     this.#list.replaceChildren(...rows);
+    this.#mark();
+  }
+
+  /** No save selected (on leaving the panel, Escape, or a click beside the saves). */
+  deselect(): void {
+    if (this.#selected === null) return;
+    this.#selected = null;
     this.#mark();
   }
 
@@ -995,36 +1005,41 @@ const icon = (path: string) => `<svg width="15" height="15" viewBox="0 0 24 24" 
 /** The Writing History's ? button: what it is and what each control does (it is not Highland's). */
 const HISTORY_HELP = `
 <h2>Writing History</h2>
-<p class="lead">Highwater Too's own addition: Highland 2 has nothing like it.</p>
-<p>Each time you save, Highwater Too records the document as it was then, in a git repository on this computer (the history folder). Each document, a <em>work</em>, has its own history. Saves that change nothing are not recorded. A .highland file carries its work's ID, so its history follows it when it is renamed or moved.</p>
+<p>Each time you save, Highwater Too keeps a copy of the document. You can look back at any earlier version, see what changed, and go back to it.</p>
+<p>The copies are kept on this computer. A save is kept only when something changed: the text, or what’s kept with it, such as the Bin, the Scratchpad, images or the template.</p>
+
 <h3>The list</h3>
+<p>Saves are listed newest first, by day. Each shows its time, its type, and how many words it added or removed. <b>+0</b> means the word count didn’t change, though something else did: a word replaced by another, punctuation, the Bin, the Scratchpad, an image or the template.</p>
 <ul>
-<li>This document's saves, newest first, under a heading for each day: the time, the kind of save, and how many words it added or removed. Hover over one for its full date and word count.</li>
-<li><b>Save</b>: you saved. <b>Autosave</b>: VS Code saved it for you (recorded at most every so often). <b>Close</b>: recorded as the document closed. <b>Revert</b>: an older save was brought back. <b>Restore</b>: the work was written out from its history. <b>Convert</b>: it became another kind of file. <b>Connect</b>: it was joined to another work's history.</li>
+<li><b>Save</b>: you saved.</li>
+<li><b>Autosave</b>: VS Code saved for you.</li>
+<li><b>Close</b>: saved as the document closed.</li>
+<li><b>Revert</b>: you went back to an earlier save.</li>
+<li><b>Restore</b>, <b>Convert</b>, <b>Connect</b>: the document was brought back from its history, changed to another file type, or joined to another document’s history.</li>
 </ul>
-<h3>A save</h3>
+
+<h3>Compare or go back</h3>
+<p>Click a save, then:</p>
 <ul>
-<li>Click a save to select it; <kbd>↑</kbd> and <kbd>↓</kbd> move the selection.</li>
-<li>${icon(COMPARE_ICON)} <b>Compare with Now</b> (or double-click, or Enter): shows the save beside the text as it is now, with the differences marked.</li>
-<li>${icon(REVERT_ICON)} <b>Revert to This Save…</b>: after asking, makes the document's text that save's. The revert is recorded as a save of its own, so nothing later is lost: you can go back to any save after it, too.</li>
+<li>${icon(COMPARE_ICON)} <b>Compare</b> shows that save beside your current text, with the changes marked.</li>
+<li>${icon(REVERT_ICON)} <b>Revert</b> puts that save’s text, Bin and Scratchpad back in the document. Nothing is saved until you save, and later saves stay in the list, so you can change your mind.</li>
 </ul>
-<h3>The foot</h3>
+
+<h3>The bottom of the panel</h3>
+<p>The status line says whether this document’s saves are being kept, and when the last one was. If you use a mirror, a second line says when it was last updated.</p>
 <ul>
-<li><b>Recording · last save</b> …, <b>Paused for this document</b>, or <b>Writing history is off</b> (the setting <code>highwater.writingHistory</code>, for every document).</li>
-<li>With a mirror: <b>Mirrored</b> and when; <b>Not mirrored yet</b> (hover for why; it is tried again later and after the next save); or <b>Mirror needs you to sign in</b> (click it to sign in).</li>
-<li>${icon('<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>')} <b>Record</b>: turns the history off for this document, or back on. Its earlier saves are kept.</li>
-<li>${icon('<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>')} <b>Export Writing History…</b>: writes this document's history to a single file (a git bundle) that anyone can open with <code>git clone</code>.</li>
-<li>${icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>')} <b>More</b>: the rest.
-<ul>
-<li><b>Connect to a Work's History…</b>: joins this document to another work's history, for a file that lost its connection (copied, or renamed after Highland 2 removed its ID). It is permanent, so it is explained and asked first.</li>
-<li><b>Link Writing History to This File</b> (.fountain and .md files): adds a short note with the work's ID at the end of the file, so its history and its Bin, Scratchpad and assets follow it if it moves.</li>
-<li><b>Set Up History Mirror…</b> (or <b>Change</b>): keeps a second copy of the whole history on a git server you choose, such as a private GitHub repository. It is sent there after saves and never overwritten, and other computers can restore your works from it (see Works).</li>
-<li><b>Sync Writing History Now</b>, <b>Sign In to History Mirror…</b> and <b>Forget History Mirror Sign-In</b> (the sign-in is kept in VS Code's secure storage).</li>
-<li><b>Reveal Writing History Folder</b> and <b>Change Writing History Location…</b></li>
-</ul></li>
+<li>${icon('<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>')} <b>Record</b> pauses or resumes the history for this document. Earlier saves are kept.</li>
+<li>${icon('<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>')} <b>Export</b> saves this document’s whole history as one file you can share or archive.</li>
+<li>${icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>')} <b>More</b> holds the less common actions, described below.</li>
 </ul>
-<h3>Works</h3>
-<p>The Works panel, beside this one, lists every work in the history, including those on the mirror from other computers.</p>
+
+<h3>More actions</h3>
+<ul>
+<li><b>Connect to a Work’s History</b>: if a copied or renamed file lost its history, joins it back up. You’ll be asked to confirm.</li>
+<li><b>Link Writing History to This File</b> (.fountain and .md files): adds a short line at the end of the file so its history, Bin and Scratchpad follow it if you move or rename it. .highland files don’t need this.</li>
+<li><b>Set Up History Mirror</b>: keeps a backup of all your history on a server you choose, such as a private GitHub repository. Your other computers can then see and restore your work. The other mirror items sync now, sign in, or forget the saved sign-in.</li>
+<li><b>Reveal Writing History Folder</b> and <b>Change Writing History Location</b>: where the copies are kept on this computer.</li>
+</ul>
 `;
 
 /** TODAY, YESTERDAY, then NOV 10, 2026. */
