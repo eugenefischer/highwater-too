@@ -375,6 +375,30 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-accent) 70%, transparent); outline-offset: -4px; border-radius: 6px; }
 .assetcard { display: flex; align-items: center; gap: 10px; }
 /* Writing History and Works: rows (Highwater's own panels, in the sidebar's style). */
+/* Writing History: saves under day headings; a selected save shows Compare and Revert where its word change was. */
+.sb-day { padding: 10px 8px 3px; color: var(--nav-muted); font-size: 0.78em; font-weight: 600; letter-spacing: 0.06em; }
+.sb-day:first-child { padding-top: 2px; }
+#histlist { outline: none; }
+.hist-row { padding-right: 8px; cursor: default; user-select: none; }
+.hist-row .sb-row-main { gap: 6px; }
+.hist-delta { margin-left: auto; flex: none; color: var(--nav-muted); font-size: 0.9em; font-variant-numeric: tabular-nums; }
+.hist-row.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
+.hist-row.selected .hist-delta { visibility: hidden; }
+.hist-row .sb-row-tools { position: absolute; top: 2px; right: 3px; display: none; }
+.hist-row.selected .sb-row-tools { display: flex; }
+.hist-row .sb-row-detail { white-space: normal; }
+#histstatus { flex: 1; min-width: 0; color: var(--nav-muted); font-size: 0.85em; line-height: 1.3; }
+#histstatus > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#histmirror.attention { color: var(--nav-fg); text-decoration: underline; cursor: pointer; }
+#histrecord { color: var(--nav-accent); }
+#histrecord.paused { color: var(--nav-muted); }
+#histrecord.paused .hist-dot { display: none; }
+/* The sidebar's menus (the Writing History's gear): a small popup above the button. */
+#sbmenu { position: fixed; z-index: 45; min-width: 200px; max-width: calc(var(--sb-width) + 120px); padding: 4px; background: var(--hl-bg); color: var(--nav-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-family: var(--vscode-font-family); font-size: 13px; }
+#sbmenu[hidden] { display: none; }
+#sbmenu button { display: block; width: 100%; text-align: left; padding: 4px 10px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; cursor: default; white-space: nowrap; }
+#sbmenu button:hover, #sbmenu button:focus { background: var(--nav-accent); color: var(--hl-bg); outline: none; }
+#sbmenu hr { border: 0; border-top: 1px solid color-mix(in srgb, var(--nav-muted) 35%, transparent); margin: 4px 6px; }
 .sb-head { padding: 4px 14px 2px; color: var(--nav-muted); font-size: 0.85em; letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-rows { display: flex; flex-direction: column; gap: 2px; }
 .sb-row { position: relative; padding: 5px 34px 5px 8px; border-radius: 5px; cursor: pointer; }
@@ -561,8 +585,13 @@ body.previewing #preview { display: flex; }
     </section>
     <section data-panel="history" hidden>
       <div class="sb-head"><span id="histtitle"></span></div>
-      <div class="sb-scroll"><div id="histlist" class="sb-rows"></div><div id="histnote" class="sb-note" hidden></div></div>
-      <div class="sb-foot sb-foot-end"><button id="histmenu" class="sb-button" data-tip="More writing history actions…" aria-label="More writing history actions…"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></div>
+      <div class="sb-scroll"><div id="histlist" class="sb-rows" tabindex="0" role="listbox" aria-label="Saves"></div><div id="histnote" class="sb-note" hidden></div></div>
+      <div class="sb-foot">
+        <div id="histstatus"><div id="histstate"></div><div id="histmirror" hidden></div></div>
+        <button id="histrecord" class="sb-button" data-tip="Turn Writing History Off for This Document" aria-label="Turn Writing History Off for This Document" hidden><svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><circle class="hist-dot" cx="12" cy="12" r="4" fill="currentColor"/></svg></button>
+        <button id="histexport" class="sb-button" data-tip="Export Writing History…" aria-label="Export Writing History…"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button>
+        <button id="histgear" class="sb-button" data-tip="More writing history actions" aria-label="More writing history actions" aria-haspopup="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      </div>
     </section>
     <section data-panel="works" hidden>
       <div class="sb-scroll"><div id="worklist" class="sb-rows"></div><div id="worknote" class="sb-note" hidden>No works yet: each document's writing history starts with its first save.</div></div>
@@ -571,6 +600,7 @@ body.previewing #preview { display: flex; }
   </div>
   <div id="sbgrip" aria-hidden="true"></div>
 </div>
+<div id="sbmenu" role="menu" hidden></div>
 <div id="binpop" role="dialog" aria-label="Bin item" hidden><textarea id="binpoptext" spellcheck="false" aria-label="Bin item text"></textarea></div>
 <div id="content">
 <div id="topbar">

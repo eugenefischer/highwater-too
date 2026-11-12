@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.13
+
+- The Writing History panel, redone in Highland's way: saves under a heading for each day (TODAY, YESTERDAY, NOV 10, 2026), each with its time, kind and change in words. A click selects a save, which shows Compare and Revert in place of its word change; a double-click or Enter compares, and the arrow keys move through the saves.
+- Its foot shows the state: "Recording · last save 3:42 PM", "Paused for this document" or "Writing history is off", and the mirror ("Mirrored 3:45 PM", "Not mirrored yet" with the reason on hover, or "Mirror needs you to sign in", which signs in when clicked). Beside it, the record button turns the history off or on for this document, the export button exports it, and the gear opens a small menu in the page with the rest (Connect to a Work's History…, Link Writing History to This File, the mirror's actions including signing in and out, and the history folder's). No more VS Code lists at the top of the window.
+- Tooltips on buttons near the foot of the window show above them.
+
 ## 0.6.12 (branch m16-sidebar)
 
 - The Highwater Too icon stays in the activity bar while the Highland-Style Editor is in front (EJ preferred it to coming and going): a sixth view, **Highland-Style Editor**, shows there in place of the five hidden ones, with a note that they are in the editor's own sidebar and a link to show or hide it (⌘0).

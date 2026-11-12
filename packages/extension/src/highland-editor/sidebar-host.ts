@@ -7,6 +7,7 @@ import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { pick } from "../ask.ts";
+import { parseSave } from "../save-message.ts";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
 import { extrasApi, type AssetItem, type Owner } from "../panels.ts";
@@ -17,6 +18,21 @@ import type { BundleStore } from "../store.ts";
 import { NAVIGATOR_LABELS, NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
 
 const STATE_KEY = "highwater.sidebar";
+
+/** What the Writing History panel's buttons and gear menu may run. */
+const HISTORY_COMMANDS = new Set([
+  "highwater.toggleDocumentHistory",
+  "highwater.exportHistory",
+  "highwater.connectToWork",
+  "highwater.linkHistoryToFile",
+  "highwater.setUpHistoryMirror",
+  "highwater.pushHistoryNow",
+  "highwater.signInHistoryMirror",
+  "highwater.forgetHistoryMirrorSignIn",
+  "highwater.openHistoryFolder",
+  "highwater.changeHistoryLocation",
+]);
+
 
 /** The views the sidebar's not-yet-moved panels point to, in VS Code's sidebar. */
 
@@ -137,47 +153,51 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     await sendFilters();
   };
 
-  // Writing History: this document's saves, newest first; click one to compare it with now.
+  // Writing History: this document's saves, newest first, with the state of its recording and the
+  // mirror for the panel's foot, and the actions for its gear menu.
   const sendHistory = async () => {
     const k = bundle() ?? plain();
     const name = k ? basename(k) : "";
-    if (!historyApi || !k) {
-      post({ type: "history", title: name, note: "Open a saved document to see its writing history.", saves: [] });
-      return;
-    }
-    const { state, commits } = await historyApi.saves(k).catch(() => ({ state: "none" as const, commits: [] }));
-    const note =
-      state === "off"
+    const config = vscode.workspace.getConfiguration("highwater");
+    const remote = !!config.get<string>("historyRemote", "").trim();
+    const mirror = historyApi?.mirror();
+    const { state, commits } = historyApi && k ? await historyApi.saves(k).catch(() => ({ state: "none" as const, commits: [] })) : { state: "none" as const, commits: [] };
+    const off = !config.get<boolean>("writingHistory", true);
+    const note = !k
+      ? "Save the document to start its writing history."
+      : off
         ? "The writing history is off (highwater.writingHistory)."
-        : state === "paused"
-          ? "The writing history is off for this document; its earlier saves are kept."
-          : commits.length
-            ? ""
+        : commits.length
+          ? ""
+          : state === "paused"
+            ? "The writing history is off for this document."
             : "No saves yet: the history starts with the next save.";
-    const saves = commits.map((c) => {
-      const [kind, ...rest] = c.message.split(" ");
-      return { hash: c.hash, when: when(c.date), kind: kind ?? "", text: rest.slice(1).join(" ").replace(/^.*?, /, ""), tip: `${c.message}\n${c.date.toLocaleString()}\nClick to compare with the text as it is now.` };
-    });
-    post({ type: "history", title: name, note, saves, paused: state === "paused" });
-  };
-  const historyMenu = async () => {
-    const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote");
-    const k = bundle() ?? plain();
-    const paused = k && historyApi ? (await historyApi.saves(k).catch(() => null))?.state === "paused" : false;
-    const items = [
-      ...(k ? [{ label: paused ? "Turn Writing History On for This Document" : "Turn Writing History Off for This Document", command: "highwater.toggleDocumentHistory" }] : []),
+    const saves = commits.map((c) => ({ hash: c.hash, at: c.date.getTime(), ...parseSave(c.message) }));
+    const menu: { label: string; command: string; sep?: boolean }[] = [
       ...(k ? [{ label: "Connect to a Work's History…", command: "highwater.connectToWork" }] : []),
-      { label: "Open Work from History…", command: "highwater.openWorkFromHistory" },
-      { label: "Export Writing History…", command: "highwater.exportHistory" },
-      ...(remote ? [{ label: "Sync Writing History Now", command: "highwater.pushHistoryNow" }] : []),
-      { label: remote ? "Change History Mirror…" : "Set Up History Mirror…", command: "highwater.setUpHistoryMirror" },
-      { label: "Show History Folder", command: "highwater.openHistoryFolder" },
-      { label: "Change History Location…", command: "highwater.changeHistoryLocation" },
+      ...(plain() ? [{ label: "Link Writing History to This File", command: "highwater.linkHistoryToFile" }] : []),
+      { label: remote ? "Change History Mirror…" : "Set Up History Mirror…", command: "highwater.setUpHistoryMirror", sep: !!k },
+      ...(remote
+        ? [
+            { label: "Sync Writing History Now", command: "highwater.pushHistoryNow" },
+            { label: "Sign In to History Mirror…", command: "highwater.signInHistoryMirror" },
+            { label: "Forget History Mirror Sign-In", command: "highwater.forgetHistoryMirrorSignIn" },
+          ]
+        : []),
+      { label: "Reveal Writing History Folder", command: "highwater.openHistoryFolder", sep: true },
+      { label: "Change Writing History Location…", command: "highwater.changeHistoryLocation" },
     ];
-    const chosen = await pick(items, { title: "Writing History" });
-    if (chosen) await vscode.commands.executeCommand(chosen.command);
+    post({
+      type: "history",
+      title: name,
+      note,
+      saves,
+      state: off ? "off" : state,
+      document: !!k,
+      mirror: remote && mirror ? { at: mirror.at?.getTime() ?? null, error: mirror.error, signIn: mirror.signIn } : null,
+      menu,
+    });
   };
-
   // Works: every work in the writing history; a work here opens, others can be restored.
   let workNodes: WorkNode[] = [];
   const saveNodes = new Map<number, WorkNode[]>();
@@ -334,8 +354,9 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       } else if (msg.type === "historyRevert" && typeof msg.hash === "string") {
         const k = bundle() ?? plain();
         if (k && historyApi) void historyApi.revert(k, msg.hash);
-      } else if (msg.type === "historyMenu") void historyMenu();
-      else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");
+      } else if (msg.type === "historyCommand" && typeof msg.command === "string" && HISTORY_COMMANDS.has(msg.command)) {
+        void vscode.commands.executeCommand(msg.command).then(() => sendHistory());
+      } else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");
       else if (msg.type === "workOpen" && typeof msg.i === "number") {
         const node = workNodes[msg.i];
         if (node && historyApi) void historyApi.works.open(node);
@@ -362,11 +383,4 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       for (const s of subscriptions) s.dispose();
     },
   };
-}
-
-/** "14:03" today, else "11 Oct" (as the Writing History pane). */
-function when(d: Date): string {
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString([], { day: "numeric", month: "short" });
 }

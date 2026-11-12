@@ -78,6 +78,8 @@ export let historyApi:
       compare(key: string, hash: string): Promise<void>;
       revert(key: string, hash: string): Promise<void>;
       works: WorksView;
+      /** The mirror's last outcome (when it last synced, its error, whether it waits for a sign-in). */
+      mirror(): { at: Date | null; error: string | null; signIn: boolean };
       onDidChange(listener: () => void): vscode.Disposable;
     }
   | undefined;
@@ -481,10 +483,13 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (commit) await revertTo(worksHost, await documentFor(key), key, commit);
     },
     works,
+    mirror: () => mirror.state,
     onDidChange: (listener) => {
       const a = view.onDidChangeTreeData(listener);
       const b = works.onDidChangeTreeData(listener);
-      return { dispose: () => (a.dispose(), b.dispose()) };
+      const c = mirror.onDidChange(listener);
+      const d = vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("highwater") && listener());
+      return { dispose: () => (a.dispose(), b.dispose(), c.dispose(), d.dispose()) };
     },
   };
   // Works another computer deleted, removed here whenever main comes in (pull, push or fetch).

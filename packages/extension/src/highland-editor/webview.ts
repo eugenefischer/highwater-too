@@ -317,7 +317,9 @@ const templateWindow = new TemplateWindow(
         tip.hidden = false;
         const r = el.getBoundingClientRect();
         const w = tip.offsetWidth;
-        tip.style.top = `${Math.round(r.bottom + 4)}px`;
+        // Below the control, or above it near the foot of the window (the sidebar's buttons).
+        const below = r.bottom + 4 + tip.offsetHeight <= window.innerHeight - 4;
+        tip.style.top = `${Math.round(below ? r.bottom + 4 : r.top - 4 - tip.offsetHeight)}px`;
         tip.style.left = `${Math.round(Math.max(4, Math.min(window.innerWidth - w - 4, r.left + r.width / 2 - w / 2)))}px`;
       }, 500);
     });

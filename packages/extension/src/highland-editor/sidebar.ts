@@ -806,54 +806,255 @@ function button(tip: string, path: string, run: () => void, cls = ""): HTMLButto
 }
 
 // ---------------------------------------------------------------------------------------------
-// Writing History (Highwater's, not Highland's): this document's saves, newest first. Click one to
-// compare it with the text as it is now; its ↺ reverts to it (after asking). The ⋯ at the foot holds
-// the rest: turning the history off for this document, connecting it to a work, the mirror.
+// Writing History (Highwater's, not Highland's): this document's saves, newest first, under a
+// heading for each day. A click selects a save, which shows Compare and Revert where its word change
+// was; a double-click or Enter compares. The foot shows whether the history is recording and how the
+// mirror is doing, with the record (off or on for this document), export and gear (the rest) buttons.
+
+interface HistorySave {
+  hash: string;
+  /** Milliseconds since 1970. */
+  at: number;
+  kind: string;
+  note: string;
+  delta: string;
+  words: string;
+}
+
+interface MenuItem {
+  label: string;
+  command: string;
+  sep?: boolean;
+}
 
 interface HistoryMessage {
   title: string;
   note: string;
-  saves: { hash: string; when: string; kind: string; text: string; tip: string }[];
+  saves: HistorySave[];
+  state: "on" | "paused" | "off" | "none";
+  document: boolean;
+  mirror: { at: number | null; error: string | null; signIn: boolean } | null;
+  menu: MenuItem[];
 }
+
+const COMPARE_ICON = '<rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/><path d="M6 9h2M6 12h2M16 9h2M16 12h2M16 15h2"/>';
+const REVERT_ICON = '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>';
 
 class HistoryPanel {
   readonly #list = $("histlist");
   readonly #note = $("histnote");
+  readonly #record = $<HTMLButtonElement>("histrecord");
+  #saves: HistorySave[] = [];
+  #selected: string | null = null;
+  #menu: MenuItem[] = [];
 
   constructor(private readonly deps: SidebarDeps) {
-    $("histmenu").onclick = () => deps.post({ type: "historyMenu" });
+    const run = (command: string) => deps.post({ type: "historyCommand", command });
+    this.#record.onclick = () => run("highwater.toggleDocumentHistory");
+    $("histexport").onclick = () => run("highwater.exportHistory");
+    const gear = $("histgear");
+    gear.onclick = () => openMenu(gear, this.#menu, run);
+    $("histmirror").onclick = () => {
+      if ($("histmirror").classList.contains("attention")) run("highwater.signInHistoryMirror");
+    };
+    this.#list.addEventListener("keydown", (e) => {
+      const i = this.#saves.findIndex((x) => x.hash === this.#selected);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const next = this.#saves[Math.max(0, Math.min(this.#saves.length - 1, i < 0 ? 0 : i + (e.key === "ArrowDown" ? 1 : -1)))];
+        if (next) this.#select(next.hash, true);
+      } else if (e.key === "Enter" && this.#selected) {
+        e.preventDefault();
+        this.#compare(this.#selected);
+      }
+    });
   }
 
   show(msg: HistoryMessage): void {
     $("histtitle").textContent = msg.title;
     this.#note.textContent = msg.note;
     this.#note.hidden = !msg.note;
-    this.#list.replaceChildren(
-      ...msg.saves.map((save) => {
-        const row = document.createElement("div");
-        row.className = "sb-row";
-        row.title = save.tip;
-        const main = document.createElement("div");
-        main.className = "sb-row-main";
-        const when = document.createElement("span");
-        when.className = "sb-row-when";
-        when.textContent = save.when;
-        const kind = document.createElement("span");
-        kind.className = "sb-row-kind";
-        kind.textContent = save.kind;
-        main.append(when, kind);
-        const text = document.createElement("div");
-        text.className = "sb-row-detail";
-        text.textContent = save.text;
-        row.append(main, text, button("Revert to This Save…", '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>', () => this.deps.post({ type: "historyRevert", hash: save.hash }), "sb-row-tool"));
-        row.addEventListener("click", (e) => {
-          if (!(e.target as HTMLElement).closest("button")) this.deps.post({ type: "historyCompare", hash: save.hash });
-        });
-        return row;
-      }),
-    );
+    this.#saves = msg.saves;
+    this.#menu = msg.menu;
+    if (!this.#saves.some((x) => x.hash === this.#selected)) this.#selected = null;
+    this.#foot(msg);
+    const rows: HTMLElement[] = [];
+    let day = "";
+    for (const save of msg.saves) {
+      const date = new Date(save.at);
+      const heading = dayHeading(date);
+      if (heading !== day) {
+        day = heading;
+        const h = document.createElement("div");
+        h.className = "sb-day";
+        h.textContent = heading;
+        rows.push(h);
+      }
+      const row = document.createElement("div");
+      row.className = "sb-row hist-row";
+      row.dataset.hash = save.hash;
+      row.setAttribute("role", "option");
+      row.title = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.words ? `\n${save.words} words` : ""}\nDouble-click to compare with the text as it is now.`;
+      const main = document.createElement("div");
+      main.className = "sb-row-main";
+      const time = document.createElement("span");
+      time.className = "sb-row-when";
+      time.textContent = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      const kind = document.createElement("span");
+      kind.className = "sb-row-kind";
+      kind.textContent = save.kind;
+      const delta = document.createElement("span");
+      delta.className = "hist-delta";
+      delta.textContent = save.delta;
+      main.append(time, kind, delta);
+      row.append(main);
+      if (save.note) {
+        const note = document.createElement("div");
+        note.className = "sb-row-detail";
+        note.textContent = save.note;
+        row.append(note);
+      }
+      const tools = document.createElement("div");
+      tools.className = "sb-row-tools";
+      tools.append(
+        button("Compare with Now", COMPARE_ICON, () => this.#compare(save.hash)),
+        button("Revert to This Save…", REVERT_ICON, () => this.deps.post({ type: "historyRevert", hash: save.hash })),
+      );
+      row.append(tools);
+      row.addEventListener("mousedown", (e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        this.#select(save.hash, false);
+      });
+      row.addEventListener("dblclick", (e) => {
+        if (!(e.target as HTMLElement).closest("button")) this.#compare(save.hash);
+      });
+      rows.push(row);
+    }
+    this.#list.replaceChildren(...rows);
+    this.#mark();
+  }
+
+  #select(hash: string, scroll: boolean): void {
+    this.#selected = hash;
+    this.#mark();
+    if (scroll) this.#list.querySelector<HTMLElement>(".hist-row.selected")?.scrollIntoView({ block: "nearest" });
+  }
+
+  #mark(): void {
+    for (const r of this.#list.querySelectorAll<HTMLElement>(".hist-row")) {
+      const on = r.dataset.hash === this.#selected;
+      r.classList.toggle("selected", on);
+      r.setAttribute("aria-selected", String(on));
+    }
+  }
+
+  #compare(hash: string): void {
+    this.deps.post({ type: "historyCompare", hash });
+  }
+
+  /** The foot: whether this document's saves are being recorded, and the mirror's last outcome. */
+  #foot(msg: HistoryMessage): void {
+    const last = msg.saves[0] ? new Date(msg.saves[0].at) : null;
+    $("histstate").textContent = !msg.document
+      ? "Not saved yet"
+      : msg.state === "off"
+        ? "Writing history is off"
+        : msg.state === "paused"
+          ? "Paused for this document"
+          : last
+            ? `Recording · last save ${shortWhen(last)}`
+            : "Starts with the next save";
+    const rec = this.#record;
+    rec.hidden = !msg.document || msg.state === "off";
+    const paused = msg.state === "paused";
+    rec.classList.toggle("paused", paused);
+    const tip = paused ? "Turn Writing History On for This Document" : "Turn Writing History Off for This Document";
+    rec.dataset.tip = tip;
+    rec.setAttribute("aria-label", tip);
+    const mirror = $("histmirror");
+    mirror.hidden = !msg.mirror || msg.state === "off";
+    mirror.classList.toggle("attention", !!msg.mirror?.signIn);
+    mirror.title = msg.mirror?.error ?? "";
+    mirror.textContent = !msg.mirror
+      ? ""
+      : msg.mirror.signIn
+        ? "Mirror needs you to sign in"
+        : msg.mirror.error
+          ? "Not mirrored yet"
+          : msg.mirror.at
+            ? `Mirrored ${shortWhen(new Date(msg.mirror.at))}`
+            : "Mirror set up";
   }
 }
+
+/** TODAY, YESTERDAY, then NOV 10, 2026. */
+function dayHeading(d: Date): string {
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "TODAY";
+  if (d.toDateString() === yesterday.toDateString()) return "YESTERDAY";
+  return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }).toUpperCase();
+}
+
+/** "3:42 PM" today, else "Nov 10, 3:42 PM". */
+function shortWhen(d: Date): string {
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
+}
+
+/**
+ * The sidebar's popup menu, above (or below) the button that opened it, like Highland's own
+ * pop-up menus. Escape, a click elsewhere or a choice closes it; the arrow keys move through it.
+ */
+function openMenu(anchor: HTMLElement, items: MenuItem[], pick: (command: string) => void): void {
+  const menu = $("sbmenu");
+  if (!menu.hidden) return closeMenu();
+  menu.replaceChildren(
+    ...items.flatMap((item) => {
+      const b = document.createElement("button");
+      b.setAttribute("role", "menuitem");
+      b.textContent = item.label;
+      b.onclick = () => {
+        closeMenu();
+        pick(item.command);
+      };
+      return item.sep ? [document.createElement("hr"), b] : [b];
+    }),
+  );
+  menu.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  const w = menu.offsetWidth;
+  const h = menu.offsetHeight;
+  menu.style.left = `${Math.round(Math.max(4, Math.min(window.innerWidth - w - 4, r.right - w)))}px`;
+  menu.style.top = `${Math.round(r.top - h - 6 >= 4 ? r.top - h - 6 : r.bottom + 6)}px`;
+  menu.querySelector<HTMLElement>("button")?.focus();
+  const away = (e: MouseEvent) => {
+    if (!menu.contains(e.target as Node) && e.target !== anchor && !anchor.contains(e.target as Node)) closeMenu();
+  };
+  const keys = (e: KeyboardEvent) => {
+    const buttons = [...menu.querySelectorAll<HTMLElement>("button")];
+    const i = buttons.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeMenu();
+      anchor.focus();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      buttons[(i + (e.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+    }
+  };
+  document.addEventListener("mousedown", away, true);
+  menu.addEventListener("keydown", keys);
+  window.addEventListener("blur", closeMenu);
+  closeMenu = () => {
+    menu.hidden = true;
+    document.removeEventListener("mousedown", away, true);
+    menu.removeEventListener("keydown", keys);
+    window.removeEventListener("blur", closeMenu);
+    closeMenu = () => {};
+  };
+}
+let closeMenu: () => void = () => {};
 
 // ---------------------------------------------------------------------------------------------
 // Works: every work in the writing history. A work here opens with a click; the arrow beside a
