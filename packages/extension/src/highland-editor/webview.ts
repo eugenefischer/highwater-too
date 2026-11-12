@@ -12,7 +12,7 @@ import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages, type PdfMessage } from "./pages.ts";
 import { TemplateWindow, type OptionValues } from "./template-window.ts";
-import { Sidebar } from "./sidebar.ts";
+import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 
@@ -68,7 +68,7 @@ const styling = StateField.define<DecorationSet>({
  * Keys that belong to Highwater (bold, italic, underline, note, omit, centre, highlight, case,
  * markers, panes, Preview): CodeMirror must leave them alone so VS Code's keybindings get them.
  */
-const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c", "Ctrl-g", "Mod-Shift-i", "Mod-=", "Mod--", "Mod-Alt-0"]);
+const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-3", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c", "Ctrl-g", "Mod-Shift-i", "Mod-=", "Mod--", "Mod-Alt-0"]);
 const isMac = /Mac/.test(navigator.platform);
 
 /**
@@ -143,6 +143,24 @@ function start(text: string): void {
         keymap.of([{ key: "Mod-;", run: (v) => (void nextMisspelling(v, spelling), true) }]),
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
         EditorView.lineWrapping,
+        // A Bin item or an image dropped from the sidebar goes in as a paragraph of its own, before
+        // or after the line it lands on (whichever end is nearer), not in the middle of a sentence.
+        EditorView.domEventHandlers({
+          drop: (e, v) => {
+            const types = e.dataTransfer?.types ?? [];
+            if (!types.includes(BIN_TYPE) && !types.includes(ASSET_TYPE)) return false;
+            const text = e.dataTransfer!.getData("text/plain").replace(/^\n+|\n+$/g, "");
+            const pos = v.posAtCoords({ x: e.clientX, y: e.clientY }, false);
+            e.preventDefault();
+            const line = v.state.doc.lineAt(pos);
+            const before = line.text.trim() === "" || pos - line.from <= line.to - pos;
+            const insert = line.text.trim() === "" ? text : before ? `${text}\n\n` : `\n\n${text}`;
+            const at = before ? line.from : line.to;
+            v.dispatch({ changes: { from: at, insert }, selection: { anchor: at + insert.length - (before && line.text.trim() !== "" ? 2 : 0) }, scrollIntoView: true });
+            v.focus();
+            return true;
+          },
+        }),
         styling,
         spellingMarks,
         invisibles.of(invisibleMarks(showInvisibles)),
@@ -255,6 +273,11 @@ const sidebar = new Sidebar({
   head: () => view?.state.selection.main.head ?? 0,
   reveal: (offset) => reveal(offset, "top", true),
   edit: (changes) => view?.dispatch({ changes, scrollIntoView: false }),
+  insert: (text) => {
+    if (!view) return;
+    view.dispatch(view.state.replaceSelection(text));
+    view.focus();
+  },
 });
 
 // The top bar: Text and Pages (as ⌘E), and Choose Theme.

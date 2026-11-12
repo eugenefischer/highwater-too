@@ -8,13 +8,18 @@ import * as vscode from "vscode";
 import { pick } from "../ask.ts";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
+import { extrasApi, type AssetItem, type Owner } from "../panels.ts";
+import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
 import { NAVIGATOR_LABELS, NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
 
 const STATE_KEY = "highwater.sidebar";
 
 /** The views the sidebar's not-yet-moved panels point to, in VS Code's sidebar. */
-const VIEWS: Record<string, string> = { bin: "highwater.bin", assets: "highwater.assets", history: "highwater.history", works: "highwater.works" };
+const VIEWS: Record<string, string> = { history: "highwater.history", works: "highwater.works" };
+
+/** Images small enough to show in the Assets panel, by extension. */
+const THUMB_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
 
 export interface SidebarHost {
   /** Handles a message from the page; false if it isn't the sidebar's. */
@@ -29,6 +34,57 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
   const bundle = () => bundleOf(document());
   const plain = () => (!bundle() && document().uri.scheme === "file" ? document().uri.fsPath : undefined);
   const key = () => bundle() ?? plain() ?? document().uri.toString();
+  const owner = (): Owner | null => {
+    const b = bundle();
+    if (b) return { bundle: b };
+    const p = plain();
+    return p ? { plain: p } : null;
+  };
+
+  // The Bin: Highland's cards, edited in place; text dragged in from the page becomes a new one.
+  const sendBin = async () => {
+    const o = owner();
+    const items = o && extrasApi ? await extrasApi.bin.items(o).catch(() => []) : [];
+    post({ type: "bin", items: items.map((i) => ({ text: i.text, label: binLabel(i.text, 80), detail: binDetail(i.text) })), available: !!o });
+  };
+  const binTask = (f: (o: Owner) => Promise<unknown>) => {
+    const o = owner();
+    if (!o || !extrasApi) return;
+    void f(o).then(
+      () => sendBin(),
+      (e: unknown) => {
+        void vscode.window.showErrorMessage(`Could not change the Bin: ${(e as Error).message}`);
+        void sendBin();
+      },
+    );
+  };
+
+  // Assets: the document's images, with a small picture of each; dragged into the page as references.
+  let assetItems: AssetItem[] = [];
+  const sendAssets = async () => {
+    const o = owner();
+    assetItems = o && extrasApi ? await extrasApi.assets.list(o).catch(() => []) : [];
+    const items = await Promise.all(
+      assetItems.map(async (a) => {
+        const dot = a.name.lastIndexOf(".");
+        const ext = dot > 0 ? a.name.slice(dot + 1).toLowerCase() : "";
+        const info = extrasApi!.assets.info(a);
+        const mime = THUMB_TYPES[ext];
+        const bytes = mime ? await extrasApi!.assets.read(a) : null;
+        const thumb = bytes && bytes.length <= 3 * 1024 * 1024 ? `data:${mime};base64,${Buffer.from(bytes).toString("base64")}` : null;
+        return { name: a.name, label: dot > 0 ? a.name.slice(0, dot) : a.name, detail: [ext, info?.dimensions, info?.size].filter(Boolean).join(" · "), reference: assetMarkdown(a.name, a.folder), thumb };
+      }),
+    );
+    post({ type: "assets", items, available: !!o });
+  };
+  const assetTask = (f: (o: Owner) => Promise<unknown>) => {
+    const o = owner();
+    if (!o || !extrasApi) return;
+    void f(o).then(
+      () => sendAssets(),
+      (e: unknown) => void vscode.window.showErrorMessage(`Could not change the assets: ${(e as Error).message}`),
+    );
+  };
 
   const readScratchpad = async (): Promise<string> => {
     const b = bundle();
@@ -85,7 +141,27 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       const p = plain();
       if (p && events.some((e) => e.uri.fsPath.endsWith("scratchpad.txt"))) void sendScratchpad();
     }),
-    { dispose: store().onExternalChange((b, entries) => b === bundle() && entries.includes("scratchpad.txt") && void sendScratchpad()) },
+    {
+      dispose: store().onExternalChange((b, entries) => {
+        if (b !== bundle()) return;
+        if (entries.includes("scratchpad.txt")) void sendScratchpad();
+        void sendBin();
+        void sendAssets();
+      }),
+    },
+    // This extension's own writes: a Bin item cut or saved in its tab, a Revert, an image added in VS Code's sidebar.
+    {
+      dispose: store().onDidWrite((b, entries) => {
+        if (b !== bundle()) return;
+        if (entries.some((e) => e.startsWith("bin/"))) void sendBin();
+        if (entries.some((e) => e.startsWith("assets/"))) void sendAssets();
+      }),
+    },
+    plainExtras().onDidChange((p) => {
+      if (p !== plain()) return;
+      void sendBin();
+      void sendAssets();
+    }),
   ];
 
   return {
@@ -97,6 +173,34 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         // Highland: "Export Scratchpad contents to a new document": an untitled one in the same language.
         void vscode.workspace.openTextDocument({ content: msg.text, language: document().languageId }).then((d) => vscode.window.showTextDocument(d, { preview: false }));
       } else if (msg.type === "navTypes") void chooseFilters();
+      else if (msg.type === "binAdd" && typeof msg.text === "string") {
+        const text = msg.text;
+        binTask((o) => extrasApi!.bin.add(text, o));
+      } else if (msg.type === "binEdit" && typeof msg.index === "number" && typeof msg.text === "string") {
+        const index = msg.index as number;
+        const text = msg.text as string;
+        binTask((o) => extrasApi!.bin.edit(o, index, text));
+      } else if (msg.type === "binMove" && typeof msg.from === "number" && typeof msg.to === "number") {
+        const from = msg.from as number;
+        const to = msg.to as number;
+        binTask((o) => extrasApi!.bin.reorder(from, to, o));
+      } else if (msg.type === "binDelete" && typeof msg.index === "number") {
+        const index = msg.index;
+        binTask(async (o) => {
+          const item = (await extrasApi!.bin.items(o))[index];
+          if (item) await extrasApi!.bin.remove(item);
+        });
+      } else if (msg.type === "assetsAdd") assetTask((o) => extrasApi!.assets.add(o));
+      else if (msg.type === "assetsImport" && Array.isArray(msg.files)) {
+        const files = (msg.files as { name: unknown; data: unknown }[]).filter((f): f is { name: string; data: Uint8Array } => typeof f.name === "string" && f.data instanceof Uint8Array);
+        assetTask((o) => extrasApi!.assets.importFiles(o, files));
+      } else if (msg.type === "assetDelete" && typeof msg.name === "string") {
+        const item = assetItems.find((a) => a.name === msg.name);
+        if (item) assetTask(() => extrasApi!.assets.remove(item));
+      } else if (msg.type === "assetOpen" && typeof msg.name === "string") {
+        const item = assetItems.find((a) => a.name === msg.name);
+        if (item) void vscode.commands.executeCommand("highwater.assets.open", item);
+      }
       else if (msg.type === "showView" && typeof msg.view === "string" && VIEWS[msg.view]) void vscode.commands.executeCommand(`${VIEWS[msg.view]}.focus`);
       else return false;
       return true;
@@ -105,6 +209,8 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       post({ type: "sidebar", state: context.globalState.get(STATE_KEY) ?? {} });
       void sendFilters();
       void sendScratchpad(true);
+      void sendBin();
+      void sendAssets();
     },
     dispose() {
       for (const s of subscriptions) s.dispose();

@@ -335,7 +335,27 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 #navempty[hidden] { display: none; }
 /* The Scratchpad: plain text, Highland's export button at the bottom right. */
 #scratch { flex: 1; min-height: 0; resize: none; border: 0; outline: none; margin: 0; padding: 12px 14px; background: transparent; color: var(--nav-fg); font-family: var(--vscode-editor-font-family, monospace); font-size: var(--vscode-editor-font-size, 13px); line-height: 1.45; }
-#scratchfoot { justify-content: flex-end; }
+#scratchfoot, .sb-foot-end { justify-content: flex-end; }
+/* The Bin's and Assets' cards. */
+.sb-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 8px 4px; }
+.sb-cards { display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
+.sb-note { padding: 16px 10px; text-align: center; color: var(--nav-muted); line-height: 1.4; }
+.sb-note[hidden] { display: none; }
+.bincard, .assetcard { position: relative; padding: 7px 10px; border-radius: 6px; background: color-mix(in srgb, var(--nav-fg) 7%, transparent); cursor: grab; }
+.bincard:hover, .assetcard:hover { background: color-mix(in srgb, var(--nav-fg) 11%, transparent); }
+.bincard.editing { cursor: text; padding: 4px; }
+.bincard-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 44px; }
+.bincard-detail { margin-top: 2px; color: var(--nav-muted); font-size: 0.92em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.bincard-tools { position: absolute; top: 4px; right: 4px; display: none; gap: 0; }
+.bincard:hover .bincard-tools, .assetcard:hover .bincard-tools { display: flex; }
+.bincard-edit { width: 100%; box-sizing: border-box; min-height: 4em; resize: none; overflow: hidden; border: 0; outline: 1px solid var(--nav-accent); border-radius: 4px; padding: 6px; background: var(--nav-input-bg); color: var(--nav-fg); font-family: var(--vscode-editor-font-family, monospace); font-size: var(--vscode-editor-font-size, 13px); line-height: 1.4; }
+.bincard.drop-before { box-shadow: 0 -3px 0 0 var(--nav-accent); }
+.sb-cards.drop-end::after { content: ""; display: block; height: 3px; border-radius: 2px; background: var(--nav-accent); }
+section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-accent) 70%, transparent); outline-offset: -4px; border-radius: 6px; }
+.assetcard { display: flex; align-items: center; gap: 10px; }
+.assetcard-pic { flex: none; width: 48px; height: 48px; border-radius: 4px; background: color-mix(in srgb, var(--nav-fg) 10%, transparent); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.assetcard-pic img { max-width: 100%; max-height: 100%; }
+.assetcard-text { min-width: 0; flex: 1; }
 #editor, .cm-editor { height: 100%; }
 /* Highland's top bar: Text and Pages at the left; the template and the theme at the right. */
 #topbar { display: flex; align-items: center; gap: 12px; padding: 6px 14px 4px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
@@ -488,9 +508,15 @@ body.previewing #preview { display: flex; }
       <div id="navwrap"><div id="navlist" tabindex="0"></div><div id="navempty" hidden>The Navigator panel shows an outline of your document.</div><div id="navdrop" hidden></div></div>
       <div class="sb-foot"><input id="navfilter" type="search" placeholder="Filter" aria-label="Filter the Navigator"><button id="navtypes" class="sb-button" data-tip="Choose what the Navigator shows" aria-label="Choose what the Navigator shows"><svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3C4.4 3 1.6 5.4.5 8c1.1 2.6 3.9 5 7.5 5s6.4-2.4 7.5-5C14.4 5.4 11.6 3 8 3zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></button></div>
     </section>
-    <section data-panel="bin" hidden><div class="sb-empty">The Bin moves here next.<br><button data-view="bin">Show the Bin</button></div></section>
+    <section data-panel="bin" id="binpanel" hidden>
+      <div class="sb-scroll"><div id="binlist" class="sb-cards"></div><div id="binempty" class="sb-note" hidden></div></div>
+      <div class="sb-foot sb-foot-end"><button id="binnew" class="sb-button" data-tip="New Bin item" aria-label="New Bin item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+    </section>
     <section data-panel="stats" hidden><div class="sb-empty">Statistics come with goals and sprints (M11).</div></section>
-    <section data-panel="assets" hidden><div class="sb-empty">Assets move here next.<br><button data-view="assets">Show Assets</button></div></section>
+    <section data-panel="assets" id="assetpanel" hidden>
+      <div class="sb-scroll"><div id="assetlist" class="sb-cards"></div><div id="assetempty" class="sb-note" hidden></div></div>
+      <div class="sb-foot sb-foot-end"><button id="assetadd" class="sb-button" data-tip="Add images…" aria-label="Add images…"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+    </section>
     <section data-panel="scratchpad" hidden>
       <textarea id="scratch" spellcheck="false" aria-label="Scratchpad"></textarea>
       <div id="scratchfoot" class="sb-foot"><button id="scratchexport" class="sb-button" data-tip="Export Scratchpad contents to a new document" aria-label="Export Scratchpad contents to a new document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button></div>

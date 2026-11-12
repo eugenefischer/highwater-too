@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -1997,10 +1997,11 @@
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
-        "command": "highwater.bin.focus",
+        "command": "highwater.showSidebarPanel",
         "mac": "cmd+2",
         "key": "ctrl+2",
-        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts",
+        "args": "bin"
       },
       {
         "command": "highwater.assets.focus",
@@ -2009,10 +2010,11 @@
         "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
-        "command": "highwater.assets.focus",
+        "command": "highwater.showSidebarPanel",
         "mac": "cmd+4",
         "key": "ctrl+4",
-        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts",
+        "args": "assets"
       },
       {
         "command": "highwater.openScratchpad",
@@ -2128,6 +2130,13 @@
         "key": "ctrl+alt+0",
         "mac": "cmd+alt+0",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
+      },
+      {
+        "command": "highwater.showSidebarPanel",
+        "args": "stats",
+        "mac": "cmd+3",
+        "key": "ctrl+3",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
       }
     ],
     "viewsContainers": {

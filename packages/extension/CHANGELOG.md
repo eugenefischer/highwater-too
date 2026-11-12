@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.1 (branch m16-sidebar)
+
+- The **Bin** is in the Highland-Style Editor's sidebar (⌘2): Highland's cards, each with its first line and how it goes on.
+  - Drag text from the page onto it to keep a copy as a new item, with no Shift: the page and the Bin are one view. ⌥⌘X and ⌥⌘C still cut and copy to it.
+  - Drag a card into the page to put it back: it goes in as a paragraph of its own, before or after the line it lands on. The arrow on a card inserts it at the cursor.
+  - Drag cards to reorder them; click one to edit it in place (saved as you type); + makes a new one; × deletes one (after asking).
+- **Assets** are in it too (⌘4): each image with a small picture, its kind, size and file size. Drag one into the page to put in its reference (as a paragraph), or use its arrow; double-click to open it; + adds images; × deletes one. Images dragged in from Finder need Shift held (VS Code's rule for views like this).
+- ⌘3 shows Statistics' place (it comes with M11).
+
 ## 0.6.0 (branch m16-sidebar)
 
 - Highland 2's sidebar, inside the Highland-Style Editor: its row of icons at the top (Navigator, Bin, Statistics, Assets, Scratchpad, then Highwater's Writing History and Works) and one panel below. Drag its right edge to make it wider or narrower; the button at the top bar's left, or ⌘0, shows or hides it. Where you left it is kept for every document.

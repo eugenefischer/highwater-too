@@ -24,6 +24,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
   const navigator = new NavigatorPane(context, store, cache, current);
   const bin = new BinView(store, fs, current);
   const assets = new AssetsView(store, current);
+  extrasApi = { bin, assets };
 
   const binTree = vscode.window.createTreeView("highwater.bin", { treeDataProvider: bin, dragAndDropController: bin, canSelectMany: false });
   const assetTree = vscode.window.createTreeView("highwater.assets", { treeDataProvider: assets, dragAndDropController: assets });
@@ -171,6 +172,9 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
   }
 }
 
+/** The Bin and Assets, for the Highland-Style Editor's sidebar (sidebar-host.ts) as well as VS Code's views. */
+export let extrasApi: { bin: BinView; assets: AssetsView } | undefined;
+
 /** The Highland script (and its bundle, or its path for a plain file) the panels show. */
 // ---------------------------------------------------------------------------------------------
 // Navigator: see navigator-pane/pane.ts.
@@ -184,16 +188,16 @@ async function reveal(uri: vscode.Uri, offset: number): Promise<void> {
 // Bin
 
 /** Whose Bin: a .highland file's, or a plain file's. */
-type Owner = { bundle: string; plain?: undefined } | { plain: string; bundle?: undefined };
+export type Owner = { bundle: string; plain?: undefined } | { plain: string; bundle?: undefined };
 
-type BinItem = Owner & {
+export type BinItem = Owner & {
   index: number;
   text: string;
 };
 
 const BIN_MIME = "application/vnd.code.tree.highwater.bin";
 
-class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDropController<BinItem> {
+export class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDropController<BinItem> {
   readonly #changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.#changed.event;
   readonly dragMimeTypes = [BIN_MIME, "text/plain"];
@@ -225,7 +229,13 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
 
   async getChildren(item?: BinItem): Promise<BinItem[]> {
     if (item) return [];
-    const { bundle, plain } = this.current;
+    const owner = this.#owner();
+    return owner ? this.items(owner) : [];
+  }
+
+  /** A document's Bin items. */
+  async items(owner: Owner): Promise<BinItem[]> {
+    const { bundle, plain } = owner;
     if (bundle) {
       const snap = await this.store.snapshot(bundle).catch(() => null);
       return (snap?.binItems ?? []).map((text, index) => ({ bundle, index, text }));
@@ -259,20 +269,24 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
   async add(text: string, owner = this.#owner()): Promise<boolean> {
     if (!owner) return false;
     if (owner.plain !== undefined && !(await plainExtras().confirm(owner.plain))) return false;
-    await this.#change(owner, (items) => [...items, text]);
+    await this.change(owner, (items) => [...items, text]);
     return true;
   }
 
-  async reorder(from: number, to: number): Promise<void> {
-    const owner = this.#owner();
+  async reorder(from: number, to: number, owner = this.#owner()): Promise<void> {
     if (!owner || to < 0) return;
-    await this.#change(owner, (items) => (to >= items.length ? items : move(items, from, to)));
+    await this.change(owner, (items) => (to >= items.length ? items : move(items, from, to)));
+  }
+
+  /** Replaces one item's text (edited in the Highland-Style Editor's sidebar). */
+  async edit(owner: Owner, index: number, text: string): Promise<void> {
+    await this.change(owner, (items) => items.map((t, i) => (i === index ? text : t)));
   }
 
   async remove(item: BinItem): Promise<void> {
     const ok = await ask("warning", `Delete the Bin item “${binLabel(item.text, 40)}”?`, { modal: true }, "Delete");
     if (ok !== "Delete") return;
-    await this.#change(item, (items) => items.filter((_, i) => i !== item.index));
+    await this.change(item, (items) => items.filter((_, i) => i !== item.index));
   }
 
   handleDrag(source: readonly BinItem[], data: vscode.DataTransfer): void {
@@ -295,7 +309,7 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
     if (text) await this.add(text);
   }
 
-  async #change(owner: Owner, f: (items: string[]) => string[]): Promise<void> {
+  async change(owner: Owner, f: (items: string[]) => string[]): Promise<void> {
     if (owner.plain !== undefined) {
       const extras = plainExtras();
       const folder = await extras.folder(owner.plain, true);
@@ -322,7 +336,7 @@ class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDragAndDro
 // ---------------------------------------------------------------------------------------------
 // Assets
 
-type AssetItem = Owner & {
+export type AssetItem = Owner & {
   name: string;
   /** The folder the text refers to it in: "assets", or a plain file's "<name> assets". */
   folder: string;
@@ -366,7 +380,7 @@ const MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg
 
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "heic", "webp", "pdf"];
 
-class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragAndDropController<AssetItem> {
+export class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragAndDropController<AssetItem> {
   readonly #changed = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.#changed.event;
   readonly dragMimeTypes = ["text/plain"];
@@ -411,6 +425,15 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
   /** Size and dimensions, found when the list is made. */
   readonly #info = new Map<string, { size: string; dimensions: string | undefined }>();
 
+  /** Size and pixel dimensions of a listed image. */
+  info(item: AssetItem): { size: string; dimensions: string | undefined } | undefined {
+    return this.#info.get(this.#key(item));
+  }
+
+  read(item: AssetItem): Promise<Uint8Array | null> {
+    return this.#read(item);
+  }
+
   #key(item: AssetItem): string {
     return `${item.bundle ?? item.plain}\n${item.name}`;
   }
@@ -435,6 +458,13 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
   async getChildren(item?: AssetItem): Promise<AssetItem[]> {
     if (item) return [];
     const { bundle, plain } = this.current;
+    return this.list(bundle ? { bundle } : plain ? { plain } : null);
+  }
+
+  /** A document's images, with their sizes measured (see info). */
+  async list(owner: Owner | null): Promise<AssetItem[]> {
+    const bundle = owner?.bundle;
+    const plain = owner?.plain;
     if (bundle) {
       const snap = await this.store.snapshot(bundle).catch(() => null);
       const names = (snap?.paths ?? []).filter((p) => p.startsWith("assets/") && !p.endsWith("/")).map((p) => p.slice("assets/".length));
@@ -463,13 +493,17 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
     await this.#import(uris);
   }
 
-  async add(): Promise<void> {
-    if (!this.current.bundle && !this.current.plain) {
+  async add(owner: Owner | null = this.#ownerOf()): Promise<void> {
+    if (!owner) {
       void vscode.window.showInformationMessage("Open a document to add images to it.");
       return;
     }
     const uris = await vscode.window.showOpenDialog({ canSelectMany: true, filters: { Images: IMAGE_TYPES }, title: "Add to Assets" });
-    if (uris) await this.#import(uris);
+    if (uris) await this.importFiles(owner, await Promise.all(uris.map(async (u) => ({ name: basename(u.fsPath), data: new Uint8Array(await readFile(u.fsPath)) }))));
+  }
+
+  #ownerOf(): Owner | null {
+    return this.current.bundle ? { bundle: this.current.bundle } : this.current.plain ? { plain: this.current.plain } : null;
   }
 
   async remove(item: AssetItem): Promise<void> {
@@ -482,9 +516,15 @@ class AssetsView implements vscode.TreeDataProvider<AssetItem>, vscode.TreeDragA
   }
 
   async #import(uris: vscode.Uri[]): Promise<void> {
-    const { bundle, plain } = this.current;
-    if ((!bundle && !plain) || !uris.length) return;
-    const files = await Promise.all(uris.map(async (u) => ({ name: basename(u.fsPath), data: new Uint8Array(await readFile(u.fsPath)) })));
+    const owner = this.#ownerOf();
+    if (!owner || !uris.length) return;
+    await this.importFiles(owner, await Promise.all(uris.map(async (u) => ({ name: basename(u.fsPath), data: new Uint8Array(await readFile(u.fsPath)) }))));
+  }
+
+  /** Copies images into a document's assets (a .highland file's assets/, or a plain file's images folder). */
+  async importFiles(owner: Owner, files: { name: string; data: Uint8Array }[]): Promise<void> {
+    const { bundle, plain } = owner;
+    if (!files.length) return;
     if (plain) {
       if (!(await plainExtras().confirm(plain))) return;
       await plainExtras().addAssets(plain, files, uniqueName);

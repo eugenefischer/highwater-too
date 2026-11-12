@@ -27,6 +27,8 @@ export interface SidebarDeps {
   reveal(offset: number): void;
   /** Changes the text as the writer's own edit (sent on to the document; undoable). */
   edit(changes: { from: number; to: number; insert: string }[]): void;
+  /** Puts text in at the cursor (a Bin item, an image reference). */
+  insert(text: string): void;
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -37,10 +39,14 @@ export class Sidebar {
   #state: SidebarState = { open: true, panel: "navigator", width: 264 };
   readonly #nav: NavigatorPanel;
   readonly #scratch: ScratchpadPanel;
+  readonly #bin: BinPanel;
+  readonly #assets: AssetsPanel;
 
   constructor(private readonly deps: SidebarDeps) {
     this.#nav = new NavigatorPanel(deps);
     this.#scratch = new ScratchpadPanel(deps);
+    this.#bin = new BinPanel(deps);
+    this.#assets = new AssetsPanel(deps);
     for (const b of document.querySelectorAll<HTMLButtonElement>("#sbicons [data-panel]")) b.onclick = () => this.show(b.dataset.panel as PanelName);
     $("tbsidebar").onclick = () => this.toggle();
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-view]")) b.onclick = () => deps.post({ type: "showView", view: b.dataset.view });
@@ -85,6 +91,8 @@ export class Sidebar {
     else if (msg.type === "navFilters") this.#nav.filters(msg.json as string | undefined, msg.filters as NavigatorFilters | undefined);
     else if (msg.type === "scratchpad") this.#scratch.load(String(msg.text ?? ""), !!msg.force);
     else if (msg.type === "scratchpadSaved") this.#scratch.saved(String(msg.text ?? ""));
+    else if (msg.type === "bin") this.#bin.show(msg.items as BinCard[], !!msg.available);
+    else if (msg.type === "assets") this.#assets.show(msg.items as AssetCard[], !!msg.available);
     else if (msg.type === "showPanel" && PANELS.includes(msg.panel as PanelName)) this.show(msg.panel as PanelName);
     else if (msg.type === "toggleSidebar") this.toggle();
     else return false;
@@ -386,4 +394,274 @@ class ScratchpadPanel {
     this.#saved = this.#area.value;
     this.deps.post({ type: "scratchpadSave", text: this.#saved });
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The Bin: Highland's cards of set-aside text. Drag text from the page onto it to keep it (no
+// Shift needed: the page and the Bin are one webview), drag a card into the page to put it back,
+// drag cards to reorder them. Click a card to edit it in place; the arrow inserts it at the cursor.
+
+interface BinCard {
+  text: string;
+  label: string;
+  detail: string;
+}
+
+export const BIN_TYPE = "application/x-highwater-bin";
+/** Marks an image reference dragged from Assets (the page puts it in as a paragraph of its own). */
+export const ASSET_TYPE = "application/x-highwater-asset";
+
+class BinPanel {
+  readonly #list = $("binlist");
+  readonly #empty = $("binempty");
+  #cards: BinCard[] = [];
+  /** The card being edited, and its edit not yet saved. */
+  #editing: { index: number; area: HTMLTextAreaElement; timer: ReturnType<typeof setTimeout> | undefined } | null = null;
+  #available = false;
+
+  constructor(private readonly deps: SidebarDeps) {
+    $("binnew").onclick = () => deps.post({ type: "binAdd", text: "" });
+    const panel = $("binpanel");
+    panel.addEventListener("dragover", (e) => {
+      const types = e.dataTransfer?.types ?? [];
+      if (!this.#available || (!types.includes("text/plain") && !types.includes(BIN_TYPE))) return;
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = types.includes(BIN_TYPE) ? "move" : "copy";
+      this.#mark(e);
+    });
+    panel.addEventListener("dragleave", (e) => {
+      if (!panel.contains(e.relatedTarget as Node | null)) this.#unmark();
+    });
+    panel.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const target = this.#dropIndex(e);
+      this.#unmark();
+      const own = e.dataTransfer?.getData(BIN_TYPE);
+      if (own) {
+        const from = Number(own);
+        // Dropped after itself or right before itself: nothing moves.
+        let to = target ?? this.#cards.length;
+        if (to > from) to--;
+        if (to !== from) deps.post({ type: "binMove", from, to: Math.min(to, this.#cards.length - 1) });
+        return;
+      }
+      const text = e.dataTransfer?.getData("text/plain");
+      if (text && text.trim()) deps.post({ type: "binAdd", text });
+    });
+  }
+
+  show(cards: BinCard[], available: boolean): void {
+    this.#available = available;
+    // Don't redraw under the writer's hands: an item being edited keeps its box.
+    if (this.#editing && cards[this.#editing.index] !== undefined && document.activeElement === this.#editing.area) {
+      this.#cards = cards;
+      return;
+    }
+    this.#editing = null;
+    this.#cards = cards;
+    this.#list.replaceChildren(...cards.map((c, i) => this.#card(c, i)));
+    this.#empty.hidden = cards.length > 0;
+    this.#empty.textContent = available ? "The Bin holds text you set aside. Drag text here, or use Cut to Bin (⌥⌘X) and Copy to Bin (⌥⌘C)." : "Open a document to use its Bin.";
+    $("binnew").hidden = !available;
+  }
+
+  #card(c: BinCard, index: number): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "bincard";
+    el.draggable = true;
+    el.dataset.index = String(index);
+    el.title = c.text.length > 600 ? `${c.text.slice(0, 600)}…` : c.text;
+    const label = document.createElement("div");
+    label.className = "bincard-label";
+    label.textContent = c.label || "(empty)";
+    const detail = document.createElement("div");
+    detail.className = "bincard-detail";
+    detail.textContent = c.detail;
+    const tools = document.createElement("div");
+    tools.className = "bincard-tools";
+    tools.append(
+      button("Insert at the cursor", '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/>', () => this.deps.insert(this.#cards[index]?.text ?? "")),
+      button("Delete", '<path d="M6 6l12 12M18 6 6 18"/>', () => this.deps.post({ type: "binDelete", index })),
+    );
+    el.append(label, detail, tools);
+    el.addEventListener("dragstart", (e) => {
+      e.dataTransfer!.setData("text/plain", this.#cards[index]?.text ?? "");
+      e.dataTransfer!.setData(BIN_TYPE, String(index));
+      e.dataTransfer!.effectAllowed = "copyMove";
+    });
+    el.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest("button")) return;
+      this.#edit(index, el);
+    });
+    return el;
+  }
+
+  /** Opens a card for editing in place; what is typed is saved as you go. */
+  #edit(index: number, el: HTMLElement): void {
+    if (this.#editing?.index === index) return;
+    this.#finish();
+    const area = document.createElement("textarea");
+    area.className = "bincard-edit";
+    area.value = this.#cards[index]?.text ?? "";
+    area.spellcheck = false;
+    el.replaceChildren(area);
+    el.draggable = false;
+    el.classList.add("editing");
+    const editing = { index, area, timer: undefined as ReturnType<typeof setTimeout> | undefined };
+    this.#editing = editing;
+    const save = () => {
+      clearTimeout(editing.timer);
+      if (area.value !== this.#cards[index]?.text) {
+        this.#cards[index] = { ...this.#cards[index]!, text: area.value };
+        this.deps.post({ type: "binEdit", index, text: area.value });
+      }
+    };
+    area.addEventListener("input", () => {
+      clearTimeout(editing.timer);
+      editing.timer = setTimeout(save, 600);
+      area.style.height = "auto";
+      area.style.height = `${area.scrollHeight}px`;
+    });
+    area.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && /^[biuy/.=\-]$/i.test(e.key)) e.stopPropagation();
+      if (e.key === "Escape") area.blur();
+    });
+    area.addEventListener("blur", () => {
+      save();
+      this.#finish();
+      this.show(this.#cards.map((c) => ({ ...c, label: c.text.split("\n").find((l) => l.trim())?.trim().slice(0, 80) ?? "" , detail: c.detail })), this.#available);
+    });
+    area.focus();
+    area.style.height = `${area.scrollHeight}px`;
+  }
+
+  #finish(): void {
+    if (!this.#editing) return;
+    clearTimeout(this.#editing.timer);
+    this.#editing = null;
+  }
+
+  /** The card the pointer is over (dropping goes before it), or null for the end. */
+  #dropIndex(e: DragEvent): number | null {
+    for (const el of this.#list.querySelectorAll<HTMLElement>(".bincard")) {
+      const r = el.getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) return Number(el.dataset.index);
+    }
+    return null;
+  }
+
+  #mark(e: DragEvent): void {
+    $("binpanel").classList.add("dropping");
+    const at = this.#dropIndex(e);
+    for (const el of this.#list.querySelectorAll<HTMLElement>(".bincard")) el.classList.toggle("drop-before", Number(el.dataset.index) === at);
+    this.#list.classList.toggle("drop-end", at === null);
+  }
+
+  #unmark(): void {
+    $("binpanel").classList.remove("dropping");
+    for (const el of this.#list.querySelectorAll(".drop-before")) el.classList.remove("drop-before");
+    this.#list.classList.remove("drop-end");
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Assets: the document's images. Drag one into the page to put in its reference; add images
+// with the + button, or by dropping files from Finder (VS Code asks for Shift while dragging in).
+
+interface AssetCard {
+  name: string;
+  label: string;
+  detail: string;
+  reference: string;
+  thumb: string | null;
+}
+
+class AssetsPanel {
+  readonly #list = $("assetlist");
+  readonly #empty = $("assetempty");
+  #cards: AssetCard[] = [];
+  #available = false;
+
+  constructor(private readonly deps: SidebarDeps) {
+    $("assetadd").onclick = () => deps.post({ type: "assetsAdd" });
+    const panel = $("assetpanel");
+    panel.addEventListener("dragover", (e) => {
+      if (!this.#available || !e.dataTransfer?.types.includes("Files")) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      panel.classList.add("dropping");
+    });
+    panel.addEventListener("dragleave", (e) => {
+      if (!panel.contains(e.relatedTarget as Node | null)) panel.classList.remove("dropping");
+    });
+    panel.addEventListener("drop", (e) => {
+      e.preventDefault();
+      panel.classList.remove("dropping");
+      const files = [...(e.dataTransfer?.files ?? [])].filter((f) => /\.(png|jpe?g|gif|tiff?|heic|webp|pdf)$/i.test(f.name));
+      if (!files.length) return;
+      void Promise.all(files.map(async (f) => ({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) }))).then((list) => deps.post({ type: "assetsImport", files: list }));
+    });
+  }
+
+  show(cards: AssetCard[], available: boolean): void {
+    this.#available = available;
+    this.#cards = cards;
+    this.#list.replaceChildren(...cards.map((c) => this.#card(c)));
+    this.#empty.hidden = cards.length > 0;
+    this.#empty.textContent = available ? "Images for this document. Add them with +, or hold Shift and drag them in from Finder; drag one into the text to use it." : "Open a document to see its assets.";
+    $("assetadd").hidden = !available;
+  }
+
+  #card(c: AssetCard): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "assetcard";
+    el.draggable = true;
+    el.title = `${c.name}\nDrag into the text, or use the arrow to insert it at the cursor.`;
+    const pic = document.createElement("div");
+    pic.className = "assetcard-pic";
+    if (c.thumb) {
+      const img = document.createElement("img");
+      img.src = c.thumb;
+      img.alt = "";
+      img.draggable = false;
+      pic.append(img);
+    }
+    const text = document.createElement("div");
+    text.className = "assetcard-text";
+    const label = document.createElement("div");
+    label.className = "bincard-label";
+    label.textContent = c.label;
+    const detail = document.createElement("div");
+    detail.className = "bincard-detail";
+    detail.textContent = c.detail;
+    text.append(label, detail);
+    const tools = document.createElement("div");
+    tools.className = "bincard-tools";
+    tools.append(
+      button("Insert at the cursor", '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/>', () => this.deps.insert(c.reference)),
+      button("Delete", '<path d="M6 6l12 12M18 6 6 18"/>', () => this.deps.post({ type: "assetDelete", name: c.name })),
+    );
+    el.append(pic, text, tools);
+    el.addEventListener("dragstart", (e) => {
+      e.dataTransfer!.setData("text/plain", c.reference);
+      e.dataTransfer!.setData(ASSET_TYPE, c.name);
+      e.dataTransfer!.effectAllowed = "copy";
+    });
+    el.addEventListener("dblclick", () => this.deps.post({ type: "assetOpen", name: c.name }));
+    return el;
+  }
+}
+
+/** A small icon button with a tooltip. */
+function button(tip: string, path: string, run: () => void): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.className = "sb-button";
+  b.title = tip;
+  b.setAttribute("aria-label", tip);
+  b.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+  b.onclick = (e) => {
+    e.stopPropagation();
+    run();
+  };
+  return b;
 }
