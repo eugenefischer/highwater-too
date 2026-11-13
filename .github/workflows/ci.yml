@@ -1,15 +1,26 @@
 name: CI
 
+# To save Actions minutes (macOS minutes count several times Linux's against the monthly allowance):
+# every push runs on Ubuntu only; macOS runs once a week and whenever started by hand (Actions →
+# CI → Run workflow). A push that changes only Markdown (READMEs, the CHANGELOG) runs nothing, and
+# a newer push cancels a run still going for an older one.
 on:
   push:
-  pull_request:
+    paths-ignore: ["**/*.md"]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: ${{ github.event_name == 'push' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest", "macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

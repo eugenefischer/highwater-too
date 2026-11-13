@@ -76,6 +76,8 @@ export let historyApi:
       /** A document's saves, newest first, and whether its history is on, paused, off, or not begun. */
       saves(key: string): Promise<{ state: "on" | "paused" | "off" | "none"; commits: CommitInfo[] }>;
       compare(key: string, hash: string): Promise<void>;
+      /** A save's text (the script), for comparing in the page. */
+      saveText(hash: string): Promise<string>;
       revert(key: string, hash: string): Promise<void>;
       works: WorksView;
       /** The mirror's last outcome (when it last synced, its error, whether it waits for a sign-in). */
@@ -483,6 +485,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const r = await peek(key).catch(() => null);
       return { state: !r ? "none" : r.paused ? "paused" : "on", commits: r ? await history().log(r.id) : [] };
     },
+    saveText: (hash) => history().scriptAt(hash),
     async compare(key, hash) {
       const r = await lookup(key);
       const commit = r && (await history().log(r.id)).find((c) => c.hash === hash);

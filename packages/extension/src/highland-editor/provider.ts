@@ -472,6 +472,22 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .assetcard-pic img { max-width: 100%; max-height: 100%; }
 .assetcard-text { min-width: 0; flex: 1; }
 #editor, .cm-editor { height: 100%; }
+/* Comparing with a save: a bar above the text, the changes marked in it, marks beside the scroll bar. */
+#cmpbar { box-sizing: border-box; height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--hl-panel-bg); color: var(--hl-panel-fg, var(--hl-fg)); border-bottom: 1px solid color-mix(in srgb, var(--hl-muted) 30%, transparent); font-family: var(--vscode-font-family); font-size: 13px; }
+#cmpbar[hidden] { display: none; }
+#cmpbar .cmp-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cmpbar .cmp-where { color: var(--hl-muted); font-variant-numeric: tabular-nums; }
+#cmpbar .sb-button { color: var(--hl-fg); }
+#cmpbar .sb-button:disabled { opacity: 0.35; cursor: default; }
+#cmpbar .cmp-text { font: inherit; padding: 3px 12px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--hl-fg) 10%, transparent); color: var(--hl-fg); cursor: default; }
+#cmpbar .cmp-text:hover { background: color-mix(in srgb, var(--hl-fg) 18%, transparent); }
+body.comparing #editor { height: calc(100% - 36px); }
+.cmp-add { color: #2e9e50; text-decoration: underline; text-decoration-color: color-mix(in srgb, #2e9e50 70%, transparent); text-underline-offset: 3px; }
+.cmp-space { text-decoration: none; opacity: 0.85; }
+.cmp-del { color: #d14b4b; text-decoration: line-through; text-decoration-color: color-mix(in srgb, #d14b4b 80%, transparent); white-space: pre-wrap; }
+#cmpmarks { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; z-index: 5; pointer-events: none; }
+.cmp-mark { position: absolute; right: 1px; width: 6px; height: 3px; border-radius: 1px; background: #2e9e50; pointer-events: auto; cursor: pointer; }
+.cmp-mark-del { background: #d14b4b; }
 /* Highland's top bar: Text and Pages at the left; the template and the theme at the right. */
 #topbar { display: flex; align-items: center; gap: 12px; padding: 6px 14px 4px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
 .tb-side { display: flex; align-items: center; gap: 10px; flex: 1; }
@@ -680,6 +696,7 @@ body.previewing #preview { display: flex; }
   </div>
 </div>
 <div id="main">
+<div id="cmpbar" role="toolbar" aria-label="Comparing with a save" hidden><span class="cmp-what"></span><span class="cmp-where"></span><button class="cmp-prev sb-button" aria-label="Previous change"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><button class="cmp-next sb-button" aria-label="Next change"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button><button class="cmp-revert cmp-text" data-tip="Revert to this save">Revert…</button><button class="cmp-done cmp-text" data-tip="Stop comparing (Escape)">Done</button></div>
 <div id="editor"></div>
 <div id="preview">
   <div id="pages" tabindex="-1"></div>

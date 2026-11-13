@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.32
+
+- Compare fixes:
+  - The marks beside the scroll bar no longer move as you scroll. They were placed by line heights, which CodeMirror only estimates for lines not yet shown and corrects as you scroll past them; they are now placed by where each change is in the text.
+  - A change of nothing but spaces or line breaks now shows in the text: removed ones as their marks (¶ for a line break, · for a space, → for a tab) in red, struck through; added ones as those marks in green. Before, only the scroll-bar mark showed (removed whitespace at the start of a file, removed or added blank lines).
+  - Blank lines no longer throw the comparison off: it compares word by word over the whole text (after setting aside what the two share at each end), so removing a blank line at the top marks just that, not the following line as removed and added. Comparing line by line first is kept only for a rewrite too big to compare word by word.
+
+## 0.6.31
+
+- **Compare in the page.** Compare on a save in the Writing History (and a click on a save of the open document in Works) marks what has changed since that save in your text, instead of opening VS Code's comparison in another tab: added words in green and underlined, removed words in red and struck through where they were, compared word by word. A bar above the text reads "Comparing with Nov 10, 3:42 PM · 4 changes", with ‹ › to move between changes (each shown and counted, "2 of 4"), Revert…, and Done. Marks beside the scroll bar show where the changes are; click one to go there. Escape, Done, typing (which goes in as usual), the Preview or another save ends or replaces the comparison. The help says how.
+- CI uses fewer Actions minutes: every push runs on Ubuntu only; macOS runs weekly and when started by hand (Actions → CI → Run workflow); a push of Markdown files only runs nothing; a newer push cancels an older push's run.
+
 ## 0.6.30
 
 - A **New Document** button in the editor's title bar, next to Export Text, in the Highwater Editor and the text editor: it asks which kind (a .highland screenplay or manuscript, or a plain .fountain or .md file), as New Document… does.

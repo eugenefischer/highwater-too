@@ -7,6 +7,7 @@ import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { parseSave } from "../save-message.ts";
+import { pageForm } from "./offsets.ts";
 import { computerName } from "@highwater/history";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
@@ -239,6 +240,17 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       saves: saves.map((n, j) => (n.kind === "save" ? { j, at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter(Boolean),
     });
   };
+  /** Compare: the save's text to the page, which marks what changed since (instead of VS Code's diff tab). */
+  const compareInPage = async (hash: string, at?: Date) => {
+    const k = bundle() ?? plain();
+    if (!k || !historyApi) return;
+    try {
+      const when = at ?? (await historyApi.saves(k)).commits.find((c) => c.hash === hash)?.date ?? new Date();
+      post({ type: "compare", hash, at: when.getTime(), base: pageForm(await historyApi.saveText(hash)) });
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Could not read that save: ${(e as Error).message}`);
+    }
+  };
   const workAction = async (i: number, action: string) => {
     const node = workNodes[i];
     if (!node || !historyApi) return;
@@ -359,8 +371,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         if (item) void vscode.commands.executeCommand("highwater.assets.open", item);
       }
       else if (msg.type === "historyCompare" && typeof msg.hash === "string") {
-        const k = bundle() ?? plain();
-        if (k && historyApi) void historyApi.compare(k, msg.hash);
+        void compareInPage(msg.hash);
       } else if (msg.type === "historyRevert" && typeof msg.hash === "string") {
         const k = bundle() ?? plain();
         if (k && historyApi) void historyApi.revert(k, msg.hash);
@@ -371,7 +382,9 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
       else if (msg.type === "workSave" && typeof msg.i === "number" && typeof msg.j === "number") {
         const node = saveNodes.get(msg.i)?.[msg.j];
-        if (node && historyApi) void historyApi.works.showSave(node);
+        // A save of the document in this page: compared here; any other work's, as before.
+        if (node?.kind === "save" && node.here && node.here === (bundle() ?? plain())) void compareInPage(node.commit.hash, node.commit.date);
+        else if (node && historyApi) void historyApi.works.showSave(node);
       }
       else return false;
       return true;
