@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "../fs-provider.ts";
-import { MODES } from "../language.ts";
+import { MODES, type ParseCache } from "../language.ts";
 import { SETTINGS_PREFIX, setTemplateOption, TEMPLATE_INFO, templateOptions } from "../template-options.ts";
 import { onDidChangeTemplate, PRINT_OPTIONS, printOptionsOf, renderDocument, setPrintOption, setTemplate, templateOf, TEMPLATES, type PrintOption, type Template } from "../render-document.ts";
 import { documentStats } from "../syntax/stats.ts";
 import { onDidChangePageCount, pageCountOf } from "../page-count.ts";
 import type { BundleStore } from "../store.ts";
-import { parse } from "@highwater/parser";
+import { parse, type Document } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { colorThemeLabel, HIGHLAND_THEMES, navigatorColors, pageColors, themeFor } from "./themes.ts";
@@ -31,6 +31,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     private readonly context: vscode.ExtensionContext,
     /** The .highland files' store, for laying out the pages (made after this provider). */
     private readonly store: () => BundleStore,
+    /** The parse every other feature shares (made after this provider). */
+    private readonly cache: () => ParseCache,
   ) {}
 
   resolveCustomTextEditor(opened: vscode.TextDocument, panel: vscode.WebviewPanel): void {
@@ -128,7 +130,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     // Highland's counts at the foot of the text: characters, words and pages (the print layout's, page-count.ts).
     const sendCounts = debounce(300, () => {
-      const stats = documentStats(parse(document.getText(), { mode: MODES.get(document.languageId) ?? "fountain" }));
+      const stats = documentStats(parsed(this.cache(), document));
       postTo(panel, { type: "counts", characters: stats.characters, words: stats.words, pages: pageCountOf(document) ?? null });
     });
     // Check Spelling While Typing (highwater.spellCheck) and the learned words.
@@ -504,6 +506,14 @@ function swapSoon(uri: vscode.Uri): void {
   setTimeout(attempt, 0);
 }
 
+/**
+ * The document's parse: the shared one, except for a moment after opening, before VS Code has
+ * given the script its language, when the page treats it as Fountain (as the cache would not).
+ */
+function parsed(cache: ParseCache, doc: vscode.TextDocument): Document {
+  return MODES.has(doc.languageId) ? cache.get(doc) : parse(doc.getText(), { mode: "fountain" });
+}
+
 /** A document in the Highwater Editor, asked for by the extension (the writing history's choices). */
 async function openInHighwater(doc: vscode.TextDocument): Promise<HighlandView | undefined> {
   const uri = doc.uri.toString();
@@ -525,11 +535,11 @@ async function openInHighwater(doc: vscode.TextDocument): Promise<HighlandView |
 }
 
 /** The Highwater Editor, its commands, and turning scripts opened as text into Highwater Editor tabs. */
-export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore): void {
+export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore, cache: () => ParseCache): void {
   registerSidebarNote(context);
   highwaterOpener.open = openInHighwater;
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store, cache), { webviewOptions: { retainContextWhenHidden: true } }),
     // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highwater Editor.
     vscode.commands.registerCommand("highwater.toggleEditorSidebar", () => {
       const v = activeView();
@@ -583,7 +593,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       const view = activeView();
       if (!view) return;
       const doc = view.document;
-      const numbers = paragraphNumbers(parse(doc.getText(), { mode: MODES.get(doc.languageId) ?? "fountain" }));
+      const numbers = paragraphNumbers(parsed(cache(), doc));
       const starts = [...numbers.keys()];
       const count = starts.length;
       if (!count) return;

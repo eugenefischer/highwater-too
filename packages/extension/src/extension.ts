@@ -28,7 +28,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerAsk(context);
   registerSurface(context);
   // The Highwater Editor.
-  registerHighlandEditor(context, () => store);
+  registerHighlandEditor(context, () => store, () => cache);
   const store = new BundleStore({ backupFolder: () => backupFolder(context) });
   // Bin, Scratchpad and images for plain .fountain and .md files.
   startPlainExtras(context, { history: currentHistory, historyRoot });
