@@ -152,6 +152,11 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       sidebar,
       panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean | string; kind?: string; word?: string }) => {
         if (sidebar.handle(msg as { type: string } & Record<string, unknown>)) return;
+        if (msg.type === "dragRecord") {
+          const lines = (msg as unknown as { lines: string[] }).lines;
+          void vscode.workspace.openTextDocument({ content: `Highwater Too: one drag, as the page saw it (time in ms, event, element, whether a handler accepted it, the drop effect)\n\n${lines.join("\n")}\n` }).then((d) => vscode.window.showTextDocument(d, { preview: false, viewColumn: vscode.ViewColumn.Beside }));
+          return;
+        }
         if (msg.type === "pageFocus") return editorFocused();
         if (msg.type === "ready") {
           sidebar.ready();
@@ -486,7 +491,7 @@ body.comparing #editor { height: calc(100% - 36px); }
 .cmp-space { text-decoration: none; opacity: 0.85; }
 .cmp-del { color: #d14b4b; text-decoration: line-through; text-decoration-color: color-mix(in srgb, #d14b4b 80%, transparent); white-space: pre-wrap; }
 #cmpmarks { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; z-index: 5; pointer-events: none; }
-.cmp-mark { position: absolute; right: 1px; width: 6px; height: 3px; border-radius: 1px; background: #2e9e50; pointer-events: auto; cursor: pointer; }
+.cmp-mark { position: absolute; right: 1px; width: 6px; height: 3px; transform: translateY(-50%); border-radius: 1px; background: #2e9e50; pointer-events: auto; cursor: pointer; }
 .cmp-mark-del { background: #d14b4b; }
 /* Highland's top bar: Text and Pages at the left; the template and the theme at the right. */
 #topbar { display: flex; align-items: center; gap: 12px; padding: 6px 14px 4px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
@@ -918,6 +923,12 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
     // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highland-Style Editor.
+    vscode.commands.registerCommand("highwater.recordDrag", () => {
+      const v = activeView();
+      if (!v) return void vscode.window.showInformationMessage("Open a document in the Highwater Editor, run this, then drag once.");
+      void v.panel.webview.postMessage({ type: "recordDrag" });
+      void vscode.window.showInformationMessage("Recording the next drag in this document: drag a Bin card over the text and let go.");
+    }),
     vscode.commands.registerCommand("highwater.toggleEditorSidebar", () => void activeView()?.panel.webview.postMessage({ type: "toggleSidebar" })),
     vscode.commands.registerCommand("highwater.showSidebarPanel", (panel: unknown) => {
       if (typeof panel === "string") void activeView()?.panel.webview.postMessage({ type: "showPanel", panel });

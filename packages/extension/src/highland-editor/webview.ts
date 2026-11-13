@@ -156,6 +156,22 @@ function showDropCaret(v: EditorView, at: number): void {
 function hideDropCaret(): void {
   if (dropCaret) dropCaret.hidden = true;
 }
+// Highwater Too: Record a Drag (diagnostics): the next drag's events, as the page saw them after
+// every handler had run (whether one accepted it, and as what), for a cursor that misbehaves only
+// in VS Code. Sent to the extension when the drag ends, which opens them as a document.
+let dragRecord: string[] | null = null;
+function recordDrag(e: DragEvent): void {
+  if (!dragRecord) return;
+  const t = e.target as HTMLElement;
+  const what = `${t.nodeName.toLowerCase()}${t.id ? `#${t.id}` : ""}${typeof t.className === "string" && t.className ? `.${t.className.trim().split(/\s+/).join(".")}` : ""}`;
+  dragRecord.push(`${Math.round(e.timeStamp)} ${e.type.padEnd(9)} ${what} accepted=${e.defaultPrevented} effect=${e.dataTransfer?.dropEffect} allowed=${e.dataTransfer?.effectAllowed} types=${[...(e.dataTransfer?.types ?? [])].join(",")}`);
+  if (e.type === "dragend") {
+    vscode.postMessage({ type: "dragRecord", lines: dragRecord });
+    dragRecord = null;
+  }
+}
+for (const type of ["dragstart", "dragenter", "dragover", "dragleave", "drop", "dragend"]) window.addEventListener(type, (e) => recordDrag(e as DragEvent));
+
 // The caret is the page's, not the text's: a drag from the sidebar ends at its card (dragend goes
 // there, not to the text), and one let go or cancelled outside the text may send the text no
 // dragleave or drop. Any end of a drag anywhere in the page hides it, and so does the pointer
@@ -204,6 +220,15 @@ function start(text: string): void {
             dragged = null;
             hideDropCaret();
             return false;
+          },
+          // A Bin item or image coming over the text, or over another line of it, is taken at once:
+          // otherwise the browser shows its own (copy) cursor until the next dragover.
+          dragenter: (e) => {
+            const types = e.dataTransfer?.types ?? [];
+            if (!types.includes(BIN_TYPE) && !types.includes(ASSET_TYPE)) return false;
+            e.preventDefault();
+            e.dataTransfer!.dropEffect = types.includes(BIN_TYPE) ? "move" : "copy";
+            return true;
           },
           // While a Bin item or image is over the text, a caret shows where it will go.
           dragover: (e, v) => {
@@ -490,6 +515,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "togglePreview") togglePreview();
+  else if (msg.type === "recordDrag") dragRecord = [];
   else if (msg.type === "compare") {
     const c = event.data as { base: string; hash: string; at: number };
     if (pages.shown) pages.hide();

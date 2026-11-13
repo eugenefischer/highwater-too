@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.34
+
+- Compare: the marks beside the scroll bar are now measured, not estimated. 0.6.33 worked out each line's rows from its length; measured against real line heights in a full-length screenplay, that was off by 150–300 pixels of text, more than half a screen, which put a mark outside the scroll thumb at the change it belonged to. The text is now laid out once, off the page, exactly as the editor lays it out (same width, line styles, italics and removed text), and each mark goes at the middle of its change's row. They are placed again when the window, sidebar or text size changes, and still don't move as you scroll.
+- Dragging a Bin item or image over the text no longer flickers to the green-plus (copy) cursor at each new line: the page now accepts the drag as it enters each line, not only as it moves.
+
+## 0.6.33
+
+- Compare: the marks beside the scroll bar sit where their changes are, and stay still. 0.6.32 placed them by position in the text, which drifts in a screenplay (a character of dialogue takes far more height than one of action); they are now placed by screen rows, worked out from each line's wrap width (dialogue 35 characters, parentheticals 28, otherwise the column), as the editor wraps it.
+- The Revert confirmation no longer says "every later save stays there"; it says what Revert does, and the Writing History help covers the rest. The READMEs say nothing is removed from the writing history.
+- **Highwater Too: Record a Drag (diagnostics)**: records the next drag in the Highwater Editor as the page sees it (each event, its element, whether it was accepted, and as what) and opens the record as a document. For a drag cursor that misbehaves in VS Code but not in testing.
+
 ## 0.6.32
 
 - Compare fixes:

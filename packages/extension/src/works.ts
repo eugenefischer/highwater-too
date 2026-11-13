@@ -272,7 +272,7 @@ export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: s
     const ok = await ask(
       "warning",
       `Revert to the save of ${when}?`,
-      { modal: true, detail: "Its text, Bin and Scratchpad replace the document's, and the document is saved. The revert is recorded in the writing history, and every later save stays there." },
+      { modal: true, detail: "Its text, Bin and Scratchpad replace the document's, and the document is saved." },
       "Revert",
     );
     if (ok !== "Revert") return;

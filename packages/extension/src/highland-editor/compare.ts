@@ -63,6 +63,8 @@ export class Compare {
   #hash = "";
   readonly #bar: HTMLElement;
   readonly #marks: HTMLElement;
+  readonly #resize: ResizeObserver;
+  #frame = 0;
   /** True while a save is being compared. */
   active = false;
 
@@ -74,6 +76,17 @@ export class Compare {
     this.#bar = document.getElementById("cmpbar")!;
     this.#marks = document.createElement("div");
     this.#marks.id = "cmpmarks";
+    // Placed again when the page's width or height changes (the window, the sidebar, the text size).
+    let last = "";
+    this.#resize = new ResizeObserver(() => {
+      const v = this.view();
+      if (!v || !this.active) return;
+      const size = `${Math.round(v.contentDOM.getBoundingClientRect().width)}x${Math.round(v.scrollDOM.clientHeight)}`;
+      if (size === last) return;
+      last = size;
+      cancelAnimationFrame(this.#frame);
+      this.#frame = requestAnimationFrame(() => this.#placeMarks());
+    });
     const q = (sel: string) => this.#bar.querySelector<HTMLElement>(sel)!;
     q(".cmp-prev").onclick = () => this.#go(-1);
     q(".cmp-next").onclick = () => this.#go(1);
@@ -120,6 +133,8 @@ export class Compare {
     v.dom.append(this.#marks);
     this.#at = -1;
     this.#placeMarks();
+    this.#resize.observe(v.contentDOM);
+    this.#resize.observe(v.scrollDOM);
     if (n) requestAnimationFrame(() => this.#go(1));
   }
 
@@ -130,6 +145,8 @@ export class Compare {
     document.body.classList.remove("comparing");
     this.#bar.hidden = true;
     this.#marks.remove();
+    this.#resize.disconnect();
+    cancelAnimationFrame(this.#frame);
     this.#changes = [];
     this.view()?.dispatch({ effects: this.#slot.reconfigure([]) });
   }
@@ -147,14 +164,21 @@ export class Compare {
   #placeMarks(): void {
     const v = this.view();
     if (!v || !this.active) return;
-    // By where each change is in the text, not by line heights: CodeMirror only estimates those
-    // for lines not yet shown, and the marks moved as it measured them while scrolling.
-    const length = Math.max(1, v.state.doc.length);
+    // Where each change is, as a share of the text's full height, measured exactly: CodeMirror only
+    // estimates the heights of lines not yet shown (marks placed by its heights moved as it measured
+    // them while scrolling), and an estimate from line lengths missed by hundreds of pixels in a
+    // full-length screenplay, enough to put a mark outside the scroll thumb.
+    const at = measure(v, this.#changes);
+    const dom = v.dom.getBoundingClientRect();
+    const track = v.scrollDOM.getBoundingClientRect();
+    this.#marks.style.top = `${track.top - dom.top}px`;
+    this.#marks.style.height = `${track.height}px`;
+    this.#marks.style.bottom = "auto";
     this.#marks.replaceChildren(
       ...this.#changes.map((c, i) => {
         const m = document.createElement("div");
         m.className = c.to > c.from ? "cmp-mark" : "cmp-mark cmp-mark-del";
-        m.style.top = `${((c.from / length) * 100).toFixed(3)}%`;
+        m.style.top = `${(at[i]! * 100).toFixed(4)}%`;
         m.onclick = () => {
           this.#at = i - 1;
           this.#go(1);
@@ -163,4 +187,97 @@ export class Compare {
       }),
     );
   }
+}
+
+/**
+ * Each change's place, as a share (0–1) of the text's height: the text laid out off the page in
+ * a copy of the editor at the same width, with the same line styles, inline styles and removed
+ * text, and the middle of each change's row measured.
+ */
+function measure(v: EditorView, changes: readonly Change[]): number[] {
+  const doc = v.state.doc;
+  const lineAttrs = new Map<number, { cls: string; style: string }>();
+  const marks: { from: number; to: number; cls: string }[] = [];
+  for (const source of v.state.facet(EditorView.decorations)) {
+    const set = typeof source === "function" ? source(v) : source;
+    set.between(0, doc.length, (from, to, deco) => {
+      const spec = deco.spec as { widget?: unknown; class?: string; attributes?: Record<string, string> };
+      if (spec.widget) return;
+      const cls = [spec.class ?? "", spec.attributes?.class ?? ""].join(" ").trim();
+      if (from === to) {
+        const a = lineAttrs.get(from) ?? { cls: "", style: "" };
+        a.cls += ` ${cls}`;
+        if (spec.attributes?.style) a.style += `;${spec.attributes.style}`;
+        lineAttrs.set(from, a);
+      } else if (cls) marks.push({ from, to, cls });
+    });
+  }
+  marks.sort((a, b) => a.from - b.from);
+
+  const outer = document.createElement("div");
+  outer.style.cssText = "position: fixed; left: -100000px; top: 0; width: 100000px; visibility: hidden; pointer-events: none";
+  const editor = outer.appendChild(document.createElement("div"));
+  editor.className = v.dom.className;
+  editor.style.setProperty("height", "auto", "important");
+  const scroller = editor.appendChild(document.createElement("div"));
+  scroller.className = v.scrollDOM.className;
+  scroller.style.setProperty("overflow", "visible", "important");
+  scroller.style.setProperty("height", "auto", "important");
+  const content = scroller.appendChild(document.createElement("div"));
+  content.className = v.contentDOM.className;
+  const width = v.contentDOM.getBoundingClientRect().width;
+  for (const [k, value] of [["flex", `0 0 ${width}px`], ["width", `${width}px`], ["max-width", "none"], ["min-width", "0"], ["box-sizing", "border-box"], ["margin", "0"]] as const) {
+    content.style.setProperty(k, value, "important");
+  }
+
+  const order = changes.map((_, i) => i).sort((a, b) => changes[a]!.from - changes[b]!.from);
+  const spots: HTMLElement[] = [];
+  let next = 0;
+  let firstMark = 0;
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n);
+    const div = content.appendChild(document.createElement("div"));
+    const a = lineAttrs.get(line.from);
+    div.className = `cm-line${a ? a.cls : ""}`;
+    if (a?.style) div.style.cssText = a.style;
+    while (firstMark < marks.length && marks[firstMark]!.to <= line.from) firstMark++;
+    const inLine: typeof marks = [];
+    for (let k = firstMark; k < marks.length && marks[k]!.from < line.to; k++) if (marks[k]!.to > line.from) inLine.push(marks[k]!);
+    const here: number[] = [];
+    while (next < order.length && changes[order[next]!]!.from <= line.to) here.push(order[next++]!);
+    const cuts = new Set([line.from, line.to]);
+    for (const m of inLine) cuts.add(Math.max(m.from, line.from)).add(Math.min(m.to, line.to));
+    for (const i of here) cuts.add(changes[i]!.from);
+    const points = [...cuts].sort((x, y) => x - y);
+    for (let j = 0; j < points.length; j++) {
+      const from = points[j]!;
+      for (const i of here) {
+        if (changes[i]!.from !== from) continue;
+        const spot = div.appendChild(document.createElement("span"));
+        spots[i] = spot;
+        const c = changes[i]!;
+        if (c.deleted) div.appendChild(new Removed(c.deleted).toDOM());
+        if (c.to > c.from && /^\s+$/.test(doc.sliceString(c.from, c.to))) div.appendChild(new AddedSpace(doc.sliceString(c.from, c.to)).toDOM());
+      }
+      const to = points[j + 1];
+      if (to === undefined || to <= from) continue;
+      const text = doc.sliceString(from, to);
+      const cls = inLine.filter((m) => m.from <= from && m.to >= to).map((m) => m.cls).join(" ");
+      if (cls) {
+        const span = div.appendChild(document.createElement("span"));
+        span.className = cls;
+        span.textContent = text;
+      } else div.append(text);
+    }
+    if (!div.textContent) div.appendChild(document.createElement("br"));
+  }
+  document.body.appendChild(outer);
+  const top = content.getBoundingClientRect().top;
+  const height = Math.max(1, content.offsetHeight);
+  const at = changes.map((_, i) => {
+    const r = spots[i]?.getClientRects()[0];
+    return r ? Math.min(1, Math.max(0, (r.top + r.height / 2 - top) / height)) : 0;
+  });
+  outer.remove();
+  return at;
 }
