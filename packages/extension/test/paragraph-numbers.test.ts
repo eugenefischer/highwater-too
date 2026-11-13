@@ -10,14 +10,14 @@ const numbered = (src: string) => {
 describe("Highland 2's paragraph numbers", () => {
   it("numbers each line with text, as in EJ's screenshots of Highland", () => {
     const src = [
-      "Title: Astounding",
+      "Title: Sample",
       "Author: Someone",
       "",
       "{{HEADER: %p}}",
       "",
-      "INT. AUTO DEALERSHIP - DAY",
+      "INT. BAKERY - DAY",
       "",
-      "= campbell gets sick",
+      "= marlowe gets lost",
       "",
       "[[notes]]",
       "",
@@ -29,7 +29,7 @@ describe("Highland 2's paragraph numbers", () => {
       "",
       "{{Header: }}",
       "",
-      "Campbell sits at a desk.",
+      "Marlowe sits at a desk.",
       "",
       "BOSS",
       "(quietly)",
@@ -41,11 +41,11 @@ describe("Highland 2's paragraph numbers", () => {
       "",
     ].join("\n");
     expect(numbered(src)).toEqual([
-      "1 INT. AUTO DEALERSHIP - DAY",
-      "2 = campbell gets sick",
+      "1 INT. BAKERY - DAY",
+      "2 = marlowe gets lost",
       "3 # Section",
       "4 ===",
-      "5 Campbell sits at a desk.",
+      "5 Marlowe sits at a desk.",
       "6 BOSS",
       "7 (quietly)",
       "8 John, a quick word?",

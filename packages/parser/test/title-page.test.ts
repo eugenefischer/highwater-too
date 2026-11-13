@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 import { fieldText, parse } from "../src/index.ts";
 import { expectTiling } from "./helpers.ts";
 
-// Shape of the Astounding title page: opens with "Draft date", tab-indented continuations,
+// Shape of a real screenplay title page: opens with "Draft date", tab-indented continuations,
 // and a tab-only line inside a value (the line that broke Better Fountain's parser).
-const ASTOUNDING = [
-  "Draft date: 2024-02-19",
+const SAMPLE = [
+  "Draft date: 2025-03-04",
   "Title:",
-  "\tASTOUNDING",
+  "\tTHE LIGHTHOUSE",
   "\t",
-  "\tPilot: “Who Goes There?”",
+  "\tPilot: “Low Tide”",
   "Credit: by",
-  "Author: Eugene Fischer and Alec Nevala-Lee",
+  "Author: Jane Doe and John Roe",
   "Source:",
-  "\tBased on the book",
+  "\tBased on the novel",
   "\t",
-  "\t_Astounding_",
+  "\t_The Lighthouse_",
   "",
   "{{HEADER: %p}}",
   "",
@@ -24,37 +24,37 @@ const ASTOUNDING = [
 
 describe("title page", () => {
   it("reads every field, keeping blank continuation lines inside values", () => {
-    const doc = parse(ASTOUNDING, { mode: "fountain" });
+    const doc = parse(SAMPLE, { mode: "fountain" });
     const tp = doc.titlePage!;
     expect(tp.fields.map((f) => f.name)).toEqual(["draft date", "title", "credit", "author", "source"]);
-    expect(fieldText(tp.fields[1]!)).toBe("ASTOUNDING\n\nPilot: “Who Goes There?”");
-    expect(fieldText(tp.fields[4]!)).toBe("Based on the book\n\n_Astounding_");
-    expect(fieldText(tp.fields[0]!)).toBe("2024-02-19");
+    expect(fieldText(tp.fields[1]!)).toBe("THE LIGHTHOUSE\n\nPilot: “Low Tide”");
+    expect(fieldText(tp.fields[4]!)).toBe("Based on the novel\n\n_The Lighthouse_");
+    expect(fieldText(tp.fields[0]!)).toBe("2025-03-04");
     expectTiling(doc);
   });
 
   it("gives exact spans for keys and values", () => {
-    const doc = parse(ASTOUNDING, { mode: "fountain" });
+    const doc = parse(SAMPLE, { mode: "fountain" });
     const author = doc.titlePage!.fields[3]!;
-    expect(ASTOUNDING.slice(author.keySpan.start, author.keySpan.end)).toBe("Author");
+    expect(SAMPLE.slice(author.keySpan.start, author.keySpan.end)).toBe("Author");
     const v = author.values[0]!;
-    expect(ASTOUNDING.slice(v.span.start, v.span.end)).toBe("Eugene Fischer and Alec Nevala-Lee");
+    expect(SAMPLE.slice(v.span.start, v.span.end)).toBe("Jane Doe and John Roe");
   });
 
   it("ends at the first empty line; the body follows", () => {
-    const doc = parse(ASTOUNDING, { mode: "fountain" });
+    const doc = parse(SAMPLE, { mode: "fountain" });
     const after = doc.nodes.slice(doc.nodes.indexOf(doc.titlePage!) + 1);
     expect(after.map((n) => n.kind)).toEqual(["blank", "text", "blank", "text"]);
   });
 
   it("allows leading blank lines and Highland's position keys in Markdown", () => {
-    const src = "\n\nTL:E. J. Fischer\n\t1 Example Street\nTR:14,800 words\nCC:Sweet Betty\n\t\n\tby\n\nHer final film…";
+    const src = "\n\nTL:A. N. Writer\n\t1 Example Street\nTR:12,000 words\nCC:Small Hours\n\t\n\tby\n\nTheir first night…";
     const doc = parse(src, { mode: "markdown" });
     expect(doc.nodes[0]!.kind).toBe("blank");
     expect(doc.titlePage!.fields.map((f) => [f.name, fieldText(f)])).toEqual([
-      ["tl", "E. J. Fischer\n1 Example Street"],
-      ["tr", "14,800 words"],
-      ["cc", "Sweet Betty\n\nby"],
+      ["tl", "A. N. Writer\n1 Example Street"],
+      ["tr", "12,000 words"],
+      ["cc", "Small Hours\n\nby"],
     ]);
     expectTiling(doc);
   });

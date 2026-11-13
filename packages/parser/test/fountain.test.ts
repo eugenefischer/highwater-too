@@ -40,7 +40,7 @@ describe("dialogue", () => {
   });
 
   it("keeps extensions, including mixed-case ones", () => {
-    expect(only("CAMPBELL (CONT’D)\nGo on.", "dialogue")).toMatchObject({ character: "CAMPBELL", extensions: ["(CONT’D)"] });
+    expect(only("MARLOWE (CONT’D)\nGo on.", "dialogue")).toMatchObject({ character: "MARLOWE", extensions: ["(CONT’D)"] });
     expect(only("EAGER FAN (O.S.) (cont'd)\nWhere?", "dialogue").extensions).toEqual(["(O.S.)", "(cont'd)"]);
   });
 
@@ -54,7 +54,7 @@ describe("dialogue", () => {
   });
 
   it("does not take mixed-case lines as cues", () => {
-    expect(kinds("YOUNG JOHN W. CAMPBELL rushes home.\nHe drops his bag.")).toEqual(["action"]);
+    expect(kinds("YOUNG PETER J. MARLOWE rushes home.\nHe drops his bag.")).toEqual(["action"]);
   });
 
   it("keeps two-space lines and lyrics inside dialogue", () => {

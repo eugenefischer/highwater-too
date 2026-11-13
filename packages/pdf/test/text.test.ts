@@ -13,7 +13,7 @@ describe("wrapping (Highland's rules)", () => {
   });
 
   it("breaks between quotes like any other space (current Highland; the 2024 export did not)", () => {
-    expect(wrap("you thought about Orson Welles’ “War of the Worlds” show.", 34)).toEqual(["you thought about Orson Welles’", "“War of the Worlds” show."]);
+    expect(wrap("you thought about Ada Lovelace’s “Analytical Engine” notes.", 34)).toEqual(["you thought about Ada Lovelace’s", "“Analytical Engine” notes."]);
   });
 
   it("splits a word longer than the line, and honours hard line breaks", () => {

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { lineAndCharacter, offsetOf, pageForm } from "../src/highland-editor/offsets.ts";
 
 describe("Highland-Style Editor offsets in files with \\r\\n line breaks", () => {
-  const doc = "INT. HALL - DAY\r\n\r\nCAMPBELL\r\nHello.\r\n";
+  const doc = "INT. HALL - DAY\r\n\r\nMARLOWE\r\nHello.\r\n";
   const page = pageForm(doc);
 
   it("holds the text with \\n line breaks", () => {
-    expect(page).toBe("INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
+    expect(page).toBe("INT. HALL - DAY\n\nMARLOWE\nHello.\n");
     expect(pageForm("a\nb")).toBe("a\nb");
   });
 

@@ -40,13 +40,13 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       // Not "Plain.fountain" or "Kettle.fountain": other tests open those.
       const path = join(dir, "Words.fountain");
-      await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello, Doña.\n");
+      await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello, Zoë.\n");
       const doc = await vscode.workspace.openTextDocument(path);
       await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
       const range = doc.getWordRangeAtPosition(new vscode.Position(2, 3));
-      assert.equal(range && doc.getText(range), "CAMPBELL");
+      assert.equal(range && doc.getText(range), "MARLOWE");
       const accented = doc.getWordRangeAtPosition(new vscode.Position(3, 9));
-      assert.equal(accented && doc.getText(accented), "Doña");
+      assert.equal(accented && doc.getText(accented), "Zoë");
     },
   ],
   [
@@ -486,7 +486,7 @@ const tests: [string, () => Promise<void>][] = [
     "the panes follow the Highland-Style Editor, and it scrolls where they ask",
     async () => {
       const path = join(dir, "Styled.fountain");
-      await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
+      await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello.\n");
       await vscode.commands.executeCommand("vscode.openWith", vscode.Uri.file(path), "highwater.highlandEditor");
       type Surface = { document?: string; view: boolean; ready?: boolean; selection?: { anchor: number; head: number }; focused?: string };
       const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
@@ -521,7 +521,7 @@ const tests: [string, () => Promise<void>][] = [
     "swaps between the text editor and the Highland-Style Editor in place, unsaved changes and all",
     async () => {
       const path = join(dir, "Swap.fountain");
-      await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
+      await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello.\n");
       const doc = await vscode.workspace.openTextDocument(path);
       await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
       const editor = await vscode.window.showTextDocument(doc, { preview: false });
@@ -564,7 +564,7 @@ const tests: [string, () => Promise<void>][] = [
       };
       try {
         const path = join(dir, "Default.fountain");
-        await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
+        await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello.\n");
         const uri = vscode.Uri.file(path).toString();
         const kinds = () =>
           vscode.window.tabGroups.all
