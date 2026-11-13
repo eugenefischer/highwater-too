@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.28
+
+- Opening a .highland file (from the Explorer, Finder, Open Recent or a command) goes straight into the Highwater Editor; it no longer shows as text for a moment first. Its script was opened before VS Code had given it its language, so it was taken for plain text.
+- A .fountain or .md file opened as text switches to the Highwater Editor as soon as it can (it used to wait 0.3 s before looking).
+- Text Editor from the breadcrumbs bar's editor menu really sticks now (0.6.27's fix failed in CI: VS Code can report the new text tab before the Highwater tab has gone). The switch is recognised from the tabs themselves: a document's Highwater tab giving way to a text tab of it, with no Highwater tab left. A Search result opened as text beside a Highwater tab still goes back to that tab.
+
 ## 0.6.27
 
 - The editor is called the **Highwater Editor** everywhere it is named: the editor menu in the breadcrumbs bar, Open in Highwater Editor, the settings, VS Code's sidebar note and messages. Highland is named in the interface only for the .highland file type; settings and messages no longer refer to Highland 2 (its themes are just "the Classic theme", and so on).

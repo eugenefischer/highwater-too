@@ -580,6 +580,29 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "opens a .highland file from the Explorer straight into the Highwater Editor, never showing it as text first",
+    async () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      await config.update("highlandEditor", true, vscode.ConfigurationTarget.Global);
+      const path = await copyOf("NoFlash");
+      const script = highland(path).toString();
+      let shownAsText = false;
+      const watch = vscode.window.tabGroups.onDidChangeTabs((e) => {
+        for (const t of [...e.opened, ...e.changed]) if (t.input instanceof vscode.TabInputText && t.input.uri.toString() === script) shownAsText = true;
+      });
+      try {
+        // As a double-click in the Explorer opens it: the file itself, which the redirect takes.
+        await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(path));
+        await waitFor("the Highwater Editor", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.input instanceof vscode.TabInputCustom && t.input.viewType === "highwater.highlandEditor" && t.input.uri.toString() === script)), 15_000);
+        assert.ok(!shownAsText, "the script showed as text before the Highwater Editor");
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      } finally {
+        watch.dispose();
+        await config.update("highlandEditor", false, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
+  [
     "the panes follow edits made in the Highland-Style Editor to a .highland file (a marker reaches the Navigator's document)",
     async () => {
       const path = await copyOf("MarkerPanes");

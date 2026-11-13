@@ -124,7 +124,10 @@ export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode
     return;
   }
   // A script opens in the Highland-Style Editor when that is the default (highwater.highlandEditor).
-  if (doc.languageId.startsWith("highland-") && vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) {
+  // A .highland file's script counts even before VS Code has given it its language (it does so a
+  // moment after opening): otherwise it would show as text first, then switch.
+  const script = doc.languageId.startsWith("highland-") || (doc.uri.scheme === "highland" && /\.highland$/i.test(doc.uri.path));
+  if (script && vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) {
     await vscode.commands.executeCommand("vscode.openWith", doc.uri, HIGHLAND_EDITOR, { viewColumn: viewColumn ?? vscode.ViewColumn.Active, preview: false });
     return;
   }
