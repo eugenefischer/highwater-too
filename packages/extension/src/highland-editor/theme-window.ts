@@ -52,6 +52,7 @@ export class ThemeWindow {
       </div>
     </div>
   </div>
+  <label class="tm-dark"><input type="checkbox" class="tm-dark-box"> Show dark PDF pages with dark themes</label>
 </div>`;
     document.body.append(this.#root);
     const q = <T extends HTMLElement>(sel: string) => this.#root.querySelector(sel) as T;
@@ -73,6 +74,8 @@ export class ThemeWindow {
       }
     });
     q<HTMLButtonElement>(".tm-new").onclick = () => this.#new();
+    const dark = q<HTMLInputElement>(".tm-dark-box");
+    dark.onchange = () => this.post({ type: "darkPagesSet", on: dark.checked });
     q<HTMLButtonElement>(".tm-import-show").onclick = () => {
       this.#import.hidden = !this.#import.hidden;
       this.#importNote.textContent = "";
@@ -104,8 +107,9 @@ export class ThemeWindow {
     return !this.#root.hidden;
   }
 
-  update(current: string, customs: CustomTheme[]): void {
+  update(current: string, customs: CustomTheme[], darkPages: boolean): void {
     this.#current = current;
+    this.#root.querySelector<HTMLInputElement>(".tm-dark-box")!.checked = darkPages;
     // While editing, this window's own copy is newer than what comes back from the settings.
     if (this.#saveTimer === undefined) this.#customs = customs.map((t) => ({ ...t }));
     if (this.#selected && !this.#customs.some((t) => t.id === this.#selected)) this.#selected = null;

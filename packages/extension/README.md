@@ -31,7 +31,8 @@ Your script appears in a page-width column of Courier Prime, as in Highland 2. E
 - **Top bar:**
   - Switches between your text and the printed pages (⌘E).
   - Opens the template window, which shows each template with a page of your text in it, plus its options, such as fonts.
-  - Has **Choose Theme…**, which applies one of Highland 2's eleven colour themes to the page and, if you like, the whole window.
+  - Has a theme menu (the dotted circle at the top right), as in Highland 2: its eleven colour themes and your own, each shown with its colours. ↑ and ↓ try each one on the page and, if you like, the whole window; Enter keeps it and Escape puts back the one you had.
+  - **Manage Themes…** at the foot of that menu makes your own themes from Highland's ten theme colours, imports a theme from a link made by Highland's theme builder, and copies a theme's link to share. It also has **Show dark PDF pages with dark themes**.
 - **Counts:** characters, words and the exact page count, at the foot of the text.
 - **Writing keys:** Highland's (see [Shortcuts](#keyboard-shortcuts)).
 - **Completion:** in a screenplay, start a line in capitals and the characters who already speak are offered, most frequent first. You're also offered scene-heading prefixes and transitions, the script's locations after `INT.` or `EXT.`, and times of day after ` - `.
@@ -145,8 +146,10 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 
 | Setting | Default | What it does |
 |---|---|---|
-| `highwater.theme` | Match VS Code | Highland 2's colour theme for the Highwater Editor and the Navigator. |
-| `highwater.themeWindow` | on | Choose Theme… also colours the rest of VS Code to match. |
+| `highwater.theme` | Match VS Code | The colour theme for the Highwater Editor: VS Code's colours, one of Highland 2's, or one of your own. |
+| `highwater.customThemes` | none | Your own themes (easiest to change with Manage Themes…). |
+| `highwater.themeWindow` | on | Choosing a theme also colours the rest of VS Code to match. |
+| `highwater.darkPages` | off | With a dark theme, show the printed pages dark too. Saved PDFs are unchanged. |
 | `highwater.fontSize` | 0 | Text size in the Highwater Editor, in pixels. 0 follows VS Code's font size, scaled to about Highland's. |
 | `highwater.paragraphNumbers` | off | Paragraph numbers in the margin. |
 | `highwater.spellCheck` | off | Check spelling while typing (American English). |

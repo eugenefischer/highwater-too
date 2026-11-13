@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.47
+
+- **The theme menu, as Highland 2's:** the theme button drops a menu of the themes (Light, Dark, and your own), each with its five colours. ↑ and ↓ try each on the page (and the window, with `highwater.themeWindow` on); Enter or a click keeps it, Escape puts back the one you had. **Choose Theme…** opens it too.
+- **Your own themes:** **Manage Themes…** in the menu makes a theme (a copy of the one in use, then Highland's ten theme colours with their theme-builder names, light or dark, with a sample as you change them), imports one from a link made by Highland's theme builder, copies a theme's link in the same form, and deletes one. The window follows your theme through two new VS Code colour themes, Highwater Custom Light and Dark.
+- **Show dark PDF pages with dark themes** (in Manage Themes…, or `highwater.darkPages`): with a dark theme, the pages show in the theme's sidebar colours, as in Highland. Saved PDFs are unchanged.
+- Colours as Highland uses them: the selected sidebar tab is the theme's secondary colour (green in Material); section and heading lines (`#`) are the theme's primary colour and bold, left-aligned with their `#`s hanging in the margin (they were centred); invisibles are the same blue in every theme; a selected row in the sidebar is shaded as in Highland.
+
 ## 0.6.46
 
 - Internal tidying, with no change meant in what you see: the Bin, Scratchpad and images of .highland files and of plain files are now read and changed through one interface, with tests that pin what each operation leaves on disk.

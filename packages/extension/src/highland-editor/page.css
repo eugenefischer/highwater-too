@@ -317,6 +317,8 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 .tm-s-ws { color: var(--hl-whitespace); }
 .tm-s-sel { background: var(--hl-selection); }
 .tm-s-caret { display: inline-block; width: 2px; height: 1.1em; margin-left: 1px; vertical-align: text-bottom; background: var(--hl-caret); }
+.tm-dark { display: flex; align-items: center; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--hl-border); }
+body.dark-pages #pages { background: var(--hl-bg); }
 @media (max-width: 620px) { .tm-sheet .tw-body { flex-direction: column; } .tm-side { flex: none; border-right: 0; padding-right: 0; } }
 /* Highland's counts at the foot of the text. */
 #counts { display: flex; justify-content: center; gap: 2em; padding: 6px 0 8px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }

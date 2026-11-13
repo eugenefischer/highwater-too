@@ -232,7 +232,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (view.ready && e.affectsConfiguration("editor.renderWhitespace", document)) sendInvisibles();
-        if (view.ready && (e.affectsConfiguration("highwater.theme") || e.affectsConfiguration("highwater.customThemes"))) sendTheme();
+        if (view.ready && (e.affectsConfiguration("highwater.theme") || e.affectsConfiguration("highwater.customThemes") || e.affectsConfiguration("highwater.darkPages"))) sendTheme();
         if (view.ready && e.affectsConfiguration(SETTINGS_PREFIX)) sendTemplateValues();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();

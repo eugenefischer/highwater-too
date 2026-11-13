@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.46",
+  "version": "0.6.47",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -547,6 +547,11 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "When a theme is chosen, colour the whole VS Code window to match (VS Code's colour theme becomes **Highwater** + the theme's name, or **Highwater Custom Light** / **Dark** for your own themes). Choosing VS Code's colours puts back the colour theme you had before."
+        },
+        "highwater.darkPages": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "With a dark theme, show the printed pages dark too: the page in the theme's sidebar colour and the print in its sidebar text colour. Saved and exported PDFs are unchanged. Also in **Manage Themes…**."
         },
         "highwater.paragraphNumbers": {
           "type": "boolean",

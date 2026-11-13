@@ -26,7 +26,16 @@ export function themeVars(): Record<string, string> | null {
 }
 
 export function themesMessage(): Extract<ToPage, { type: "themes" }> {
-  return { type: "themes", current: currentThemeId(), customs: customThemes() };
+  const theme = themeFor(currentThemeId(), customThemes());
+  const dark = config().get<boolean>("darkPages", false);
+  return {
+    type: "themes",
+    current: currentThemeId(),
+    customs: customThemes(),
+    darkPagesSetting: dark,
+    // Highland 2's dark pages: the page in Sidebar Background, the print in Sidebar Text (measured from EJ's screenshot).
+    darkPages: dark && theme?.mode === "dark" ? { background: theme.sidebarBackground, text: theme.sidebarText } : null,
+  };
 }
 
 /** VS Code's colour theme now. */
@@ -104,6 +113,7 @@ export function handleThemeMessage(context: vscode.ExtensionContext, msg: FromPa
   else if (msg.type === "themePaneClose") stopTrying(context, msg.keep);
   else if (msg.type === "customThemesSave") void config().update("customThemes", msg.themes, vscode.ConfigurationTarget.Global);
   else if (msg.type === "customThemeDelete") void deleteTheme(context, msg.id);
+  else if (msg.type === "darkPagesSet") void config().update("darkPages", msg.on, vscode.ConfigurationTarget.Global);
   else if (msg.type === "copyText") void vscode.env.clipboard.writeText(msg.text).then(() => vscode.window.setStatusBarMessage(msg.note, 3000));
   else return false;
   return true;

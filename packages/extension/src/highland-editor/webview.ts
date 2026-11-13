@@ -520,7 +520,8 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);
   else if (msg.type === "themes") {
     themePane.update(msg.current, msg.customs);
-    themeWindow.update(msg.current, msg.customs);
+    themeWindow.update(msg.current, msg.customs, msg.darkPagesSetting);
+    pages.darkPages(msg.darkPages);
   } else if (msg.type === "showThemePane") {
     if (!themePane.shown) themePane.open();
   }

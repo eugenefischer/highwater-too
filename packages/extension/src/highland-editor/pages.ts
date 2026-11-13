@@ -75,6 +75,20 @@ export class Pages {
     window.addEventListener("resize", () => this.shown && this.#zoom.value === "fit" && this.#layout(this.#offsetAtTop()));
   }
 
+  #dark: { background: string; text: string } | null = null;
+
+  /**
+   * Dark pages (with a dark theme and "Show dark PDF pages with dark themes"): each page drawn in the
+   * theme's Sidebar Background with its Sidebar Text for the print, as Highland 2 shows them. The
+   * PDF itself is unchanged.
+   */
+  darkPages(colors: { background: string; text: string } | null): void {
+    if (JSON.stringify(colors) === JSON.stringify(this.#dark)) return;
+    this.#dark = colors;
+    document.body.classList.toggle("dark-pages", !!colors);
+    if (this.shown && this.#pdf) this.#layout(this.#offsetAtTop());
+  }
+
   /** The template menu in the top bar (shown with the text as well as the pages). */
   templates(list: readonly string[], current: string): void {
     this.#templateName = list.length ? current : "";
@@ -222,6 +236,7 @@ export class Pages {
     canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
     if (gen !== this.#generation) return;
+    if (this.#dark) darken(canvas, this.#dark.background, this.#dark.text);
     this.#pages.querySelector(`.page[data-index="${i}"]`)?.replaceChildren(canvas);
   }
 
@@ -278,4 +293,28 @@ export class Pages {
     for (const el of this.#pageEls()) if (el.offsetTop - this.#pages.offsetTop <= mid) n = Number(el.dataset.index) + 1;
     this.#status.textContent = `Page ${n} of ${this.#sizes.length}${this.#problems}`;
   }
+}
+
+const rgbOf = (hex: string): [number, number, number] => {
+  const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+/**
+ * A printed page recoloured dark: white paper becomes `background`, black print `text`, and the
+ * greys between in proportion; colours (revision colours, highlights, images) keep their hue.
+ */
+export function darken(canvas: HTMLCanvasElement, background: string, text: string): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx || !canvas.width || !canvas.height) return;
+  const bg = rgbOf(background);
+  const fg = rgbOf(text);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = image.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const grey = (d[i]! + d[i + 1]! + d[i + 2]!) / 3;
+    const light = grey / 255;
+    for (let c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, fg[c]! + (bg[c]! - fg[c]!) * light + (d[i + c]! - grey) * 0.8));
+  }
+  ctx.putImageData(image, 0, 0);
 }

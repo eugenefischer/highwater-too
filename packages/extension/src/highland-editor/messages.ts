@@ -124,7 +124,7 @@ export type ToPage =
   | { type: "select"; ranges: SelectionRange[] }
   | { type: "theme"; vars: Record<string, string> | null }
   /** The theme in use (highwater.theme) and your own themes, for the theme menu and window. */
-  | { type: "themes"; current: string; customs: CustomTheme[] }
+  | { type: "themes"; current: string; customs: CustomTheme[]; darkPagesSetting: boolean; darkPages: { background: string; text: string } | null }
   /** Choose Theme… from the Command Palette: the theme menu drops down. */
   | { type: "showThemePane" }
   | { type: "fontSize"; px: number | null }
@@ -176,6 +176,7 @@ export type FromPage =
   // The theme window: your own themes saved, one deleted (after asking), a theme link copied.
   | { type: "customThemesSave"; themes: CustomTheme[] }
   | { type: "customThemeDelete"; id: string }
+  | { type: "darkPagesSet"; on: boolean }
   | { type: "copyText"; text: string; note: string }
   | { type: "learnWord"; word: string }
   /** A comparison started or ended: the text can't be changed meanwhile. */
