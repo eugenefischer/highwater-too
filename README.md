@@ -2,12 +2,20 @@
 
 Highwater Too is a VS Code extension for writing screenplays and manuscripts in the `.highland` format used by Highland 2. It reads and writes `.highland` files without losing anything Highland 2 stored in them. It also works with plain `.fountain`, `.md` and `.txt` files. It was created because Highland 2 is no longer being developed, having been replaced by [Highland Pro](https://quoteunquoteapps.com/highland-pro/). 
 
-Highland Pro is undoubtedly great, and should be used instead of this by anyone who can justify a subscription to creative writing software. I, alas, cannot, as my blocks of time for doing creative writing are too irregular for a subscription model to make sense. I really just wanted to keep using Highland 2 forever, and a VS Code extension will let me do just that, with the added benefit of letting me (1) use it on any operating system, and (2) add git based version tracking with remote mirroring.
+Highland Pro is undoubtedly great, and anyone who can justify a subscription to creative writing software should use it and not this.
+
+Alas, my own blocks of time for doing creative writing are too irregular these days for subscription writing software to make sense. I really just want to keep using Highland 2 forever, and a VS Code extension will let me do just that, with the added benefit of letting me (1) use it on any operating system, and (2) add git based version tracking with remote mirroring.
+
+While I'm aiming for feature parity with Highland 2, I have no intention of trying to add any features unique to Highland Pro. If you want Highland Pro-specific features, including support for any changes or additions that may have been made to the .highland file type, please buy Highland Pro. 
 
 The extension is in active use. It has not been published to the VS Code Marketplace; builds are attached to the GitHub releases.
 
 <!-- Screenshot: a screenplay open in the Highwater Editor with the sidebar showing the Navigator. -->
 ![A screenplay in the Highwater Editor](docs/images/hero.png)
+
+## AI Use Disclosure
+
+The day job that keeps me from creative writing is working as a software developer. I write code myself when I'm paid to do so. I let Claude write all of this.
 
 ## What it does
 
@@ -22,7 +30,7 @@ The extension is in active use. It has not been published to the VS Code Marketp
 
 The print options (revision colours, paragraph numbers, synopses, notes, title page) and Highland's directives (`{{HEADER}}`, `{{FOOTER}}`, `{{PAGENUMBER}}`, `{{TOC}}`, `{{INCLUDE}}` and others) are supported. Manuscripts can also be exported to `.docx`.
 
-**Writing history.** Highland 2 had nothing like this. Each save is committed to a git repository in the system's application-data folder:
+**Writing history.** Each save is committed to a git repository in the system's application-data folder:
 
 - One branch per work, holding the unpacked contents of the `.highland` file at each save.
 - A catalog of works on `main` (titles, file names, dates and text hashes, no text).
