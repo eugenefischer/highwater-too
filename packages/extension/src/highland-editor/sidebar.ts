@@ -999,8 +999,8 @@ class HistoryPanel {
         : msg.mirror.error
           ? "Not mirrored yet"
           : msg.mirror.at
-            ? `Mirrored ${shortWhen(new Date(msg.mirror.at))}`
-            : "Mirror set up";
+            ? `Synced with the mirror ${shortWhen(new Date(msg.mirror.at))}`
+            : "Not synced with the mirror yet";
   }
 }
 

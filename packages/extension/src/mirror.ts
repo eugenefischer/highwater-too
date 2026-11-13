@@ -88,6 +88,10 @@ export class HistoryMirror implements vscode.Disposable {
     if (!result.ok && result.kind === "auth" && interactive && (await this.#offerSignIn(url, true))) result = await this.#track(h.exclusive(() => mirror.pull()));
     this.lastPull = Date.now();
     if (result.ok) {
+      // In touch with the mirror: when, for the Writing History panel (a push still failing keeps
+      // its error, since this computer's saves have not reached it).
+      this.state = { at: new Date(), error: this.state.error, signIn: false };
+      this.#changed.fire();
       if (result.removed.length) this.#removed.fire(result.removed);
       return result.updated;
     }

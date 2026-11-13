@@ -456,6 +456,10 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 #topbar select:hover { color: var(--hl-fg); }
 #topbar select option { color: var(--hl-panel-fg); background: var(--hl-panel-bg); }
 /* Tooltips for the top bar, as Highland's: a small dark label just below the control (webview.ts places it). */
+/* Scroll bars never sit in a band of their own colour: their track is whatever is behind them
+   (the sidebar's colour in the sidebar, the page's in the page), in every theme. */
+* { scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(128, 128, 128, 0.4)) transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 #hl-tip { position: fixed; z-index: 60; pointer-events: none; padding: 3px 7px; border-radius: 4px; font-family: var(--vscode-font-family); font-size: 12px; white-space: pre; max-width: 420px; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-editorHoverWidget-foreground, #ddd); background: var(--vscode-editorHoverWidget-background, #252526); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
 #hl-tip[hidden] { display: none; }
 #ptemplate { font: inherit; color: var(--hl-muted); background: transparent; border: 0; padding: 2px 4px; cursor: pointer; }

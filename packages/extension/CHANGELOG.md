@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.20
+
+- Scroll bars in the Highland-Style Editor (the sidebar's panels, the text, the pages, the help and template windows) no longer sit in a band of their own colour: their track is transparent, so it is the colour of whatever is behind it, in every theme.
+- The mirror line reads "Synced with the mirror" and the time after any exchange with the mirror, bringing saves in as well as sending them (it used to say "Mirror set up" after a check that brought nothing), and "Not synced with the mirror yet" before the first one. A failed send still shows "Not mirrored yet".
+
 ## 0.6.19
 
 - The Writing History panel's mirror line shows "Syncing with the mirror…" with a small spinner while the mirror is being checked for other computers' saves or sent this computer's, then the result as before.
