@@ -33,7 +33,10 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     vscode.commands.registerCommand("highwater.toggleInvisibles", toggleInvisibles),
     vscode.commands.registerCommand("highwater.newScreenplay", () => newDocument("screenplay")),
     vscode.commands.registerCommand("highwater.newManuscript", () => newDocument("manuscript")),
-    vscode.commands.registerCommand("highwater.newDocument", (kind?: NewKind, target?: vscode.Uri) => newAnyDocument(kind, target)),
+    // The editor's title bar passes the open document's URI, which is not a kind: then it asks.
+    vscode.commands.registerCommand("highwater.newDocument", (kind?: unknown, target?: unknown) =>
+      typeof kind === "string" ? newAnyDocument(kind as NewKind, target instanceof vscode.Uri ? target : undefined) : newAnyDocument(),
+    ),
     vscode.commands.registerCommand("highwater.useForMarkdown", useForMarkdown),
     vscode.commands.registerCommand("highwater.stopUsingForMarkdown", stopUsingForMarkdown),
     // Menus (the editor title button) pass the document's URI; only an explicit option sets where to save.

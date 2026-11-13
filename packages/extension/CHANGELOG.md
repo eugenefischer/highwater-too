@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.30
+
+- A **New Document** button in the editor's title bar, next to Export Text, in the Highwater Editor and the text editor: it asks which kind (a .highland screenplay or manuscript, or a plain .fountain or .md file), as New Document… does.
+
 ## 0.6.29
 
 - Fixed: a stray text cursor could stay drawn over the Highwater Editor, fixed in the window whatever you scrolled or switched to. It was the drop caret shown while dragging a Bin card or an image over the text, left behind when the drag was cancelled over the text (Escape): only the text listened for the drag ending, and a drag from the sidebar ends at the sidebar. Any end of a drag anywhere in the page now hides it, as does the pointer moving with no drag under way. Reloading the window clears one left by an earlier version.
