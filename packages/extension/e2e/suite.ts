@@ -668,6 +668,8 @@ export async function run(): Promise<void> {
   // Writing history only in its own test: its info.json write would race the other tests' checks.
   await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
   // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
+  // The extension starts when a document opens; its test commands are needed before that.
+  await vscode.extensions.getExtension("eugenefischer.highwater-too")!.activate();
   await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
   const failed: string[] = [];
   for (const [name, test] of tests) {
