@@ -392,6 +392,7 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .hist-row .sb-row-detail { white-space: normal; }
 #histstatus { flex: 1; min-width: 0; color: var(--nav-muted); font-size: 0.85em; line-height: 1.3; }
 #histstatus > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#histmirror.busy::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: -1px; border: 1.5px solid color-mix(in srgb, var(--nav-muted) 35%, transparent); border-top-color: var(--nav-muted); border-radius: 50%; animation: sb-spin 0.8s linear infinite; }
 #histmirror.attention { color: var(--nav-fg); text-decoration: underline; cursor: pointer; }
 #histrecord { color: var(--nav-accent); }
 #histrecord.paused { color: var(--nav-muted); }
@@ -604,7 +605,7 @@ body.previewing #preview { display: flex; }
     </section>
     <section data-panel="history" hidden>
       <div class="sb-head sb-head-help"><span id="histtitle"></span><button id="histhelp" class="sb-button sb-help" data-tip="How the Writing History works" aria-label="How the Writing History works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
-      <div class="sb-scroll"><div id="histlist" class="sb-rows" tabindex="0" role="listbox" aria-label="Saves"></div><div id="histnote" class="sb-note sb-loading">Loading saves…</div></div>
+      <div class="sb-scroll"><div id="histlist" class="sb-rows" tabindex="0" role="listbox" aria-label="Saves"></div><div id="histnote" class="sb-note sb-loading">Loading history…</div></div>
       <div class="sb-foot">
         <div id="histstatus"><div id="histstate"></div><div id="histmirror" hidden></div></div>
         <button id="histrecord" class="sb-button" data-tip="Turn Writing History Off for This Document" aria-label="Turn Writing History Off for This Document" hidden><svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><circle class="hist-dot" cx="12" cy="12" r="4" fill="currentColor"/></svg></button>

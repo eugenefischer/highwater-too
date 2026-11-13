@@ -21,6 +21,20 @@ export class HistoryMirror implements vscode.Disposable {
   state: { at: Date | null; error: string | null; signIn: boolean } = { at: null, error: null, signIn: false };
   readonly #changed = new vscode.EventEmitter<void>();
   readonly onDidChange = this.#changed.event;
+  /** How many exchanges with the mirror are under way (or waiting their turn). */
+  #active = 0;
+
+  /** True while the mirror is being pulled from or pushed to (shown in the Writing History panel). */
+  get busy(): boolean {
+    return this.#active > 0;
+  }
+
+  #track<T>(work: Promise<T>): Promise<T> {
+    if (this.#active++ === 0) this.#changed.fire();
+    return work.finally(() => {
+      if (--this.#active === 0) this.#changed.fire();
+    });
+  }
   readonly #removed = new vscode.EventEmitter<Removed>();
   /** Works removed from this computer because another computer deleted them (seen on any pull, push or fetch). */
   readonly onDidRemoveDeleted = this.#removed.event;
@@ -48,12 +62,12 @@ export class HistoryMirror implements vscode.Disposable {
     const h = this.history();
     if (!(await exists(h))) return false; // nothing recorded yet
     const mirror = new Mirror(h, url, () => this.#auth(url));
-    let result = await h.exclusive(() => mirror.push());
+    let result = await this.#track(h.exclusive(() => mirror.push()));
     // Needs a login (or a missing private repository the server will not admit to without one).
-    if (!result.ok && result.kind === "auth" && (await this.#offerSignIn(url, interactive))) result = await h.exclusive(() => mirror.push());
+    if (!result.ok && result.kind === "auth" && (await this.#offerSignIn(url, interactive))) result = await this.#track(h.exclusive(() => mirror.push()));
     if (!result.ok && result.kind === "missing" && (interactive || !this.#offered.has(url))) {
       this.#offered.add(url);
-      if (await this.#create(url, mirror)) result = await h.exclusive(() => mirror.push());
+      if (await this.#create(url, mirror)) result = await this.#track(h.exclusive(() => mirror.push()));
     }
     this.#record(result);
     if (result.ok && result.removed.length) this.#removed.fire(result.removed);
@@ -70,8 +84,8 @@ export class HistoryMirror implements vscode.Disposable {
     if (!url) return [];
     const h = this.history();
     const mirror = new Mirror(h, url, () => this.#auth(url));
-    let result = await h.exclusive(() => mirror.pull());
-    if (!result.ok && result.kind === "auth" && interactive && (await this.#offerSignIn(url, true))) result = await h.exclusive(() => mirror.pull());
+    let result = await this.#track(h.exclusive(() => mirror.pull()));
+    if (!result.ok && result.kind === "auth" && interactive && (await this.#offerSignIn(url, true))) result = await this.#track(h.exclusive(() => mirror.pull()));
     this.lastPull = Date.now();
     if (result.ok) {
       if (result.removed.length) this.#removed.fire(result.removed);
@@ -95,7 +109,7 @@ export class HistoryMirror implements vscode.Disposable {
     const mirror = new Mirror(h, url, () => this.#auth(url));
     let deleted = false;
     const attempt = () =>
-      h.exclusive(() => mirror.fetchWork(branch)).then(
+      this.#track(h.exclusive(() => mirror.fetchWork(branch))).then(
         (r) => {
           if (r.removed.length) this.#removed.fire(r.removed);
           deleted = r.deleted;

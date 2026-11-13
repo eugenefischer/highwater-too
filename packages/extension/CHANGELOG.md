@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.19
+
+- The Writing History panel's mirror line shows "Syncing with the mirror…" with a small spinner while the mirror is being checked for other computers' saves or sent this computer's, then the result as before.
+- The panel's loading message reads "Loading history…".
+
 ## 0.6.18
 
 - The Writing History and Works panels (and the status bar's last save) no longer wait for the mirror. Opening a document brings in other computers' saves from the mirror, which can take a few seconds over the network, and reading the history for display used to queue behind it. It now reads what is on this computer straight away; the panels update again when the pull brings anything new. The Works list also reads each work's latest save side by side instead of one after another.

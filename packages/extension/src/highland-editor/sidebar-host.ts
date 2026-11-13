@@ -194,7 +194,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       saves,
       state: off ? "off" : state,
       document: !!k,
-      mirror: remote && mirror ? { at: mirror.at?.getTime() ?? null, error: mirror.error, signIn: mirror.signIn } : null,
+      mirror: remote && mirror ? { at: mirror.at?.getTime() ?? null, error: mirror.error, signIn: mirror.signIn, busy: mirror.busy } : null,
       menu,
     });
   };

@@ -835,7 +835,7 @@ interface HistoryMessage {
   saves: HistorySave[];
   state: "on" | "paused" | "off" | "none";
   document: boolean;
-  mirror: { at: number | null; error: string | null; signIn: boolean } | null;
+  mirror: { at: number | null; error: string | null; signIn: boolean; busy: boolean } | null;
   menu: MenuItem[];
 }
 
@@ -986,12 +986,15 @@ class HistoryPanel {
     rec.setAttribute("aria-label", tip);
     const mirror = $("histmirror");
     mirror.hidden = !msg.mirror || msg.state === "off";
-    mirror.classList.toggle("attention", !!msg.mirror?.signIn);
+    mirror.classList.toggle("attention", !!msg.mirror?.signIn && !msg.mirror.busy);
     if (msg.mirror?.error) mirror.dataset.tip = msg.mirror.error;
     else delete mirror.dataset.tip;
+    mirror.classList.toggle("busy", !!msg.mirror?.busy);
     mirror.textContent = !msg.mirror
       ? ""
-      : msg.mirror.signIn
+      : msg.mirror.busy
+        ? "Syncing with the mirror…"
+        : msg.mirror.signIn
         ? "Mirror needs you to sign in"
         : msg.mirror.error
           ? "Not mirrored yet"
