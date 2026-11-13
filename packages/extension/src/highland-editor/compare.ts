@@ -36,6 +36,8 @@ export class Compare {
     private readonly topOffset: () => number,
     /** True for a transaction that brings in the document's text from outside (not the writer's edit). */
     private readonly fromOutside: (tr: Transaction) => boolean,
+    /** The save being compared, or null when comparing stops (the Writing History outlines it). */
+    private readonly onChange: (hash: string | null) => void,
   ) {
     this.extension = this.#slot.of([]);
     this.#bar = document.getElementById("cmpbar")!;
@@ -72,6 +74,7 @@ export class Compare {
     this.#bar.hidden = false;
     this.#describe();
     this.post({ type: "comparing", on: true });
+    this.onChange(hash);
     this.#showAtTop(top);
   }
 
@@ -89,6 +92,7 @@ export class Compare {
     this.#bar.hidden = true;
     this.#hint(false);
     this.post({ type: "comparing", on: false });
+    this.onChange(null);
     if (!v) return;
     v.dispatch({ effects: this.#slot.reconfigure([]) });
     if (at !== undefined) {

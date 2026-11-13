@@ -15,6 +15,8 @@ export class HistoryPanel {
   readonly #record = $<HTMLButtonElement>("histrecord");
   #saves: HistorySave[] = [];
   #selected: string | null = null;
+  /** The save being compared in the page, if any (outlined). */
+  #compared: string | null = null;
   #menu: MenuItem[] = [];
 
   constructor(private readonly deps: SidebarDeps) {
@@ -125,7 +127,14 @@ export class HistoryPanel {
       const on = r.dataset.hash === this.#selected;
       r.classList.toggle("selected", on);
       r.setAttribute("aria-selected", String(on));
+      r.classList.toggle("compared", r.dataset.hash === this.#compared);
     }
+  }
+
+  /** The save the page is comparing with (null when it stops): its row is outlined. */
+  compared(hash: string | null): void {
+    this.#compared = hash;
+    this.#mark();
   }
 
   #compare(hash: string): void {

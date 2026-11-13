@@ -117,6 +117,8 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .hist-delta { margin-left: auto; flex: none; color: var(--nav-muted); font-size: 0.9em; font-variant-numeric: tabular-nums; }
 .hist-row.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
 .hist-row.selected .hist-delta { visibility: hidden; }
+/* The save being compared in the page: outlined in the accent colour of the border round the page. */
+.hist-row.compared { box-shadow: inset 0 0 0 2px var(--hl-accent); }
 .hist-row .sb-row-tools { position: absolute; top: 2px; right: 3px; display: none; }
 .hist-row.selected .sb-row-tools { display: flex; }
 .hist-row .sb-row-detail { white-space: normal; }
@@ -351,7 +353,8 @@ body.comparing #editor { height: calc(100% - 36px); }
 /* A border in the theme's accent colour round the bar and the text while comparing, drawn over them (no change to the layout). */
 body.comparing #main { position: relative; }
 body.comparing #main::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--hl-accent); border-radius: 3px; pointer-events: none; z-index: 20; }
-.cm-editor .cm-content .cm-changedLine { background: color-mix(in srgb, #2e9e50 9%, transparent) !important; }
-.cm-editor .cm-content .cm-changedText { background: color-mix(in srgb, #2e9e50 28%, transparent) !important; text-decoration: none !important; border-radius: 2px; }
-.cm-editor .cm-content .cm-deletedChunk { background: color-mix(in srgb, #d14b4b 9%, transparent) !important; padding: 0 !important; }
-.cm-editor .cm-content .cm-deletedChunk del, .cm-editor .cm-content .cm-deletedText { background: color-mix(in srgb, #d14b4b 28%, transparent) !important; text-decoration: line-through; text-decoration-color: color-mix(in srgb, #d14b4b 80%, transparent); border-radius: 2px; }
+/* The tints: the Highland theme's (themes.ts diffTints), else mixed for VS Code's colours. */
+.cm-editor .cm-content .cm-changedLine { background: var(--hl-add-line, color-mix(in srgb, #2ea043 14%, transparent)) !important; }
+.cm-editor .cm-content .cm-changedText { background: var(--hl-add-text, color-mix(in srgb, #2ea043 32%, transparent)) !important; text-decoration: none !important; border-radius: 2px; }
+.cm-editor .cm-content .cm-deletedChunk { background: var(--hl-del-line, color-mix(in srgb, #e5534b 14%, transparent)) !important; padding: 0 !important; }
+.cm-editor .cm-content .cm-deletedChunk del, .cm-editor .cm-content .cm-deletedText { background: var(--hl-del-text, color-mix(in srgb, #e5534b 32%, transparent)) !important; text-decoration: line-through; text-decoration-color: var(--hl-del, #e5534b); border-radius: 2px; }

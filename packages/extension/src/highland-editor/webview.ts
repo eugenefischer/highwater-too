@@ -194,6 +194,7 @@ const compare = new Compare(
   (msg) => vscode.postMessage(msg),
   () => topOffset(),
   (tr) => !!tr.annotation(remote),
+  (hash) => sidebar.compared(hash),
 );
 
 function start(text: string): void {

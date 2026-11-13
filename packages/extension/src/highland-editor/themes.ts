@@ -19,20 +19,23 @@ export interface HighlandTheme {
   sceneHeading: string;
   notes: string;
   cursor: string;
+  /** Compare: the colours added and removed text are tinted with (theirs where the theme has them). */
+  added: string;
+  removed: string;
 }
 
 export const HIGHLAND_THEMES: Record<string, HighlandTheme> = {
-  "classic": { name: "Classic", mode: "light", background: "#ffffff", text: "#2d333b", sidebarBackground: "#3f4752", sidebarText: "#c4cace", primary: "#b36795", secondary: "#2faad1", inactive: "#9bacba", sceneHeading: "#3f4752", notes: "#499c91", cursor: "#f85e66" },
-  "clean": { name: "Clean", mode: "light", background: "#ffffff", text: "#2d333b", sidebarBackground: "#f3f3f3", sidebarText: "#4a4a4a", primary: "#2faad1", secondary: "#b36795", inactive: "#888888", sceneHeading: "#06455f", notes: "#499c91", cursor: "#f85e66" },
-  "winter": { name: "Winter", mode: "light", background: "#f5f5f5", text: "#333333", sidebarBackground: "#e3e3e3", sidebarText: "#3a3a3a", primary: "#326878", secondary: "#5795a0", inactive: "#696969", sceneHeading: "#84697c", notes: "#5e4630", cursor: "#d36671" },
-  "kermit": { name: "Kermit", mode: "light", background: "#ffffff", text: "#333333", sidebarBackground: "#eeeeee", sidebarText: "#4a4a4a", primary: "#148456", secondary: "#00ab6b", inactive: "#999999", sceneHeading: "#079e65", notes: "#00ab6b", cursor: "#0be370" },
-  "solarized-light": { name: "Solarized Light", mode: "light", background: "#fdf6e3", text: "#657b83", sidebarBackground: "#ddd7d0", sidebarText: "#586e75", primary: "#268bd2", secondary: "#2aa198", inactive: "#839496", sceneHeading: "#6c71c4", notes: "#b58900", cursor: "#d33682" },
-  "dark-mode": { name: "Dark Mode", mode: "dark", background: "#000000", text: "#aaaaaa", sidebarBackground: "#111111", sidebarText: "#888888", primary: "#b8c663", secondary: "#aa5b7f", inactive: "#848484", sceneHeading: "#74a2a5", notes: "#b8c663", cursor: "#c86e75" },
-  "dracula": { name: "Dracula", mode: "dark", background: "#282a36", text: "#f8f8f2", sidebarBackground: "#202026", sidebarText: "#ccccca", primary: "#50fa7b", secondary: "#ffb86c", inactive: "#6272a4", sceneHeading: "#bd93f9", notes: "#ff79c6", cursor: "#f1fa8c" },
-  "material": { name: "Material", mode: "dark", background: "#263238", text: "#eeffff", sidebarBackground: "#192226", sidebarText: "#657b83", primary: "#39adb5", secondary: "#91b859", inactive: "#65737e", sceneHeading: "#bb80b3", notes: "#ef5471", cursor: "#f07178" },
-  "monokai": { name: "Monokai", mode: "dark", background: "#232323", text: "#f7f7f7", sidebarBackground: "#191919", sidebarText: "#999999", primary: "#f62d73", secondary: "#66d9ef", inactive: "#808080", sceneHeading: "#e6db74", notes: "#a6e22e", cursor: "#a6e22e" },
-  "solarized-dark": { name: "Solarized Dark", mode: "dark", background: "#073642", text: "#839496", sidebarBackground: "#091f23", sidebarText: "#657b83", primary: "#d33682", secondary: "#2aa198", inactive: "#708284", sceneHeading: "#2aa198", notes: "#b58900", cursor: "#859900" },
-  "transit": { name: "Transit", mode: "dark", background: "#1c0c19", text: "#c6bac1", sidebarBackground: "#140611", sidebarText: "#a7969e", primary: "#bc2e9e", secondary: "#ea3f3f", inactive: "#a7969e", sceneHeading: "#2faad1", notes: "#e7ea09", cursor: "#bedc3c" },
+  "classic": { name: "Classic", mode: "light", background: "#ffffff", text: "#2d333b", sidebarBackground: "#3f4752", sidebarText: "#c4cace", primary: "#b36795", secondary: "#2faad1", inactive: "#9bacba", sceneHeading: "#3f4752", notes: "#499c91", cursor: "#f85e66", added: "#2da44e", removed: "#cf222e" },
+  "clean": { name: "Clean", mode: "light", background: "#ffffff", text: "#2d333b", sidebarBackground: "#f3f3f3", sidebarText: "#4a4a4a", primary: "#2faad1", secondary: "#b36795", inactive: "#888888", sceneHeading: "#06455f", notes: "#499c91", cursor: "#f85e66", added: "#2da44e", removed: "#cf222e" },
+  "winter": { name: "Winter", mode: "light", background: "#f5f5f5", text: "#333333", sidebarBackground: "#e3e3e3", sidebarText: "#3a3a3a", primary: "#326878", secondary: "#5795a0", inactive: "#696969", sceneHeading: "#84697c", notes: "#5e4630", cursor: "#d36671", added: "#2da44e", removed: "#cf222e" },
+  "kermit": { name: "Kermit", mode: "light", background: "#ffffff", text: "#333333", sidebarBackground: "#eeeeee", sidebarText: "#4a4a4a", primary: "#148456", secondary: "#00ab6b", inactive: "#999999", sceneHeading: "#079e65", notes: "#00ab6b", cursor: "#0be370", added: "#2da44e", removed: "#cf222e" },
+  "solarized-light": { name: "Solarized Light", mode: "light", background: "#fdf6e3", text: "#657b83", sidebarBackground: "#ddd7d0", sidebarText: "#586e75", primary: "#268bd2", secondary: "#2aa198", inactive: "#839496", sceneHeading: "#6c71c4", notes: "#b58900", cursor: "#d33682", added: "#859900", removed: "#dc322f" },
+  "dark-mode": { name: "Dark Mode", mode: "dark", background: "#000000", text: "#aaaaaa", sidebarBackground: "#111111", sidebarText: "#888888", primary: "#b8c663", secondary: "#aa5b7f", inactive: "#848484", sceneHeading: "#74a2a5", notes: "#b8c663", cursor: "#c86e75", added: "#3fb950", removed: "#f85149" },
+  "dracula": { name: "Dracula", mode: "dark", background: "#282a36", text: "#f8f8f2", sidebarBackground: "#202026", sidebarText: "#ccccca", primary: "#50fa7b", secondary: "#ffb86c", inactive: "#6272a4", sceneHeading: "#bd93f9", notes: "#ff79c6", cursor: "#f1fa8c", added: "#50fa7b", removed: "#ff5555" },
+  "material": { name: "Material", mode: "dark", background: "#263238", text: "#eeffff", sidebarBackground: "#192226", sidebarText: "#657b83", primary: "#39adb5", secondary: "#91b859", inactive: "#65737e", sceneHeading: "#bb80b3", notes: "#ef5471", cursor: "#f07178", added: "#c3e88d", removed: "#ff5370" },
+  "monokai": { name: "Monokai", mode: "dark", background: "#232323", text: "#f7f7f7", sidebarBackground: "#191919", sidebarText: "#999999", primary: "#f62d73", secondary: "#66d9ef", inactive: "#808080", sceneHeading: "#e6db74", notes: "#a6e22e", cursor: "#a6e22e", added: "#a6e22e", removed: "#f92672" },
+  "solarized-dark": { name: "Solarized Dark", mode: "dark", background: "#073642", text: "#839496", sidebarBackground: "#091f23", sidebarText: "#657b83", primary: "#d33682", secondary: "#2aa198", inactive: "#708284", sceneHeading: "#2aa198", notes: "#b58900", cursor: "#859900", added: "#859900", removed: "#dc322f" },
+  "transit": { name: "Transit", mode: "dark", background: "#1c0c19", text: "#c6bac1", sidebarBackground: "#140611", sidebarText: "#a7969e", primary: "#bc2e9e", secondary: "#ea3f3f", inactive: "#a7969e", sceneHeading: "#2faad1", notes: "#e7ea09", cursor: "#bedc3c", added: "#5ccf7a", removed: "#ff5f6d" },
 };
 
 /** The chosen theme, or null for VS Code's colours (and for a name that isn't one of Highland's). */
@@ -43,6 +46,7 @@ export function themeFor(setting: string | undefined): HighlandTheme | null {
 /** The page's colour variables for a theme (the Highwater Editor's CSS reads these). */
 export function pageColors(t: HighlandTheme): Record<string, string> {
   return {
+    ...diffTints(t),
     "--hl-bg": t.background,
     "--hl-fg": t.text,
     "--hl-scene": t.sceneHeading,
@@ -297,4 +301,76 @@ export function colorTheme(t: HighlandTheme): object {
       { scope: ["markup.underline.link"], settings: { foreground: t.primary } },
     ],
   };
+}
+
+/**
+ * Compare's tints for a theme, as solid colours over its page: a changed line's background, and the
+ * stronger background of the added or removed words in it. Each is mixed just strong enough to
+ * stand out from the page (a colour difference, ΔE, of up to 11 for a line and 26 for words), but
+ * not so strong that the text on it becomes hard to read.
+ */
+export function diffTints(t: HighlandTheme): Record<string, string> {
+  const bg = rgb(t.background);
+  const fg = rgb(t.text);
+  // Text on the tints keeps a contrast of 5.5 (above WCAG's 4.5), or three quarters of the theme's own when that is lower.
+  const floor = Math.min(5.5, contrast(fg, bg) * 0.75);
+  // A tint must also look like its colour: on some pages (Transit's purple) a little green mixed in
+  // only greys the page, so the tint must lean that colour's way by `lean` (in Lab's a and b).
+  /** How far a colour leans towards `color`'s hue, in Lab's a and b. */
+  const leaning = (color: Rgb) => {
+    const [, ca, cb] = lab(color);
+    const length = Math.hypot(ca, cb) || 1;
+    return (c: Rgb) => {
+      const [, a, b] = lab(c);
+      return (a * ca + b * cb) / length;
+    };
+  };
+  const tint = (color: Rgb, target: number, lean: number, keepText: boolean): Rgb => {
+    const leans = leaning(color);
+    let mixed = bg;
+    for (let p = 0.05; p <= 0.6; p += 0.01) {
+      const next = blend(color, bg, p);
+      if (keepText && contrast(fg, next) < floor) break;
+      mixed = next;
+      if (deltaE(next, bg) >= target && leans(next) >= lean) break;
+    }
+    return mixed;
+  };
+  // The words first; the line a step lighter than them (where the words had to stay light to keep
+  // the text readable, the line is lighter still, so the words still stand out from it).
+  const pair = (color: string) => {
+    const c = rgb(color);
+    const words = tint(c, 26, 10, true);
+    const line = tint(c, Math.max(7, Math.min(11, deltaE(words, bg) - 7)), Math.min(5, leaning(c)(words) - 8), false);
+    return [hex(line), hex(words)] as const;
+  };
+  const [addLine, addText] = pair(t.added);
+  const [delLine, delText] = pair(t.removed);
+  return { "--hl-add-line": addLine, "--hl-add-text": addText, "--hl-del-line": delLine, "--hl-del-text": delText, "--hl-del": t.removed };
+}
+
+type Rgb = [number, number, number];
+const rgb = (h: string): Rgb => [0, 2, 4].map((i) => parseInt(h.slice(1 + i, 3 + i), 16) / 255) as Rgb;
+const hex = (c: Rgb) => `#${c.map((x) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, "0")).join("")}`;
+const blend = (a: Rgb, b: Rgb, p: number): Rgb => [0, 1, 2].map((i) => a[i]! * p + b[i]! * (1 - p)) as Rgb;
+const linear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const luminance = (c: Rgb) => 0.2126 * linear(c[0]) + 0.7152 * linear(c[1]) + 0.0722 * linear(c[2]);
+/** WCAG contrast ratio. */
+export function contrast(a: Rgb, b: Rgb): number {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m) as [number, number];
+  return (x + 0.05) / (y + 0.05);
+}
+/** CIE Lab (D65). */
+function lab(c: Rgb): Rgb {
+  const [r, g, bl] = c.map(linear) as Rgb;
+  const f = (v: number) => (v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
+  const x = f((0.4124 * r + 0.3576 * g + 0.1805 * bl) / 0.95047);
+  const y = f(0.2126 * r + 0.7152 * g + 0.0722 * bl);
+  const z = f((0.0193 * r + 0.1192 * g + 0.9505 * bl) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+/** CIE76 colour difference. */
+export function deltaE(a: Rgb, b: Rgb): number {
+  const [p, q] = [lab(a), lab(b)];
+  return Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!, p[2]! - q[2]!);
 }

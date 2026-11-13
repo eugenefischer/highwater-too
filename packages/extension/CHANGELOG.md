@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.40
+
+- Compare: the save being compared is outlined in the Writing History, in the same colour as the border.
+- Compare: the green and red tints are worked out for each of Highland's themes, from its own greens and reds where it has them (Solarized, Dracula, Material, Monokai): each is just strong enough to stand out from that theme's page, without making the text on it hard to read. Each tint also has to look like its colour (on Transit's purple page a little green only greyed it), and the added or removed words stand out from their line. Before, one fixed tint was too faint on several dark themes (barely visible red in Solarized Dark). With VS Code's own colours the tints are a little stronger than before.
+
 ## 0.6.39
 
 - Compare: the Changes Only / Show All button is gone; the comparison always shows the whole text, and ‹ › step between changes.

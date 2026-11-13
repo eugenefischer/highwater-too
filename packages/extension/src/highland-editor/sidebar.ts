@@ -79,6 +79,11 @@ export class Sidebar {
   textChanged(): void {
     this.#nav.textChanged();
   }
+  /** The save the page is comparing with, or null: outlined in the Writing History. */
+  compared(hash: string | null): void {
+    this.#history.compared(hash);
+  }
+
   cursorMoved(): void {
     this.#nav.cursorMoved();
   }
