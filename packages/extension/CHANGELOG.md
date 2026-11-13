@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.36
+
+- Internal cleanup, with no change to what the app does:
+  - The messages between the extension and the Highwater Editor's page are typed in one place, `messages.ts`. This found four message handlers for messages the page never sends, which are removed.
+  - The sidebar's page code is split into one file per panel.
+  - The page's stylesheet and markup move out of `provider.ts` into `page.css` and `page-html.ts`. The page the webview loads is byte-for-byte the same.
+  - The writing history's work commands and its tree view move out of `registerHistory`.
+  - A shared debounce helper replaces five hand-written timers, with the same delays.
+  - Unused code is removed, and the build now fails on unused variables and imports.
 ## 0.6.35
 
 - Compare goes back to VS Code's side-by-side comparison, from the Writing History and from a save in Works. The in-page comparison (0.6.31–0.6.34) is removed: its scroll-bar marks never matched where the changes were in VS Code. Its code is kept on the in-page-compare branch.
