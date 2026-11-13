@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.48
+
+- **Show Page Breaks** (in the Highwater Editor's title-bar menu, or `highwater.pageBreaks`), as in Highland 2: where each printed page starts, a short line in the right margin with the page number under it, also in the middle of a paragraph that breaks across pages. It comes from the same layout as the page count, a second after you stop typing.
+- Show Invisibles marks line ends with ¶, as Highland does.
+- Section names in the Navigator are in the sidebar's text colour, bold, as in Highland (they were the theme's secondary colour).
+
 ## 0.6.47
 
 - **The theme menu, as Highland 2's:** the theme button drops a menu of the themes (Light, Dark, and your own), each with its five colours. ↑ and ↓ try each on the page (and the window, with `highwater.themeWindow` on); Enter or a click keeps it, Escape puts back the one you had. **Choose Theme…** opens it too.

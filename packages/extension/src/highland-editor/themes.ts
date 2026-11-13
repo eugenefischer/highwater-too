@@ -12,7 +12,7 @@ export interface HighlandTheme {
   sidebarText: string;
   /** Selection, Find matches, the current Navigator item. */
   primary: string;
-  /** Sections in the Navigator. */
+  /** The selected sidebar tab. */
   secondary: string;
   /** Markup and other quiet text: directives, omitted text, the title page, synopses. */
   inactive: string;
@@ -154,7 +154,8 @@ export function navigatorColors(t: HighlandTheme): Record<string, string> {
   return {
     "--nav-bg": t.sidebarBackground,
     "--nav-fg": t.sidebarText,
-    "--nav-section": t.secondary,
+    // Sections in the Navigator: Sidebar Text, bold (EJ's screenshot of Highland).
+    "--nav-section": t.sidebarText,
     "--nav-muted": t.inactive,
     // A selected row (the Navigator's current item, a Bin card, a save, a work): Sidebar Text at
     // 20% over Sidebar Background, measured from EJ's screenshot of Highland.

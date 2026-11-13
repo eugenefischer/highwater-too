@@ -27,6 +27,17 @@ describe("exportScreenplay", () => {
     expect(result.pages).toBe(31);
   });
 
+  it("says where each numbered page starts (Show Page Breaks): the title page has none", async () => {
+    const path = join(generated, "ScreenplayEdgeCases.highland");
+    const text = HighlandBundle.fromZip(new Uint8Array(readFileSync(path))).text;
+    const result = await exportScreenplay({ text, path, fontDir: defaultFontDir(), render: false });
+    const starts = result.pageStarts.filter((_, i) => i % 2 === 0);
+    const numbers = result.pageStarts.filter((_, i) => i % 2 === 1);
+    expect(numbers).toEqual(Array.from({ length: result.pages - 1 }, (_, i) => i + 1));
+    expect(starts).toEqual([...starts].sort((a, b) => a - b));
+    expect(text.slice(starts[0], starts[0]! + 17)).toBe("INT. TEST KITCHEN"); // the section line does not print
+  });
+
   it("merges {{INCLUDE}} files by path (Highland only prints them with a macOS bookmark)", async () => {
     const path = join(generated, "ScreenplayEdgeCases.highland");
     const text = HighlandBundle.fromZip(new Uint8Array(readFileSync(path))).text;

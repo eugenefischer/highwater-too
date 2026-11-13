@@ -4,7 +4,7 @@ import { MODES, type ParseCache } from "../language.ts";
 import { SETTINGS_PREFIX, setTemplateOption, TEMPLATE_INFO, templateOptions } from "../template-options.ts";
 import { onDidChangeTemplate, PRINT_OPTIONS, printOptionsOf, renderDocument, setPrintOption, setTemplate, templateOf, TEMPLATES, type PrintOption, type Template } from "../render-document.ts";
 import { documentStats } from "../syntax/stats.ts";
-import { onDidChangePageCount, pageCountOf } from "../page-count.ts";
+import { onDidChangePageCount, pageCountOf, pageStartsOf } from "../page-count.ts";
 import type { BundleStore } from "../store.ts";
 import { parse, type Document } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
@@ -121,6 +121,12 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
     const sendNumbers = () => postTo(panel, { type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
+    // Show Page Breaks (highwater.pageBreaks): where each page starts, from the page count's layout.
+    const sendPageBreaks = () => {
+      const on = vscode.workspace.getConfiguration("highwater").get<boolean>("pageBreaks", false);
+      const starts = on ? pageStartsOf(document) : [];
+      postTo(panel, { type: "pageBreaks", starts: starts.map((v, i) => (i % 2 === 0 ? toPage(v) : v)) });
+    };
     // The template window's options (settings for every document).
     const sendTemplateValues = () => postTo(panel, { type: "templateValues", values: Object.fromEntries(TEMPLATE_INFO.map((t) => [t.name, templateOptions(t.name)])) });
     // The top bar's template menu, shown with the text too.
@@ -175,6 +181,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendTheme();
           sendFontSize();
           sendNumbers();
+          sendPageBreaks();
           sendSpelling();
           void sendTemplate();
           sendCounts();
@@ -236,11 +243,15 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && e.affectsConfiguration(SETTINGS_PREFIX)) sendTemplateValues();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
+        if (view.ready && e.affectsConfiguration("highwater.pageBreaks")) sendPageBreaks();
         if (view.ready && (e.affectsConfiguration("highwater.spellCheck") || e.affectsConfiguration("highwater.spellingWords"))) sendSpelling();
       }),
       // A template or print option changed (here, or in the status bar): lay the pages out again.
       onDidChangePageCount((d) => {
-        if (view.ready && d.uri.toString() === document.uri.toString()) sendCounts();
+        if (view.ready && d.uri.toString() === document.uri.toString()) {
+          sendCounts();
+          sendPageBreaks();
+        }
       }),
       onDidChangeTemplate((d) => {
         if (d.uri.toString() !== document.uri.toString()) return;
@@ -560,6 +571,10 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
     vscode.commands.registerCommand("highwater.nextMisspelling", () => {
       const v = activeView();
       if (v) postTo(v.panel, { type: "nextMisspelling" });
+    }),
+    vscode.commands.registerCommand("highwater.togglePageBreaks", async () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      await config.update("pageBreaks", !config.get<boolean>("pageBreaks", false), vscode.ConfigurationTarget.Global);
     }),
     vscode.commands.registerCommand("highwater.toggleParagraphNumbers", async () => {
       const config = vscode.workspace.getConfiguration("highwater");

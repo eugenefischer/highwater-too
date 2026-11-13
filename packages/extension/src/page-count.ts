@@ -7,15 +7,22 @@ import { activeDocument, onDidChangeActiveSurface } from "./surface.ts";
 /**
  * The exact page count, as Highland shows it under its text: the document laid out with its print
  * template and options (no PDF drawn), a second after typing stops. Every page, the title page too
- * (Highland's 57 for Astounding is its PDF's 57).
+ * (Highland's 57 for Astounding is its PDF's 57). The same layout says where each page starts (Show Page Breaks).
  */
 const counts = new Map<string, number>();
+const starts = new Map<string, string>();
 const changed = new vscode.EventEmitter<vscode.TextDocument>();
 export const onDidChangePageCount = changed.event;
 
 /** The last exact count for a document, or undefined until its first layout is done. */
 export function pageCountOf(doc: vscode.TextDocument): number | undefined {
   return counts.get(doc.uri.toString());
+}
+
+/** Where each numbered page starts, as [source offset, page number] pairs, from the last layout. */
+export function pageStartsOf(doc: vscode.TextDocument): number[] {
+  const s = starts.get(doc.uri.toString());
+  return s ? (JSON.parse(s) as number[]) : [];
 }
 
 /** After typing stops, a layout takes this long to start. */
@@ -31,8 +38,10 @@ export function registerPageCounts(context: vscode.ExtensionContext, store: Bund
     try {
       const laid = await renderDocument(context, store, doc, undefined, false);
       if (generation.get(key) !== mine || !laid) return;
-      if (counts.get(key) === laid.pages) return;
+      const where = JSON.stringify(laid.pageStarts ?? []);
+      if (counts.get(key) === laid.pages && starts.get(key) === where) return;
       counts.set(key, laid.pages);
+      starts.set(key, where);
       changed.fire(doc);
     } catch {
       // A document that can't be laid out keeps its last count (the preview shows the error).
@@ -63,6 +72,7 @@ export function registerPageCounts(context: vscode.ExtensionContext, store: Bund
     vscode.workspace.onDidOpenTextDocument((doc) => doc === activeDocument() && schedule(doc, 0)),
     vscode.workspace.onDidCloseTextDocument((doc) => {
       counts.delete(doc.uri.toString());
+      starts.delete(doc.uri.toString());
       generation.delete(doc.uri.toString());
     }),
   );

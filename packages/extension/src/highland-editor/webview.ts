@@ -73,6 +73,51 @@ function lineCss(left: number, width?: number): { style?: string } {
   return parts.length ? { style: parts.join("; ") } : {};
 }
 
+/**
+ * Show Page Breaks, as Highland 2's: at the start of each printed page, a short line in the right
+ * margin with the page number under it. The starts come from the extension's layout a second after
+ * typing stops; edits meanwhile carry them along.
+ */
+class PageBreak extends WidgetType {
+  constructor(readonly page: number) {
+    super();
+  }
+  override toDOM(): HTMLElement {
+    const at = document.createElement("span");
+    at.className = "hl-pagebreak";
+    const mark = document.createElement("span");
+    mark.className = "hl-pagebreak-mark";
+    const n = document.createElement("span");
+    n.textContent = String(this.page);
+    mark.append(n);
+    at.append(mark);
+    return at;
+  }
+  override eq(other: PageBreak): boolean {
+    return other.page === this.page;
+  }
+  override ignoreEvent(): boolean {
+    return true;
+  }
+}
+const setPageBreaks = StateEffect.define<number[]>();
+const pageBreaks = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, tr) {
+    for (const e of tr.effects)
+      if (e.is(setPageBreaks)) {
+        const b = new RangeSetBuilder<Decoration>();
+        const pairs: [number, number][] = [];
+        for (let i = 0; i + 1 < e.value.length; i += 2) if (e.value[i]! <= tr.state.doc.length) pairs.push([e.value[i]!, e.value[i + 1]!]);
+        pairs.sort((x, y) => x[0] - y[0]);
+        for (const [at, n] of pairs) b.add(at, at, Decoration.widget({ widget: new PageBreak(n), side: -1 }));
+        return b.finish();
+      }
+    return value.map(tr.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
 const styling = StateField.define<DecorationSet>({
   create: (state) => decorate(state.doc),
   update: (value, tr) => (tr.docChanged ? decorate(tr.state.doc) : value),
@@ -96,12 +141,12 @@ function withoutHighlandKeys(bindings: readonly KeyBinding[]): KeyBinding[] {
   return [...[...HIGHLAND_KEYS].map((key) => ({ key, run: () => true })), ...kept];
 }
 
-/** Show Invisibles: spaces and tabs marked, and "¬" at each line's end, as the text editor's whitespace. */
+/** Show Invisibles: spaces and tabs marked, and "¶" at each line's end, as in Highland 2. */
 class LineEnd extends WidgetType {
   override toDOM(): HTMLElement {
     const mark = document.createElement("span");
     mark.className = "hl-eol";
-    mark.textContent = "¬";
+    mark.textContent = "¶";
     return mark;
   }
   override eq(): boolean {
@@ -253,6 +298,7 @@ function start(text: string): void {
         // After the handlers above, so a Bin item shows only its own caret.
         dropCursor(),
         styling,
+        pageBreaks,
         spellingMarks,
         compare.extension,
         invisibles.of(invisibleMarks(showInvisibles)),
@@ -525,6 +571,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   } else if (msg.type === "showThemePane") {
     if (!themePane.shown) themePane.open();
   }
+  else if (msg.type === "pageBreaks") view?.dispatch({ effects: setPageBreaks.of(msg.starts), annotations: remote.of(true) });
   else if (msg.type === "numbers") {
     document.documentElement.classList.toggle("hl-numbers", !!msg.on);
     view?.requestMeasure();

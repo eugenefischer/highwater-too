@@ -24,7 +24,7 @@ describe("Highland themes", () => {
   it("gives the page and the Navigator their colours", () => {
     const d = HIGHLAND_THEMES["dracula"]!;
     expect(pageColors(d)).toMatchObject({ "--hl-bg": "#282a36", "--hl-fg": "#f8f8f2", "--hl-scene": "#bd93f9", "--hl-note": "#ff79c6", "--hl-caret": "#f1fa8c" });
-    expect(navigatorColors(d)).toMatchObject({ "--nav-bg": "#202026", "--nav-fg": "#ccccca", "--nav-section": "#ffb86c" });
+    expect(navigatorColors(d)).toMatchObject({ "--nav-bg": "#202026", "--nav-fg": "#ccccca", "--nav-section": "#ccccca" });
   });
 
   it("puts readable text on a button", () => {

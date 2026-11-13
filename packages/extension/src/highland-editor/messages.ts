@@ -129,6 +129,8 @@ export type ToPage =
   | { type: "showThemePane" }
   | { type: "fontSize"; px: number | null }
   | { type: "numbers"; on: boolean }
+  /** Show Page Breaks: where each page starts, as [page offset, page number] pairs (none when off). */
+  | { type: "pageBreaks"; starts: number[] }
   | { type: "invisibles"; on: boolean }
   | { type: "spelling"; on: boolean; words: string[] }
   | { type: "nextMisspelling" }

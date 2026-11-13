@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.47",
+  "version": "0.6.48",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -313,6 +313,11 @@
         "category": "Highwater Too"
       },
       {
+        "command": "highwater.togglePageBreaks",
+        "title": "Show or Hide Page Breaks",
+        "category": "Highwater Too"
+      },
+      {
         "command": "highwater.toggleSpelling",
         "title": "Check Spelling While Typing (On or Off)",
         "category": "Highwater Too"
@@ -557,6 +562,11 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Show paragraph numbers in the Highwater Editor's margin: every line with text is numbered, except the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers. **Go to Paragraph…** (⌃G) goes to a number."
+        },
+        "highwater.pageBreaks": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show where each printed page starts in the Highwater Editor's text: a short line in the right margin with the page number, as Highland 2's Show Page Breaks. Updated a second after typing stops."
         },
         "highwater.spellCheck": {
           "type": "boolean",
@@ -1516,6 +1526,11 @@
         },
         {
           "command": "highwater.toggleSpelling",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "1_highwater@4"
+        },
+        {
+          "command": "highwater.togglePageBreaks",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "1_highwater@3"
         }

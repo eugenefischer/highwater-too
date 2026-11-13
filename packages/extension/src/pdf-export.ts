@@ -81,7 +81,7 @@ export async function exportScreenplay(options: ScriptExportOptions): Promise<Ex
   });
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
-  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missingFonts(layout.substituted, options.template ?? "Screenplay")], anchors: anchors(layout) };
+  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missingFonts(layout.substituted, options.template ?? "Screenplay")], anchors: anchors(layout), pageStarts: pageStarts(layout) };
 }
 
 function script(options: ScriptExportOptions) {
@@ -120,14 +120,14 @@ export async function exportProse(options: ProseExportOptions): Promise<ExportRe
   const title = doc.titlePage?.fields.find((f) => f.name === "title")?.values.map((v) => v.text).filter(Boolean).join(" ") ?? "";
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
   const missing = missingFonts(layout.substituted, options.template);
-  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missing], anchors: anchors(layout) };
+  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missing], anchors: anchors(layout), pageStarts: pageStarts(layout) };
 }
 
 /** The Plain Text template: the text as typed (includes and directives print as written). */
 export async function exportPlainText(options: ExportOptions): Promise<ExportResult> {
   const layout = layoutPlainText(options.text);
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title: "" });
-  return { pdf, pages: layout.pages.length, problems: [], anchors: anchors(layout) };
+  return { pdf, pages: layout.pages.length, problems: [], anchors: anchors(layout), pageStarts: pageStarts(layout) };
 }
 
 /** Lays out and renders a manuscript, with {{INCLUDE}} files merged in. */
@@ -149,7 +149,7 @@ export async function exportManuscript(options: ManuscriptExportOptions): Promis
   const cc = doc.titlePage?.fields.find((f) => f.name === "cc" || f.name === "title");
   const title = cc?.values.map((v) => v.text.trim()).find(Boolean) ?? "";
   const pdf = options.render === false ? new Uint8Array() : await renderPdf(layout, { fontDir: options.fontDir, title });
-  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missingFonts(layout.substituted, "Manuscript")], anchors: anchors(layout) };
+  return { pdf, pages: layout.pages.length, problems: [...merged.problems.map((p) => p.message), ...missingFonts(layout.substituted, "Manuscript")], anchors: anchors(layout), pageStarts: pageStarts(layout) };
 }
 
 /** A Word document of a manuscript, with {{INCLUDE}} files merged in. */
@@ -186,6 +186,8 @@ export interface ExportResult {
   problems: string[];
   /** Printed lines as [page index, baseline y, source offset] triples, in print order. */
   anchors: number[];
+  /** Where each numbered page starts: [source offset of its first printed line, page number] pairs (Show Page Breaks). */
+  pageStarts: number[];
 }
 
 /** Elements from included files map to the include line in the script that pulled them in. */
@@ -197,6 +199,16 @@ function sourceMap(elements: MergedElement[], root: IncludeFile): (e: Element) =
     map.set(m.element, m.file === root || m.file.id === root.id ? m.element.span : { start: last.start, end: last.start });
   }
   return (e) => map.get(e) ?? e.span;
+}
+
+function pageStarts(layout: Layout): number[] {
+  const out: number[] = [];
+  for (const p of layout.pages) {
+    if (p.number === null) continue; // the title page
+    const first = p.items.find((it) => it.source !== undefined);
+    if (first) out.push(first.source!, p.number);
+  }
+  return out;
 }
 
 function anchors(layout: Layout): number[] {

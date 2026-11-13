@@ -11,7 +11,7 @@
   --hl-whitespace: var(--vscode-editorWhitespace-foreground); --hl-section: var(--hl-accent);
   /* The sidebar's colours: VS Code's sidebar, unless a Highland theme sets these. */
   --nav-bg: var(--vscode-sideBar-background, var(--hl-panel-bg)); --nav-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground));
-  --nav-section: var(--vscode-textLink-foreground); --nav-muted: var(--vscode-descriptionForeground);
+  --nav-section: var(--nav-fg); --nav-muted: var(--vscode-descriptionForeground);
   --nav-current: var(--vscode-list-inactiveSelectionBackground); --nav-hover: var(--vscode-list-hoverBackground);
   --nav-accent: var(--vscode-focusBorder); --nav-tab: var(--nav-accent); --nav-input-bg: var(--vscode-input-background);
   --sb-width: 264px;
@@ -365,6 +365,10 @@ body.dark-pages #pages { background: var(--hl-bg); }
 .hl-omitted { color: var(--hl-muted); }
 /* Show Invisibles. */
 .hl-eol { color: var(--hl-whitespace); }
+/* Show Page Breaks: in the right margin at a page's first line, a short rule with the page number under it (Inactive, as in Highland). */
+.hl-pagebreak { position: static; }
+.hl-pagebreak-mark { position: absolute; left: calc(var(--column) + 2ch); width: 5ch; margin-top: -0.12em; border-top: 1px solid var(--hl-muted); text-align: right; text-indent: 0; font-weight: 400; font-style: normal; color: var(--hl-muted); pointer-events: none; user-select: none; }
+.hl-pagebreak-mark span { font-family: var(--vscode-font-family); font-size: 0.7em; }
 .cm-editor .cm-highlightSpace { background-image: radial-gradient(circle at 50% 55%, var(--hl-whitespace) 15%, transparent 5%); }
 .cm-editor .cm-highlightTab { background-image: none; position: relative; }
 .cm-editor .cm-highlightTab::before { content: "→"; position: absolute; left: 0; color: var(--hl-whitespace); }
