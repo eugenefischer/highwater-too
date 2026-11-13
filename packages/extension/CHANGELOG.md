@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.46
+
+- Internal tidying, with no change meant in what you see: the Bin, Scratchpad and images of .highland files and of plain files are now read and changed through one interface, with tests that pin what each operation leaves on disk.
+
 ## 0.6.45
 
 - Internal tidying, with no change meant in what you see: the Highwater Editor's counts and Go to Paragraph use the same parse as the rest of the extension; the writing history's code is split into smaller files; the last Python scripts in the repository are replaced or removed.

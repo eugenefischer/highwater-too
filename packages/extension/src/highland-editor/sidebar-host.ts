@@ -3,14 +3,14 @@
  * it was left (for every document), the Navigator's kinds to list, and the Scratchpad, read from
  * and saved to the .highland file or a plain file's extras.
  */
-import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { parseSave } from "../save-message.ts";
 import { computerName } from "@highwater/history";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
-import { extrasApi, type AssetItem, type Owner } from "../bin-assets.ts";
+import { extrasApi } from "../bin-assets.ts";
+import type { AssetItem, Owner } from "../document-extras.ts";
 import { historyApi } from "../history.ts";
 import type { WorkNode } from "../works.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
@@ -119,33 +119,16 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
   };
 
   const readScratchpad = async (): Promise<string> => {
-    const b = bundle();
-    if (b) return (await store().snapshot(b)).scratchpad ?? "";
-    const p = plain();
-    if (!p) return "";
-    return (await (await plainExtras().folder(p))?.scratchpad()) ?? "";
+    const o = owner();
+    return (o && extrasApi ? await extrasApi.of(o).scratchpad() : undefined) ?? "";
   };
   const sendScratchpad = async (force = false) => post({ type: "scratchpad", text: await readScratchpad().catch(() => ""), force });
 
   /** Saves the Scratchpad; for a plain file's first one, after the one-time note on where it is kept. */
   const saveScratchpad = async (text: string): Promise<void> => {
-    const b = bundle();
-    if (b) {
-      await store().update(b, (x) => ((x.scratchpad = text), ["scratchpad.txt"]));
-      post({ type: "scratchpadSaved", text });
-      return;
-    }
-    const p = plain();
-    if (!p) return;
-    const extras = plainExtras();
-    let folder = await extras.folder(p);
-    if (!folder || (await folder.scratchpad()) === undefined) {
-      if (!(await extras.confirm(p))) return sendScratchpad(true);
-      folder = await extras.folder(p, true);
-      if (!folder) return sendScratchpad(true);
-    }
-    await writeFile(await folder.ensureScratchpad(), text, "utf8");
-    extras.fireChanged([folder.scratchpadPath]);
+    const o = owner();
+    if (!o || !extrasApi) return;
+    if (!(await extrasApi.of(o).saveScratchpad(text))) return sendScratchpad(true);
     post({ type: "scratchpadSaved", text });
   };
 
@@ -316,7 +299,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         const op = msg.op as { kind: string; index?: number; text?: string; from?: number; to?: number };
         binTask(async (o) => {
           // A plain file's first Bin item: the one-time note on where it is kept; declined, the page undoes it.
-          if (op.kind === "add" && o.plain !== undefined && !(await plainExtras().confirm(o.plain))) {
+          if (op.kind === "add" && !(await extrasApi!.of(o).confirm())) {
             post({ type: "binRefused" });
             return;
           }

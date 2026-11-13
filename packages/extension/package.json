@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.45",
+  "version": "0.6.46",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",

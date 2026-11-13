@@ -13,6 +13,7 @@ import { History } from "@highwater/history";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as vscode from "vscode";
 import { AssetsView, BinView, type Owner } from "../src/bin-assets.ts";
+import { documentExtras } from "../src/document-extras.ts";
 import { plainExtras, startPlainExtras } from "../src/extras.ts";
 import type { HighlandFileSystem } from "../src/fs-provider.ts";
 import type { FocusedDocument } from "../src/focus.ts";
@@ -53,7 +54,8 @@ async function world(): Promise<World> {
   const fired: World["fired"] = [];
   const fs = { fireChanged: (b: string, entries: string[]) => fired.push({ bundle: b, entries }) } as unknown as HighlandFileSystem;
   const current = (owner: Owner) => ({ bundle: owner.bundle, plain: owner.plain }) as unknown as FocusedDocument;
-  return { dir, store, bundle, plain, history, fired, bin: (o) => new BinView(store, fs, current(o)), assets: (o) => new AssetsView(store, current(o)) };
+  const of = (o: Owner) => documentExtras(o, store, fs);
+  return { dir, store, bundle, plain, history, fired, bin: (o) => new BinView(of, current(o)), assets: (o) => new AssetsView(of, current(o)) };
 }
 
 let w: World;
@@ -175,5 +177,41 @@ describe("the assets of a plain file", () => {
     const assets = w.assets(owner);
     await assets.importFiles(owner, [{ name: "a.png", data: image(1) }]);
     expect(existsSync(join(w.dir, "Plain assets"))).toBe(false);
+  });
+});
+
+describe("the Scratchpad", () => {
+  it("of a .highland file is its scratchpad.txt, made empty when first opened in a tab", async () => {
+    const extras = documentExtras({ bundle: w.bundle }, w.store, { fireChanged: () => undefined });
+    expect(await extras.scratchpad()).toBeUndefined();
+    expect((await extras.scratchpadUri())!.toString()).toBe(`highland:${w.bundle}/scratchpad.txt`);
+    expect((await readBundle(w.bundle)).bundle.scratchpad).toBe("");
+    expect(await extras.saveScratchpad("ideas")).toBe(true);
+    expect((await readBundle(w.bundle)).bundle.scratchpad).toBe("ideas");
+    expect(await extras.scratchpad()).toBe("ideas");
+    expect(stub.shown).toEqual([]);
+  });
+
+  it("of a plain file is kept in its extras folder, after the one question", async () => {
+    const extras = documentExtras({ plain: w.plain }, w.store, { fireChanged: () => undefined });
+    expect(await extras.scratchpad()).toBeUndefined();
+    expect(await extras.saveScratchpad("declined")).toBe(false);
+    expect(await plainExtras().folder(w.plain)).toBeNull();
+    stub.answers.push("Continue");
+    expect(await extras.saveScratchpad("ideas")).toBe(true);
+    const folder = (await plainExtras().folder(w.plain))!;
+    expect(await readFile(folder.scratchpadPath, "utf8")).toBe("ideas");
+    expect(await extras.scratchpad()).toBe("ideas");
+    expect(await extras.saveScratchpad("more")).toBe(true);
+    expect(stub.shown.length).toBe(2); // the declined question and the answered one; none after
+    expect((await extras.scratchpadUri())!.toString()).toBe(`highwater-extras:${folder.scratchpadPath}`);
+  });
+
+  it("of a plain file opens in a tab only after the one question", async () => {
+    const extras = documentExtras({ plain: w.plain }, w.store, { fireChanged: () => undefined });
+    expect(await extras.scratchpadUri()).toBeNull();
+    stub.answers.push("Continue");
+    const uri = (await extras.scratchpadUri())!;
+    expect(await readFile(uri.fsPath, "utf8")).toBe("");
   });
 });

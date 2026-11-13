@@ -1,11 +1,12 @@
 import { readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import * as vscode from "vscode";
 import { ask } from "./ask.ts";
-import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
+import { HighlandFileSystem, SCHEME } from "./fs-provider.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
-import { binLabel, byteSize, imageSize, move, uniqueName } from "./syntax/workspace.ts";
+import { documentExtras, type AssetItem, type DocumentExtras, type Owner } from "./document-extras.ts";
+import { binLabel, byteSize, imageSize, move } from "./syntax/workspace.ts";
 import { idNote, noteId } from "./extras-folder.ts";
 import { focusedDocument, type FocusedDocument } from "./focus.ts";
 import { activeDocument, activeSelections, activeView } from "./surface.ts";
@@ -20,16 +21,17 @@ import { postTo } from "./highland-editor/messages.ts";
  */
 export function registerBinAndAssets(context: vscode.ExtensionContext, store: BundleStore, fs: HighlandFileSystem): void {
   const current = focusedDocument(context);
-  const bin = new BinView(store, fs, current);
-  const assets = new AssetsView(store, current);
-  extrasApi = { bin, assets };
+  const of = (owner: Owner) => documentExtras(owner, store, fs);
+  const bin = new BinView(of, current);
+  const assets = new AssetsView(of, current);
+  extrasApi = { bin, assets, of };
   const extras = plainExtras();
 
   context.subscriptions.push(
     vscode.commands.registerCommand("highwater.copyToBin", () => toBin(false)),
     vscode.commands.registerCommand("highwater.cutToBin", () => toBin(true)),
-    vscode.commands.registerCommand("highwater.assets.open", (item: AssetItem) => vscode.commands.executeCommand("vscode.open", assetUri(item))),
-    vscode.commands.registerCommand("highwater.openScratchpad", () => openScratchpad(store, current)),
+    vscode.commands.registerCommand("highwater.assets.open", (item: AssetItem) => vscode.commands.executeCommand("vscode.open", of(item).assetUri(item))),
+    vscode.commands.registerCommand("highwater.openScratchpad", () => openScratchpad(of, current)),
     vscode.commands.registerCommand("highwater.linkHistoryToFile", () => linkHistoryToFile()),
   );
 
@@ -87,13 +89,12 @@ export function registerBinAndAssets(context: vscode.ExtensionContext, store: Bu
 }
 
 /** The Bin and Assets, for the Highwater Editor's sidebar (sidebar-host.ts). */
-export let extrasApi: { bin: BinView; assets: AssetsView } | undefined;
+export let extrasApi: { bin: BinView; assets: AssetsView; of(owner: Owner): DocumentExtras } | undefined;
 
 // ---------------------------------------------------------------------------------------------
 // Bin
 
-/** Whose Bin: a .highland file's, or a plain file's. */
-export type Owner = { bundle: string; plain?: undefined } | { plain: string; bundle?: undefined };
+export type { AssetItem, Owner };
 
 export type BinItem = Owner & {
   index: number;
@@ -102,25 +103,14 @@ export type BinItem = Owner & {
 
 /** A document's Bin items: read, added, reordered, edited and removed. */
 export class BinView {
-
   constructor(
-    private readonly store: BundleStore,
-    private readonly fs: HighlandFileSystem,
+    private readonly of: (owner: Owner) => DocumentExtras,
     private readonly current: FocusedDocument,
   ) {}
 
   /** A document's Bin items. */
   async items(owner: Owner): Promise<BinItem[]> {
-    const { bundle, plain } = owner;
-    if (bundle) {
-      const snap = await this.store.snapshot(bundle).catch(() => null);
-      return (snap?.binItems ?? []).map((text, index) => ({ bundle, index, text }));
-    }
-    if (plain) {
-      const folder = await plainExtras().folder(plain).catch(() => null);
-      return ((await folder?.binItems()) ?? []).map((text, index) => ({ plain, index, text }));
-    }
-    return [];
+    return (await this.of(owner).binItems()).map((text, index) => ({ ...owner, index, text }));
   }
 
   #owner(): Owner | null {
@@ -132,7 +122,7 @@ export class BinView {
   /** Adds a Bin item at the end (Highland's ⌥⌘C / ⌥⌘X). False if nothing was added. */
   async add(text: string, owner = this.#owner()): Promise<boolean> {
     if (!owner) return false;
-    if (owner.plain !== undefined && !(await plainExtras().confirm(owner.plain))) return false;
+    if (!(await this.of(owner).confirm())) return false;
     await this.change(owner, (items) => [...items, text]);
     return true;
   }
@@ -153,43 +143,13 @@ export class BinView {
     await this.change(item, (items) => items.filter((_, i) => i !== item.index));
   }
 
-  async change(owner: Owner, f: (items: string[]) => string[]): Promise<void> {
-    if (owner.plain !== undefined) {
-      const extras = plainExtras();
-      const folder = await extras.folder(owner.plain, true);
-      if (!folder) return;
-      const items = f(await folder.binItems());
-      const before = await folder.setBinItems(items);
-      extras.fireChanged(Array.from({ length: Math.max(before, items.length) }, (_, i) => folder.binPath(i)));
-      extras.changed(owner.plain);
-      return;
-    }
-    const bundle = owner.bundle;
-    const before = (await this.store.snapshot(bundle)).binItems.length;
-    await this.store.update(bundle, (b) => {
-      b.setBinItems(f(b.binItems));
-      return b.paths.filter((p) => p.startsWith("bin/"));
-    });
-    const after = (await this.store.snapshot(bundle)).binItems.length;
-    // Items are renumbered: let open item tabs reload.
-    this.fs.fireChanged(bundle, Array.from({ length: Math.max(before, after) }, (_, i) => `bin/${i}.txt`));
+  change(owner: Owner, f: (items: string[]) => string[]): Promise<void> {
+    return this.of(owner).changeBin(f);
   }
 }
 
 // ---------------------------------------------------------------------------------------------
 // Assets
-
-export type AssetItem = Owner & {
-  name: string;
-  /** The folder the text refers to it in: "assets", or a plain file's "<name> assets". */
-  folder: string;
-  /** A plain file's image, on disk. */
-  file?: string;
-};
-
-function assetUri(item: AssetItem): vscode.Uri {
-  return item.file ? vscode.Uri.file(item.file) : toHighlandUri(item.bundle!, `assets/${item.name}`);
-}
 
 const IMAGE_TYPES = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "heic", "webp", "pdf"];
 
@@ -197,7 +157,7 @@ const IMAGE_TYPES = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "heic", "webp",
 export class AssetsView {
 
   constructor(
-    private readonly store: BundleStore,
+    private readonly of: (owner: Owner) => DocumentExtras,
     private readonly current: FocusedDocument,
   ) {}
 
@@ -217,9 +177,8 @@ export class AssetsView {
     return `${item.bundle ?? item.plain}\n${item.name}`;
   }
 
-  async #read(item: AssetItem): Promise<Uint8Array | null> {
-    if (item.file) return readFile(item.file).catch(() => null);
-    return this.store.read(item.bundle!, `assets/${item.name}`).catch(() => null);
+  #read(item: AssetItem): Promise<Uint8Array | null> {
+    return this.of(item).readAsset(item);
   }
 
   async #measure(items: AssetItem[]): Promise<AssetItem[]> {
@@ -236,19 +195,7 @@ export class AssetsView {
 
   /** A document's images, with their sizes measured (see info). */
   async list(owner: Owner | null): Promise<AssetItem[]> {
-    const bundle = owner?.bundle;
-    const plain = owner?.plain;
-    if (bundle) {
-      const snap = await this.store.snapshot(bundle).catch(() => null);
-      const names = (snap?.paths ?? []).filter((p) => p.startsWith("assets/") && !p.endsWith("/")).map((p) => p.slice("assets/".length));
-      return this.#measure(names.sort((a, b) => a.localeCompare(b)).map((name) => ({ bundle, name, folder: "assets" })));
-    }
-    if (plain) {
-      const extras = plainExtras();
-      const { name: folder, dir } = await extras.assetsFolder(plain);
-      return this.#measure((await extras.assets(plain)).map((name) => ({ plain, name, folder, file: join(dir, name) })));
-    }
-    return [];
+    return owner ? this.#measure(await this.of(owner).assets()) : [];
   }
 
   async add(owner: Owner | null = this.#ownerOf()): Promise<void> {
@@ -268,34 +215,20 @@ export class AssetsView {
     const detail = item.file ? `It is moved to the Trash from the “${item.folder}” folder. Images in the text that use it will no longer print.` : "Images in the text that use it will no longer print.";
     const ok = await ask("warning", `Delete ${item.name} from this document's assets?`, { modal: true, detail }, "Delete");
     if (ok !== "Delete") return;
-    if (item.file) await vscode.workspace.fs.delete(vscode.Uri.file(item.file), { useTrash: true });
-    else await this.store.update(item.bundle!, (b) => (b.delete(`assets/${item.name}`) ? [`assets/${item.name}`] : []));
+    await this.of(item).removeAsset(item);
   }
 
   /** Copies images into a document's assets (a .highland file's assets/, or a plain file's images folder). */
   async importFiles(owner: Owner, files: { name: string; data: Uint8Array }[]): Promise<void> {
-    const { bundle, plain } = owner;
     if (!files.length) return;
-    if (plain) {
-      if (!(await plainExtras().confirm(plain))) return;
-      await plainExtras().addAssets(plain, files, uniqueName);
-        return;
-    }
-    await this.store.update(bundle!, (b) => {
-      const taken = b.paths.filter((p) => p.startsWith("assets/")).map((p) => p.slice(7));
-      return files.map((f) => {
-        const name = uniqueName(f.name, taken);
-        taken.push(name);
-        b.set(`assets/${name}`, f.data);
-        return `assets/${name}`;
-      });
-    });
+    await this.of(owner).addAssets(files);
   }
+
 }
 
 // ---------------------------------------------------------------------------------------------
 
-async function openScratchpad(store: BundleStore, current: FocusedDocument): Promise<void> {
+async function openScratchpad(of: (owner: Owner) => DocumentExtras, current: FocusedDocument): Promise<void> {
   // In the Highwater Editor, the Scratchpad is a panel of its sidebar.
   const view = activeView();
   if (view) {
@@ -304,23 +237,13 @@ async function openScratchpad(store: BundleStore, current: FocusedDocument): Pro
   }
   const active = activeDocument();
   const bundle = (active?.uri.scheme === SCHEME ? splitBundlePath(active.uri.fsPath)?.bundle : undefined) ?? current.bundle;
-  if (!bundle) {
-    const extras = plainExtras();
-    const plain = active && extras.isPlain(active) ? active.uri.fsPath : current.plain;
-    if (!plain) {
-      void vscode.window.showInformationMessage("Open a document to use its Scratchpad.");
-      return;
-    }
-    const existing = await extras.folder(plain);
-    if ((await existing?.scratchpad()) === undefined && !(await extras.confirm(plain))) return;
-    const folder = await extras.folder(plain, true);
-    if (!folder) return;
-    const doc = await vscode.workspace.openTextDocument(extras.uri(await folder.ensureScratchpad()));
-    await vscode.window.showTextDocument(doc, { preview: false });
+  const plain = bundle ? undefined : active && plainExtras().isPlain(active) ? active.uri.fsPath : current.plain;
+  if (!bundle && !plain) {
+    void vscode.window.showInformationMessage("Open a document to use its Scratchpad.");
     return;
   }
-  const snap = await store.snapshot(bundle);
-  if (snap.scratchpad === undefined) await store.update(bundle, (b) => ((b.scratchpad = ""), ["scratchpad.txt"]));
-  const doc = await vscode.workspace.openTextDocument(toHighlandUri(bundle, "scratchpad.txt"));
+  const uri = await of(bundle ? { bundle } : { plain: plain! }).scratchpadUri();
+  if (!uri) return;
+  const doc = await vscode.workspace.openTextDocument(uri);
   await vscode.window.showTextDocument(doc, { preview: false });
 }
