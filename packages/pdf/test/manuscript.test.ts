@@ -208,13 +208,20 @@ describe("manuscript rules from the probes", () => {
 });
 
 describe("source offsets for scroll sync", () => {
-  it("tags each printed line with where it comes from, sharing a paragraph's range out by line", () => {
+  it("tags each printed line with where it starts in the source", () => {
     const words = Array.from({ length: 30 }, () => "word").join(" ");
     const src = `TL: Me\n\nOne.\n\n${words}\n\n# Head`;
     const l = layout(src);
     const body = l.pages[1]!.items.filter((it) => it.y > 60);
     expect(l.pages[0]!.items.every((it) => it.source === 0)).toBe(true);
-    const at = src.indexOf("word");
-    expect(body.map((it) => it.source)).toEqual([src.indexOf("One."), at, at + Math.floor((words.length * 1) / 3), at + Math.floor((words.length * 2) / 3), src.indexOf("# Head")]);
+    // Each wrapped line starts right after the one before it, even when every word is the same.
+    const starts: number[] = [];
+    let at = src.indexOf("word");
+    for (const it of body.slice(1, -1)) {
+      starts.push(at);
+      at += it.runs.map((r) => r.text).join("").trimEnd().length + 1;
+    }
+    expect(body.length).toBe(5);
+    expect(body.map((it) => it.source)).toEqual([src.indexOf("One."), ...starts, src.indexOf("# Head")]);
   });
 });

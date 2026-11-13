@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.49
+
+- Page breaks in the editor land on the line the printed page starts with (they could be a line or so off in a long paragraph).
+- Show Invisibles, bold and italic no longer change where the editor wraps a line, so its lines match the printed ones.
+- Lines with a ¶ or a page-break mark are no longer taller than the others.
+
 ## 0.6.48
 
 - **Show Page Breaks** (in the Highwater Editor's title-bar menu, or `highwater.pageBreaks`), as in Highland 2: where each printed page starts, a short line in the right margin with the page number under it, also in the middle of a paragraph that breaks across pages. It comes from the same layout as the page count, a second after you stop typing.

@@ -277,7 +277,7 @@ function run(doc: Document, T: ProseTemplate, options: ProseOptions, m: Measurer
     if (p.footer && !p.footer.off) items.push(...pageText(p.footer.slots, fill, F.y, T, fSpec, m, false));
     return { number: p.number, items, ...(graphics.length ? { graphics } : {}) };
   });
-  assignSources(printed);
+  assignSources(printed, doc.source);
   return { body, pages, ctx };
 }
 

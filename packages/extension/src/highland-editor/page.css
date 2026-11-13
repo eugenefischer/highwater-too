@@ -331,7 +331,10 @@ body.dark-pages #pages { background: var(--hl-bg); }
 .cm-editor .cm-scroller { font-family: "Courier Prime", monospace !important; line-height: 1.3; }
 /* The page column: as wide as the printed text, centred in the window. As in Highland, a narrower window
    narrows it down to the right edge of dialogue (--column-min) and no further: past that the page scrolls sideways. */
-.cm-editor .cm-content { flex: 0 1 var(--column) !important; width: var(--column); max-width: calc(100% - 2ch); min-width: var(--column-min); margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--hl-caret); }
+/* The column (and a speech's narrower width) is half a pixel over its characters: a full line split
+   into pieces (spaces marked by Show Invisibles, bold or italic words) adds up to a hair over
+   N characters in Chrome, which then broke it a word early, unlike the plain text and the page. */
+.cm-editor .cm-content { flex: 0 1 calc(var(--column) + 0.5px) !important; width: calc(var(--column) + 0.5px); max-width: calc(100% - 2ch); min-width: var(--column-min); margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--hl-caret); }
 /* More specific than CodeMirror's own line padding; each line's indent is set inline. */
 .cm-editor .cm-content .cm-line { padding: 0; }
 .cm-editor .cm-searchMatch { background: var(--hl-match); outline: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent); }
@@ -364,7 +367,10 @@ body.dark-pages #pages { background: var(--hl-bg); }
 .hl-section.hl-level-6, .hl-heading.hl-level-6 { text-indent: -7ch; }
 .hl-omitted { color: var(--hl-muted); }
 /* Show Invisibles. */
-.hl-eol { color: var(--hl-whitespace); }
+.hl-eol { color: var(--hl-whitespace); line-height: 0; }
+/* CodeMirror's 1em-tall buffer images beside widgets (the ¶, page breaks) sat on the baseline and
+   could stand above the line, making lines with a widget taller than the rest. */
+.cm-editor .cm-widgetBuffer { vertical-align: top; }
 /* Show Page Breaks: in the right margin at a page's first line, a short rule with the page number under it (Inactive, as in Highland). */
 .hl-pagebreak { position: static; }
 .hl-pagebreak-mark { position: absolute; left: calc(var(--column) + 2ch); width: 5ch; margin-top: -0.12em; border-top: 1px solid var(--hl-muted); text-align: right; text-indent: 0; font-weight: 400; font-style: normal; color: var(--hl-muted); pointer-events: none; user-select: none; }

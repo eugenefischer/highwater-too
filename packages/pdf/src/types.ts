@@ -95,19 +95,61 @@ export interface SourceRange {
 /**
  * Gives every printed line a source offset: consecutive lines from the same range (one element,
  * maybe split across pages) share it out by line, so a long paragraph's middle maps to its middle.
+ * With the source text, each line's offset is then made exact: where its first words are in the
+ * source, nearest that estimate and in order (Show Page Breaks needs the very line a page starts
+ * with; the estimate could be a line out). Lines whose words can't be found keep the estimate.
  */
-export function assignSources(lines: { range: SourceRange | undefined; items: PlacedText[] }[]): void {
+export function assignSources(lines: { range: SourceRange | undefined; items: PlacedText[] }[], source?: string): void {
   for (let i = 0; i < lines.length; ) {
     const range = lines[i]!.range;
     let j = i + 1;
     while (j < lines.length && lines[j]!.range === range) j++;
     if (range) {
       const n = j - i;
+      let floor = range.start;
+      // The line before: where it starts (when found) and how long it printed.
+      let previous: { at: number; length: number } | null = { at: range.start, length: -1 };
       for (let k = 0; k < n; k++) {
-        const offset = range.start + Math.floor(((range.end - range.start) * k) / n);
+        const text = lines[i + k]!.items.map((it) => runsText(it.runs)).join(" ");
+        const shared = range.start + Math.floor(((range.end - range.start) * k) / n);
+        // Next after the line before (its printed length and a space), else the shared-out guess.
+        const estimate: number = previous && previous.length >= 0 ? previous.at + previous.length + 1 : shared;
+        const exact: number | null = source && k > 0 ? lineStart(source, range, text, estimate, floor) : null;
+        const offset = exact ?? (k === 0 ? range.start : shared);
+        if (exact !== null) floor = exact + 1;
+        previous = exact !== null || k === 0 ? { at: offset, length: text.trimEnd().length } : null;
         for (const it of lines[i + k]!.items) it.source = offset;
       }
     }
     i = j;
   }
+}
+
+/**
+ * Where a printed line starts in the source: its first three words (else two, else one) found
+ * with anything between them that isn't a letter or digit (markup, dashes, quotes, line breaks),
+ * the occurrence at or after `floor` nearest `estimate`, moved back over punctuation that opens
+ * the line (an opening quote). Null if the words aren't there (text from an included file, say).
+ */
+function lineStart(source: string, range: SourceRange, text: string, estimate: number, floor: number): number | null {
+  const words = text.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const within = source.slice(range.start, range.end);
+  for (let count = Math.min(3, words.length); count >= 1; count--) {
+    const pattern = new RegExp(words.slice(0, count).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[^\\p{L}\\p{N}]+"), "giu");
+    let best: number | null = null;
+    // Step one character at a time so repeated words still match at every start.
+    for (let m = pattern.exec(within); m; pattern.lastIndex = m.index + 1, m = pattern.exec(within)) {
+      const at = range.start + m.index;
+      if (m.index > 0 && /[\p{L}\p{N}]/u.test(within[m.index - 1]!)) continue;
+      if (at < floor) continue;
+      if (best === null || Math.abs(at - estimate) < Math.abs(best - estimate)) best = at;
+      else if (at > estimate) break;
+    }
+    if (best !== null) {
+      let start = best;
+      while (start > floor && start > range.start && !/\s/.test(source[start - 1]!) && !/[\p{L}\p{N}]/u.test(source[start - 1]!)) start--;
+      return start;
+    }
+  }
+  return null;
 }

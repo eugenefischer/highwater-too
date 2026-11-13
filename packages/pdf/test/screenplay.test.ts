@@ -153,7 +153,7 @@ describe("screenplay source offsets", () => {
   it("tags every printed line, keeping a speech split across pages on its own range", () => {
     const src = "INT. HOUSE - DAY\n\nBOB\nHello there.\n\nShe leaves.";
     const l = layoutScreenplay(parse(src, { mode: "fountain" }));
-    expect(l.pages[0]!.items.map((it) => it.source)).toEqual([0, src.indexOf("BOB"), src.indexOf("BOB") + Math.floor(("BOB\nHello there.".length * 1) / 2), src.indexOf("She")]);
+    expect(l.pages[0]!.items.map((it) => it.source)).toEqual([0, src.indexOf("BOB"), src.indexOf("Hello"), src.indexOf("She")]);
   });
 });
 

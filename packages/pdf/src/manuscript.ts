@@ -321,7 +321,7 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
     if (p.footer && !p.footer.off) items.push(...pageText(p.footer.slots, fill(p.sectionEnd), M.footer));
     return { number: p.number, items, ...(graphics.length ? { graphics } : {}) };
   });
-  assignSources(printed);
+  assignSources(printed, doc.source);
   return { body, pages, ctx };
 }
 

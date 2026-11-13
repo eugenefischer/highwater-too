@@ -69,7 +69,7 @@ function decorate(doc: Text): DecorationSet {
 
 /** A line's indent (wrapped lines too), and the width it wraps at; in a column narrower than that, it wraps at the column's edge. */
 function lineCss(left: number, width?: number): { style?: string } {
-  const parts = [left ? `padding-left: ${left}ch` : "", width ? `max-width: ${width}ch` : ""].filter(Boolean);
+  const parts = [left ? `padding-left: ${left}ch` : "", width ? `max-width: calc(${width}ch + 0.5px)` : ""].filter(Boolean);
   return parts.length ? { style: parts.join("; ") } : {};
 }
 

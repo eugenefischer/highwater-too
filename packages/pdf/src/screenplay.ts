@@ -442,7 +442,7 @@ function layout(doc: Document, options: ScreenplayOptions, family: string): Layo
     if (p.header === null && p.number >= 2) items.push(...pageText({ left: null, center: null, right: [{ kind: "text", text: `${p.number}.` }] }, fill, S.header));
     pages.push({ number: p.number, items });
   }
-  assignSources(printed);
+  assignSources(printed, doc.source);
   for (const it of pages[0]?.number === null ? pages[0].items : []) it.source = 0;
   // Runs print in the chosen font (Courier Prime is the renderer's own).
   if (family !== "Courier Prime") for (const p of pages) for (const it of p.items) for (const r of it.runs) if (r.style.font === undefined) r.style = { ...r.style, font: family };
