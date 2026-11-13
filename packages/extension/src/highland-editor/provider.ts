@@ -253,8 +253,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       }),
     ];
     panel.onDidDispose(() => {
-      log(`panel disposed ${document.uri.path.split("/").pop()} swapping=${swapping}`);
-      if (!swapping) closedAt.set(document.uri.toString(), Date.now());
+      log(`panel disposed ${document.uri.path.split("/").pop()}`);
       clearTimeout(countsTimer);
       subscriptions.forEach((s) => s.dispose());
     });
@@ -709,12 +708,6 @@ function log(what: string): void {
 }
 /** Documents the writer switched to the text editor with the code button: left as text until closed. */
 const wantsText = new Set<string>();
-/**
- * When a document's Highwater Editor tab last closed other than by our own swap: a text tab of it
- * opening just then is VS Code's Reopen Editor With… → Text Editor (the editor menu in the
- * breadcrumbs bar), the writer's choice, so it is left as text like the code button's.
- */
-const closedAt = new Map<string, number>();
 
 /**
  * The tab in front, and the one before it with when it stopped being in front: VS Code's Reopen
@@ -735,10 +728,12 @@ function noteFront(): void {
   if (front) before = { ...front, until: Date.now() };
   front = now;
   log(`front ${now ? `${now.highwater ? "highwater" : "text"} ${now.uri.split("/").pop()}` : "none"}`);
-  // From a Highwater tab straight to a text tab of the same document, not by our own swap: the
-  // writer chose the text editor (the breadcrumbs bar's editor menu), if the Highwater tab is gone.
+  // From a Highwater tab straight to a text tab of the same document: the writer chose the text
+  // editor (the breadcrumbs bar's editor menu, or the code button), if the Highwater tab is gone.
+  // Not gated on \`swapping\`: that stays on for half a second after our own swap to the Highwater
+  // Editor, and a choice made in that time was missed (CI's log, 0.6.28).
   // (A Search result opened as text beside a Highwater tab keeps that tab: it goes back there.)
-  if (!swapping && now && !now.highwater && before?.highwater && before.uri === now.uri && Date.now() - before.until < 2000) {
+  if (now && !now.highwater && before?.highwater && before.uri === now.uri && Date.now() - before.until < 2000) {
     reopenedAsText.set(now.uri, Date.now());
     log("reopened as text");
   }
@@ -753,8 +748,8 @@ function hasHighwaterTab(uri: string): boolean {
 /** The writer turned this document's Highwater tab into a text tab just now: leave it as text. */
 function choseText(uri: string): boolean {
   const recent = (at: number | undefined) => at !== undefined && Date.now() - at < 2000;
-  if ((recent(reopenedAsText.get(uri)) || recent(closedAt.get(uri))) && !hasHighwaterTab(uri)) wantsText.add(uri);
-  log(`choseText ${uri.split("/").pop()}: reopened=${recent(reopenedAsText.get(uri))} closed=${recent(closedAt.get(uri))} tab=${hasHighwaterTab(uri)} → ${wantsText.has(uri)}`);
+  if (recent(reopenedAsText.get(uri)) && !hasHighwaterTab(uri)) wantsText.add(uri);
+  log(`choseText ${uri.split("/").pop()}: reopened=${recent(reopenedAsText.get(uri))} tab=${hasHighwaterTab(uri)} → ${wantsText.has(uri)}`);
   return wantsText.has(uri);
 }
 
@@ -855,6 +850,13 @@ function swapSoon(uri: vscode.Uri): void {
       else swapsPending.delete(key);
     };
     noteFront();
+    // Already in the Highwater Editor (our own swap, say): this loop's work is done. Left running,
+    // it swapped the document back after the writer chose the text editor (CI's log, 0.6.28).
+    const inFront = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+    if (inFront instanceof vscode.TabInputCustom && inFront.viewType === HIGHLAND_EDITOR && inFront.uri.toString() === key) {
+      swapsPending.delete(key);
+      return log(`swapSoon ${key.split("/").pop()}: already in the Highwater Editor`);
+    }
     // Reopen Editor With… under way: wait for its Highwater tab to go, then leave the text be.
     if (Date.now() - (reopenedAsText.get(key) ?? 0) < 2000 && hasHighwaterTab(key)) return again();
     if (choseText(key)) {

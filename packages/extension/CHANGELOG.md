@@ -4,7 +4,7 @@
 
 - Opening a .highland file (from the Explorer, Finder, Open Recent or a command) goes straight into the Highwater Editor; it no longer shows as text for a moment first. Its script was opened before VS Code had given it its language, so it was taken for plain text.
 - A .fountain or .md file opened as text switches to the Highwater Editor as soon as it can (it used to wait 0.3 s before looking).
-- Not yet fixed: Text Editor from the breadcrumbs bar's editor menu still switches back to the Highwater Editor (the end-to-end test fails). The test now records every tab event VS Code reports and every decision the extension makes about switching editors (test builds only), and prints them if it fails, so the fix can follow from what actually happens.
+- Text Editor from the breadcrumbs bar's editor menu stays the text editor. The end-to-end test's record of tab events and the extension's decisions (kept in test builds, printed on failure) showed two causes: the extension's "swap in progress" flag stays on for half a second after it switches a document to the Highwater Editor, and a choice made in that time was ignored; and a loop still waiting to switch the document kept running after the switch had happened, then switched it back. The choice is now recognised from the tabs alone (a document's Highwater tab giving way to its text tab), and a waiting loop stops once its document is in the Highwater Editor. 0.6.27's check on the panel closing is gone: the record showed it comes too late to help.
 
 ## 0.6.27
 
