@@ -1,6 +1,8 @@
 # Highwater Too
 
-Highwater Too is a VS Code extension for writing screenplays and manuscripts in the `.highland` format used by Highland 2, a Mac writing app that is no longer developed. It reads and writes `.highland` files without losing anything Highland 2 stored in them. It also works with plain `.fountain`, `.md` and `.txt` files.
+Highwater Too is a VS Code extension for writing screenplays and manuscripts in the `.highland` format used by Highland 2. It reads and writes `.highland` files without losing anything Highland 2 stored in them. It also works with plain `.fountain`, `.md` and `.txt` files. It was created because Highland 2 is no longer being developed, having been replaced by [Highland Pro](https://quoteunquoteapps.com/highland-pro/). 
+
+Highland Pro is undoubtedly great, and should be used instead of this by anyone who can justify a subscription to creative writing software. I, alas, cannot, as my blocks of time for doing creative writing are too irregular for a subscription model to make sense. I really just wanted to keep using Highland 2 forever, and a VS Code extension will let me do just that, with the added benefit of letting me (1) use it on any operating system, and (2) add git based version tracking with remote mirroring.
 
 The extension is in active use. It has not been published to the VS Code Marketplace; builds are attached to the GitHub releases.
 
