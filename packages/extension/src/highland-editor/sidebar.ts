@@ -116,7 +116,7 @@ export class Sidebar {
     else if (msg.type === "bin") this.#bin.show(msg.items as BinCard[], !!msg.available);
     else if (msg.type === "assets") this.#assets.show(msg.items as AssetCard[], !!msg.available);
     else if (msg.type === "history") this.#history.show(msg as unknown as HistoryMessage);
-    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[], (msg.mirror as { busy: boolean; at: number | null } | null) ?? null);
+    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[], (msg.mirror as { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null) ?? null);
     else if (msg.type === "workSaves") this.#works.saves(msg.i as number, msg.saves as WorkSaveRow[]);
     else if (msg.type === "showPanel" && PANELS.includes(msg.panel as PanelName)) this.show(msg.panel as PanelName);
     else if (msg.type === "toggleSidebar") this.toggle();
@@ -878,7 +878,7 @@ class HistoryPanel {
       }
     });
     // A click in the list but not on a save lets go of the selection.
-    this.#list.addEventListener("mousedown", (e) => {
+    $("histscroll").addEventListener("mousedown", (e) => {
       if (!(e.target as HTMLElement).closest(".hist-row")) this.deselect();
     });
   }
@@ -1192,11 +1192,12 @@ interface WorkSaveRow {
 }
 
 const WORK_SECTIONS: [WorkRow["kind"], string][] = [
-  ["here", "FILE ON THIS COMPUTER"],
-  ["local", "HISTORY ONLY"],
+  ["here", "LOCAL WORKS"],
+  ["local", "LOCAL HISTORY ONLY"],
   ["remote", "MIRROR ONLY"],
 ];
-const OPEN_ICON = '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>';
+/** A page: opening the work's file (the arrow out of a box is Export, elsewhere). */
+const OPEN_ICON = '<path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5z"/><path d="M14 3v4.5h4.5"/>';
 const RESTORE_ICON = '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 19h14"/>';
 const MORE_ICON = '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>';
 
@@ -1213,7 +1214,8 @@ class WorksPanel {
     this.#sync.onclick = () => deps.post({ type: "worksRefresh" });
     const help = $("workhelp");
     help.onclick = () => openHelp(help, WORKS_HELP);
-    this.#list.addEventListener("mousedown", (e) => {
+    // A click anywhere in the list's area but on a work (between works, or below them) lets go.
+    $("workscroll").addEventListener("mousedown", (e) => {
       if (!(e.target as HTMLElement).closest(".work-card")) this.deselect();
     });
     this.#list.addEventListener("keydown", (e) => {
@@ -1230,7 +1232,7 @@ class WorksPanel {
     });
   }
 
-  show(rows: WorkRow[], mirror: { busy: boolean; at: number | null } | null): void {
+  show(rows: WorkRow[], mirror: { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null): void {
     // Works are matched by title and kind across refreshes (their order may change).
     const was = this.#rows.find((w) => w.i === this.#selected);
     this.#rows = rows;
@@ -1244,9 +1246,23 @@ class WorksPanel {
     note.hidden = rows.length > 0;
     this.#sync.hidden = !mirror;
     this.#sync.classList.toggle("busy", !!mirror?.busy);
-    const tip = mirror?.busy ? "Syncing with the mirror…" : mirror?.at ? `Sync with the mirror (last synced ${shortWhen(new Date(mirror.at))})` : "Sync with the mirror";
-    this.#sync.dataset.tip = tip;
-    this.#sync.setAttribute("aria-label", tip);
+    // When the mirror was last synced, always in view (as in the Writing History's foot).
+    const status = $("workstatus");
+    status.hidden = !mirror;
+    status.classList.toggle("busy", !!mirror?.busy);
+    status.textContent = !mirror
+      ? ""
+      : mirror.busy
+        ? "Syncing with the mirror…"
+        : mirror.signIn
+          ? "Mirror needs you to sign in"
+          : mirror.error
+            ? "Not mirrored yet"
+            : mirror.at
+              ? `Synced with the mirror ${shortWhen(new Date(mirror.at))}`
+              : "Not synced with the mirror yet";
+    if (mirror?.error) status.dataset.tip = mirror.error;
+    else delete status.dataset.tip;
     this.#render();
   }
 
@@ -1380,8 +1396,8 @@ const WORKS_HELP = `
 <h3>The list</h3>
 <p>Works are grouped by where they are:</p>
 <ul>
-<li><b>File on this computer</b>: the work’s file is where it was last saved.</li>
-<li><b>History only</b>: the history is on this computer, but the file isn’t where it was last saved. It may have been moved, renamed or deleted.</li>
+<li><b>Local works</b>: the work’s file is on this computer, where it was last saved.</li>
+<li><b>Local history only</b>: the history is on this computer, but the file isn’t where it was last saved. It may have been moved, renamed or deleted.</li>
 <li><b>Mirror only</b>: the work was saved on another computer, and its history is on the mirror.</li>
 </ul>
 <p>Each shows its file name, when it was last saved, and its word count.</p>
@@ -1402,7 +1418,7 @@ const WORKS_HELP = `
 <h3>The bottom of the panel</h3>
 <ul>
 <li><b>Filter</b> shows only the works whose name contains what you type.</li>
-<li><b>Sync</b> (with a mirror) checks the mirror for works saved on your other computers.</li>
+<li><b>Sync</b> (with a mirror) checks the mirror for works saved on your other computers. The line above says when it last synced.</li>
 </ul>
 `;
 

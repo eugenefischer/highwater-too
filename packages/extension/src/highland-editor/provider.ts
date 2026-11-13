@@ -414,14 +414,17 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 #sbhelptext code { font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; }
 #sbhelptext svg { vertical-align: -3px; }
 /* Works: works by where they are; a selected work shows Open or Restore and More, and its saves beneath. */
-#worklist { outline: none; }
+#worklist { outline: none; gap: 6px; }
+#workstatus { padding: 4px 12px 0; color: var(--nav-muted); font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#workstatus[hidden] { display: none; }
+#workstatus.busy::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: -1px; border: 1.5px solid color-mix(in srgb, var(--nav-muted) 35%, transparent); border-top-color: var(--nav-muted); border-radius: 50%; animation: sb-spin 0.8s linear infinite; }
 .work-card { padding-right: 8px; cursor: default; user-select: none; }
 .work-card.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
 .work-card.selected .sb-row-main { padding-right: 52px; }
 .work-card .sb-row-tools { position: absolute; top: 2px; right: 3px; display: none; }
 .work-card.selected .sb-row-tools { display: flex; }
 .work-card.work-local .sb-row-title, .work-card.work-remote .sb-row-title { font-weight: 500; color: color-mix(in srgb, var(--nav-fg) 75%, var(--nav-muted)); }
-.work-saves { margin: 4px -4px 0; padding-top: 4px; border-top: 1px solid color-mix(in srgb, var(--nav-muted) 25%, transparent); }
+.work-saves { margin: 4px -4px 0; padding-top: 4px; border-top: 1px solid color-mix(in srgb, var(--nav-muted) 25%, transparent); max-height: 230px; overflow-y: auto; }
 .work-save { display: flex; gap: 6px; align-items: baseline; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
 .work-save:hover { background: var(--nav-hover); }
 .work-save .when { flex: none; }
@@ -623,7 +626,7 @@ body.previewing #preview { display: flex; }
     </section>
     <section data-panel="history" hidden>
       <div class="sb-head sb-head-help"><span id="histtitle"></span><button id="histhelp" class="sb-button sb-help" data-tip="How the Writing History works" aria-label="How the Writing History works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
-      <div class="sb-scroll"><div id="histlist" class="sb-rows" tabindex="0" role="listbox" aria-label="Saves"></div><div id="histnote" class="sb-note sb-loading">Loading history…</div></div>
+      <div class="sb-scroll" id="histscroll"><div id="histlist" class="sb-rows" tabindex="0" role="listbox" aria-label="Saves"></div><div id="histnote" class="sb-note sb-loading">Loading history…</div></div>
       <div class="sb-foot">
         <div id="histstatus"><div id="histstate"></div><div id="histmirror" hidden></div></div>
         <button id="histrecord" class="sb-button" data-tip="Turn Writing History Off for This Document" aria-label="Turn Writing History Off for This Document" hidden><svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><circle class="hist-dot" cx="12" cy="12" r="4" fill="currentColor"/></svg></button>
@@ -632,9 +635,9 @@ body.previewing #preview { display: flex; }
       </div>
     </section>
     <section data-panel="works" hidden>
-      <div class="sb-head sb-head-help"><span>All works</span><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
-      <div class="sb-scroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
-      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
+      <div class="sb-scroll" id="workscroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
+      <div id="workstatus" hidden></div>
+      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
     </section>
   </div>
   <div id="sbgrip" aria-hidden="true"></div>

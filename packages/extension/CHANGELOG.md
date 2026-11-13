@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.23
+
+- Works panel, from EJ's review:
+  - A selected work's saves scroll inside it, about ten at a time, however many there are.
+  - A click anywhere in the list's area but on a work clears the selection, below the works as well as between them (the Writing History too), and works have a little space between them.
+  - Open has its own icon, a page; the arrow out of a box means Export everywhere.
+  - A status line above the foot always shows when the mirror last synced (or that it is syncing, or not yet mirrored); the sync button's tooltip is just "Sync with the mirror".
+  - The sections are LOCAL WORKS, LOCAL HISTORY ONLY and MIRROR ONLY; the "All works" heading is gone, and the ? button sits in the foot.
+
 ## 0.6.22
 
 - The Works panel, redone in Highland's way: works under FILE ON THIS COMPUTER, HISTORY ONLY and MIRROR ONLY, each with its file name, when it was last saved and its word count. A click selects a work, which shows Open (or Restore…) and More at its top right, and its saves beneath; a click on a save shows it (beside the file, when the file is on this computer). More opens a small menu with Remove from This Computer… and, in red, Delete Writing History… (both still ask first). Escape, a click beside the works or leaving the panel lets go of the selection; ↑↓ move it. The foot has the Filter and, with a mirror, the sync button, which spins while syncing and gives the last sync time on hover. A ? button at the top explains it all.

@@ -213,7 +213,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
   const sendWorks = async () => {
     const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote", "").trim();
     const m = historyApi?.mirror();
-    const mirror = remote && m ? { busy: m.busy, at: m.at?.getTime() ?? null } : null;
+    const mirror = remote && m ? { busy: m.busy, at: m.at?.getTime() ?? null, error: m.error, signIn: m.signIn } : null;
     if (!historyApi) return post({ type: "works", items: [], mirror });
     workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
     saveNodes.clear();
