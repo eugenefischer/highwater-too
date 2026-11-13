@@ -8,6 +8,7 @@ import { EditorSelection, StateEffect } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { Document } from "@highwater/parser";
 import { key, matchCase, spellContext, wordsToCheck, type SpellContext, type Word } from "./spell-words.ts";
+import type { FromPage } from "./messages.ts";
 
 const recheck = StateEffect.define<null>();
 const misspelled = Decoration.mark({ class: "hl-misspelled" });
@@ -29,7 +30,7 @@ export class Spelling {
   constructor(
     private readonly views: () => EditorView | null,
     private readonly parsed: () => Document | null,
-    private readonly post: (msg: unknown) => void,
+    private readonly post: (msg: FromPage) => void,
   ) {}
 
   /** From the extension: on or off, and the learned words. */

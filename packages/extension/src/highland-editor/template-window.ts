@@ -1,4 +1,5 @@
 import { TEMPLATE_INFO, type TemplateInfo } from "../template-info.ts";
+import type { FromPage, OptionValues } from "./messages.ts";
 
 /**
  * Highland 2's Document Template window: the templates by group on the left; on the right the
@@ -11,7 +12,6 @@ type PdfPage = { getViewport(o: { scale: number }): { width: number; height: num
 type PdfDoc = { numPages: number; getPage(n: number): Promise<PdfPage>; loadingTask?: { destroy(): Promise<void> } };
 export type PdfJs = { getDocument(o: { data: Uint8Array }): { promise: Promise<PdfDoc> } };
 
-export type OptionValues = Record<string, Record<string, string | boolean>>;
 
 const GROUPS: TemplateInfo["group"][] = ["Scripts", "Literary", "Professional", "Academic", "Unformatted"];
 const THUMB_WIDTH = 216;
@@ -32,7 +32,7 @@ export class TemplateWindow {
   shown = false;
 
   constructor(
-    private readonly post: (msg: unknown) => void,
+    private readonly post: (msg: FromPage) => void,
     private readonly pdfjs: () => Promise<PdfJs>,
   ) {
     this.#root = document.createElement("div");

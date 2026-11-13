@@ -15,6 +15,7 @@ import { historyApi } from "../history.ts";
 import type { WorkNode } from "../works.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
+import type { FromPage, ToPage, WorkRow, WorkSaveRow } from "./messages.ts";
 import { NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
 
 const STATE_KEY = "highwater.sidebar";
@@ -41,7 +42,7 @@ const THUMB_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg
 
 export interface SidebarHost {
   /** Handles a message from the page; false if it isn't the sidebar's. */
-  handle(msg: { type: string } & Record<string, unknown>): boolean;
+  handle(msg: FromPage): boolean;
   /** The page is ready (again): send it everything. */
   ready(): void;
   dispose(): void;
@@ -50,7 +51,7 @@ export interface SidebarHost {
 export function sidebarHost(context: vscode.ExtensionContext, store: () => BundleStore, panel: vscode.WebviewPanel, document: () => vscode.TextDocument): SidebarHost {
   let disposed = false;
   // Lists are read asynchronously, so the tab may have closed by the time one is ready.
-  const post = (msg: object) => {
+  const post = (msg: ToPage) => {
     if (disposed) return;
     try {
       void panel.webview.postMessage(msg).then(undefined, () => undefined);
@@ -214,7 +215,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     if (!historyApi) return post({ type: "works", items: [], mirror, computer: computerName() });
     workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
     saveNodes.clear();
-    const items = workNodes.map((n, i) => {
+    const items = workNodes.map((n, i): WorkRow => {
       const w = n.work;
       const words = w.latest ? parseSave(w.latest.message).words : "";
       return {
@@ -236,7 +237,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     post({
       type: "workSaves",
       i,
-      saves: saves.map((n, j) => (n.kind === "save" ? { j, at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter(Boolean),
+      saves: saves.map((n, j) => (n.kind === "save" ? { j, at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter((s): s is WorkSaveRow => s !== null),
     });
   };
   const workAction = async (i: number, action: string) => {
@@ -297,23 +298,10 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         // Highland: "Export Scratchpad contents to a new document": an untitled one in the same language.
         void vscode.workspace.openTextDocument({ content: msg.text, language: document().languageId }).then((d) => vscode.window.showTextDocument(d, { preview: false }));
       } else if (msg.type === "navFiltersSet" && msg.filters && typeof msg.filters === "object") void setFilters(msg.filters as NavigatorFilters);
-      else if (msg.type === "binAdd" && typeof msg.text === "string") {
-        const text = msg.text;
-        binTask((o) => extrasApi!.bin.add(text, o));
-      } else if (msg.type === "binEdit" && typeof msg.index === "number" && typeof msg.text === "string") {
+      else if (msg.type === "binEdit" && typeof msg.index === "number" && typeof msg.text === "string") {
         const index = msg.index as number;
         const text = msg.text as string;
         binTask((o) => extrasApi!.bin.edit(o, index, text));
-      } else if (msg.type === "binMove" && typeof msg.from === "number" && typeof msg.to === "number") {
-        const from = msg.from as number;
-        const to = msg.to as number;
-        binTask((o) => extrasApi!.bin.reorder(from, to, o));
-      } else if (msg.type === "binDelete" && typeof msg.index === "number") {
-        const index = msg.index;
-        binTask(async (o) => {
-          const item = (await extrasApi!.bin.items(o))[index];
-          if (item) await extrasApi!.bin.remove(item);
-        });
       } else if (msg.type === "binOp" && msg.op && typeof msg.op === "object") {
         // A Bin change from the page, done or undone there (see webview.ts): add, remove or move.
         const op = msg.op as { kind: string; index?: number; text?: string; from?: number; to?: number };
@@ -337,10 +325,6 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
             return next;
           });
         });
-      } else if (msg.type === "binTake" && typeof msg.index === "number") {
-        // Dragged into the text: out of the Bin, without asking.
-        const index = msg.index;
-        binTask((o) => extrasApi!.bin.change(o, (items) => items.filter((_, i) => i !== index)));
       } else if (msg.type === "binExport") {
         // Highland's "Export Bin contents to a new document": a new plain-text document with every item, in
         // order, a blank line, "---" and a blank line between; the Bin keeps its items.

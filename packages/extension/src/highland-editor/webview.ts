@@ -10,9 +10,10 @@ import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder,
 import { Decoration, dropCursor, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
-import { Pages, type PdfMessage } from "./pages.ts";
-import { TemplateWindow, type OptionValues } from "./template-window.ts";
-import { ASSET_TYPE, BIN_TYPE, Sidebar, type BinOp } from "./sidebar.ts";
+import { Pages } from "./pages.ts";
+import { TemplateWindow } from "./template-window.ts";
+import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
+import type { BinOp, FromPage, ToPage } from "./messages.ts";
 
 /**
  * Bin changes made from the page ride in its undo history, as Highland's do: each is an effect on
@@ -25,7 +26,7 @@ const binHistory = invertedEffects.of((tr) => tr.effects.filter((e) => e.is(binE
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
+declare function acquireVsCodeApi(): { postMessage(message: FromPage): void };
 const vscode = acquireVsCodeApi();
 // The page was given focus: the extension closes VS Code's Highwater Too sidebar if it is open.
 window.addEventListener("focus", () => vscode.postMessage({ type: "pageFocus" }));
@@ -494,8 +495,8 @@ function replace(text: string): void {
 }
 
 window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data as { type: string; px?: number | null; vars?: Record<string, string> | null; on?: boolean; text?: string; mode?: Mode; offset?: number; how?: "top" | "center"; select?: boolean; ranges?: { anchor: number; head: number }[] };
-  if (sidebar.receive(event.data as { type: string } & Record<string, unknown>)) return;
+  const msg = event.data as ToPage;
+  if (sidebar.receive(msg)) return;
   if (msg.type === "init") {
     mode = msg.mode ?? "fountain";
     document.body.dataset.mode = mode;
@@ -505,10 +506,10 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "togglePreview") togglePreview();
   else if (msg.type === "recordDrag") dragRecord = [];
-  else if (msg.type === "toBin") toBin(!!(event.data as { cut?: boolean }).cut);
+  else if (msg.type === "toBin") toBin(!!msg.cut);
   else if (msg.type === "binRefused" && view) undo(view);
-  else if (msg.type === "pdf") void pages.receive(event.data as PdfMessage);
-  else if (msg.type === "previewEmpty") pages.empty(String((event.data as { message?: string }).message ?? ""));
+  else if (msg.type === "pdf") void pages.receive(msg);
+  else if (msg.type === "previewEmpty") pages.empty(String(msg.message ?? ""));
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);
   else if (msg.type === "numbers") {
     document.documentElement.classList.toggle("hl-numbers", !!msg.on);
@@ -520,15 +521,12 @@ window.addEventListener("message", (event: MessageEvent) => {
     view?.requestMeasure();
   }
   else if (msg.type === "template") {
-    const t = event.data as { template: string; templates: string[] };
-    pages.templates(t.templates, t.template);
-    templateWindow.template(t.template);
-  } else if (msg.type === "templateValues") templateWindow.values((event.data as { values: OptionValues }).values);
-  else if (msg.type === "templateThumb") {
-    const t = event.data as { template: string; data: Uint8Array | null; message?: string };
-    void templateWindow.thumbnail(t.template, t.data, t.message ?? "");
-  } else if (msg.type === "counts") showCounts(event.data as { characters: number; words: number; pages: number | null });
-  else if (msg.type === "spelling") spelling.configure(!!msg.on, (event.data as { words?: string[] }).words ?? []);
+    pages.templates(msg.templates, msg.template);
+    templateWindow.template(msg.template);
+  } else if (msg.type === "templateValues") templateWindow.values(msg.values);
+  else if (msg.type === "templateThumb") void templateWindow.thumbnail(msg.template, msg.data, msg.message ?? "");
+  else if (msg.type === "counts") showCounts(msg);
+  else if (msg.type === "spelling") spelling.configure(!!msg.on, msg.words ?? []);
   else if (msg.type === "nextMisspelling") {
     if (view) void nextMisspelling(view, spelling);
   }

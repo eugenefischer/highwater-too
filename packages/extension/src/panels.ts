@@ -12,6 +12,7 @@ import { idNote, noteId } from "./extras-folder.ts";
 import { focusedDocument, roleOf, type FocusedDocument } from "./focus.ts";
 import { LANGUAGES } from "./language.ts";
 import { activeColumn, activeDocument, activeSelections, activeView, insertAtSelection, onDidChangeActiveSurface, revealOffset, viewOf } from "./surface.ts";
+import { postTo } from "./highland-editor/messages.ts";
 
 /**
  * The Highland sidebar (M6): Navigator, Bin and Assets as tree views in a "Highwater Too" view
@@ -129,7 +130,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     // In the Highwater Editor the page does it, so ⌘Z there puts the text back and takes the item out.
     const view = activeView();
     if (view) {
-      void view.panel.webview.postMessage({ type: "toBin", cut });
+      postTo(view.panel, { type: "toBin", cut });
       return;
     }
     const active = activeSelections();
@@ -562,7 +563,7 @@ async function openScratchpad(store: BundleStore, current: FocusedDocument): Pro
   // In the Highwater Editor, the Scratchpad is a panel of its sidebar.
   const view = activeView();
   if (view) {
-    void view.panel.webview.postMessage({ type: "showPanel", panel: "scratchpad" });
+    postTo(view.panel, { type: "showPanel", panel: "scratchpad" });
     return;
   }
   const active = activeDocument();

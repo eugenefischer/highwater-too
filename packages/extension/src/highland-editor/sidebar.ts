@@ -5,6 +5,7 @@
  * This file is the page's side; the extension's is sidebar-host.ts.
  */
 import type { Document } from "@highwater/parser";
+import { PANELS, type AssetCard, type BinCard, type BinOp, type FromPage, type HistoryMessage, type HistorySave, type MenuItem, type MirrorStatus, type PanelName, type SidebarState, type ToPage, type WorkRow, type WorkSaveRow } from "./messages.ts";
 import { blockAt, currentRow, moveBlock, navigatorItems, navigatorRows, parseFilters, type NavigatorFilters, type NavigatorRow } from "../syntax/navigator.ts";
 
 /** On a Mac, shortcuts are written as Highland writes them (⌥⌘X); elsewhere as VS Code does there (Ctrl+Alt+X). */
@@ -25,17 +26,8 @@ export function keys(mac: string): string {
   return [...mods, mac.replace(/[⌃⌘⌥⇧]/g, "")].join("+");
 }
 
-export const PANELS = ["navigator", "bin", "stats", "assets", "scratchpad", "history", "works"] as const;
-export type PanelName = (typeof PANELS)[number];
-
-export interface SidebarState {
-  open: boolean;
-  panel: PanelName;
-  width: number;
-}
-
 export interface SidebarDeps {
-  post(msg: unknown): void;
+  post(msg: FromPage): void;
   /** The latest parse of the text. */
   parsed(): Document | null;
   /** The text's length, and the cursor's offset. */
@@ -54,9 +46,6 @@ export interface SidebarDeps {
    */
   bin(op: BinOp, cut?: string): void;
 }
-
-/** A change to the Bin that undo can reverse: an item added or removed at an index, or moved. */
-export type BinOp = { kind: "add" | "remove"; index: number; text: string } | { kind: "move"; from: number; to: number };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const MIN_WIDTH = 240;
@@ -127,17 +116,17 @@ export class Sidebar {
     this.#nav.cursorMoved();
   }
 
-  receive(msg: { type: string } & Record<string, unknown>): boolean {
-    if (msg.type === "sidebar") this.restore(msg.state as Partial<SidebarState>);
-    else if (msg.type === "navFilters") this.#nav.filters(msg.json as string | undefined, msg.filters as NavigatorFilters | undefined);
+  receive(msg: ToPage): boolean {
+    if (msg.type === "sidebar") this.restore(msg.state);
+    else if (msg.type === "navFilters") this.#nav.filters(msg.json, msg.filters);
     else if (msg.type === "scratchpad") this.#scratch.load(String(msg.text ?? ""), !!msg.force);
     else if (msg.type === "scratchpadSaved") this.#scratch.saved(String(msg.text ?? ""));
-    else if (msg.type === "bin") this.#bin.show(msg.items as BinCard[], !!msg.available);
-    else if (msg.type === "assets") this.#assets.show(msg.items as AssetCard[], !!msg.available);
-    else if (msg.type === "history") this.#history.show(msg as unknown as HistoryMessage);
-    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[], (msg.mirror as { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null) ?? null, typeof msg.computer === "string" ? msg.computer : "");
-    else if (msg.type === "workSaves") this.#works.saves(msg.i as number, msg.saves as WorkSaveRow[]);
-    else if (msg.type === "showPanel" && PANELS.includes(msg.panel as PanelName)) this.show(msg.panel as PanelName);
+    else if (msg.type === "bin") this.#bin.show(msg.items, !!msg.available);
+    else if (msg.type === "assets") this.#assets.show(msg.items, !!msg.available);
+    else if (msg.type === "history") this.#history.show(msg);
+    else if (msg.type === "works") this.#works.show(msg.items, msg.mirror ?? null, typeof msg.computer === "string" ? msg.computer : "");
+    else if (msg.type === "workSaves") this.#works.saves(msg.i, msg.saves);
+    else if (msg.type === "showPanel" && PANELS.includes(msg.panel)) this.show(msg.panel);
     else if (msg.type === "toggleSidebar") this.toggle();
     else return false;
     return true;
@@ -559,12 +548,6 @@ class ScratchpadPanel {
 // page and the Bin are one webview); drag a card into the page to put it back; drag cards to reorder
 // them. The Filter at the foot narrows the cards by their words.
 
-interface BinCard {
-  text: string;
-  label: string;
-  detail: string;
-}
-
 export const BIN_TYPE = "application/x-highwater-bin";
 /** Marks an image reference dragged from Assets (the page puts it in as a paragraph of its own). */
 export const ASSET_TYPE = "application/x-highwater-asset";
@@ -825,14 +808,6 @@ class BinPanel {
 // Assets: the document's images. Drag one into the page to put in its reference; add images
 // with the + button, or by dropping files from Finder (VS Code asks for Shift while dragging in).
 
-interface AssetCard {
-  name: string;
-  label: string;
-  detail: string;
-  reference: string;
-  thumb: string | null;
-}
-
 class AssetsPanel {
   readonly #list = $("assetlist");
   readonly #empty = $("assetempty");
@@ -924,34 +899,6 @@ function button(tip: string, path: string, run: () => void, cls = ""): HTMLButto
 // heading for each day. A click selects a save, which shows Compare and Revert where its word change
 // was; Escape, a click beside the saves or leaving the panel lets go of it. The foot shows whether the history is recording and how the
 // mirror is doing, with the record (off or on for this document), export and gear (the rest) buttons.
-
-interface HistorySave {
-  hash: string;
-  /** Milliseconds since 1970. */
-  at: number;
-  kind: string;
-  note: string;
-  delta: string;
-  words: string;
-}
-
-interface MenuItem {
-  label: string;
-  command: string;
-  sep?: boolean;
-  /** Shown in the error colour (deleting). */
-  danger?: boolean;
-}
-
-interface HistoryMessage {
-  title: string;
-  note: string;
-  saves: HistorySave[];
-  state: "on" | "paused" | "off" | "none";
-  document: boolean;
-  mirror: { at: number | null; error: string | null; signIn: boolean; busy: boolean } | null;
-  menu: MenuItem[];
-}
 
 const COMPARE_ICON = '<rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/><path d="M6 9h2M6 12h2M16 9h2M16 12h2M16 15h2"/>';
 const REVERT_ICON = '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>';
@@ -1281,25 +1228,6 @@ let closeMenu: () => void = () => {};
 // its saves beneath (a click on one shows it). The Filter narrows the list; the sync button (with a
 // mirror) brings in works saved on other computers.
 
-interface WorkRow {
-  i: number;
-  title: string;
-  file: string;
-  /** Last save, milliseconds since 1970. */
-  at: number | null;
-  words: string;
-  kind: "here" | "local" | "remote";
-}
-
-interface WorkSaveRow {
-  j: number;
-  at: number;
-  kind: string;
-  note: string;
-  delta: string;
-  words: string;
-}
-
 const WORK_SECTIONS: [WorkRow["kind"], string][] = [
   ["here", "LOCAL WORKS"],
   ["local", "LOCAL HISTORY ONLY"],
@@ -1345,7 +1273,7 @@ class WorksPanel {
     });
   }
 
-  show(rows: WorkRow[], mirror: { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null, computer: string): void {
+  show(rows: WorkRow[], mirror: MirrorStatus | null, computer: string): void {
     // This computer's name: what saves made here are called on other computers ("on …").
     const name = $("workcomputer");
     name.textContent = computer;

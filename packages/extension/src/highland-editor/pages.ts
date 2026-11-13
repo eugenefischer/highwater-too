@@ -5,6 +5,7 @@
  * lays out; anchors (page, y, source offset) map between the text and the pages, so switching
  * keeps your place.
  */
+import type { FromPage, PdfMessage } from "./messages.ts";
 
 type PdfPage = { getViewport(o: { scale: number }): { width: number; height: number }; render(o: { canvasContext: CanvasRenderingContext2D; viewport: unknown }): { promise: Promise<void> } };
 type PdfDoc = { numPages: number; getPage(n: number): Promise<PdfPage>; loadingTask?: { destroy(): Promise<void> } };
@@ -23,17 +24,6 @@ export const PRINT_BOXES: PrintBox[] = [
   { key: "printInlineNotes", label: "Notes" },
   { key: "printTitlePage", label: "Title Page" },
 ];
-
-export interface PdfMessage {
-  data: Uint8Array;
-  template: string;
-  templates: string[];
-  anchors: number[];
-  problems: string[];
-  print: Record<string, boolean>;
-  /** The offset the pages should open at. */
-  at: number | null;
-}
 
 type Anchor = { page: number; y: number; offset: number };
 
@@ -57,7 +47,7 @@ export class Pages {
   shown = false;
 
   constructor(
-    private readonly post: (msg: unknown) => void,
+    private readonly post: (msg: FromPage) => void,
     /** Leaving the pages: the source offset at their top, and (double-click) where to put the cursor. */
     private readonly onLeave: (top: number | null, cursor: number | null) => void,
     private readonly onTemplate: (current: string) => void,
@@ -86,7 +76,7 @@ export class Pages {
   }
 
   /** The template menu in the top bar (shown with the text as well as the pages). */
-  templates(list: string[], current: string): void {
+  templates(list: readonly string[], current: string): void {
     this.#templateName = list.length ? current : "";
     this.#template.textContent = this.#templateName;
     this.#template.hidden = !this.#templateName;

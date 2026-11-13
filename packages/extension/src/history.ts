@@ -19,6 +19,7 @@ import { Connector } from "./connect.ts";
 import { focusedDocument, roleOf, scriptIsOpen } from "./focus.ts";
 import { afterPull, deletedElsewhere, revertTo, WorksView, type WorksHost } from "./works.ts";
 import { activeView, showDocument } from "./surface.ts";
+import { postTo } from "./highland-editor/messages.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -375,7 +376,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     // In the Highwater Editor, its sidebar's Writing History panel.
     const hv = activeView();
     if (hv) {
-      void hv.panel.webview.postMessage({ type: "showPanel", panel: "history" });
+      postTo(hv.panel, { type: "showPanel", panel: "history" });
       return;
     }
     const key = focus.key;

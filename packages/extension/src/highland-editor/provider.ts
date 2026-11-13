@@ -12,6 +12,7 @@ import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { colorThemeLabel, HIGHLAND_THEMES, navigatorColors, pageColors, themeFor } from "./themes.ts";
 import { editorFocused, registerSidebarNote } from "./sidebar-note.ts";
 import { sidebarHost } from "./sidebar-host.ts";
+import { postTo, type FromPage, type PanelName, type ToPage } from "./messages.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
 import { activeOffsets, activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
@@ -72,20 +73,20 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       top: 0,
       ready: false,
       pagesSent: 0,
-      togglePreview: () => void panel.webview.postMessage({ type: "togglePreview" }),
+      togglePreview: () => postTo(panel, { type: "togglePreview" }),
       select: (ranges) => {
         // The page must hold the edited text before it can select in it.
         if (changedElsewhere()) send();
-        if (view.ready) void panel.webview.postMessage({ type: "select", ranges: ranges.map((r) => ({ anchor: toPage(r.anchor), head: toPage(r.head) })) });
+        if (view.ready) postTo(panel, { type: "select", ranges: ranges.map((r) => ({ anchor: toPage(r.anchor), head: toPage(r.head) })) });
       },
       reveal: (offset, how, select) => {
-        const msg = { type: "reveal", offset: toPage(offset), how, select };
+        const msg: ToPage = { type: "reveal", offset: toPage(offset), how, select };
         // The page drops messages sent before its script has started: hold the latest until it has.
-        if (view.ready) void panel.webview.postMessage(msg);
+        if (view.ready) postTo(panel, msg);
         else pendingReveal = msg;
       },
     };
-    let pendingReveal: object | undefined;
+    let pendingReveal: ToPage | undefined;
     /** Preview mode: the page shows the printed pages, laid out here. */
     let previewing = false;
     let layout = 0;
@@ -95,27 +96,27 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         const rendered = await renderDocument(this.context, this.store(), document);
         if (mine !== layout || !previewing) return;
         if (!rendered) {
-          void panel.webview.postMessage({ type: "previewEmpty", message: "Plain-text documents have no print template to preview." });
+          postTo(panel, { type: "previewEmpty", message: "Plain-text documents have no print template to preview." });
           return;
         }
         const print = await printOptionsOf(this.context, this.store(), document);
         // The anchors' offsets are the document's; the page counts "\r\n" as one character.
         const anchors = rendered.anchors.map((v, i) => (i % 3 === 2 ? toPage(v) : v));
-        void panel.webview.postMessage({ type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, anchors, problems: rendered.problems, print, at });
+        postTo(panel, { type: "pdf", data: rendered.pdf, template: rendered.template, templates: TEMPLATES, anchors, problems: rendered.problems, print, at });
         view.pagesSent++;
       } catch (error) {
-        if (mine === layout) void panel.webview.postMessage({ type: "previewEmpty", message: `Could not lay out the document: ${(error as Error).message}` });
+        if (mine === layout) postTo(panel, { type: "previewEmpty", message: `Could not lay out the document: ${(error as Error).message}` });
       }
     };
 
     // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
-    const sendNumbers = () => void panel.webview.postMessage({ type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
+    const sendNumbers = () => postTo(panel, { type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
     // The template window's options (settings for every document).
-    const sendTemplateValues = () => void panel.webview.postMessage({ type: "templateValues", values: Object.fromEntries(TEMPLATE_INFO.map((t) => [t.name, templateOptions(t.name)])) });
+    const sendTemplateValues = () => postTo(panel, { type: "templateValues", values: Object.fromEntries(TEMPLATE_INFO.map((t) => [t.name, templateOptions(t.name)])) });
     // The top bar's template menu, shown with the text too.
     const sendTemplate = async () => {
       const template = await templateOf(this.context, this.store(), document);
-      void panel.webview.postMessage({ type: "template", template: template ?? "", templates: template ? TEMPLATES : [] });
+      postTo(panel, { type: "template", template: template ?? "", templates: template ? TEMPLATES : [] });
     };
     // Highland's counts at the foot of the text: characters, words and pages (the print layout's, page-count.ts).
     let countsTimer: ReturnType<typeof setTimeout> | undefined;
@@ -123,35 +124,35 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       clearTimeout(countsTimer);
       countsTimer = setTimeout(() => {
         const stats = documentStats(parse(document.getText(), { mode: MODES.get(document.languageId) ?? "fountain" }));
-        void panel.webview.postMessage({ type: "counts", characters: stats.characters, words: stats.words, pages: pageCountOf(document) ?? null });
+        postTo(panel, { type: "counts", characters: stats.characters, words: stats.words, pages: pageCountOf(document) ?? null });
       }, 300);
     };
     // Check Spelling While Typing (highwater.spellCheck) and the learned words.
     const sendSpelling = () => {
       const config = vscode.workspace.getConfiguration("highwater");
-      void panel.webview.postMessage({ type: "spelling", on: config.get<boolean>("spellCheck", false), words: config.get<string[]>("spellingWords", []) });
+      postTo(panel, { type: "spelling", on: config.get<boolean>("spellCheck", false), words: config.get<string[]>("spellingWords", []) });
     };
     // The text size (highwater.fontSize; 0 follows VS Code's editor size).
-    const sendFontSize = () => void panel.webview.postMessage({ type: "fontSize", px: vscode.workspace.getConfiguration("highwater").get<number>("fontSize", 0) || null });
+    const sendFontSize = () => postTo(panel, { type: "fontSize", px: vscode.workspace.getConfiguration("highwater").get<number>("fontSize", 0) || null });
     // A Highland theme for the page (highwater.theme), or VS Code's colours.
     const sendTheme = () => {
       const theme = themeFor(vscode.workspace.getConfiguration("highwater").get<string>("theme"));
-      void panel.webview.postMessage({ type: "theme", vars: theme ? { ...pageColors(theme), ...navigatorColors(theme) } : null });
+      postTo(panel, { type: "theme", vars: theme ? { ...pageColors(theme), ...navigatorColors(theme) } : null });
     };
     // Show Invisibles follows the text editor's whitespace setting for the document's language.
     const sendInvisibles = () =>
-      void panel.webview.postMessage({ type: "invisibles", on: vscode.workspace.getConfiguration("editor", document).get<string>("renderWhitespace", "none") !== "none" });
+      postTo(panel, { type: "invisibles", on: vscode.workspace.getConfiguration("editor", document).get<string>("renderWhitespace", "none") !== "none" });
     const send = () => {
       pageText = pageForm(document.getText());
-      void panel.webview.postMessage({ type: "update", text: pageText });
+      postTo(panel, { type: "update", text: pageText });
     };
     // Highland's sidebar: the Navigator, the Scratchpad and the rest (sidebar-host.ts).
     const sidebar = sidebarHost(this.context, this.store, panel, () => document);
     const subscriptions = [
       highlandViews.add(view),
       sidebar,
-      panel.webview.onDidReceiveMessage((msg: { type: string; changes?: { from: number; to: number; insert: string }[]; ranges?: { anchor: number; head: number }[]; top?: number; at?: number | null; template?: string; key?: string; value?: boolean | string; kind?: string; word?: string }) => {
-        if (sidebar.handle(msg as { type: string } & Record<string, unknown>)) return;
+      panel.webview.onDidReceiveMessage((msg: FromPage) => {
+        if (sidebar.handle(msg)) return;
         if (msg.type === "dragRecord") {
           const lines = (msg as unknown as { lines: string[] }).lines;
           void vscode.workspace.openTextDocument({ content: `Highwater Too: one drag, as the page saw it (time in ms, event, element, whether a handler accepted it, the drop effect)\n\n${lines.join("\n")}\n` }).then((d) => vscode.window.showTextDocument(d, { preview: false, viewColumn: vscode.ViewColumn.Beside }));
@@ -161,7 +162,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (msg.type === "ready") {
           sidebar.ready();
           pageText = pageForm(document.getText());
-          void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
+          postTo(panel, { type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
           previewing = false;
           sendInvisibles();
@@ -171,7 +172,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendSpelling();
           void sendTemplate();
           sendCounts();
-          if (pendingReveal) void panel.webview.postMessage(pendingReveal);
+          if (pendingReveal) postTo(panel, pendingReveal);
           pendingReveal = undefined;
         } else if (msg.type === "selection" && msg.ranges) {
           view.selections = msg.ranges.map((r) => ({ anchor: toDocument(r.anchor), head: toDocument(r.head) }));
@@ -189,8 +190,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           // The template window's page: the text's first page in that template (no title page).
           const template = msg.template as Template;
           void renderDocument(this.context, this.store(), document, template, true, false).then(
-            (r) => void panel.webview.postMessage({ type: "templateThumb", template, data: r?.pdf ?? null, message: r ? "" : "No pages to show." }),
-            (e: unknown) => void panel.webview.postMessage({ type: "templateThumb", template, data: null, message: `Could not lay out the text: ${(e as Error).message}` }),
+            (r) => postTo(panel, { type: "templateThumb", template, data: r?.pdf ?? null, message: r ? "" : "No pages to show." }),
+            (e: unknown) => postTo(panel, { type: "templateThumb", template, data: null, message: `Could not lay out the text: ${(e as Error).message}` }),
           );
         } else if (msg.type === "printOption" && PRINT_OPTIONS.includes(msg.key as PrintOption)) {
           void setPrintOption(this.context, this.store(), document, msg.key as PrintOption, !!msg.value).catch((e: unknown) => void vscode.window.showErrorMessage(`Could not save the print option: ${(e as Error).message}`));
@@ -247,7 +248,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         // A new language (a .md file made Highwater Markdown): the page lays the text out again.
         if (view.ready && languageChanged) {
           pageText = pageForm(document.getText());
-          void panel.webview.postMessage({ type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
+          postTo(panel, { type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
         }
       }),
       vscode.workspace.onDidChangeTextDocument((e) => {
@@ -909,12 +910,16 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
     vscode.commands.registerCommand("highwater.recordDrag", () => {
       const v = activeView();
       if (!v) return void vscode.window.showInformationMessage("Open a document in the Highwater Editor, run this, then drag once.");
-      void v.panel.webview.postMessage({ type: "recordDrag" });
+      postTo(v.panel, { type: "recordDrag" });
       void vscode.window.showInformationMessage("Recording the next drag in this document: drag a Bin card over the text and let go.");
     }),
-    vscode.commands.registerCommand("highwater.toggleEditorSidebar", () => void activeView()?.panel.webview.postMessage({ type: "toggleSidebar" })),
+    vscode.commands.registerCommand("highwater.toggleEditorSidebar", () => {
+      const v = activeView();
+      if (v) postTo(v.panel, { type: "toggleSidebar" });
+    }),
     vscode.commands.registerCommand("highwater.showSidebarPanel", (panel: unknown) => {
-      if (typeof panel === "string") void activeView()?.panel.webview.postMessage({ type: "showPanel", panel });
+      const v = activeView();
+      if (typeof panel === "string" && v) postTo(v.panel, { type: "showPanel", panel: panel as PanelName });
     }),
     vscode.commands.registerCommand("highwater.openHighlandEditor", async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
@@ -982,7 +987,10 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       await config.update("spellCheck", !config.get<boolean>("spellCheck", false), vscode.ConfigurationTarget.Global);
     }),
     // ⌘; is handled in the page itself; this is the same for the Command Palette.
-    vscode.commands.registerCommand("highwater.nextMisspelling", () => void activeView()?.panel.webview.postMessage({ type: "nextMisspelling" })),
+    vscode.commands.registerCommand("highwater.nextMisspelling", () => {
+      const v = activeView();
+      if (v) postTo(v.panel, { type: "nextMisspelling" });
+    }),
     vscode.commands.registerCommand("highwater.toggleParagraphNumbers", async () => {
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("paragraphNumbers", !config.get<boolean>("paragraphNumbers", false), vscode.ConfigurationTarget.Global);
