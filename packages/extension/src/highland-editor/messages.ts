@@ -7,6 +7,7 @@
  */
 import type { Mode } from "@highwater/parser";
 import type { NavigatorFilters } from "../syntax/navigator.ts";
+import type { CustomTheme } from "./themes.ts";
 
 export const PANELS = ["navigator", "bin", "stats", "assets", "scratchpad", "history", "works"] as const;
 export type PanelName = (typeof PANELS)[number];
@@ -122,6 +123,10 @@ export type ToPage =
   | { type: "reveal"; offset: number; how: "top" | "center"; select: boolean }
   | { type: "select"; ranges: SelectionRange[] }
   | { type: "theme"; vars: Record<string, string> | null }
+  /** The theme in use (highwater.theme) and your own themes, for the theme menu and window. */
+  | { type: "themes"; current: string; customs: CustomTheme[] }
+  /** Choose Theme… from the Command Palette: the theme menu drops down. */
+  | { type: "showThemePane" }
   | { type: "fontSize"; px: number | null }
   | { type: "numbers"; on: boolean }
   | { type: "invisibles"; on: boolean }
@@ -164,7 +169,14 @@ export type FromPage =
   | { type: "edit"; changes: TextChange[] }
   | { type: "selection"; ranges: SelectionRange[] }
   | { type: "scroll"; top: number }
-  | { type: "chooseTheme" }
+  // The theme menu: opened (remember the theme there was), a theme tried, closed keeping it or not.
+  | { type: "themePaneOpen" }
+  | { type: "themePreview"; id: string }
+  | { type: "themePaneClose"; keep: boolean }
+  // The theme window: your own themes saved, one deleted (after asking), a theme link copied.
+  | { type: "customThemesSave"; themes: CustomTheme[] }
+  | { type: "customThemeDelete"; id: string }
+  | { type: "copyText"; text: string; note: string }
   | { type: "learnWord"; word: string }
   /** A comparison started or ended: the text can't be changed meanwhile. */
   | { type: "comparing"; on: boolean }

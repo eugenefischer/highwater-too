@@ -12,6 +12,8 @@ import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages } from "./pages.ts";
 import { TemplateWindow } from "./template-window.ts";
+import { ThemePane } from "./theme-pane.ts";
+import { ThemeWindow } from "./theme-window.ts";
 import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
 import { Compare } from "./compare.ts";
 import type { BinOp, FromPage, ToPage } from "./messages.ts";
@@ -412,7 +414,10 @@ const sidebar = new Sidebar({
 // The top bar: Text and Pages (as ⌘E), and Choose Theme.
 document.getElementById("tbtext")!.onclick = () => pages.shown && togglePreview();
 document.getElementById("tbpages")!.onclick = () => !pages.shown && togglePreview();
-document.getElementById("tbtheme")!.onclick = () => vscode.postMessage({ type: "chooseTheme" });
+// The theme menu under the theme button, and the theme window its Manage Themes… opens.
+const themeWindow = new ThemeWindow((m) => vscode.postMessage(m));
+const themePane = new ThemePane((m) => vscode.postMessage(m), document.getElementById("tbtheme")!, () => themeWindow.open());
+document.getElementById("tbtheme")!.onclick = () => themePane.toggle();
 
 /** Highland's counts at the foot of the text. */
 function showCounts(c: { characters: number; words: number; pages: number | null }): void {
@@ -513,6 +518,12 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "pdf") void pages.receive(msg);
   else if (msg.type === "previewEmpty") pages.empty(String(msg.message ?? ""));
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);
+  else if (msg.type === "themes") {
+    themePane.update(msg.current, msg.customs);
+    themeWindow.update(msg.current, msg.customs);
+  } else if (msg.type === "showThemePane") {
+    if (!themePane.shown) themePane.open();
+  }
   else if (msg.type === "numbers") {
     document.documentElement.classList.toggle("hl-numbers", !!msg.on);
     view?.requestMeasure();

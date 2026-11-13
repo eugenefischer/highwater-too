@@ -41,9 +41,87 @@ export const HIGHLAND_THEMES: Record<string, HighlandTheme> = {
   "transit": { name: "Transit", mode: "dark", background: "#1c0c19", text: "#c6bac1", sidebarBackground: "#140611", sidebarText: "#a7969e", primary: "#bc2e9e", secondary: "#ea3f3f", inactive: "#a7969e", sceneHeading: "#2faad1", notes: "#e7ea09", cursor: "#bedc3c", added: "#5ccf7a", removed: "#ff5f6d" },
 };
 
-/** The chosen theme, or null for VS Code's colours (and for a name that isn't one of Highland's). */
-export function themeFor(setting: string | undefined): HighlandTheme | null {
-  return setting && setting !== "vscode" ? (HIGHLAND_THEMES[setting] ?? null) : null;
+/**
+ * A theme the writer made or imported (highwater.customThemes): Highland's ten colours, a name and
+ * light or dark, as in Highland's theme builder. `id` keeps it the same theme when it is renamed.
+ */
+export interface CustomTheme {
+  id: string;
+  name: string;
+  mode: "light" | "dark";
+  background: string;
+  text: string;
+  primary: string;
+  secondary: string;
+  sceneHeading: string;
+  sidebarBackground: string;
+  sidebarText: string;
+  notes: string;
+  inactive: string;
+  cursor: string;
+}
+
+/** The ten colours in the order and with the names of Highland's theme builder (and its links). */
+export const THEME_COLORS: readonly { key: keyof Omit<CustomTheme, "id" | "name" | "mode">; label: string }[] = [
+  { key: "background", label: "Background Color" },
+  { key: "text", label: "Text Color" },
+  { key: "primary", label: "Theme Primary" },
+  { key: "secondary", label: "Theme Secondary" },
+  { key: "sceneHeading", label: "Scene Header" },
+  { key: "sidebarBackground", label: "Sidebar Background" },
+  { key: "sidebarText", label: "Sidebar Text" },
+  { key: "notes", label: "Notes/Links" },
+  { key: "inactive", label: "Inactive" },
+  { key: "cursor", label: "Insertion Point" },
+];
+
+/** The id highwater.theme holds for a custom theme. */
+export const customId = (t: Pick<CustomTheme, "id">) => `custom:${t.id}`;
+
+/** A custom theme as a full theme: Compare's green and red are GitHub's for light or dark pages. */
+export function fromCustom(c: CustomTheme): HighlandTheme {
+  const { id: _id, ...colors } = c;
+  void _id;
+  return { ...colors, added: c.mode === "dark" ? "#3fb950" : "#2da44e", removed: c.mode === "dark" ? "#f85149" : "#cf222e" };
+}
+
+/** The chosen theme, or null for VS Code's colours (and for a name that is no theme, or a deleted custom one). */
+export function themeFor(setting: string | undefined, customs: readonly CustomTheme[] = []): HighlandTheme | null {
+  if (!setting || setting === "vscode") return null;
+  if (setting.startsWith("custom:")) {
+    const c = customs.find((t) => customId(t) === setting);
+    return c ? fromCustom(c) : null;
+  }
+  return HIGHLAND_THEMES[setting] ?? null;
+}
+
+/** The five swatches Highland's theme menu shows: background, primary, secondary, scene heading, cursor. */
+export function swatches(t: Pick<HighlandTheme, "background" | "primary" | "secondary" | "sceneHeading" | "cursor">): string[] {
+  return [t.background, t.primary, t.secondary, t.sceneHeading, t.cursor];
+}
+
+const HEX = /^#?([0-9a-f]{6})$/i;
+
+/**
+ * Highland's theme link, as its theme builder makes it:
+ * https://quoteunquoteapps.com/theme-builder/?Name_With_Underscores,L|D,<ten colours as RRGGBB>
+ */
+export function themeLink(t: Omit<CustomTheme, "id">): string {
+  const name = (t.name.trim() || "Custom Theme").replace(/ /g, "_");
+  return `https://quoteunquoteapps.com/theme-builder/?${[name, t.mode === "dark" ? "D" : "L", ...THEME_COLORS.map((c) => t[c.key].replace("#", "").toUpperCase())].join(",")}`;
+}
+
+/** A theme from Highland's link (the builder's https link, its highland://theme link, or just the part after "?"); null if it isn't one. */
+export function parseThemeLink(text: string): Omit<CustomTheme, "id"> | null {
+  const trimmed = text.trim();
+  const query = trimmed.includes("?") ? trimmed.slice(trimmed.indexOf("?") + 1) : trimmed;
+  const parts = decodeURIComponent(query).split(",");
+  if (parts.length !== 12 || (parts[1] !== "L" && parts[1] !== "D")) return null;
+  const colors = parts.slice(2).map((p) => HEX.exec(p.trim())?.[1]);
+  if (colors.some((c) => !c)) return null;
+  const theme = { name: parts[0]!.replace(/_/g, " ").trim() || "Custom Theme", mode: parts[1] === "D" ? "dark" : "light" } as Omit<CustomTheme, "id">;
+  THEME_COLORS.forEach((c, i) => (theme[c.key] = `#${colors[i]!.toLowerCase()}`));
+  return theme;
 }
 
 /** The page's colour variables for a theme (the Highwater Editor's CSS reads these). */
@@ -118,6 +196,16 @@ function mix(a: string, b: string, t: number): string {
   const out = [16, 8, 0].map((s) => Math.round(ch(ca, s) * (1 - t) + ch(cb, s) * t));
   return `#${out.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
+
+/**
+ * VS Code colour themes for custom themes: one light, one dark, which a custom theme's colours
+ * replace through workbench.colorCustomizations scoped to them (VS Code themes are fixed files).
+ * Classic's and Material's colours stand in until then.
+ */
+export const CUSTOM_WINDOW_THEMES: Record<"custom-light" | "custom-dark", HighlandTheme> = {
+  "custom-light": { ...HIGHLAND_THEMES.classic!, name: "Custom Light" },
+  "custom-dark": { ...HIGHLAND_THEMES.material!, name: "Custom Dark", mode: "dark" },
+};
 
 /** The theme's id in themes/: highwater-<id>-color-theme.json. */
 export function colorThemeFile(id: string): string {

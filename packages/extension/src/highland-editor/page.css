@@ -251,6 +251,73 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 .tw-font span { width: 5em; text-align: right; }
 .tw-font select { flex: 1; max-width: 240px; font: inherit; padding: 3px 6px; color: var(--vscode-dropdown-foreground); background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border, var(--hl-border)); border-radius: 4px; }
 @media (max-width: 560px) { .tw-body { flex-direction: column; } .tw-list { flex: none; max-height: 30vh; border-right: 0; } }
+/* The theme menu (Highland 2's): dropped from the theme button; themes by Light, Dark and Custom, each with its five swatches. */
+#thpane { position: fixed; z-index: 55; display: flex; flex-direction: column; width: 300px; max-height: min(640px, calc(100vh - 80px)); background: var(--hl-panel-bg); color: var(--hl-panel-fg); border: 1px solid var(--hl-border); border-radius: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
+#thpane[hidden] { display: none; }
+.th-title { padding: 14px 16px 8px; text-align: center; font-size: 1.5em; font-weight: 600; color: var(--hl-muted); }
+.th-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 4px; outline: none; }
+.th-group { margin: 10px 0 4px; padding: 8px 4px 0; border-top: 1px solid var(--hl-border); font-size: 0.8em; font-weight: 600; letter-spacing: 0.06em; color: var(--hl-muted); }
+.th-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 8px 5px 10px; border-radius: 6px; cursor: pointer; font-size: 1.1em; }
+.th-row:hover { background: color-mix(in srgb, var(--hl-panel-fg) 10%, transparent); }
+.th-row.th-on { background: var(--hl-accent); color: var(--hl-accent-fg); }
+.th-list:focus-visible .th-row.th-on { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+.th-swatches { display: inline-flex; flex: none; }
+.th-swatches span { width: 18px; height: 18px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.35); }
+.th-none { padding: 4px 10px; color: var(--hl-muted); font-style: italic; }
+.th-manage { margin: 6px 12px 12px; padding: 6px; font: inherit; font-size: 1.05em; border: 0; border-top: 1px solid var(--hl-border); background: none; color: inherit; cursor: pointer; }
+.th-manage:hover { color: var(--hl-accent); }
+/* The theme window (Manage Themes…): your own themes, made, imported, edited. */
+#thwin { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; background: rgba(0, 0, 0, 0.35); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
+#thwin[hidden] { display: none; }
+.tm-sheet { width: min(860px, 100%); }
+.tm-side { flex: 0 0 200px; display: flex; flex-direction: column; min-height: 0; padding-right: 12px; border-right: 1px solid var(--hl-border); }
+.tm-list { overflow-y: auto; min-height: 60px; }
+.tm-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tm-sheet button:not(.tw-item):not(.tw-done) { font: inherit; padding: 4px 10px; border: 1px solid var(--hl-border); border-radius: 5px; background: color-mix(in srgb, var(--hl-panel-fg) 8%, transparent); color: inherit; cursor: pointer; }
+.tm-sheet button:not(.tw-item):not(.tw-done):hover { background: color-mix(in srgb, var(--hl-panel-fg) 16%, transparent); }
+.tm-sheet input[type="text"] { box-sizing: border-box; font: inherit; padding: 4px 6px; color: var(--hl-panel-fg); background: color-mix(in srgb, var(--hl-panel-fg) 8%, var(--hl-panel-bg)); border: 1px solid var(--hl-border); border-radius: 4px; outline: none; }
+.tm-sheet input[type="text"]:focus { border-color: var(--hl-accent); }
+.tm-import { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tm-import[hidden] { display: none; }
+.tm-import-text { flex: 1; min-width: 0; }
+.tm-import-note { flex-basis: 100%; color: var(--vscode-errorForeground, #f48771); font-size: 0.9em; }
+.tm-detail { flex: 1; min-width: 0; overflow-y: auto; }
+.tm-empty { padding: 20px 4px; color: var(--hl-muted); line-height: 1.4; }
+.tm-row { display: flex; gap: 10px; align-items: center; }
+.tm-name { flex: 1; font-size: 1.15em !important; }
+.tm-mode { display: inline-flex; }
+.tm-mode button { border-radius: 0 !important; }
+.tm-mode button:first-child { border-radius: 5px 0 0 5px !important; }
+.tm-mode button:last-child { border-radius: 0 5px 5px 0 !important; border-left: 0 !important; }
+.tm-mode button.tm-on { background: var(--hl-accent) !important; color: var(--hl-accent-fg); border-color: var(--hl-accent) !important; }
+.tm-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 16px; margin: 12px 0; }
+.tm-color { display: flex; align-items: center; gap: 8px; }
+.tm-color span { flex: 1; }
+.tm-color input[type="color"] { width: 30px; height: 22px; padding: 0; border: 1px solid var(--hl-border); border-radius: 4px; background: none; cursor: pointer; }
+.tm-hex { width: 76px; font-family: var(--vscode-editor-font-family, monospace) !important; }
+.tm-actions { display: flex; gap: 8px; margin-top: 12px; }
+.tm-delete { margin-left: auto; }
+/* The sample: a corner of the editor and sidebar in the theme's colours (the variables set on it). */
+.tm-sample { display: flex; height: 170px; border: 1px solid var(--hl-border); border-radius: 6px; overflow: hidden; font-size: 12px; }
+.tm-s-side { flex: 0 0 150px; padding: 8px; background: var(--nav-bg); color: var(--nav-fg); font-family: var(--vscode-font-family); }
+.tm-s-icons { display: flex; gap: 12px; margin: 2px 4px 10px; }
+.tm-s-icon { position: relative; width: 14px; height: 12px; border-radius: 2px; background: var(--hl-muted); }
+.tm-s-icon.tm-s-on { background: var(--nav-tab); }
+.tm-s-icon.tm-s-on::after { content: ""; position: absolute; left: 5px; top: 16px; width: 4px; height: 4px; border-radius: 50%; background: var(--nav-tab); }
+.tm-s-item { padding: 3px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-s-item.tm-s-current { background: var(--nav-current); }
+.tm-s-item.tm-s-note { font-weight: 400; font-style: italic; color: var(--hl-note); }
+.tm-s-page { flex: 1; min-width: 0; padding: 8px 18px; background: var(--hl-bg); color: var(--hl-fg); font-family: "Courier Prime", monospace; line-height: 1.5; }
+.tm-s-top { height: 22px; }
+.tm-s-text { display: inline-block; width: 14px; height: 12px; border-radius: 2px; background: var(--hl-accent); }
+.tm-s-section { color: var(--hl-section); font-weight: 700; margin-left: -2ch; }
+.tm-s-synopsis { color: var(--hl-muted); }
+.tm-s-scene { color: var(--hl-scene); font-weight: 700; margin-top: 6px; }
+.tm-s-note { color: var(--hl-note); font-style: italic; }
+.tm-s-ws { color: var(--hl-whitespace); }
+.tm-s-sel { background: var(--hl-selection); }
+.tm-s-caret { display: inline-block; width: 2px; height: 1.1em; margin-left: 1px; vertical-align: text-bottom; background: var(--hl-caret); }
+@media (max-width: 620px) { .tm-sheet .tw-body { flex-direction: column; } .tm-side { flex: none; border-right: 0; padding-right: 0; } }
 /* Highland's counts at the foot of the text. */
 #counts { display: flex; justify-content: center; gap: 2em; padding: 6px 0 8px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--hl-muted); }
 #counts:empty, body.previewing #counts { display: none; }

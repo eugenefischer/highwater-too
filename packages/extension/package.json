@@ -442,7 +442,8 @@
         "highwater.theme": {
           "type": "string",
           "default": "vscode",
-          "enum": [
+          "markdownDescription": "Colours for the Highwater Editor and its sidebar: `vscode` (VS Code's own colours), one of Highland 2's themes, or a custom theme (`custom:<id>`). Easiest to choose with the theme button at the top right of the Highwater Editor, or **Choose Theme…**.",
+          "examples": [
             "vscode",
             "classic",
             "clean",
@@ -455,36 +456,85 @@
             "monokai",
             "solarized-dark",
             "transit"
-          ],
-          "enumItemLabels": [
-            "Match VS Code",
-            "Classic",
-            "Clean",
-            "Winter",
-            "Kermit",
-            "Solarized Light",
-            "Dark Mode",
-            "Dracula",
-            "Material",
-            "Monokai",
-            "Solarized Dark",
-            "Transit"
-          ],
-          "enumDescriptions": [
-            "Your VS Code colour theme.",
-            "The Classic theme (light).",
-            "The Clean theme (light).",
-            "The Winter theme (light).",
-            "The Kermit theme (light).",
-            "The Solarized Light theme (light).",
-            "The Dark Mode theme (dark).",
-            "The Dracula theme (dark).",
-            "The Material theme (dark).",
-            "The Monokai theme (dark).",
-            "The Solarized Dark theme (dark).",
-            "The Transit theme (dark)."
-          ],
-          "markdownDescription": "Colours for the Highwater Editor and the Navigator: one of its themes, or **Match VS Code**. With `highwater.themeWindow` on, **Choose Theme…** also colours the whole window to match."
+          ]
+        },
+        "highwater.customThemes": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Your own themes, made or imported with **Manage Themes…** in the Highwater Editor's theme menu: Highland 2's ten theme colours, a name, and light or dark.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "mode",
+              "background",
+              "text",
+              "primary",
+              "secondary",
+              "sceneHeading",
+              "sidebarBackground",
+              "sidebarText",
+              "notes",
+              "inactive",
+              "cursor"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "dark"
+                ]
+              },
+              "background": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "text": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "primary": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "secondary": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "sceneHeading": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "sidebarBackground": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "sidebarText": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "notes": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "inactive": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "cursor": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            }
+          }
         },
         "highwater.fontSize": {
           "type": "number",
@@ -496,7 +546,7 @@
         "highwater.themeWindow": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "When a theme is chosen with **Choose Theme…**, colour the whole VS Code window to match (VS Code's colour theme becomes **Highwater** + the theme's name). **Match VS Code** puts back the colour theme you had before."
+          "markdownDescription": "When a theme is chosen, colour the whole VS Code window to match (VS Code's colour theme becomes **Highwater** + the theme's name, or **Highwater Custom Light** / **Dark** for your own themes). Choosing VS Code's colours puts back the colour theme you had before."
         },
         "highwater.paragraphNumbers": {
           "type": "boolean",
@@ -1815,6 +1865,16 @@
         "label": "Highwater Transit",
         "uiTheme": "vs-dark",
         "path": "./themes/highwater-transit-color-theme.json"
+      },
+      {
+        "label": "Highwater Custom Light",
+        "uiTheme": "vs",
+        "path": "./themes/highwater-custom-light-color-theme.json"
+      },
+      {
+        "label": "Highwater Custom Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/highwater-custom-dark-color-theme.json"
       }
     ]
   },
