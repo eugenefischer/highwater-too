@@ -20,7 +20,7 @@ export const HISTORY_HELP = `
 <h3>Compare or go back</h3>
 <p>Click a save, then:</p>
 <ul>
-<li>${icon(COMPARE_ICON)} <b>Compare</b> marks what has changed since that save in your text: added text in green, removed text in red and struck through. Use ‹ and › at the top to move between changes, and <b>Changes Only</b> to fold away passages that haven’t changed (<b>Show All</b> brings them back). The text can’t be changed while you compare: double-click a spot to stop comparing and edit there, or press <b>Done</b> or Escape. <b>Revert</b> goes back to that save.</li>
+<li>${icon(COMPARE_ICON)} <b>Compare</b> marks what has changed since that save in your text: added text in green, removed text in red and struck through. Use ‹ and › at the top to move between changes. The text can’t be changed while you compare: double-click a spot to stop comparing and edit there, or press <b>Done</b> or Escape. <b>Revert</b> goes back to that save.</li>
 <li>${icon(REVERT_ICON)} <b>Revert</b> puts that save’s text, Bin and Scratchpad back and saves the document. The revert is added to the list straight away, and nothing is ever removed from the work history, so you can always go back again. If you have unsaved changes, you can save them first or leave them out.</li>
 </ul>
 

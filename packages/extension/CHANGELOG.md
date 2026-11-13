@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.39
+
+- Compare: the Changes Only / Show All button is gone; the comparison always shows the whole text, and ‹ › step between changes.
+- Compare: a border in the theme's accent colour runs round the bar and the text while comparing, so it's clear the page is in a different mode.
+- Compare: the bar's buttons use the bar's own text colour, so they're readable in light themes (they were dark on dark in Classic).
+
 ## 0.6.38
 
 - Compare in the page:

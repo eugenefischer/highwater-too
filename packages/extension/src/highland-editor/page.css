@@ -343,13 +343,15 @@ body.previewing #preview { display: flex; }
 #cmpbar .cmp-hint { display: none; color: var(--hl-accent, var(--hl-fg)); white-space: nowrap; }
 #cmpbar.hinting .cmp-hint { display: inline; }
 #cmpbar.hinting .cmp-where { display: none; }
-#cmpbar .sb-button { color: var(--hl-fg); }
+#cmpbar .sb-button { color: var(--hl-panel-fg, var(--hl-fg)); }
 #cmpbar .sb-button:disabled { opacity: 0.35; cursor: default; }
-#cmpbar .cmp-text { font: inherit; padding: 3px 12px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--hl-fg) 10%, transparent); color: var(--hl-fg); cursor: default; }
-#cmpbar .cmp-text:hover { background: color-mix(in srgb, var(--hl-fg) 18%, transparent); }
+#cmpbar .cmp-text { font: inherit; padding: 3px 12px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--hl-panel-fg, var(--hl-fg)) 12%, transparent); color: var(--hl-panel-fg, var(--hl-fg)); cursor: default; }
+#cmpbar .cmp-text:hover { background: color-mix(in srgb, var(--hl-panel-fg, var(--hl-fg)) 20%, transparent); }
 body.comparing #editor { height: calc(100% - 36px); }
+/* A border in the theme's accent colour round the bar and the text while comparing, drawn over them (no change to the layout). */
+body.comparing #main { position: relative; }
+body.comparing #main::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--hl-accent); border-radius: 3px; pointer-events: none; z-index: 20; }
 .cm-editor .cm-content .cm-changedLine { background: color-mix(in srgb, #2e9e50 9%, transparent) !important; }
 .cm-editor .cm-content .cm-changedText { background: color-mix(in srgb, #2e9e50 28%, transparent) !important; text-decoration: none !important; border-radius: 2px; }
 .cm-editor .cm-content .cm-deletedChunk { background: color-mix(in srgb, #d14b4b 9%, transparent) !important; padding: 0 !important; }
 .cm-editor .cm-content .cm-deletedChunk del, .cm-editor .cm-content .cm-deletedText { background: color-mix(in srgb, #d14b4b 28%, transparent) !important; text-decoration: line-through; text-decoration-color: color-mix(in srgb, #d14b4b 80%, transparent); border-radius: 2px; }
-.cm-editor .cm-collapsedLines { color: var(--hl-muted) !important; background: color-mix(in srgb, var(--hl-fg) 6%, transparent) !important; font-family: var(--vscode-font-family); font-size: 12px; }
