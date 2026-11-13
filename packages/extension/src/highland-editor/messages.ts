@@ -132,6 +132,10 @@ export type ToPage =
   | { type: "recordDrag" }
   /** Compare with a save: its text as the page holds text, and when it was saved (ms). */
   | { type: "compare"; base: string; hash: string; at: number }
+  /** An edit from the extension (a writing key, a Bin item) was refused while comparing. */
+  | { type: "compareRefused" }
+  /** Back to the text (a revert from the comparison went through). */
+  | { type: "compareEnd" }
   // The pages (preview mode) and the template window.
   | { type: "togglePreview" }
   | PdfMessage
@@ -165,6 +169,8 @@ export type FromPage =
   | { type: "chooseTheme" }
   | { type: "learnWord"; word: string }
   | { type: "dragRecord"; lines: string[] }
+  /** A comparison started or ended: the text can't be changed meanwhile. */
+  | { type: "comparing"; on: boolean }
   // The pages and the template window.
   | { type: "preview"; at: number | null }
   | { type: "previewClosed" }

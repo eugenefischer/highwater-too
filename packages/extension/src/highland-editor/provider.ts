@@ -75,6 +75,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       top: 0,
       ready: false,
       pagesSent: 0,
+      comparing: false,
       togglePreview: () => postTo(panel, { type: "togglePreview" }),
       select: (ranges) => {
         // The page must hold the edited text before it can select in it.
@@ -157,7 +158,12 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         }
         if (msg.type === "pageFocus") return editorFocused();
+        if (msg.type === "comparing") {
+          view.comparing = msg.on;
+          return;
+        }
         if (msg.type === "ready") {
+          view.comparing = false;
           sidebar.ready();
           pageText = pageForm(document.getText());
           postTo(panel, { type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });

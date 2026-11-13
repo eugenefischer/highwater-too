@@ -354,7 +354,8 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       else if (msg.type === "historyCompare" && typeof msg.hash === "string") void compareInPage(msg.hash);
       else if (msg.type === "historyRevert" && typeof msg.hash === "string") {
         const k = bundle() ?? plain();
-        if (k && historyApi) void historyApi.revert(k, msg.hash);
+        // Reverted (not cancelled): a comparison with that save ends, back to the text.
+        if (k && historyApi) void historyApi.revert(k, msg.hash).then((done) => done && post({ type: "compareEnd" }));
       } else if (msg.type === "historyCommand" && typeof msg.command === "string" && HISTORY_COMMANDS.has(msg.command)) {
         void vscode.commands.executeCommand(msg.command).then(() => sendHistory());
       } else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");

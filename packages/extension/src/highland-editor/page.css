@@ -340,6 +340,9 @@ body.previewing #preview { display: flex; }
 #cmpbar[hidden] { display: none; }
 #cmpbar .cmp-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #cmpbar .cmp-where { color: var(--hl-muted); font-variant-numeric: tabular-nums; }
+#cmpbar .cmp-hint { display: none; color: var(--hl-accent, var(--hl-fg)); white-space: nowrap; }
+#cmpbar.hinting .cmp-hint { display: inline; }
+#cmpbar.hinting .cmp-where { display: none; }
 #cmpbar .sb-button { color: var(--hl-fg); }
 #cmpbar .sb-button:disabled { opacity: 0.35; cursor: default; }
 #cmpbar .cmp-text { font: inherit; padding: 3px 12px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--hl-fg) 10%, transparent); color: var(--hl-fg); cursor: default; }

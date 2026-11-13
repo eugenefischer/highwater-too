@@ -192,6 +192,8 @@ const spellingMarks = spellingPlugin(spelling);
 const compare = new Compare(
   () => view,
   (msg) => vscode.postMessage(msg),
+  () => topOffset(),
+  (tr) => !!tr.annotation(remote),
 );
 
 function start(text: string): void {
@@ -519,6 +521,8 @@ window.addEventListener("message", (event: MessageEvent) => {
     if (pages.shown) pages.hide();
     compare.start(msg.base, msg.hash, msg.at);
   }
+  else if (msg.type === "compareRefused") compare.refused();
+  else if (msg.type === "compareEnd") compare.end();
   else if (msg.type === "toBin") toBin(!!msg.cut);
   else if (msg.type === "binRefused" && view) undo(view);
   else if (msg.type === "pdf") void pages.receive(msg);

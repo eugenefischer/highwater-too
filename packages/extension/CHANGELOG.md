@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.38
+
+- Compare in the page:
+  - **Read-only:** the text can't be changed while comparing. Typing, pasting, dropping, undo and the writing keys do nothing, and the bar says "Double-click to edit there, or press Done". Text changed by another program still comes in.
+  - **Double-click to edit:** double-clicking a spot in the text stops comparing and puts the cursor there, where you clicked on screen.
+  - **The whole text by default.** **Changes Only** in the bar folds away passages that haven't changed; **Show All** brings them back.
+  - **Keeps your place:** starting, stopping and Changes Only / Show All keep the same line at the top, as switching to the pages does. Starting no longer jumps to the first change; ‹ › step from where you are. If the line you were on is in a folded passage, that passage opens.
+  - **Revert** (when it goes through, not when cancelled) stops comparing and goes back to the text.
 ## 0.6.37
 
 - **Compare in the page again**, now built on CodeMirror's own merge view (`@codemirror/merge`). Compare on a save in the Writing History (or a click on a save of the open document in Works) marks what has changed since that save in your text:

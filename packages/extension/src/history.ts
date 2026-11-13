@@ -77,7 +77,8 @@ export let historyApi:
       /** A document's saves, newest first, and whether its history is on, paused, off, or not begun. */
       saves(key: string): Promise<{ state: "on" | "paused" | "off" | "none"; commits: CommitInfo[] }>;
       compare(key: string, hash: string): Promise<void>;
-      revert(key: string, hash: string): Promise<void>;
+      /** True once the document holds the save's text (false if cancelled or it failed). */
+      revert(key: string, hash: string): Promise<boolean>;
       /** A save's text (the script), for comparing in the page. */
       saveText(hash: string): Promise<string>;
       works: WorksView;
@@ -496,7 +497,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     async revert(key, hash) {
       const r = await lookup(key);
       const commit = r && (await history().log(r.id)).find((c) => c.hash === hash);
-      if (commit) await revertTo(worksHost, await documentFor(key), key, commit);
+      return commit ? revertTo(worksHost, await documentFor(key), key, commit) : false;
     },
     saveText: (hash) => history().scriptAt(hash),
     works,

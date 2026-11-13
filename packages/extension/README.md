@@ -95,7 +95,7 @@ Every save is recorded in a git repository on your computer, as a record of how 
 
 **In the Writing History panel**, select a save to see two buttons:
 
-- **Compare** marks what has changed since the save in your text: added text in green, removed text in red and struck through, with unchanged passages folded away. ‹ and › at the top move between changes; **Done** or Escape stops comparing.
+- **Compare** marks what has changed since the save in your text: added text in green, removed text in red and struck through. ‹ and › at the top move between changes, and **Changes Only** folds away passages that haven’t changed. The text can’t be changed while comparing: double-click a spot to stop and edit there, or press **Done** or Escape. **Revert** in the bar goes back to the save and stops comparing.
 - **Revert** puts that save's text, Bin and Scratchpad back and saves the document. The revert is recorded as a save, so nothing is removed from the history.
 
 The panel's foot shows whether saves are being recorded and mirrored. The ⚙ menu has the rest: pause, export, connect to another work, sync. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.

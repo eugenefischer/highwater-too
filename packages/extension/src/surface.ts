@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { postTo } from "./highland-editor/messages.ts";
 
 /**
  * Where the writer is writing: a VS Code text editor or a Highwater Editor. The panes,
@@ -19,6 +20,8 @@ export interface HighlandView {
   top: number;
   /** True once the page's script has started and holds the text. */
   ready: boolean;
+  /** Comparing with a save: the text can't be changed meanwhile. */
+  comparing: boolean;
   /** Preview mode: how many times the pages were laid out and sent (for the tests). */
   pagesSent: number;
   /** Flips between the text and the printed pages (⌘E). */
@@ -190,6 +193,7 @@ export async function revealOffset(doc: vscode.TextDocument, offset: number, how
 /** Replaces the selection in whichever editor shows the document (a text editor is opened if none is). */
 export async function insertAtSelection(doc: vscode.TextDocument, text: string): Promise<void> {
   const view = viewOf(doc);
+  if (view?.comparing) return void postTo(view.panel, { type: "compareRefused" });
   if (view) {
     const s = view.selections[0] ?? { anchor: 0, head: 0 };
     const edit = new vscode.WorkspaceEdit();
@@ -217,6 +221,10 @@ export interface OffsetEdit {
 export async function editActive(doc: vscode.TextDocument, edits: readonly OffsetEdit[], selections?: readonly { anchor: number; head: number }[]): Promise<boolean> {
   const view = activeView();
   if (view && view.document === doc) {
+    if (view.comparing) {
+      postTo(view.panel, { type: "compareRefused" });
+      return false;
+    }
     const edit = new vscode.WorkspaceEdit();
     for (const e of edits) edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
     if (!(await vscode.workspace.applyEdit(edit))) return false;

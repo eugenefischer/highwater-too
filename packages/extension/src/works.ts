@@ -246,8 +246,9 @@ export async function afterPull(host: WorksHost, asked: Set<string>): Promise<vo
  * Revert to This Save: the save's text, Bin and Scratchpad go back into the document, which is
  * saved at once, so the revert is recorded straight away (EJ, 0.6.16) and later edits are ordinary
  * saves. Unsaved changes are first saved (recorded), left out, or the revert is cancelled.
+ * True once the document holds the save's text (false if cancelled or it failed).
  */
-export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: string, commit: CommitInfo): Promise<void> {
+export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: string, commit: CommitInfo): Promise<boolean> {
   const h = host.history();
   const files = await h.filesAt(commit.hash);
   const when = commit.date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
@@ -263,9 +264,12 @@ export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: s
       "Save and Revert",
       "Revert Without Saving",
     );
-    if (!choice) return;
+    if (!choice) return false;
     if (choice === "Save and Revert") {
-      if (!(await doc.save())) return void vscode.window.showErrorMessage(`${basename(key)} could not be saved, so it was not reverted.`);
+      if (!(await doc.save())) {
+        void vscode.window.showErrorMessage(`${basename(key)} could not be saved, so it was not reverted.`);
+        return false;
+      }
       await host.settle(key);
     }
   } else {
@@ -275,7 +279,7 @@ export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: s
       { modal: true, detail: "Its text, Bin and Scratchpad replace the document's, and the document is saved." },
       "Revert",
     );
-    if (ok !== "Revert") return;
+    if (ok !== "Revert") return false;
   }
   if (key.toLowerCase().endsWith(".highland")) {
     await host.store.update(key, (b) => {
@@ -297,14 +301,18 @@ export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: s
   if (doc.getText() !== files.script) {
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), files.script);
-    if (!(await vscode.workspace.applyEdit(edit))) return void vscode.window.showErrorMessage(`${basename(key)} could not be changed, so it was not reverted.`);
+    if (!(await vscode.workspace.applyEdit(edit))) {
+      void vscode.window.showErrorMessage(`${basename(key)} could not be changed, so it was not reverted.`);
+      return false;
+    }
   }
   // The save that follows is recorded as the revert (or, with nothing to save, the revert alone).
   host.connector.setNext(key, { kind: "revert", note });
   if (doc.isDirty) {
     if (!(await doc.save())) {
       host.connector.takeNext(key);
-      return void vscode.window.showErrorMessage(`${basename(key)} could not be saved. Its text is the earlier save's, but the revert is not in the writing history until you save.`);
+      void vscode.window.showErrorMessage(`${basename(key)} could not be saved. Its text is the earlier save's, but the revert is not in the writing history until you save.`);
+      return true;
     }
     await host.settle(key);
   } else {
@@ -313,4 +321,5 @@ export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: s
   }
   await vscode.commands.executeCommand("highwater.panels.refresh");
   host.changed();
+  return true;
 }
