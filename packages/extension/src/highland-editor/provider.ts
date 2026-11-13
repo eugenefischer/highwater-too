@@ -253,6 +253,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       }),
     ];
     panel.onDidDispose(() => {
+      log(`panel disposed ${document.uri.path.split("/").pop()} swapping=${swapping}`);
       if (!swapping) closedAt.set(document.uri.toString(), Date.now());
       clearTimeout(countsTimer);
       subscriptions.forEach((s) => s.dispose());
@@ -699,6 +700,13 @@ body.previewing #preview { display: flex; }
  */
 /** True while a swap is under way: its new tab must not be taken for a second one. */
 let swapping = false;
+/** What the switching between editors decided and why, for the end-to-end tests (highwater.test.swapLog). */
+export const swapLog: string[] = [];
+function log(what: string): void {
+  // The clock's last six digits in ms, to line up with the test's own record.
+  swapLog.push(`${Date.now() % 1_000_000} ${what}`);
+  if (swapLog.length > 400) swapLog.splice(0, 100);
+}
 /** Documents the writer switched to the text editor with the code button: left as text until closed. */
 const wantsText = new Set<string>();
 /**
@@ -726,10 +734,14 @@ function noteFront(): void {
   if (now?.uri === front?.uri && now?.highwater === front?.highwater) return;
   if (front) before = { ...front, until: Date.now() };
   front = now;
+  log(`front ${now ? `${now.highwater ? "highwater" : "text"} ${now.uri.split("/").pop()}` : "none"}`);
   // From a Highwater tab straight to a text tab of the same document, not by our own swap: the
   // writer chose the text editor (the breadcrumbs bar's editor menu), if the Highwater tab is gone.
   // (A Search result opened as text beside a Highwater tab keeps that tab: it goes back there.)
-  if (!swapping && now && !now.highwater && before?.highwater && before.uri === now.uri && Date.now() - before.until < 2000) reopenedAsText.set(now.uri, Date.now());
+  if (!swapping && now && !now.highwater && before?.highwater && before.uri === now.uri && Date.now() - before.until < 2000) {
+    reopenedAsText.set(now.uri, Date.now());
+    log("reopened as text");
+  }
 }
 const reopenedAsText = new Map<string, number>();
 
@@ -742,6 +754,7 @@ function hasHighwaterTab(uri: string): boolean {
 function choseText(uri: string): boolean {
   const recent = (at: number | undefined) => at !== undefined && Date.now() - at < 2000;
   if ((recent(reopenedAsText.get(uri)) || recent(closedAt.get(uri))) && !hasHighwaterTab(uri)) wantsText.add(uri);
+  log(`choseText ${uri.split("/").pop()}: reopened=${recent(reopenedAsText.get(uri))} closed=${recent(closedAt.get(uri))} tab=${hasHighwaterTab(uri)} → ${wantsText.has(uri)}`);
   return wantsText.has(uri);
 }
 
@@ -830,8 +843,9 @@ const MAX_FONT = 48;
 const swapsPending = new Set<string>();
 function swapSoon(uri: vscode.Uri): void {
   const key = uri.toString();
-  if (swapsPending.has(key)) return;
+  if (swapsPending.has(key)) return log(`swapSoon ${key.split("/").pop()} (already pending)`);
   swapsPending.add(key);
+  log(`swapSoon ${key.split("/").pop()}`);
   // VS Code reports a new tab, its activation and the document's language in separate steps, and
   // on a slow machine (CI's macOS) not at once: keep looking for up to 3 s while the tab is open.
   const end = Date.now() + 3000;
@@ -853,7 +867,8 @@ function swapSoon(uri: vscode.Uri): void {
     const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === key);
     if (swapping || !(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== key || !doc || !doc.languageId.startsWith("highland-")) return again();
     swapsPending.delete(key);
-    if (roleOf(doc).kind !== "script" || viewOf(doc, true)) return;
+    if (roleOf(doc).kind !== "script" || viewOf(doc, true)) return log(`swapSoon: not swapping (view open=${!!viewOf(doc, true)})`);
+    log(`swapSoon: swapping ${key.split("/").pop()} to the Highwater Editor`);
     void swapActive(uri, HIGHLAND_EDITOR);
   };
   // Straight away (a script that already has its language swaps at once), then every 150 ms.
@@ -990,6 +1005,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
           // Where the text editor was opened to (a search result's line), to show the same place.
           const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
           const at = editor ? doc.offsetAt(editor.selection.active) : undefined;
+          log(`search handler: closing the text tab of ${uri.split("/").pop()}`);
           void vscode.window.tabGroups.close(tab).then(() => {
             view.panel.reveal(view.panel.viewColumn, false);
             if (at !== undefined) view.reveal(at, "center", true);

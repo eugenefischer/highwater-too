@@ -569,10 +569,26 @@ const tests: [string, () => Promise<void>][] = [
         // is the writer's choice too: it stays text, not switched straight back.
         await vscode.window.showTextDocument(doc, { preview: false });
         await waitFor("the Highwater Editor again", () => kinds().join() === "highland");
-        await vscode.commands.executeCommand("reopenActiveEditorWith", "default");
-        await waitFor("the text editor from Reopen Editor With", () => kinds().join() === "text");
-        await new Promise((r) => setTimeout(r, 1500));
-        assert.equal(kinds().join(), "text", "Reopen Editor With → Text Editor was undone");
+        // Every tab event and the extension's own decisions, printed if this fails, so a failure
+        // says what happened rather than leaving it to be guessed at.
+        const events: string[] = [];
+        const name = (t: vscode.Tab) => `${t.label}:${t.input instanceof vscode.TabInputCustom ? "highwater" : t.input instanceof vscode.TabInputText ? "text" : "other"}${t.isActive ? "*" : ""}`;
+        const watch = vscode.window.tabGroups.onDidChangeTabs((e) =>
+          events.push(`${Date.now() % 1_000_000} tabs opened=[${e.opened.map(name)}] closed=[${e.closed.map(name)}] changed=[${e.changed.map(name)}]`),
+        );
+        const watchEditor = vscode.window.onDidChangeActiveTextEditor((ed) => events.push(`${Date.now() % 1_000_000} active text editor ${ed?.document.uri.path.split("/").pop() ?? "none"}`));
+        await vscode.commands.executeCommand("highwater.test.swapLog"); // from here on
+        try {
+          await vscode.commands.executeCommand("reopenActiveEditorWith", "default");
+          events.push(`${Date.now() % 1_000_000} reopenActiveEditorWith returned; tabs now ${kinds().join()}`);
+          await waitFor("the text editor from Reopen Editor With", () => kinds().join() === "text");
+          await new Promise((r) => setTimeout(r, 1500));
+          const log = (await vscode.commands.executeCommand<string[]>("highwater.test.swapLog")) ?? [];
+          assert.equal(kinds().join(), "text", `Reopen Editor With → Text Editor was undone.\nTest's view:\n${events.join("\n")}\nExtension's log:\n${log.join("\n")}`);
+        } finally {
+          watch.dispose();
+          watchEditor.dispose();
+        }
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       } finally {
         await config.update("highlandEditor", false, vscode.ConfigurationTarget.Global);
