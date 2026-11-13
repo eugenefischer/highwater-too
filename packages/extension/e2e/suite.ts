@@ -565,6 +565,15 @@ const tests: [string, () => Promise<void>][] = [
         await new Promise((r) => setTimeout(r, 1000));
         assert.equal(kinds().join(), "text");
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+        // VS Code's own Reopen Editor With… → Text Editor (the editor menu in the breadcrumbs bar)
+        // is the writer's choice too: it stays text, not switched straight back.
+        await vscode.window.showTextDocument(doc, { preview: false });
+        await waitFor("the Highwater Editor again", () => kinds().join() === "highland");
+        await vscode.commands.executeCommand("reopenActiveEditorWith", "default");
+        await waitFor("the text editor from Reopen Editor With", () => kinds().join() === "text");
+        await new Promise((r) => setTimeout(r, 1500));
+        assert.equal(kinds().join(), "text", "Reopen Editor With → Text Editor was undone");
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       } finally {
         await config.update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }

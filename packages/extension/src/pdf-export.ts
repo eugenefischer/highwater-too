@@ -91,7 +91,7 @@ function script(options: ScriptExportOptions) {
 
 /** A warning for each template font that isn't installed. */
 function missingFonts(substituted: Record<string, string>, template: string): string[] {
-  return Object.entries(substituted).map(([font, sub]) => `${font} isn't installed on this computer, so ${template} prints in ${sub} instead; lines and pages may fall differently from Highland 2's.`);
+  return Object.entries(substituted).map(([font, sub]) => `${font} isn't installed on this computer, so ${template} prints in ${sub} instead; lines and pages may fall differently.`);
 }
 
 export interface ProseExportOptions extends ExportOptions {

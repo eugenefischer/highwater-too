@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.27
+
+- The editor is called the **Highwater Editor** everywhere it is named: the editor menu in the breadcrumbs bar, Open in Highwater Editor, the settings, VS Code's sidebar note and messages. Highland is named in the interface only for the .highland file type; settings and messages no longer refer to Highland 2 (its themes are just "the Classic theme", and so on).
+- Works: the top line is just this computer's name, without its network's part ("ejairm1", not "ejairm1.tuatara-procyon.ts.net" or "….local"); the same short name marks saves restored here.
+- Choosing **Text Editor** from the editor menu in the breadcrumbs bar (VS Code's Reopen Editor With…) keeps the document as text, as the code button does; it used to switch straight back to the Highwater Editor.
+
 ## 0.6.26
 
 - Empty panels look like Highland 2's: a short line in the middle of the panel, a little larger, in the quiet colour (Navigator, Bin, Assets, Writing History, Works). An empty Scratchpad shows "Click here to edit" at the top and "The Scratchpad is a place to make notes about your document." in the middle (it showed nothing).

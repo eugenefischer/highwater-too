@@ -1349,7 +1349,9 @@ class WorksPanel {
 
   show(rows: WorkRow[], mirror: { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null, computer: string): void {
     // This computer's name: what saves made here are called on other computers ("on …").
-    $("workcomputer").textContent = computer ? `This computer: ${computer}` : "";
+    const name = $("workcomputer");
+    name.textContent = computer;
+    name.dataset.tip = "This computer";
     // Works are matched by title and kind across refreshes (their order may change).
     const was = this.#rows.find((w) => w.i === this.#selected);
     this.#rows = rows;

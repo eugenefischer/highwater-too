@@ -1,8 +1,8 @@
 {
   "name": "highwater-too",
   "displayName": "Highwater Too",
-  "description": "Write screenplays and manuscripts in .highland files: Highland 2's format, preview and PDF export, plus a git writing history.",
-  "version": "0.6.26",
+  "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
+  "version": "0.6.27",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -404,7 +404,7 @@
       },
       {
         "command": "highwater.openHighlandEditor",
-        "title": "Open in Highland-Style Editor",
+        "title": "Open in Highwater Editor",
         "category": "Highwater Too",
         "icon": "$(book)"
       },
@@ -482,7 +482,7 @@
       },
       {
         "viewType": "highwater.highlandEditor",
-        "displayName": "Highland-Style Editor",
+        "displayName": "Highwater Editor",
         "selector": [
           {
             "filenamePattern": "*.highland"
@@ -518,12 +518,12 @@
         "highwater.highlandShortcuts": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Highland 2's shortcuts in documents: ⌘E for Preview, ⌘L for Live Margins, ⌘0 for the sidebar, ⌘1 for the Navigator, ⌘2 for the Bin, ⌘4 for Assets and ⌘5 for the Scratchpad and ⇧⌘I for Show Invisibles, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
+          "markdownDescription": "Writing shortcuts in documents: ⌘E for Preview, ⌘L for Live Margins, ⌘0 for the sidebar, ⌘1 for the Navigator, ⌘2 for the Bin, ⌘4 for Assets and ⌘5 for the Scratchpad and ⇧⌘I for Show Invisibles, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
         },
         "highwater.showSidebarOnOpen": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened in the text editor. (The Highland-Style Editor has these panels in its own sidebar; VS Code's Highwater Too sidebar closes when it is given focus.)"
+          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened in the text editor. (The Highwater Editor has these panels in its own sidebar; VS Code's Highwater Too sidebar closes when it is given focus.)"
         },
         "highwater.docxFont": {
           "type": "string",
@@ -560,7 +560,7 @@
         "highwater.highlandEditor": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Open screenplays and manuscripts (`.highland`, `.fountain`, and `.md` files Highwater Too handles) in the Highland-Style Editor. Off: they open as text. Either way, the book and code buttons in the editor's title bar switch a document between the two."
+          "markdownDescription": "Open screenplays and manuscripts (`.highland`, `.fountain`, and `.md` files Highwater Too handles) in the Highwater Editor. Off: they open as text. Either way, the book and code buttons in the editor's title bar switch a document between the two."
         },
         "highwater.theme": {
           "type": "string",
@@ -595,26 +595,26 @@
           ],
           "enumDescriptions": [
             "Your VS Code colour theme.",
-            "Highland 2's Classic theme (light).",
-            "Highland 2's Clean theme (light).",
-            "Highland 2's Winter theme (light).",
-            "Highland 2's Kermit theme (light).",
-            "Highland 2's Solarized Light theme (light).",
-            "Highland 2's Dark Mode theme (dark).",
-            "Highland 2's Dracula theme (dark).",
-            "Highland 2's Material theme (dark).",
-            "Highland 2's Monokai theme (dark).",
-            "Highland 2's Solarized Dark theme (dark).",
-            "Highland 2's Transit theme (dark)."
+            "The Classic theme (light).",
+            "The Clean theme (light).",
+            "The Winter theme (light).",
+            "The Kermit theme (light).",
+            "The Solarized Light theme (light).",
+            "The Dark Mode theme (dark).",
+            "The Dracula theme (dark).",
+            "The Material theme (dark).",
+            "The Monokai theme (dark).",
+            "The Solarized Dark theme (dark).",
+            "The Transit theme (dark)."
           ],
-          "markdownDescription": "Colours for the Highland-Style Editor and the Navigator: one of Highland 2's themes, or **Match VS Code**. With `highwater.themeWindow` on, **Choose Theme…** also colours the whole window to match."
+          "markdownDescription": "Colours for the Highwater Editor and the Navigator: one of its themes, or **Match VS Code**. With `highwater.themeWindow` on, **Choose Theme…** also colours the whole window to match."
         },
         "highwater.fontSize": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "maximum": 48,
-          "markdownDescription": "Text size in the Highland-Style Editor, in pixels. **0** follows VS Code's editor font size, scaled to Highland 2's (about 1.4 times). ⌘+ and ⌘− change it; ⌥⌘0 sets it back to 0."
+          "markdownDescription": "Text size in the Highwater Editor, in pixels. **0** follows VS Code's editor font size, scaled up about 1.4 times. ⌘+ and ⌘− change it; ⌥⌘0 sets it back to 0."
         },
         "highwater.themeWindow": {
           "type": "boolean",
@@ -624,12 +624,12 @@
         "highwater.paragraphNumbers": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Show Highland 2's paragraph numbers in the Highland-Style Editor's margin: every line with text is numbered, except the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers. **Go to Paragraph…** (⌃G) goes to a number."
+          "markdownDescription": "Show paragraph numbers in the Highwater Editor's margin: every line with text is numbered, except the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers. **Go to Paragraph…** (⌃G) goes to a number."
         },
         "highwater.spellCheck": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Check spelling as you type in the Highland-Style Editor, in American English, as Highland 2 does with macOS's spelling: misspelled words get red dots under them. Right-click one for guesses, **Ignore Spelling** or **Learn Spelling**; ⌘; goes to the next misspelling. Character names (from cues), scene-heading prefixes, directives, addresses and omitted text aren't checked."
+          "markdownDescription": "Check spelling as you type in the Highwater Editor, in American English: misspelled words get red dots under them. Right-click one for guesses, **Ignore Spelling** or **Learn Spelling**; ⌘; goes to the next misspelling. Character names (from cues), scene-heading prefixes, directives, addresses and omitted text aren't checked."
         },
         "highwater.spellingWords": {
           "type": "array",
@@ -637,7 +637,7 @@
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Words **Learn Spelling** has added to the Highland-Style Editor's dictionary (any document). Add or remove words here too."
+          "markdownDescription": "Words **Learn Spelling** has added to the Highwater Editor's dictionary (any document). Add or remove words here too."
         },
         "highwater.templates.screenplay.body": {
           "type": "string",
@@ -648,7 +648,7 @@
           ],
           "default": "Courier Prime",
           "scope": "application",
-          "markdownDescription": "The Screenplay template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Screenplay template's Body font (Template Options): all its text. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.multiCam.body": {
           "type": "string",
@@ -659,13 +659,13 @@
           ],
           "default": "Courier Prime",
           "scope": "application",
-          "markdownDescription": "The Multi-Cam template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Multi-Cam template's Body font (Template Options): all its text. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.multiCam.uppercaseAction": {
           "type": "boolean",
           "default": true,
           "scope": "application",
-          "markdownDescription": "Multi-Cam prints action, lyrics and centred text in capitals (Highland 2's Uppercase action option)."
+          "markdownDescription": "Multi-Cam prints action, lyrics and centred text in capitals (the Uppercase action option)."
         },
         "highwater.templates.stagePlay.body": {
           "type": "string",
@@ -677,7 +677,7 @@
           ],
           "default": "Courier Prime",
           "scope": "application",
-          "markdownDescription": "The Stage Play template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Stage Play template's Body font (Template Options): all its text. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.graphicNovel.body": {
           "type": "string",
@@ -689,7 +689,7 @@
           ],
           "default": "Courier Prime",
           "scope": "application",
-          "markdownDescription": "The Graphic Novel template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Graphic Novel template's Body font (Template Options): all its text. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.manuscript.body": {
           "type": "string",
@@ -701,19 +701,19 @@
           ],
           "default": "Courier Prime",
           "scope": "application",
-          "markdownDescription": "The Manuscript template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Manuscript template's Body font (Template Options): all its text. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.manuscript.indentLeading": {
           "type": "boolean",
           "default": false,
           "scope": "application",
-          "markdownDescription": "Manuscript indents every paragraph, the first after a heading or scene break too (Highland 2's Indent leading paragraphs option)."
+          "markdownDescription": "Manuscript indents every paragraph, the first after a heading or scene break too (the Indent leading paragraphs option)."
         },
         "highwater.templates.manuscript.spaceBeforeSections": {
           "type": "boolean",
           "default": true,
           "scope": "application",
-          "markdownDescription": "Manuscript starts a heading that opens a page (the first, or one after `===`) a third of the way down it (Highland 2's Add space before section headers option)."
+          "markdownDescription": "Manuscript starts a heading that opens a page (the first, or one after `===`) a third of the way down it (the Add space before section headers option)."
         },
         "highwater.templates.novel.headers": {
           "type": "string",
@@ -726,7 +726,7 @@
           ],
           "default": "Amiri",
           "scope": "application",
-          "markdownDescription": "The Novel template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Novel template's Headers font (Template Options): its headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.novel.body": {
           "type": "string",
@@ -739,7 +739,7 @@
           ],
           "default": "Amiri",
           "scope": "application",
-          "markdownDescription": "The Novel template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Novel template's Body font (Template Options): everything but the headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.treatment.body": {
           "type": "string",
@@ -750,7 +750,7 @@
           ],
           "default": "Highland Sans",
           "scope": "application",
-          "markdownDescription": "The Treatment template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Treatment template's Body font (Template Options): all its text. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.modernStandard.headers": {
           "type": "string",
@@ -760,7 +760,7 @@
           ],
           "default": "Avenir Next",
           "scope": "application",
-          "markdownDescription": "The Modern Standard template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Modern Standard template's Headers font (Template Options): its headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.modernStandard.body": {
           "type": "string",
@@ -770,7 +770,7 @@
           ],
           "default": "Avenir Next",
           "scope": "application",
-          "markdownDescription": "The Modern Standard template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Modern Standard template's Body font (Template Options): everything but the headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.article.headers": {
           "type": "string",
@@ -781,7 +781,7 @@
           ],
           "default": "Lato",
           "scope": "application",
-          "markdownDescription": "The Article template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Article template's Headers font (Template Options): its headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.article.body": {
           "type": "string",
@@ -792,7 +792,7 @@
           ],
           "default": "Georgia",
           "scope": "application",
-          "markdownDescription": "The Article template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Article template's Body font (Template Options): everything but the headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.bulletin.body": {
           "type": "string",
@@ -802,7 +802,7 @@
           ],
           "default": "SF Pro Display",
           "scope": "application",
-          "markdownDescription": "The Bulletin template's Body font (Highland 2's Template Options): all its text. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Bulletin template's Body font (Template Options): all its text. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.speech.headers": {
           "type": "string",
@@ -812,7 +812,7 @@
           ],
           "default": "New York Medium",
           "scope": "application",
-          "markdownDescription": "The Speech template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Speech template's Headers font (Template Options): its headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.speech.body": {
           "type": "string",
@@ -822,7 +822,7 @@
           ],
           "default": "New York Medium",
           "scope": "application",
-          "markdownDescription": "The Speech template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Speech template's Body font (Template Options): everything but the headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.wiki.headers": {
           "type": "string",
@@ -832,7 +832,7 @@
           ],
           "default": "Georgia",
           "scope": "application",
-          "markdownDescription": "The Wiki template's Headers font (Highland 2's Template Options): its headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Wiki template's Headers font (Template Options): its headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         },
         "highwater.templates.wiki.body": {
           "type": "string",
@@ -842,7 +842,7 @@
           ],
           "default": "Georgia",
           "scope": "application",
-          "markdownDescription": "The Wiki template's Body font (Highland 2's Template Options): everything but the headings. Choose it in the Highland-Style Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+          "markdownDescription": "The Wiki template's Body font (Template Options): everything but the headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
         }
       }
     },
@@ -2184,14 +2184,14 @@
         {
           "id": "highwater.inEditor",
           "when": "activeCustomEditorId == 'highwater.highlandEditor'",
-          "name": "Highland-Style Editor"
+          "name": "Highwater Editor"
         }
       ]
     },
     "viewsWelcome": [
       {
         "view": "highwater.inEditor",
-        "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highland-Style Editor's own sidebar, at the left of the page.\n[Show or Hide the Sidebar (⌘0)](command:highwater.toggleEditorSidebar)\nThis sidebar closes whenever you go back to the page. Switch the tab to the text editor (the code button) to use VS Code's versions of these views."
+        "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highwater Editor's own sidebar, at the left of the page.\n[Show or Hide the Sidebar (⌘0)](command:highwater.toggleEditorSidebar)\nThis sidebar closes whenever you go back to the page. Switch the tab to the text editor (the code button) to use VS Code's versions of these views."
       },
       {
         "view": "highwater.works",

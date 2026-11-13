@@ -253,6 +253,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       }),
     ];
     panel.onDidDispose(() => {
+      if (!swapping) closedAt.set(document.uri.toString(), Date.now());
       clearTimeout(countsTimer);
       subscriptions.forEach((s) => s.dispose());
     });
@@ -700,6 +701,12 @@ body.previewing #preview { display: flex; }
 let swapping = false;
 /** Documents the writer switched to the text editor with the code button: left as text until closed. */
 const wantsText = new Set<string>();
+/**
+ * When a document's Highwater Editor tab last closed other than by our own swap: a text tab of it
+ * opening just then is VS Code's Reopen Editor With… → Text Editor (the editor menu in the
+ * breadcrumbs bar), the writer's choice, so it is left as text like the code button's.
+ */
+const closedAt = new Map<string, number>();
 
 async function swapActive(target: vscode.Uri, viewType: string): Promise<void> {
   swapping = true;
@@ -773,7 +780,7 @@ async function zoom(step: number): Promise<void> {
   const now = config.get<number>("fontSize", 0) || Math.round(vscode.workspace.getConfiguration("editor").get<number>("fontSize", 14) * DEFAULT_SCALE);
   const next = Math.max(MIN_FONT, Math.min(MAX_FONT, now + step));
   await config.update("fontSize", next, vscode.ConfigurationTarget.Global);
-  vscode.window.setStatusBarMessage(`Highland-Style Editor text: ${next} px (⌥⌘0 resets)`, 2500);
+  vscode.window.setStatusBarMessage(`Highwater Editor text: ${next} px (⌥⌘0 resets)`, 2500);
 }
 const DEFAULT_SCALE = 1.4;
 const MIN_FONT = 8;
@@ -796,6 +803,7 @@ function swapSoon(uri: vscode.Uri): void {
       if (Date.now() < end) setTimeout(attempt, 150);
       else swapsPending.delete(key);
     };
+    if (Date.now() - (closedAt.get(key) ?? 0) < 2000) wantsText.add(key);
     if (wantsText.has(key)) {
       swapsPending.delete(key);
       return;
@@ -834,7 +842,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
         ...Object.entries(HIGHLAND_THEMES).map(([id, t]) => ({ label: t.name, description: t.mode, id })),
       ];
       const quick = vscode.window.createQuickPick<(typeof items)[number]>();
-      quick.title = "Theme for the Highland-Style Editor and the Navigator";
+      quick.title = "Theme for the Highwater Editor and the Navigator";
       quick.items = items;
       quick.activeItems = items.filter((i) => i.id === before.theme);
       let chosen = false;

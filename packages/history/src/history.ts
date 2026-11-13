@@ -1037,8 +1037,12 @@ export function formOf(path: string): Form {
 }
 
 /** The name of the computer, for Restore saves. */
+/**
+ * This computer's name, without its network's part: "ejairm1", not "ejairm1.local" or
+ * "ejairm1.tuatara-procyon.ts.net" (a Tailscale name).
+ */
 export function computerName(): string {
-  return hostname().replace(/\.local$/i, "") || "this computer";
+  return hostname().split(".")[0] || "this computer";
 }
 
 /**
