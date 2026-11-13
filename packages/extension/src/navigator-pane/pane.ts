@@ -10,7 +10,7 @@ import { blockAt, currentRow, moveBlock, NAVIGATOR_LABELS, NAVIGATOR_TYPES, navi
 export const NAVIGATOR_VIEW = "highwater.navigator";
 
 /**
- * The Navigator (M15: Highland's look): a webview list of the focused document's scenes, sections
+ * The Navigator (in Highland's look): a webview list of the focused document's scenes, sections
  * and the rest. Click to go there; drag a scene or section, with a line showing where it lands;
  * filter by words at the foot, or by kind with the eye (Highland's per-document toggles).
  */
@@ -68,7 +68,7 @@ export class NavigatorPane implements vscode.WebviewViewProvider {
   #post(): void {
     const view = this.#view;
     if (!view || !this.#ready) return;
-    // Not while hidden (as it is with the Highland-Style Editor in front): VS Code no longer knows it then.
+    // Not while hidden (as it is with the Highwater Editor in front): VS Code no longer knows it then.
     if (view.visible) view.description = this.focused.key ? (this.focused.label.split(/[\\/]/).pop() ?? "") : "";
     const doc = this.focused.script;
     if (!doc) {

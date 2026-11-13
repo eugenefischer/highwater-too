@@ -1,5 +1,5 @@
 /**
- * Spelling in the Highland-Style Editor: which words to check, as pure functions (tested). The
+ * Spelling in the Highwater Editor: which words to check, as pure functions (tested). The
  * dictionary (Hunspell's American English, via nspell) runs in a worker; see spelling.ts.
  */
 import { hiddenRanges, type Document } from "@highwater/parser";

@@ -1,5 +1,5 @@
 /**
- * The Highland-Style Editor's page holds the text with "\n" line breaks (CodeMirror normalises
+ * The Highwater Editor's page holds the text with "\n" line breaks (CodeMirror normalises
  * them), so in a file with "\r\n" breaks its offsets differ from the document's by one per line.
  * The extension converts through line and character, which both agree on. Pure, for tests.
  */

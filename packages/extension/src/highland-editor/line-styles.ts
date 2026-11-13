@@ -2,7 +2,7 @@ import type { Document } from "@highwater/parser";
 import { MARGINS } from "../syntax/margins.ts";
 
 /**
- * How the Highland-style editor (M15) shows each source line: a kind, for its look, and an indent
+ * How the Highwater Editor shows each source line: a kind, for its look, and an indent
  * in characters from the left of the page column. Unlike Live Margins (inlay hints, first visual
  * line only), the indent applies to the whole line, so wrapped lines stay indented, as in Highland.
  * Pure: used by the webview's script and by tests.

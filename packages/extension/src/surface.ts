@@ -1,15 +1,15 @@
 import * as vscode from "vscode";
 
 /**
- * Where the writer is writing: a VS Code text editor or a Highland-Style Editor (M15). The panes,
+ * Where the writer is writing: a VS Code text editor or a Highwater Editor. The panes,
  * status bar and Preview ask this module, not `vscode.window.activeTextEditor`, so they follow
  * either kind of editor.
  */
 
-/** The view type of the Highland-Style Editor. */
+/** The view type of the Highwater Editor. */
 export const HIGHLAND_EDITOR = "highwater.highlandEditor";
 
-/** A Highland-Style Editor showing a document, as its provider reports it. */
+/** A Highwater Editor showing a document, as its provider reports it. */
 export interface HighlandView {
   readonly document: vscode.TextDocument;
   readonly panel: vscode.WebviewPanel;
@@ -34,14 +34,14 @@ const activeEmitter = new vscode.EventEmitter<void>();
 const selectionEmitter = new vscode.EventEmitter<vscode.TextDocument>();
 const scrollEmitter = new vscode.EventEmitter<HighlandView>();
 
-/** Fires when the active editor may have changed (text editor or Highland-Style Editor). */
+/** Fires when the active editor may have changed (text editor or Highwater Editor). */
 export const onDidChangeActiveSurface = activeEmitter.event;
-/** Fires when the selection changes in a Highland-Style Editor. */
+/** Fires when the selection changes in a Highwater Editor. */
 export const onDidChangeViewSelection = selectionEmitter.event;
-/** Fires when a Highland-Style Editor scrolls. */
+/** Fires when a Highwater Editor scrolls. */
 export const onDidScrollView = scrollEmitter.event;
 
-/** Called by the Highland-Style Editor's provider. */
+/** Called by the Highwater Editor's provider. */
 export const highlandViews = {
   add(view: HighlandView): vscode.Disposable {
     views.add(view);
@@ -89,7 +89,7 @@ export function registerSurface(context: vscode.ExtensionContext): void {
   );
 }
 
-/** The Highland-Style Editor in the active tab of the active editor group, if that is one. */
+/** The Highwater Editor in the active tab of the active editor group, if that is one. */
 export function activeView(): HighlandView | undefined {
   const group = vscode.window.tabGroups.activeTabGroup;
   const input = group.activeTab?.input;
@@ -99,7 +99,7 @@ export function activeView(): HighlandView | undefined {
   return matching.find((v) => v.panel.viewColumn === group.viewColumn) ?? matching[0];
 }
 
-/** A visible Highland-Style Editor showing the document (the active one first); with `any`, a hidden one too. */
+/** A visible Highwater Editor showing the document (the active one first); with `any`, a hidden one too. */
 export function viewOf(doc: vscode.TextDocument, any = false): HighlandView | undefined {
   const active = activeView();
   if (active?.document === doc) return active;
@@ -107,8 +107,8 @@ export function viewOf(doc: vscode.TextDocument, any = false): HighlandView | un
 }
 
 /**
- * Shows a document in the tab it's already open in (Highland-Style or text; one tab per document),
- * else in a new Highland-Style Editor if that is the default, else in a text editor.
+ * Shows a document in the tab it's already open in (Highwater Editor or text; one tab per document),
+ * else in a new Highwater Editor if that is the default, else in a text editor.
  */
 export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode.ViewColumn): Promise<void> {
   const view = viewOf(doc, true);
@@ -123,7 +123,7 @@ export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode
     await vscode.window.showTextDocument(doc, { viewColumn: textTab.group.viewColumn, preview: false });
     return;
   }
-  // A script opens in the Highland-Style Editor when that is the default (highwater.highlandEditor).
+  // A script opens in the Highwater Editor when that is the default (highwater.highlandEditor).
   // A .highland file's script counts even before VS Code has given it its language (it does so a
   // moment after opening): otherwise it would show as text first, then switch.
   const script = doc.languageId.startsWith("highland-") || (doc.uri.scheme === "highland" && /\.highland$/i.test(doc.uri.path));
@@ -135,7 +135,7 @@ export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode
 }
 
 /**
- * The document being written: the active Highland-Style Editor's, else the active text editor's.
+ * The document being written: the active Highwater Editor's, else the active text editor's.
  * The view comes first: VS Code keeps `activeTextEditor` set to a text editor in another group
  * while a custom editor has the focus.
  */
@@ -168,7 +168,7 @@ export function visibleTop(doc: vscode.TextDocument): number | undefined {
 }
 
 /**
- * Shows an offset of a document: in its Highland-Style Editor if one is visible, else in a visible
+ * Shows an offset of a document: in its Highwater Editor if one is visible, else in a visible
  * text editor. With `select`, puts the cursor there and focuses that editor (opening a text editor if
  * none shows the document).
  */
@@ -211,7 +211,7 @@ export interface OffsetEdit {
 }
 
 /**
- * Applies non-overlapping edits to the document in the active editor (text or Highland-Style),
+ * Applies non-overlapping edits to the document in the active editor (text or Highwater Editor),
  * then sets its selections, given as offsets in the edited text.
  */
 export async function editActive(doc: vscode.TextDocument, edits: readonly OffsetEdit[], selections?: readonly { anchor: number; head: number }[]): Promise<boolean> {

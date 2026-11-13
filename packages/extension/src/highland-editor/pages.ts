@@ -1,5 +1,5 @@
 /**
- * The Highland-Style Editor's preview mode, as Highland 2's: the same tab shows the printed pages
+ * The Highwater Editor's preview mode, as Highland 2's: the same tab shows the printed pages
  * instead of the text (⌘E toggles), with zoom, "Page x of y" and the template at the top and the
  * print options and Save As PDF at the foot. Pages are drawn with pdf.js from the PDF the extension
  * lays out; anchors (page, y, source offset) map between the text and the pages, so switching
@@ -48,7 +48,6 @@ export class Pages {
   #rendered = new Map<number, number>();
   #observer: IntersectionObserver;
   #pending: number | null = null;
-  readonly #root = $("preview");
   readonly #pages = $("pages");
   readonly #status = $("pstatus");
   readonly #zoom = $<HTMLSelectElement>("pzoom");

@@ -19,9 +19,9 @@ import { activeOffsets, activeView, HIGHLAND_EDITOR, highlandViews, revealOffset
 export { HIGHLAND_EDITOR };
 
 /**
- * The Highland-style editor (M15, experimental): a custom text editor over the same document as
+ * The Highwater Editor: a custom text editor over the same document as
  * VS Code's editor, so saving, the writing history and the panes work as before. Opened with
- * Reopen Editor With… or Open in Highland-Style Editor; the text editor stays one click away.
+ * Reopen Editor With… or Open in Highwater Editor; the text editor stays one click away.
  */
 export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
   constructor(
@@ -698,7 +698,7 @@ body.previewing #preview { display: flex; }
 }
 
 /**
- * Switches the active tab between the text editor and the Highland-Style Editor in place, as
+ * Switches the active tab between the text editor and the Highwater Editor in place, as
  * Reopen Editor With… does: one tab per document, and no save-or-discard question for unsaved
  * changes (two tabs of a document in different editors would each ask on closing).
  */
@@ -855,7 +855,7 @@ const MIN_FONT = 8;
 const MAX_FONT = 48;
 
 /**
- * Turns a script's text tab into the Highland-Style Editor (the default) once things settle, if it
+ * Turns a script's text tab into the Highwater Editor (the default) once things settle, if it
  * is still the active tab: a .md file is given its Highwater language just after it opens.
  */
 const swapsPending = new Set<string>();
@@ -900,12 +900,12 @@ function swapSoon(uri: vscode.Uri): void {
   setTimeout(attempt, 0);
 }
 
-/** Opens the active document in the Highland-style editor, or back in the text editor. */
+/** Opens the active document in the Highwater Editor, or back in the text editor. */
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore): void {
   registerSidebarNote(context);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
-    // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highland-Style Editor.
+    // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highwater Editor.
     vscode.commands.registerCommand("highwater.recordDrag", () => {
       const v = activeView();
       if (!v) return void vscode.window.showInformationMessage("Open a document in the Highwater Editor, run this, then drag once.");
@@ -995,8 +995,8 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       log(`code button: ${target.path.split("/").pop()} wants text`);
       await swapActive(target, "default");
     }),
-    // The Highland-Style Editor is the default (highwater.highlandEditor): a script opened as text
-    // becomes a Highland-Style tab, unless the writer chose the text editor for it with the code button.
+    // The Highwater Editor is the default (highwater.highlandEditor): a script opened as text
+    // becomes a Highwater Editor tab, unless the writer chose the text editor for it with the code button.
     vscode.window.tabGroups.onDidChangeTabGroups(() => noteFront()),
     vscode.window.tabGroups.onDidChangeTabs((e) => {
       noteFront();
@@ -1018,7 +1018,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
     vscode.window.onDidChangeActiveTextEditor((e) => {
       if (e && vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) swapSoon(e.document.uri);
     }),
-    // A script opened in the text editor (from Search, say) while it is open in the Highland-Style
+    // A script opened in the text editor (from Search, say) while it is open in the Highwater
     // Editor: show it there instead, at the same place, so there is one tab per document. Only when it has no unsaved
     // changes, as closing a tab of a changed document asks to save or discard.
     vscode.window.tabGroups.onDidChangeTabs((e) => {

@@ -1,5 +1,5 @@
 /**
- * Highland 2's sidebar, inside the Highland-Style Editor (0.6.0): a row of icons at its top
+ * Highland 2's sidebar, inside the Highwater Editor: a row of icons at its top
  * (Navigator, Bin, Statistics, Assets, Scratchpad, then Highwater's Writing History and Works),
  * one panel below. Its width, whether it shows, and the panel shown are kept for every document.
  * This file is the page's side; the extension's is sidebar-host.ts.
@@ -836,7 +836,6 @@ interface AssetCard {
 class AssetsPanel {
   readonly #list = $("assetlist");
   readonly #empty = $("assetempty");
-  #cards: AssetCard[] = [];
   #available = false;
 
   constructor(private readonly deps: SidebarDeps) {
@@ -862,7 +861,6 @@ class AssetsPanel {
 
   show(cards: AssetCard[], available: boolean): void {
     this.#available = available;
-    this.#cards = cards;
     this.#list.replaceChildren(...cards.map((c) => this.#card(c)));
     this.#empty.hidden = cards.length > 0;
     this.#empty.textContent = available ? `The Assets list shows images imported into your document. Add them with +, or hold Shift and drag them in from ${MAC ? "Finder" : "your files"}; drag one into the text to use it.` : "Open a document to see its assets.";

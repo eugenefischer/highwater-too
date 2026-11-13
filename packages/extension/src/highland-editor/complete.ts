@@ -1,5 +1,5 @@
 /**
- * Completion in the Highland-Style Editor (M15), as in the text editor: on a line after an empty
+ * Completion in the Highwater Editor, as in the text editor: on a line after an empty
  * one, typed in capitals, the characters who already speak (most frequent first), scene-heading
  * prefixes and transitions; after INT. or EXT., the script's locations; after " - ", times of day.
  * Screenplays only. The suggestions come from the same pure function the text editor uses.

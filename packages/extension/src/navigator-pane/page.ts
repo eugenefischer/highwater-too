@@ -1,5 +1,5 @@
 /**
- * The Navigator pane's page (M15), in a VS Code webview view: Highland's list of scenes, sections
+ * The Navigator pane's page, in a VS Code webview view: Highland's list of scenes, sections
  * and the rest, the current one highlighted, a filter box at the foot, and scenes and sections
  * dragged to a new place with a line showing where they will land.
  */

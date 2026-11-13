@@ -1,5 +1,5 @@
 import { seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
-import { extraBlankLines, pageText, sameParagraph, styledValue } from "./screenplay.ts";
+import { extraBlankLines, pageText, styledValue } from "./screenplay.ts";
 import { addPrintMarks } from "./marks.ts";
 import { onlyNotes, plain, printContext, runsWidth, setMeasure, SYNOPSIS_COLOR, toRuns, wrapRuns, type InlineContext } from "./text.ts";
 import { Measurer, resolveFonts, type FontFaces } from "./fonts.ts";

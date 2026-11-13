@@ -1,5 +1,5 @@
 /**
- * The Highland-style editor's page (M15 spike), running in a VS Code webview: CodeMirror 6 with
+ * The Highwater Editor's page, running in a VS Code webview: CodeMirror 6 with
  * every line styled and indented from the parser, so wrapped dialogue stays indented, as in
  * Highland. Edits go to the extension, which applies them to the document; changes made
  * elsewhere (the text editor, Highland 2, a revert) come back as a new text.

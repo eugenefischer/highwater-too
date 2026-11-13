@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import * as vscode from "vscode";
-import { ask, pick } from "./ask.ts";
+import { ask } from "./ask.ts";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import type { ParseCache } from "./language.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
@@ -28,7 +28,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
 
   const binTree = vscode.window.createTreeView("highwater.bin", { treeDataProvider: bin, dragAndDropController: bin, canSelectMany: false });
   const assetTree = vscode.window.createTreeView("highwater.assets", { treeDataProvider: assets, dragAndDropController: assets });
-  // Highland's look (M15): a webview list rather than a tree, so it can show where a drag will land.
+  // Highland's look: a webview list rather than a tree, so it can show where a drag will land.
   const navPane = vscode.window.registerWebviewViewProvider(NAVIGATOR_VIEW, navigator, { webviewOptions: { retainContextWhenHidden: true } });
 
   const refreshAll = () => {
@@ -119,14 +119,14 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     if (shown.has(key)) return;
     shown.add(key);
     if (!vscode.workspace.getConfiguration("highwater").get<boolean>("showSidebarOnOpen", true)) return;
-    // The Highland-Style Editor has these panels in its own sidebar (and VS Code's are hidden there).
+    // The Highwater Editor has these panels in its own sidebar (and VS Code's are hidden there).
     if (viewOf(doc)) return;
     await vscode.commands.executeCommand("workbench.view.extension.highwater");
     await vscode.window.showTextDocument(doc, { ...(column ? { viewColumn: column } : {}), preserveFocus: false });
   }
 
   async function toBin(cut: boolean): Promise<void> {
-    // In the Highland-Style Editor the page does it, so ⌘Z there puts the text back and takes the item out.
+    // In the Highwater Editor the page does it, so ⌘Z there puts the text back and takes the item out.
     const view = activeView();
     if (view) {
       void view.panel.webview.postMessage({ type: "toBin", cut });
@@ -178,7 +178,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
   }
 }
 
-/** The Bin and Assets, for the Highland-Style Editor's sidebar (sidebar-host.ts) as well as VS Code's views. */
+/** The Bin and Assets, for the Highwater Editor's sidebar (sidebar-host.ts) as well as VS Code's views. */
 export let extrasApi: { bin: BinView; assets: AssetsView } | undefined;
 
 /** The Highland script (and its bundle, or its path for a plain file) the panels show. */
@@ -186,7 +186,7 @@ export let extrasApi: { bin: BinView; assets: AssetsView } | undefined;
 // Navigator: see navigator-pane/pane.ts.
 
 async function reveal(uri: vscode.Uri, offset: number): Promise<void> {
-  // In the Highland-Style Editor if one shows the document, else in a text editor.
+  // In the Highwater Editor if one shows the document, else in a text editor.
   await revealOffset(await vscode.workspace.openTextDocument(uri), offset, "top", true);
 }
 
@@ -284,7 +284,7 @@ export class BinView implements vscode.TreeDataProvider<BinItem>, vscode.TreeDra
     await this.change(owner, (items) => (to >= items.length ? items : move(items, from, to)));
   }
 
-  /** Replaces one item's text (edited in the Highland-Style Editor's sidebar). */
+  /** Replaces one item's text (edited in the Highwater Editor's sidebar). */
   async edit(owner: Owner, index: number, text: string): Promise<void> {
     await this.change(owner, (items) => items.map((t, i) => (i === index ? text : t)));
   }
@@ -559,7 +559,7 @@ async function insertText(current: FocusedDocument, text: string): Promise<void>
 }
 
 async function openScratchpad(store: BundleStore, current: FocusedDocument): Promise<void> {
-  // In the Highland-Style Editor, the Scratchpad is a panel of its sidebar.
+  // In the Highwater Editor, the Scratchpad is a panel of its sidebar.
   const view = activeView();
   if (view) {
     void view.panel.webview.postMessage({ type: "showPanel", panel: "scratchpad" });

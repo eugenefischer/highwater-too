@@ -96,7 +96,7 @@ describe("markers, against a file Highland saved", async () => {
   });
 });
 
-describe("navigator rows for the Highland-style pane", async () => {
+describe("navigator rows for the Navigator pane", async () => {
   const { navigatorItems, navigatorRows, currentRow } = await import("../src/syntax/navigator.ts");
   const src = "# Act One\n\nINT. HOUSE - DAY\n\nShe enters. [[check]]\n\nEXT. ROAD - NIGHT\n\nRain.\n";
   const doc = parse(src, { mode: "fountain" });

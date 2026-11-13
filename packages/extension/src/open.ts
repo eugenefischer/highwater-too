@@ -27,7 +27,7 @@ export class OpenRedirect implements vscode.CustomReadonlyEditorProvider {
   }
 }
 
-/** Opens a .highland file's script: in its Highland-Style Editor if it is open in one, else as text. */
+/** Opens a .highland file's script: in its Highwater Editor if it is open in one, else as text. */
 export async function openHighland(file: vscode.Uri, viewColumn?: vscode.ViewColumn): Promise<void> {
   await showDocument(await vscode.workspace.openTextDocument(toHighlandUri(file.fsPath)), viewColumn);
 }

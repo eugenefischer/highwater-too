@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { lineAndCharacter, offsetOf, pageForm } from "../src/highland-editor/offsets.ts";
 
-describe("Highland-Style Editor offsets in files with \\r\\n line breaks", () => {
+describe("Highwater Editor offsets in files with \\r\\n line breaks", () => {
   const doc = "INT. HALL - DAY\r\n\r\nMARLOWE\r\nHello.\r\n";
   const page = pageForm(doc);
 

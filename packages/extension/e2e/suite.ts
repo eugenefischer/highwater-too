@@ -264,7 +264,7 @@ const tests: [string, () => Promise<void>][] = [
         }, 30_000);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
   await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
         await vscode.workspace.getConfiguration("highwater").update("historyRemote", undefined, vscode.ConfigurationTarget.Global);
       }
@@ -364,7 +364,7 @@ const tests: [string, () => Promise<void>][] = [
         }, 20_000);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
   await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
@@ -411,7 +411,7 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(execFileSync("git", ["diff", `${entry.branch}~2`, entry.branch, "--", "text.fountain", "bin"], { cwd: repo, encoding: "utf8" }), "", `the text and Bin are unchanged; the branch:\n${record()}`);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
   await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
@@ -464,7 +464,7 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(await idOf(taken), id, "it keeps the work's ID");
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
   await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
@@ -483,7 +483,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "the panes follow the Highland-Style Editor, and it scrolls where they ask",
+    "the panes follow the Highwater Editor, and it scrolls where they ask",
     async () => {
       const path = join(dir, "Styled.fountain");
       await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello.\n");
@@ -493,7 +493,7 @@ const tests: [string, () => Promise<void>][] = [
       let now: Surface = { view: false };
       const end = Date.now() + 10_000;
       while (!(now = await surface()).view || now.focused !== path) {
-        if (Date.now() > end) throw new Error(`The panes did not follow the Highland-Style Editor: ${JSON.stringify(now)}`);
+        if (Date.now() > end) throw new Error(`The panes did not follow the Highwater Editor: ${JSON.stringify(now)}`);
         await new Promise((r) => setTimeout(r, 100));
       }
       assert.equal(now.document, vscode.Uri.file(path).toString());
@@ -501,7 +501,7 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.commands.executeCommand("highwater.test.revealInView", 17);
       const until = Date.now() + 10_000;
       while ((now = await surface()).selection?.head !== 17) {
-        if (Date.now() > until) throw new Error(`The Highland-Style Editor did not move its cursor: ${JSON.stringify(now)}`);
+        if (Date.now() > until) throw new Error(`The Highwater Editor did not move its cursor: ${JSON.stringify(now)}`);
         await new Promise((r) => setTimeout(r, 100));
       }
       // A writing key works there: ⌘B with nothing selected adds the pair and puts the cursor inside.
@@ -510,7 +510,7 @@ const tests: [string, () => Promise<void>][] = [
       assert.equal(doc.getText().slice(17, 21), "****");
       const after = Date.now() + 10_000;
       while ((now = await surface()).selection?.head !== 19) {
-        if (Date.now() > after) throw new Error(`The Highland-Style Editor did not put the cursor inside the bold pair: ${JSON.stringify(now)}`);
+        if (Date.now() > after) throw new Error(`The Highwater Editor did not put the cursor inside the bold pair: ${JSON.stringify(now)}`);
         await new Promise((r) => setTimeout(r, 100));
       }
       await doc.save(); // closing an unsaved editor would ask
@@ -518,7 +518,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "swaps between the text editor and the Highland-Style Editor in place, unsaved changes and all",
+    "swaps between the text editor and the Highwater Editor in place, unsaved changes and all",
     async () => {
       const path = join(dir, "Swap.fountain");
       await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello.\n");
@@ -531,8 +531,8 @@ const tests: [string, () => Promise<void>][] = [
       const tabs = () => vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri);
       const within = <T>(what: string, p: Thenable<T>) =>
         Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${what} did not finish (a save-or-discard question?)`)), 10_000))]);
-      await within("Open in Highland-Style Editor", vscode.commands.executeCommand("highwater.openHighlandEditor"));
-      await waitFor("one Highland-Style tab", () => tabs().length === 1 && tabs()[0]!.input instanceof vscode.TabInputCustom);
+      await within("Open in Highwater Editor", vscode.commands.executeCommand("highwater.openHighlandEditor"));
+      await waitFor("one Highwater Editor tab", () => tabs().length === 1 && tabs()[0]!.input instanceof vscode.TabInputCustom);
       assert.ok(doc.isDirty, "the unsaved changes are kept");
       await within("Open in Text Editor", vscode.commands.executeCommand("highwater.openTextEditor"));
       await waitFor("one text tab", () => tabs().length === 1 && tabs()[0]!.input instanceof vscode.TabInputText);
@@ -542,7 +542,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "opens scripts in the Highland-Style Editor when it is the default, except after the code button",
+    "opens scripts in the Highwater Editor when it is the default, except after the code button",
     async () => {
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("highlandEditor", true, vscode.ConfigurationTarget.Global);
@@ -575,7 +575,7 @@ const tests: [string, () => Promise<void>][] = [
         await until("Fountain language", () => doc.languageId === "highland-fountain");
         note("showTextDocument");
         await vscode.window.showTextDocument(doc, { preview: false });
-        await until("the Highland-Style Editor instead of text", () => kinds().join() === "highland");
+        await until("the Highwater Editor instead of text", () => kinds().join() === "highland");
         note("code button (highwater.openTextEditor)");
         await vscode.commands.executeCommand("highwater.openTextEditor");
         note(`openTextEditor returned; tabs now ${kinds().join()}`);
@@ -628,7 +628,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "the panes follow edits made in the Highland-Style Editor to a .highland file (a marker reaches the Navigator's document)",
+    "the panes follow edits made in the Highwater Editor to a .highland file (a marker reaches the Navigator's document)",
     async () => {
       const path = await copyOf("MarkerPanes");
       await vscode.commands.executeCommand("vscode.openWith", highland(path), "highwater.highlandEditor");
@@ -642,7 +642,7 @@ const tests: [string, () => Promise<void>][] = [
           await new Promise((r) => setTimeout(r, 100));
         }
       };
-      await until("the Highland-Style Editor", (s) => s.view && s.ready === true && s.focused === path);
+      await until("the Highwater Editor", (s) => s.view && s.ready === true && s.focused === path);
       await vscode.commands.executeCommand("highwater.test.answer", "From test");
       await vscode.commands.executeCommand("highwater.insertMarker");
       await until("the marker in the focused document's text", (s) => s.focusedText?.includes("{{%m: From test}}") === true);
@@ -651,7 +651,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "a .highland script's own URI with a line (as a Search result opens it) lands on that line, and keeps it when switched to the Highland-Style Editor",
+    "a .highland script's own URI with a line (as a Search result opens it) lands on that line, and keeps it when switched to the Highwater Editor",
     async () => {
       const path = await copyOf("SearchResult");
       const doc = await vscode.workspace.openTextDocument(highland(path));
@@ -675,7 +675,7 @@ const tests: [string, () => Promise<void>][] = [
             active: g.isActive,
             tabs: g.tabs.map((t) => ({ label: t.label, active: t.isActive, kind: t.input instanceof vscode.TabInputCustom ? `custom:${t.input.viewType}` : t.input instanceof vscode.TabInputText ? "text" : typeof t.input })),
           }));
-          throw new Error(`The Highland-Style Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}`);
+          throw new Error(`The Highwater Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}`);
         }
         await new Promise((r) => setTimeout(r, 100));
       }
@@ -684,7 +684,7 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "⌘E in the Highland-Style Editor lays out the pages in place, not in a side-by-side Preview",
+    "⌘E in the Highwater Editor lays out the pages in place, not in a side-by-side Preview",
     async () => {
       // A side-by-side Preview left open by an earlier test would follow this document (and take
       // its name): close it first, so only a Preview this test opens could fail it.
@@ -702,7 +702,7 @@ const tests: [string, () => Promise<void>][] = [
           await new Promise((r) => setTimeout(r, 100));
         }
       };
-      await until("the Highland-Style Editor", (s) => s.view && s.ready === true);
+      await until("the Highwater Editor", (s) => s.view && s.ready === true);
       // The exact page count, laid out in the background for the counts line and status bar.
       await until("the page count", (s) => typeof s.pageCount === "number" && s.pageCount >= 1);
       await vscode.commands.executeCommand("highwater.preview");
@@ -731,7 +731,7 @@ const tests: [string, () => Promise<void>][] = [
 export async function run(): Promise<void> {
   // Writing history only in its own test: its info.json write would race the other tests' checks.
   await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highland-Style Editor's own tests open it explicitly.
+  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
   await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
   const failed: string[] = [];
   for (const [name, test] of tests) {

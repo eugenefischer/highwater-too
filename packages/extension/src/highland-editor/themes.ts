@@ -1,6 +1,6 @@
 /**
  * Highland 2's editor themes (its Default Themes folder): the colours of the page, text, scene
- * headings, notes and cursor, and of the sidebar. The Highland-Style Editor and the Navigator use
+ * headings, notes and cursor, and of the sidebar. The Highwater Editor and the Navigator use
  * the one chosen in `highwater.theme`; "vscode" keeps VS Code's own colours. Pure, for tests.
  */
 export interface HighlandTheme {
@@ -40,7 +40,7 @@ export function themeFor(setting: string | undefined): HighlandTheme | null {
   return setting && setting !== "vscode" ? (HIGHLAND_THEMES[setting] ?? null) : null;
 }
 
-/** The page's colour variables for a theme (the Highland-Style Editor's CSS reads these). */
+/** The page's colour variables for a theme (the Highwater Editor's CSS reads these). */
 export function pageColors(t: HighlandTheme): Record<string, string> {
   return {
     "--hl-bg": t.background,
@@ -253,7 +253,7 @@ export function colorTheme(t: HighlandTheme): object {
       "notifications.foreground": t.sidebarText,
       "toolbar.hoverBackground": alpha(t.sidebarText, 0.12),
     },
-    // The text editor's Fountain and Markdown, as the Highland-Style Editor shows them.
+    // The text editor's Fountain and Markdown, as the Highwater Editor shows them.
     semanticTokenColors: {
       sceneHeading: { foreground: t.sceneHeading, bold: true },
       sceneNumber: t.sceneHeading,

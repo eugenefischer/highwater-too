@@ -169,7 +169,7 @@ export function moveBlock(source: string, block: Block, to: number | null): { de
 }
 
 // ---------------------------------------------------------------------------------------------
-// Rows for the Highland-style Navigator pane (M15): the items in document order, flat, with
+// Rows for the Navigator pane: the items in document order, flat, with
 // their depth, and for scenes, sections and headings the text they cover, so the pane can tell
 // which drop places would move something.
 

@@ -4,7 +4,7 @@ import { columnMinimum, columnWidth, DIALOGUE_WIDTH, inlineMarks, lineStyles, PA
 
 const at = (src: string, line: string) => src.indexOf(line);
 
-describe("Highland-style editor line styles", () => {
+describe("Highwater Editor line styles", () => {
   it("indents and narrows each part of a speech, so wrapped lines stay in place", () => {
     const src = "INT. KITCHEN - DAY\n\nBrenda waits.\n\nBRENDA\n(whispering)\nAre you coming?\n\nCUT TO:\n";
     const doc = parse(src, { mode: "fountain" });

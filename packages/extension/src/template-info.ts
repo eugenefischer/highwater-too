@@ -1,6 +1,6 @@
 /**
  * Highland 2's Document Template window: each template's group, description and Template Options
- * (EJ's screenshots, 2026-11-12). No VS Code imports: the Highland-Style Editor's page uses it too.
+ * (EJ's screenshots, 2026-11-12). No VS Code imports: the Highwater Editor's page uses it too.
  */
 export interface TemplateOption {
   /** The setting's last part: "headers", "body" or a checkbox's key. */

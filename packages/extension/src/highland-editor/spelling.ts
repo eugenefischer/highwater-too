@@ -1,5 +1,5 @@
 /**
- * Check Spelling While Typing in the Highland-Style Editor (highwater.spellCheck, off by default):
+ * Check Spelling While Typing in the Highwater Editor (highwater.spellCheck, off by default):
  * misspelled words underlined with red dots, as macOS draws them in Highland 2. Right-click one
  * for guesses, Ignore Spelling or Learn Spelling; ⌘; goes to the next misspelling. The dictionary
  * is Hunspell's American English (SCOWL), checked in a worker; learned words are a setting.

@@ -1,5 +1,5 @@
 /**
- * The extension's side of the Highland-Style Editor's sidebar (sidebar.ts is the page's): where
+ * The extension's side of the Highwater Editor's sidebar (sidebar.ts is the page's): where
  * it was left (for every document), the Navigator's kinds to list, and the Scratchpad, read from
  * and saved to the .highland file or a plain file's extras.
  */

@@ -70,7 +70,7 @@ async function fileId(path: string): Promise<string | null> {
  * document's branch in the history repository. Explicit saves commit at once; autosaves at most every
  * five minutes, and once more when the document closes. A failed commit never blocks a save.
  */
-/** The writing history, for the Highland-Style Editor's sidebar (set by registerHistory). */
+/** The writing history, for the Highwater Editor's sidebar (set by registerHistory). */
 export let historyApi:
   | {
       /** A document's saves, newest first, and whether its history is on, paused, off, or not begun. */
@@ -372,7 +372,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   }
 
   async function showHistory(): Promise<void> {
-    // In the Highland-Style Editor, its sidebar's Writing History panel.
+    // In the Highwater Editor, its sidebar's Writing History panel.
     const hv = activeView();
     if (hv) {
       void hv.panel.webview.postMessage({ type: "showPanel", panel: "history" });
@@ -476,7 +476,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     },
   };
   const works = new WorksView(worksHost);
-  // For the Highland-Style Editor's sidebar (sidebar-host.ts): the same history, for one document.
+  // For the Highwater Editor's sidebar (sidebar-host.ts): the same history, for one document.
   historyApi = {
     async saves(key) {
       if (!enabled()) return { state: "off", commits: [] };

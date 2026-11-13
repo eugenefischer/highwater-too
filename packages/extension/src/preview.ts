@@ -13,7 +13,7 @@ export function registerPreview(context: vscode.ExtensionContext, store: BundleS
   let preview: Preview | undefined;
   context.subscriptions.push(
     vscode.commands.registerCommand("highwater.preview", () => {
-      // In the Highland-Style Editor, the pages show in place of the text, as in Highland 2.
+      // In the Highwater Editor, the pages show in place of the text, as in Highland 2.
       const view = activeView();
       if (view) return view.togglePreview();
       const doc = scriptOf(activeDocument());

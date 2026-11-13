@@ -63,7 +63,7 @@ async function openBuilder(context: vscode.ExtensionContext, cache: ParseCache):
         await vscode.workspace.applyEdit(we);
       }
       panel.dispose();
-      // Back to the editor the writer came from (the Highland-Style Editor if that was it).
+      // Back to the editor the writer came from (the Highwater Editor if that was it).
       const view = viewOf(document);
       if (view) view.panel.reveal(view.panel.viewColumn, false);
       else await vscode.window.showTextDocument(document, column ? { viewColumn: column } : {});

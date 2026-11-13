@@ -27,7 +27,7 @@ export function outline(doc: Document): OutlineNode[] {
 
   // Each entry runs until the next entry at the same or a higher level (a smaller number).
   for (let k = 0; k < entries.length; k++) {
-    const { node, index } = entries[k]!;
+    const { node } = entries[k]!;
     let endIndex = doc.elements.length;
     for (let m = k + 1; m < entries.length; m++) {
       if (entries[m]!.node.level <= node.level) {

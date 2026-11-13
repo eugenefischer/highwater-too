@@ -41,7 +41,7 @@ function tabUris(tab: vscode.Tab): vscode.Uri[] {
   const i = tab.input;
   if (i instanceof vscode.TabInputText) return [i.uri];
   if (i instanceof vscode.TabInputTextDiff) return [i.modified];
-  if (i instanceof vscode.TabInputCustom) return [i.uri]; // the Highland-Style Editor
+  if (i instanceof vscode.TabInputCustom) return [i.uri]; // the Highwater Editor
   return [];
 }
 
@@ -97,7 +97,7 @@ export class FocusedDocument implements vscode.Disposable {
   constructor() {
     this.#subscriptions.push(
       this.#emitter,
-      // The active text editor or Highland-Style Editor.
+      // The active text editor or Highwater Editor.
       onDidChangeActiveSurface(() => this.follow(activeDocument())),
       // A file whose language changed (a .md file switched to Highwater Markdown) is a new document.
       vscode.workspace.onDidOpenTextDocument((d) => {

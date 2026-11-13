@@ -27,7 +27,7 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     vscode.commands.registerCommand("highwater.note", wrap("[[", "]]")),
     vscode.commands.registerCommand("highwater.centre", () => applyToSelections(toggleCentre)),
     vscode.commands.registerCommand("highwater.omit", () => applyToSelections(toggleBoneyard)),
-    // ⌃U and ⌃⇧U: VS Code's own case commands in the text editor; these in the Highland-Style Editor.
+    // ⌃U and ⌃⇧U: VS Code's own case commands in the text editor; these in the Highwater Editor.
     vscode.commands.registerCommand("highwater.upperCase", () => applyToSelections((t, s, e) => changeCase(t, s, e, true))),
     vscode.commands.registerCommand("highwater.lowerCase", () => applyToSelections((t, s, e) => changeCase(t, s, e, false))),
     vscode.commands.registerCommand("highwater.toggleInvisibles", toggleInvisibles),
@@ -49,7 +49,7 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
   );
 }
 
-/** Applies a text toggle to every selection, in a text editor or the Highland-Style Editor. */
+/** Applies a text toggle to every selection, in a text editor or the Highwater Editor. */
 async function applyToSelections(toggle: (text: string, start: number, end: number) => TextEdit): Promise<void> {
   const active = activeOffsets();
   if (!active) return;
@@ -75,7 +75,7 @@ async function applyToSelections(toggle: (text: string, start: number, end: numb
 }
 
 async function toggleInvisibles(): Promise<void> {
-  // The setting for the document's language: the text editor and the Highland-Style Editor both follow it.
+  // The setting for the document's language: the text editor and the Highwater Editor both follow it.
   const doc = activeDocument();
   if (!doc) return;
   const config = vscode.workspace.getConfiguration("editor", doc);
