@@ -186,6 +186,8 @@ interface Row {
   range?: SourceRange | undefined;
   /** `dy`: moved from the row's baseline (Multi-Cam's double-spaced dialogue). */
   items: { x: number; runs: Run[]; dy?: number }[];
+  /** Added by the layout to a speech split across pages: its "(MORE)", or its cue again with "(CONT’D)". */
+  added?: "more" | "contd";
 }
 
 /** A unit of the flow: an element's rows plus how it joins the page. */
@@ -416,7 +418,7 @@ function layout(doc: Document, options: ScreenplayOptions, family: string): Layo
 
   if (page !== null) (page as OpenPage).footer = footer;
   const last = body.at(-1)?.number ?? 0;
-  const printed: { range: SourceRange | undefined; items: PlacedText[] }[] = [];
+  const printed: { range: SourceRange | undefined; items: PlacedText[]; added?: "more" | "contd" | undefined }[] = [];
   for (const p of body) {
     const items: PlacedText[] = [];
     // Rows without text (a directive's paragraph) are 12 pt in any font; others take the font's
@@ -427,7 +429,7 @@ function layout(doc: Document, options: ScreenplayOptions, family: string): Layo
       if (!row) return;
       const line: PlacedText[] = [];
       for (const it of row.items) if (it.runs.length) line.push({ x: it.x, y: y + (it.dy ?? 0), runs: it.runs });
-      if (line.length) printed.push({ range: row.range, items: line });
+      if (line.length) printed.push({ range: row.range, items: line, added: row.added });
       items.push(...line);
     });
     const fill = (parts: PageTextPart[] | null) => (parts ? parts.map((t) => (t.kind === "text" ? t.text : t.kind === "page" ? String(p.number) : t.kind === "pageCount" ? String(last) : p.section)).join("") : "");
@@ -756,16 +758,22 @@ function dialogueBlock(cue: string, parts: Part[], space: number, cueStyle: Text
           // A parenthetical goes with the line after it, never just before (MORE).
           if (head.at(-1)!.kind === "parenthetical" || head.at(-1)!.kind === "empty") continue;
           const headRows = partRows(head, null);
-          if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0, cueStyle) };
-          best = { head: [rows[0]!, ...headRows, { items: [{ x: S.parenthetical.x + runsWidth([{ text: " ", style: {} }]), runs: [{ text: "(MORE)", style: {} }] }] }], tail };
+          if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: continued(dialogueBlock(contd(cue), best.tail, 0, cueStyle)) };
+          best = { head: [rows[0]!, ...headRows, { items: [{ x: S.parenthetical.x + runsWidth([{ text: " ", style: {} }]), runs: [{ text: "(MORE)", style: {} }] }], added: "more" }], tail };
         }
       }
-      return best && { head: best.head, tail: dialogueBlock(contd(cue), best.tail, 0, cueStyle) };
+      return best && { head: best.head, tail: continued(dialogueBlock(contd(cue), best.tail, 0, cueStyle)) };
     },
   };
 }
 
 const SENTENCE_END = /[.?!]+[’”'")\]]*(\s|$)/;
+
+/** A split speech's second part: its cue (the first row) is the layout's, not the script's. */
+function continued(block: Block): Block {
+  if (block.rows[0]) block.rows[0].added = "contd";
+  return block;
+}
 
 function contd(cue: string): string {
   return /\(CONT['’]D\)/i.test(cue) ? cue : `${cue} (CONT’D)`;

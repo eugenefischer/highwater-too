@@ -155,6 +155,27 @@ describe("screenplay source offsets", () => {
     const l = layoutScreenplay(parse(src, { mode: "fountain" }));
     expect(l.pages[0]!.items.map((it) => it.source)).toEqual([0, src.indexOf("BOB"), src.indexOf("Hello"), src.indexOf("She")]);
   });
+
+  it("gives a split speech's (MORE) the line before's place, and its (CONT’D) cue the next line's, where the page starts", () => {
+    const filler = Array.from({ length: 24 }, (_, i) => `Action line ${i + 1}.`).join("\n\n");
+    const speech = Array.from({ length: 12 }, (_, i) => `Sentence number ${i + 1} goes on.`).join(" ");
+    const src = `INT. HOUSE - DAY\n\n${filler}\n\nBOB\n${speech}\n\nShe leaves.`;
+    const l = layoutScreenplay(parse(src, { mode: "fountain" }));
+    const text = (it: { runs: { text: string }[] }) => it.runs.map((r) => r.text).join("");
+    const body = l.pages.map((p) => p.items.filter((it) => it.source !== undefined && !/^\d+\.$/.test(text(it))));
+    const at = body.findIndex((items) => items.some((it) => text(it) === "(MORE)"));
+    expect(at).toBeGreaterThanOrEqual(0);
+    const page = body[at]!;
+    const more = page.findIndex((it) => text(it) === "(MORE)");
+    expect(page[more]!.source).toBe(page[more - 1]!.source);
+    const next = body[at + 1]!;
+    expect(text(next[0]!)).toBe("BOB (CONT’D)");
+    expect(next[0]!.source).toBe(next[1]!.source);
+    expect(src.slice(next[1]!.source!)).toMatch(new RegExp(`^${text(next[1]!).split(" ").slice(0, 3).join(" ")}`));
+    // In order throughout.
+    const sources = body.flat().map((it) => it.source!);
+    expect(sources).toEqual([...sources].sort((x, y) => x - y));
+  });
 });
 
 describe("markers", () => {

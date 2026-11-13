@@ -10,7 +10,7 @@ describe("Highwater Editor line styles", () => {
     const doc = parse(src, { mode: "fountain" });
     const s = lineStyles(doc);
     expect(columnWidth(doc)).toBe(63);
-    expect(columnMinimum(doc)).toBe(46);
+    expect(columnMinimum(doc)).toBe(45);
     expect(s.get(0)).toMatchObject({ kind: "scene", indent: 0 });
     expect(s.get(at(src, "Brenda waits"))).toMatchObject({ kind: "action", indent: 0 });
     expect(s.get(at(src, "BRENDA"))).toMatchObject({ kind: "cue", indent: 21 });

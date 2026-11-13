@@ -208,6 +208,14 @@ describe("manuscript rules from the probes", () => {
 });
 
 describe("source offsets for scroll sync", () => {
+  it("starts a line after a hyphen that ends the line above, not on the hyphen", () => {
+    const words = Array.from({ length: 40 }, (_, i) => (i % 3 === 2 ? "well-known" : "word")).join(" ");
+    const src = `TL: Me\n\nOne.\n\n${words}`;
+    const body = layout(src).pages[1]!.items.filter((it) => it.y > 60).slice(1);
+    expect(body.length).toBeGreaterThan(3);
+    for (const it of body) expect(src[it.source!]).toBe(runsText(it.runs).trimStart()[0]);
+  });
+
   it("tags each printed line with where it starts in the source", () => {
     const words = Array.from({ length: 30 }, () => "word").join(" ");
     const src = `TL: Me\n\nOne.\n\n${words}\n\n# Head`;

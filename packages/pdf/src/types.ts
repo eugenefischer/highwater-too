@@ -98,8 +98,10 @@ export interface SourceRange {
  * With the source text, each line's offset is then made exact: where its first words are in the
  * source, nearest that estimate and in order (Show Page Breaks needs the very line a page starts
  * with; the estimate could be a line out). Lines whose words can't be found keep the estimate.
+ * Lines the layout added to a split speech aren't looked for: "(MORE)" takes the place of the line
+ * before it, the cue repeated with "(CONT’D)" that of the line after it (where the page starts).
  */
-export function assignSources(lines: { range: SourceRange | undefined; items: PlacedText[] }[], source?: string): void {
+export function assignSources(lines: { range: SourceRange | undefined; items: PlacedText[]; added?: "more" | "contd" | undefined }[], source?: string): void {
   for (let i = 0; i < lines.length; ) {
     const range = lines[i]!.range;
     let j = i + 1;
@@ -109,7 +111,9 @@ export function assignSources(lines: { range: SourceRange | undefined; items: Pl
       let floor = range.start;
       // The line before: where it starts (when found) and how long it printed.
       let previous: { at: number; length: number } | null = { at: range.start, length: -1 };
+      const offsets: (number | undefined)[] = [];
       for (let k = 0; k < n; k++) {
+        if (lines[i + k]!.added) continue;
         const text = lines[i + k]!.items.map((it) => runsText(it.runs)).join(" ");
         const shared = range.start + Math.floor(((range.end - range.start) * k) / n);
         // Next after the line before (its printed length and a space), else the shared-out guess.
@@ -118,7 +122,16 @@ export function assignSources(lines: { range: SourceRange | undefined; items: Pl
         const offset = exact ?? (k === 0 ? range.start : shared);
         if (exact !== null) floor = exact + 1;
         previous = exact !== null || k === 0 ? { at: offset, length: text.trimEnd().length } : null;
-        for (const it of lines[i + k]!.items) it.source = offset;
+        offsets[k] = offset;
+      }
+      for (let k = 0; k < n; k++) {
+        const line = lines[i + k]!;
+        let offset = offsets[k];
+        // An added line: the place of the line before it ("(MORE)") or after it (the repeated cue).
+        const step = line.added === "more" ? -1 : 1;
+        for (let m = k + step; offset === undefined && m >= 0 && m < n; m += step) offset = offsets[m];
+        for (let m = k - step; offset === undefined && m >= 0 && m < n; m -= step) offset = offsets[m];
+        for (const it of line.items) it.source = offset ?? range.start;
       }
     }
     i = j;
@@ -128,8 +141,8 @@ export function assignSources(lines: { range: SourceRange | undefined; items: Pl
 /**
  * Where a printed line starts in the source: its first three words (else two, else one) found
  * with anything between them that isn't a letter or digit (markup, dashes, quotes, line breaks),
- * the occurrence at or after `floor` nearest `estimate`, moved back over punctuation that opens
- * the line (an opening quote). Null if the words aren't there (text from an included file, say).
+ * the occurrence at or after `floor` nearest `estimate`, moved back over the punctuation the
+ * printed line opens with (an opening quote). Null if the words aren't there (text from an included file, say).
  */
 function lineStart(source: string, range: SourceRange, text: string, estimate: number, floor: number): number | null {
   const words = text.match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -146,8 +159,11 @@ function lineStart(source: string, range: SourceRange, text: string, estimate: n
       else if (at > estimate) break;
     }
     if (best !== null) {
+      // Back over as much punctuation as the printed line opens with (a quote, a parenthesis); not
+      // over a hyphen or dash that ends the line above ("eye-" then "catching").
+      const opens = (text.trimStart().match(/^[^\p{L}\p{N}\s]*/u)?.[0] ?? "").length;
       let start = best;
-      while (start > floor && start > range.start && !/\s/.test(source[start - 1]!) && !/[\p{L}\p{N}]/u.test(source[start - 1]!)) start--;
+      for (let k = 0; k < opens && start > floor && start > range.start && !/[\s\p{L}\p{N}]/u.test(source[start - 1]!); k++) start--;
       return start;
     }
   }

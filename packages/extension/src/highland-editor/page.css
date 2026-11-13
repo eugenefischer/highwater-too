@@ -335,6 +335,9 @@ body.dark-pages #pages { background: var(--hl-bg); }
    into pieces (spaces marked by Show Invisibles, bold or italic words) adds up to a hair over
    N characters in Chrome, which then broke it a word early, unlike the plain text and the page. */
 .cm-editor .cm-content { flex: 0 1 calc(var(--column) + 0.5px) !important; width: calc(var(--column) + 0.5px); max-width: calc(100% - 2ch); min-width: var(--column-min); margin: 0 auto; box-sizing: content-box; padding: 3em 1ch; caret-color: var(--hl-caret); }
+/* The space after a full line's last word hangs past the edge, as on the page (CodeMirror's
+   break-spaces made it take room, so a line that fills the page's width lost its last word). */
+.cm-editor .cm-content.cm-lineWrapping { white-space: pre-wrap !important; }
 /* More specific than CodeMirror's own line padding; each line's indent is set inline. */
 .cm-editor .cm-content .cm-line { padding: 0; }
 .cm-editor .cm-searchMatch { background: var(--hl-match); outline: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent); }
@@ -372,8 +375,7 @@ body.dark-pages #pages { background: var(--hl-bg); }
    could stand above the line, making lines with a widget taller than the rest. */
 .cm-editor .cm-widgetBuffer { vertical-align: top; }
 /* Show Page Breaks: in the right margin at a page's first line, a short rule with the page number under it (Inactive, as in Highland). */
-.hl-pagebreak { position: static; }
-.hl-pagebreak-mark { position: absolute; left: calc(var(--column) + 2ch); width: 5ch; margin-top: -0.12em; border-top: 1px solid var(--hl-muted); text-align: right; text-indent: 0; font-weight: 400; font-style: normal; color: var(--hl-muted); pointer-events: none; user-select: none; }
+.hl-pagebreak-mark { position: absolute; margin-left: calc(var(--column) + 2ch); width: 5ch; margin-top: -0.12em; border-top: 1px solid var(--hl-muted); text-align: right; text-indent: 0; font-weight: 400; font-style: normal; color: var(--hl-muted); pointer-events: none; user-select: none; }
 .hl-pagebreak-mark span { font-family: var(--vscode-font-family); font-size: 0.7em; }
 .cm-editor .cm-highlightSpace { background-image: radial-gradient(circle at 50% 55%, var(--hl-whitespace) 15%, transparent 5%); }
 .cm-editor .cm-highlightTab { background-image: none; position: relative; }

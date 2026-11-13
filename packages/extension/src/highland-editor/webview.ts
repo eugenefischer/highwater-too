@@ -7,7 +7,7 @@
 import { history, defaultKeymap, historyKeymap, indentWithTab, invertedEffects, isolateHistory, redo, undo } from "@codemirror/commands";
 import { search, searchKeymap } from "@codemirror/search";
 import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder, StateEffect, StateField, Transaction, type ChangeSpec, type Range, type Text } from "@codemirror/state";
-import { Decoration, dropCursor, EditorView, highlightWhitespace, keymap, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type ViewUpdate } from "@codemirror/view";
+import { Decoration, dropCursor, EditorView, highlightWhitespace, keymap, layer, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type LayerMarker, type ViewUpdate } from "@codemirror/view";
 import { parse, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages } from "./pages.ts";
@@ -78,44 +78,70 @@ function lineCss(left: number, width?: number): { style?: string } {
  * margin with the page number under it. The starts come from the extension's layout a second after
  * typing stops; edits meanwhile carry them along.
  */
-class PageBreak extends WidgetType {
-  constructor(readonly page: number) {
-    super();
-  }
-  override toDOM(): HTMLElement {
-    const at = document.createElement("span");
-    at.className = "hl-pagebreak";
-    const mark = document.createElement("span");
-    mark.className = "hl-pagebreak-mark";
-    const n = document.createElement("span");
-    n.textContent = String(this.page);
-    mark.append(n);
-    at.append(mark);
-    return at;
-  }
-  override eq(other: PageBreak): boolean {
-    return other.page === this.page;
-  }
-  override ignoreEvent(): boolean {
-    return true;
-  }
-}
+type PageStart = { at: number; page: number };
 const setPageBreaks = StateEffect.define<number[]>();
-const pageBreaks = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
+const pageBreaks = StateField.define<PageStart[]>({
+  create: () => [],
   update(value, tr) {
     for (const e of tr.effects)
       if (e.is(setPageBreaks)) {
-        const b = new RangeSetBuilder<Decoration>();
-        const pairs: [number, number][] = [];
-        for (let i = 0; i + 1 < e.value.length; i += 2) if (e.value[i]! <= tr.state.doc.length) pairs.push([e.value[i]!, e.value[i + 1]!]);
-        pairs.sort((x, y) => x[0] - y[0]);
-        for (const [at, n] of pairs) b.add(at, at, Decoration.widget({ widget: new PageBreak(n), side: -1 }));
-        return b.finish();
+        const starts: PageStart[] = [];
+        for (let i = 0; i + 1 < e.value.length; i += 2) if (e.value[i]! <= tr.state.doc.length) starts.push({ at: e.value[i]!, page: e.value[i + 1]! });
+        return starts.sort((x, y) => x.at - y.at);
       }
-    return value.map(tr.changes);
+    return tr.docChanged ? value.map((s) => ({ at: tr.changes.mapPos(s.at, 1), page: s.page })) : value;
   },
-  provide: (f) => EditorView.decorations.from(f),
+});
+
+/** A page's mark: a short rule in the right margin with the page number under it (Inactive, as in Highland). */
+class PageMark implements LayerMarker {
+  constructor(
+    readonly left: number,
+    readonly top: number,
+    readonly page: number,
+  ) {}
+  draw(): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "hl-pagebreak-mark";
+    el.append(document.createElement("span"));
+    this.update(el);
+    return el;
+  }
+  update(el: HTMLElement): boolean {
+    el.style.left = `${this.left}px`;
+    el.style.top = `${this.top}px`;
+    el.firstElementChild!.textContent = String(this.page);
+    return true;
+  }
+  eq(other: LayerMarker): boolean {
+    return other instanceof PageMark && other.left === this.left && other.top === this.top && other.page === this.page;
+  }
+}
+
+/**
+ * The marks, beside the row each page's first character is on. Placed by where that character is on
+ * screen, not as a widget in the text: a widget at the start of a wrapped row sat at the end of the
+ * row above, so the mark showed a line early.
+ */
+const pageBreakMarks = layer({
+  above: true,
+  class: "hl-pagebreaks",
+  update: (u) => u.docChanged || u.viewportChanged || u.geometryChanged || u.startState.field(pageBreaks) !== u.state.field(pageBreaks),
+  markers(view) {
+    const starts = view.state.field(pageBreaks);
+    if (!starts.length) return [];
+    const scroller = view.scrollDOM.getBoundingClientRect();
+    const baseLeft = scroller.left - view.scrollDOM.scrollLeft * view.scaleX;
+    const baseTop = scroller.top - view.scrollDOM.scrollTop * view.scaleY;
+    const left = (view.contentDOM.getBoundingClientRect().left - baseLeft) / view.scaleX;
+    const marks: PageMark[] = [];
+    for (const { at, page } of starts) {
+      if (at < view.viewport.from || at > view.viewport.to) continue;
+      const c = view.coordsAtPos(at, 1);
+      if (c) marks.push(new PageMark(left, (c.top - baseTop) / view.scaleY, page));
+    }
+    return marks;
+  },
 });
 
 const styling = StateField.define<DecorationSet>({
@@ -299,6 +325,7 @@ function start(text: string): void {
         dropCursor(),
         styling,
         pageBreaks,
+        pageBreakMarks,
         spellingMarks,
         compare.extension,
         invisibles.of(invisibleMarks(showInvisibles)),

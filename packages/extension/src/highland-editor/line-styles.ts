@@ -39,8 +39,8 @@ export interface LineStyle {
   align?: "right" | "center";
 }
 
-/** Dialogue wraps after 35 characters and parentheticals after 28, as Highland's editor shows them. */
-export const DIALOGUE_WIDTH = 35;
+/** Dialogue wraps after 34 characters and parentheticals after 28, as the printed page. */
+export const DIALOGUE_WIDTH = 34;
 export const PAREN_WIDTH = 28;
 
 /** The page column's width in characters, as the printed page: 63 for scripts, 65 for prose. */

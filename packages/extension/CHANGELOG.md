@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.51
+
+- The editor wraps lines where the printed page does. The space after a full line's last word hangs past the edge, as on the page; before, a line that filled the page's width lost its last word to the next line. Dialogue wraps at 34 characters, as printed (it was 35).
+- Show Page Breaks: the mark sits beside the line the page starts on; it showed a line early when a page started partway through a paragraph.
+- Page breaks and the pages' scroll position are right where a speech splits across pages ("(MORE)" and the cue repeated with "(CONT’D)"), and where a line starts after a hyphen.
+
 ## 0.6.50
 
 - Switching to the pages a second time opens them at your place in the text straight away. They used to show where you left them, then jump a second later, losing any scrolling you had done.
