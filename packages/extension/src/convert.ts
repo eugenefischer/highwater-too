@@ -8,7 +8,7 @@ import { ask } from "./ask.ts";
 import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
 import { assetsFolderName, withoutIdNote } from "./extras-folder.ts";
 import { SCHEME } from "./fs-provider.ts";
-import { currentHistory } from "./history.ts";
+import { currentHistory } from "./history-location.ts";
 import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";

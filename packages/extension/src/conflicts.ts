@@ -4,7 +4,7 @@ import { ask } from "./ask.ts";
 import { HighlandFileSystem, SCHEME, toHighlandUri } from "./fs-provider.ts";
 import { openHighland } from "./open.ts";
 import { splitBundlePath } from "./store.ts";
-import { currentHistory } from "./history.ts";
+import { currentHistory } from "./history-location.ts";
 import { showDocument } from "./surface.ts";
 
 export const DISK_SCHEME = "highland-disk";

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.45
+
+- Internal tidying, with no change meant in what you see: the Highwater Editor's counts and Go to Paragraph use the same parse as the rest of the extension; the writing history's code is split into smaller files; the last Python scripts in the repository are replaced or removed.
+
 ## 0.6.44
 
 - A Search result in a script opens in the Highwater Editor at the result's line again (it could land at the top: the switch to the Highwater Editor read the cursor before the text editor had it, or moved it before the Highwater Editor was there).
