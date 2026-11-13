@@ -755,9 +755,11 @@ function choseText(uri: string): boolean {
 
 async function swapActive(target: vscode.Uri, viewType: string): Promise<void> {
   swapping = true;
+  log(`swapActive ${target.path.split("/").pop()} → ${viewType === HIGHLAND_EDITOR ? "highwater" : viewType}`);
   try {
     await swapInPlace(target, viewType);
   } finally {
+    log(`swapActive ${target.path.split("/").pop()} done`);
     // The old tab closes just after the command returns.
     setTimeout(() => (swapping = false), 500);
   }
@@ -963,6 +965,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       const target = uri ?? (tab?.input instanceof vscode.TabInputCustom ? tab.input.uri : undefined);
       if (!target) return;
       wantsText.add(target.toString()); // not switched back by the default below
+      log(`code button: ${target.path.split("/").pop()} wants text`);
       await swapActive(target, "default");
     }),
     // The Highland-Style Editor is the default (highwater.highlandEditor): a script opened as text
@@ -975,7 +978,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
         if (!(input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom)) continue;
         const uri = input.uri.toString();
         const still = vscode.window.tabGroups.all.flatMap((g) => g.tabs).some((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri);
-        if (!still) wantsText.delete(uri);
+        if (!still && wantsText.delete(uri)) log(`wantsText cleared for ${uri.split("/").pop()} (its last tab closed)`);
       }
       if (swapping || !vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) return;
       for (const opened of e.opened) {

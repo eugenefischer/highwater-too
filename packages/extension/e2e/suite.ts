@@ -546,6 +546,22 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("highlandEditor", true, vscode.ConfigurationTarget.Global);
+      // Every tab event and the extension's own decisions over the whole test, printed with any
+      // failure, so a failure says what happened rather than leaving it to be guessed at.
+      const events: string[] = [];
+      const note = (what: string) => events.push(`${Date.now() % 1_000_000} ${what}`);
+      const name = (t: vscode.Tab) => `${t.label}:${t.input instanceof vscode.TabInputCustom ? "highwater" : t.input instanceof vscode.TabInputText ? "text" : "other"}${t.isActive ? "*" : ""}`;
+      const watch = vscode.window.tabGroups.onDidChangeTabs((e) => note(`tabs opened=[${e.opened.map(name)}] closed=[${e.closed.map(name)}] changed=[${e.changed.map(name)}]`));
+      const watchEditor = vscode.window.onDidChangeActiveTextEditor((ed) => note(`active text editor ${ed?.document.uri.path.split("/").pop() ?? "none"}`));
+      await vscode.commands.executeCommand("highwater.test.swapLog"); // from here on
+      const record = async () => `\nTest's view:\n${events.join("\n")}\nExtension's log:\n${((await vscode.commands.executeCommand<string[]>("highwater.test.swapLog")) ?? []).join("\n")}`;
+      const until = async (what: string, test: () => boolean) => {
+        try {
+          await waitFor(what, test);
+        } catch (e) {
+          throw new Error(`${(e as Error).message}${await record()}`);
+        }
+      };
       try {
         const path = join(dir, "Default.fountain");
         await writeFile(path, "INT. HALL - DAY\n\nCAMPBELL\nHello.\n");
@@ -556,41 +572,34 @@ const tests: [string, () => Promise<void>][] = [
             .filter((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri)
             .map((t) => (t.input instanceof vscode.TabInputCustom ? "highland" : "text"));
         const doc = await vscode.workspace.openTextDocument(path);
-        await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
+        await until("Fountain language", () => doc.languageId === "highland-fountain");
+        note("showTextDocument");
         await vscode.window.showTextDocument(doc, { preview: false });
-        await waitFor("the Highland-Style Editor instead of text", () => kinds().join() === "highland");
+        await until("the Highland-Style Editor instead of text", () => kinds().join() === "highland");
+        note("code button (highwater.openTextEditor)");
         await vscode.commands.executeCommand("highwater.openTextEditor");
-        await waitFor("the text editor", () => kinds().join() === "text");
+        note(`openTextEditor returned; tabs now ${kinds().join()}`);
+        await until("the text editor", () => kinds().join() === "text");
         // It stays text: the code button was the writer's choice.
         await new Promise((r) => setTimeout(r, 1000));
-        assert.equal(kinds().join(), "text");
+        assert.equal(kinds().join(), "text", `The code button's text editor was undone.${await record()}`);
+        note("closeActiveEditor");
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
         // VS Code's own Reopen Editor With… → Text Editor (the editor menu in the breadcrumbs bar)
         // is the writer's choice too: it stays text, not switched straight back.
+        note("showTextDocument");
         await vscode.window.showTextDocument(doc, { preview: false });
-        await waitFor("the Highwater Editor again", () => kinds().join() === "highland");
-        // Every tab event and the extension's own decisions, printed if this fails, so a failure
-        // says what happened rather than leaving it to be guessed at.
-        const events: string[] = [];
-        const name = (t: vscode.Tab) => `${t.label}:${t.input instanceof vscode.TabInputCustom ? "highwater" : t.input instanceof vscode.TabInputText ? "text" : "other"}${t.isActive ? "*" : ""}`;
-        const watch = vscode.window.tabGroups.onDidChangeTabs((e) =>
-          events.push(`${Date.now() % 1_000_000} tabs opened=[${e.opened.map(name)}] closed=[${e.closed.map(name)}] changed=[${e.changed.map(name)}]`),
-        );
-        const watchEditor = vscode.window.onDidChangeActiveTextEditor((ed) => events.push(`${Date.now() % 1_000_000} active text editor ${ed?.document.uri.path.split("/").pop() ?? "none"}`));
-        await vscode.commands.executeCommand("highwater.test.swapLog"); // from here on
-        try {
-          await vscode.commands.executeCommand("reopenActiveEditorWith", "default");
-          events.push(`${Date.now() % 1_000_000} reopenActiveEditorWith returned; tabs now ${kinds().join()}`);
-          await waitFor("the text editor from Reopen Editor With", () => kinds().join() === "text");
-          await new Promise((r) => setTimeout(r, 1500));
-          const log = (await vscode.commands.executeCommand<string[]>("highwater.test.swapLog")) ?? [];
-          assert.equal(kinds().join(), "text", `Reopen Editor With → Text Editor was undone.\nTest's view:\n${events.join("\n")}\nExtension's log:\n${log.join("\n")}`);
-        } finally {
-          watch.dispose();
-          watchEditor.dispose();
-        }
+        await until("the Highwater Editor again", () => kinds().join() === "highland");
+        note("reopenActiveEditorWith default");
+        await vscode.commands.executeCommand("reopenActiveEditorWith", "default");
+        note(`reopenActiveEditorWith returned; tabs now ${kinds().join()}`);
+        await until("the text editor from Reopen Editor With", () => kinds().join() === "text");
+        await new Promise((r) => setTimeout(r, 1500));
+        assert.equal(kinds().join(), "text", `Reopen Editor With → Text Editor was undone.${await record()}`);
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       } finally {
+        watch.dispose();
+        watchEditor.dispose();
         await config.update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
