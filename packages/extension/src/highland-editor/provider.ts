@@ -413,6 +413,24 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 #sbhelptext .lead { color: color-mix(in srgb, var(--hl-fg) 70%, transparent); }
 #sbhelptext code { font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; }
 #sbhelptext svg { vertical-align: -3px; }
+/* Works: works by where they are; a selected work shows Open or Restore and More, and its saves beneath. */
+#worklist { outline: none; }
+.work-card { padding-right: 8px; cursor: default; user-select: none; }
+.work-card.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
+.work-card.selected .sb-row-main { padding-right: 52px; }
+.work-card .sb-row-tools { position: absolute; top: 2px; right: 3px; display: none; }
+.work-card.selected .sb-row-tools { display: flex; }
+.work-card.work-local .sb-row-title, .work-card.work-remote .sb-row-title { font-weight: 500; color: color-mix(in srgb, var(--nav-fg) 75%, var(--nav-muted)); }
+.work-saves { margin: 4px -4px 0; padding-top: 4px; border-top: 1px solid color-mix(in srgb, var(--nav-muted) 25%, transparent); }
+.work-save { display: flex; gap: 6px; align-items: baseline; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+.work-save:hover { background: var(--nav-hover); }
+.work-save .when { flex: none; }
+.work-save .kind { color: var(--nav-muted); font-size: 0.9em; }
+.work-save .hist-delta { margin-left: auto; }
+.work-saves .sb-row-detail { padding: 3px 4px; white-space: normal; }
+#workrefresh.busy svg { animation: sb-spin 0.9s linear infinite; }
+#sbmenu button.danger { color: var(--vscode-errorForeground, #f48771); }
+#sbmenu button.danger:hover, #sbmenu button.danger:focus { background: var(--vscode-errorForeground, #f48771); color: var(--hl-bg); }
 /* The sidebar's menus (the Writing History's gear): a small popup above the button. */
 #sbmenu { position: fixed; z-index: 45; min-width: 200px; max-width: calc(var(--sb-width) + 120px); padding: 4px; background: var(--hl-bg); color: var(--nav-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-family: var(--vscode-font-family); font-size: 13px; }
 #sbmenu[hidden] { display: none; }
@@ -429,10 +447,6 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .sb-row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-row-detail { color: var(--nav-muted); font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-row .sb-row-detail { padding-left: 0; }
-.sb-row.work .sb-row-detail { padding-left: 16px; }
-.sb-row.save { padding-left: 26px; }
-.sb-row.work-remote .sb-row-title, .sb-row.work-local .sb-row-title { font-weight: 500; color: color-mix(in srgb, var(--nav-fg) 75%, var(--nav-muted)); }
-.sb-twist { flex: none; width: 10px; color: var(--nav-muted); font-size: 0.85em; }
 .sb-row-tool { position: absolute; top: 5px; right: 4px; display: none; }
 .sb-row:hover .sb-row-tool { display: flex; }
 .assetcard-pic { flex: none; width: 48px; height: 48px; border-radius: 4px; background: color-mix(in srgb, var(--nav-fg) 10%, transparent); display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -618,8 +632,9 @@ body.previewing #preview { display: flex; }
       </div>
     </section>
     <section data-panel="works" hidden>
-      <div class="sb-scroll"><div id="worklist" class="sb-rows"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
-      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync and refresh" aria-label="Sync and refresh"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
+      <div class="sb-head sb-head-help"><span>All works</span><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
+      <div class="sb-scroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
+      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
     </section>
   </div>
   <div id="sbgrip" aria-hidden="true"></div>

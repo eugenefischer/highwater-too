@@ -48,7 +48,16 @@ export interface SidebarHost {
 }
 
 export function sidebarHost(context: vscode.ExtensionContext, store: () => BundleStore, panel: vscode.WebviewPanel, document: () => vscode.TextDocument): SidebarHost {
-  const post = (msg: object) => void panel.webview.postMessage(msg);
+  let disposed = false;
+  // Lists are read asynchronously, so the tab may have closed by the time one is ready.
+  const post = (msg: object) => {
+    if (disposed) return;
+    try {
+      void panel.webview.postMessage(msg).then(undefined, () => undefined);
+    } catch {
+      // The webview was disposed.
+    }
+  };
   const bundle = () => bundleOf(document());
   const plain = () => (!bundle() && document().uri.scheme === "file" ? document().uri.fsPath : undefined);
   const key = () => bundle() ?? plain() ?? document().uri.toString();
@@ -202,14 +211,25 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
   let workNodes: WorkNode[] = [];
   const saveNodes = new Map<number, WorkNode[]>();
   const sendWorks = async () => {
-    if (!historyApi) return post({ type: "works", items: [] });
+    const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote", "").trim();
+    const m = historyApi?.mirror();
+    const mirror = remote && m ? { busy: m.busy, at: m.at?.getTime() ?? null } : null;
+    if (!historyApi) return post({ type: "works", items: [], mirror });
     workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
     saveNodes.clear();
     const items = workNodes.map((n, i) => {
-      const t = historyApi!.works.getTreeItem(n);
-      return { i, title: String(typeof t.label === "string" ? t.label : (t.label?.label ?? "")), detail: String(t.description ?? ""), tip: typeof t.tooltip === "string" ? t.tooltip : "", kind: t.contextValue === "work.here" ? "here" : t.contextValue === "work.local" ? "local" : "remote" };
+      const w = n.work;
+      const words = w.latest ? parseSave(w.latest.message).words : "";
+      return {
+        i,
+        title: w.title,
+        file: n.here ? basename(n.here) : (w.file ?? ""),
+        at: w.lastSave?.getTime() ?? null,
+        words,
+        kind: n.here ? "here" : w.local ? "local" : "remote",
+      };
     });
-    post({ type: "works", items });
+    post({ type: "works", items, mirror });
   };
   const sendWorkSaves = async (i: number) => {
     const node = workNodes[i];
@@ -219,24 +239,17 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     post({
       type: "workSaves",
       i,
-      saves: saves.map((n, j) => {
-        const t = historyApi!.works.getTreeItem(n);
-        return { j, when: String(typeof t.label === "string" ? t.label : ""), detail: String(t.description ?? ""), tip: typeof t.tooltip === "string" ? t.tooltip : "" };
-      }),
+      saves: saves.map((n, j) => (n.kind === "save" ? { j, at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter(Boolean),
     });
   };
-  const workMenu = async (i: number) => {
+  const workAction = async (i: number, action: string) => {
     const node = workNodes[i];
     if (!node || !historyApi) return;
-    const kind = historyApi.works.getTreeItem(node).contextValue;
     const w = historyApi.works;
-    const items = [
-      ...(kind === "work.here" ? [{ label: "Open", run: () => w.open(node) }] : [{ label: "Restore…", run: () => w.restore(node) }]),
-      ...(kind === "work.here" || kind === "work.local" ? [{ label: "Remove from This Computer…", run: () => w.remove(node) }] : []),
-      { label: "Delete Writing History…", run: () => w.delete(node) },
-    ];
-    const chosen = await pick(items, { title: (node as { work: { title: string } }).work.title });
-    if (chosen) await chosen.run();
+    if (action === "open") await w.open(node);
+    else if (action === "restore") await w.restore(node);
+    else if (action === "remove") await w.remove(node);
+    else if (action === "delete") await w.delete(node);
   };
   let historyTimer: ReturnType<typeof setTimeout> | undefined;
   const historyChanged = () => {
@@ -357,10 +370,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       } else if (msg.type === "historyCommand" && typeof msg.command === "string" && HISTORY_COMMANDS.has(msg.command)) {
         void vscode.commands.executeCommand(msg.command).then(() => sendHistory());
       } else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");
-      else if (msg.type === "workOpen" && typeof msg.i === "number") {
-        const node = workNodes[msg.i];
-        if (node && historyApi) void historyApi.works.open(node);
-      } else if (msg.type === "workMenu" && typeof msg.i === "number") void workMenu(msg.i);
+      else if (msg.type === "workAction" && typeof msg.i === "number" && typeof msg.action === "string") void workAction(msg.i, msg.action);
       else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
       else if (msg.type === "workSave" && typeof msg.i === "number" && typeof msg.j === "number") {
         const node = saveNodes.get(msg.i)?.[msg.j];
@@ -380,6 +390,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       void sendWorks();
     },
     dispose() {
+      disposed = true;
       for (const s of subscriptions) s.dispose();
     },
   };

@@ -622,6 +622,10 @@ const tests: [string, () => Promise<void>][] = [
   [
     "⌘E in the Highland-Style Editor lays out the pages in place, not in a side-by-side Preview",
     async () => {
+      // A side-by-side Preview left open by an earlier test would follow this document (and take
+      // its name): close it first, so only a Preview this test opens could fail it.
+      const previews = vscode.window.tabGroups.all.flatMap((g) => g.tabs.filter((t) => t.label.startsWith("Preview")));
+      if (previews.length) await vscode.window.tabGroups.close(previews);
       const path = await copyOf("PreviewInPlace");
       await vscode.commands.executeCommand("vscode.openWith", highland(path), "highwater.highlandEditor");
       type Surface = { view: boolean; ready?: boolean; pagesSent?: number; pageCount?: number };

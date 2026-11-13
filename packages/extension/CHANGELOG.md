@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.22
+
+- The Works panel, redone in Highland's way: works under FILE ON THIS COMPUTER, HISTORY ONLY and MIRROR ONLY, each with its file name, when it was last saved and its word count. A click selects a work, which shows Open (or Restore…) and More at its top right, and its saves beneath; a click on a save shows it (beside the file, when the file is on this computer). More opens a small menu with Remove from This Computer… and, in red, Delete Writing History… (both still ask first). Escape, a click beside the works or leaving the panel lets go of the selection; ↑↓ move it. The foot has the Filter and, with a mirror, the sync button, which spins while syncing and gives the last sync time on hover. A ? button at the top explains it all.
+- Fixed: no "Webview is disposed" errors when a document's tab closes while its history or works are being read.
+- Tests: the end-to-end test for ⌘E closes any side-by-side Preview an earlier test left open, which followed its document and failed it on Linux.
+
 ## 0.6.21
 
 - When sending saves to the mirror failed (offline, say), they are sent again as soon as the mirror next answers a check, instead of waiting for the ten-minute retry or the next save.

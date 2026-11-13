@@ -84,8 +84,11 @@ export class Sidebar {
 
   /** Shows a panel (opening the sidebar if it is hidden). */
   show(panel: PanelName): void {
-    // Leaving the Writing History lets go of its selected save.
-    if (panel !== this.#state.panel) this.#history.deselect();
+    // Leaving the Writing History or Works lets go of its selection.
+    if (panel !== this.#state.panel) {
+      this.#history.deselect();
+      this.#works.deselect();
+    }
     this.#state = { ...this.#state, panel, open: true };
     this.#apply();
     this.#save();
@@ -113,7 +116,7 @@ export class Sidebar {
     else if (msg.type === "bin") this.#bin.show(msg.items as BinCard[], !!msg.available);
     else if (msg.type === "assets") this.#assets.show(msg.items as AssetCard[], !!msg.available);
     else if (msg.type === "history") this.#history.show(msg as unknown as HistoryMessage);
-    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[]);
+    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[], (msg.mirror as { busy: boolean; at: number | null } | null) ?? null);
     else if (msg.type === "workSaves") this.#works.saves(msg.i as number, msg.saves as WorkSaveRow[]);
     else if (msg.type === "showPanel" && PANELS.includes(msg.panel as PanelName)) this.show(msg.panel as PanelName);
     else if (msg.type === "toggleSidebar") this.toggle();
@@ -827,6 +830,8 @@ interface MenuItem {
   label: string;
   command: string;
   sep?: boolean;
+  /** Shown in the error colour (deleting). */
+  danger?: boolean;
 }
 
 interface HistoryMessage {
@@ -1117,6 +1122,7 @@ function openMenu(anchor: HTMLElement, items: MenuItem[], pick: (command: string
     ...items.flatMap((item) => {
       const b = document.createElement("button");
       b.setAttribute("role", "menuitem");
+      if (item.danger) b.className = "danger";
       b.textContent = item.label;
       b.onclick = () => {
         closeMenu();
@@ -1161,114 +1167,244 @@ function openMenu(anchor: HTMLElement, items: MenuItem[], pick: (command: string
 let closeMenu: () => void = () => {};
 
 // ---------------------------------------------------------------------------------------------
-// Works: every work in the writing history. A work here opens with a click; the arrow beside a
-// work with its history on this computer lists its saves (click one to read it); ⋯ on a work offers
-// restoring, removing from this computer and deleting. The Filter narrows the list; ↻ syncs.
+// Works: every work in the writing history, under where it is (its file on this computer, only its
+// history, or only on the mirror). A click selects a work: it shows Open (or Restore) and More, and
+// its saves beneath (a click on one shows it). The Filter narrows the list; the sync button (with a
+// mirror) brings in works saved on other computers.
 
 interface WorkRow {
   i: number;
   title: string;
-  detail: string;
-  tip: string;
+  file: string;
+  /** Last save, milliseconds since 1970. */
+  at: number | null;
+  words: string;
   kind: "here" | "local" | "remote";
 }
 
 interface WorkSaveRow {
   j: number;
-  when: string;
-  detail: string;
-  tip: string;
+  at: number;
+  kind: string;
+  note: string;
+  delta: string;
+  words: string;
 }
+
+const WORK_SECTIONS: [WorkRow["kind"], string][] = [
+  ["here", "FILE ON THIS COMPUTER"],
+  ["local", "HISTORY ONLY"],
+  ["remote", "MIRROR ONLY"],
+];
+const OPEN_ICON = '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>';
+const RESTORE_ICON = '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 19h14"/>';
+const MORE_ICON = '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>';
 
 class WorksPanel {
   readonly #list = $("worklist");
   readonly #filter = $<HTMLInputElement>("workfilter");
+  readonly #sync = $<HTMLButtonElement>("workrefresh");
   #rows: WorkRow[] = [];
-  readonly #open = new Set<number>();
-  readonly #saves = new Map<number, WorkSaveRow[]>();
+  #selected: number | null = null;
+  #saves: WorkSaveRow[] | null = null;
 
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
-    $("workrefresh").onclick = () => deps.post({ type: "worksRefresh" });
+    this.#sync.onclick = () => deps.post({ type: "worksRefresh" });
+    const help = $("workhelp");
+    help.onclick = () => openHelp(help, WORKS_HELP);
+    this.#list.addEventListener("mousedown", (e) => {
+      if (!(e.target as HTMLElement).closest(".work-card")) this.deselect();
+    });
+    this.#list.addEventListener("keydown", (e) => {
+      const shown = this.#shown();
+      const at = shown.findIndex((w) => w.i === this.#selected);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const next = shown[Math.max(0, Math.min(shown.length - 1, at < 0 ? 0 : at + (e.key === "ArrowDown" ? 1 : -1)))];
+        if (next) this.#select(next.i, true);
+      } else if (e.key === "Escape" && this.#selected !== null) {
+        e.preventDefault();
+        this.deselect();
+      }
+    });
   }
 
-  show(rows: WorkRow[]): void {
+  show(rows: WorkRow[], mirror: { busy: boolean; at: number | null } | null): void {
+    // Works are matched by title and kind across refreshes (their order may change).
+    const was = this.#rows.find((w) => w.i === this.#selected);
     this.#rows = rows;
-    this.#saves.clear();
-    // Works open before stay open (their saves are asked for again).
-    for (const i of this.#open) {
-      if (rows[i]?.kind === "remote" || !rows[i]) this.#open.delete(i);
-      else this.deps.post({ type: "workSaves", i });
-    }
-    this.#render();
+    const again = was ? rows.find((w) => w.title === was.title && w.kind === was.kind) : undefined;
+    this.#selected = again?.i ?? null;
+    this.#saves = null;
+    if (again && again.kind !== "remote") this.deps.post({ type: "workSaves", i: again.i });
     const note = $("worknote");
     note.classList.remove("sb-loading");
     note.textContent = "No works yet: each document's writing history starts with its first save.";
     note.hidden = rows.length > 0;
-  }
-
-  saves(i: number, saves: WorkSaveRow[]): void {
-    this.#saves.set(i, saves);
+    this.#sync.hidden = !mirror;
+    this.#sync.classList.toggle("busy", !!mirror?.busy);
+    const tip = mirror?.busy ? "Syncing with the mirror…" : mirror?.at ? `Sync with the mirror (last synced ${shortWhen(new Date(mirror.at))})` : "Sync with the mirror";
+    this.#sync.dataset.tip = tip;
+    this.#sync.setAttribute("aria-label", tip);
     this.#render();
   }
 
-  #render(): void {
+  saves(i: number, saves: WorkSaveRow[]): void {
+    if (i !== this.#selected) return;
+    this.#saves = saves;
+    this.#render();
+  }
+
+  /** No work selected (on leaving the panel, Escape, or a click beside the works). */
+  deselect(): void {
+    if (this.#selected === null) return;
+    this.#selected = null;
+    this.#saves = null;
+    this.#render();
+  }
+
+  #select(i: number, scroll: boolean): void {
+    if (i === this.#selected) return;
+    this.#selected = i;
+    this.#saves = null;
+    if (this.#rows.find((w) => w.i === i)?.kind !== "remote") this.deps.post({ type: "workSaves", i });
+    this.#render();
+    if (scroll) this.#list.querySelector<HTMLElement>(".work-card.selected")?.scrollIntoView({ block: "nearest" });
+  }
+
+  /** The works the Filter lets through, in the order shown (by section). */
+  #shown(): WorkRow[] {
     const words = this.#filter.value.trim().toLowerCase();
+    const match = (w: WorkRow) => !words || `${w.title} ${w.file}`.toLowerCase().includes(words);
+    return WORK_SECTIONS.flatMap(([kind]) => this.#rows.filter((w) => w.kind === kind && match(w)));
+  }
+
+  #render(): void {
+    const shown = this.#shown();
     const out: HTMLElement[] = [];
-    for (const w of this.#rows) {
-      if (words && !`${w.title} ${w.detail}`.toLowerCase().includes(words)) continue;
-      const row = document.createElement("div");
-      row.className = `sb-row work work-${w.kind}`;
-      row.title = w.tip;
-      const main = document.createElement("div");
-      main.className = "sb-row-main";
-      const twist = document.createElement("span");
-      twist.className = "sb-twist";
-      twist.textContent = w.kind === "remote" ? "" : this.#open.has(w.i) ? "▾" : "▸";
-      twist.onclick = (e) => {
-        e.stopPropagation();
-        if (w.kind === "remote") return;
-        if (this.#open.has(w.i)) this.#open.delete(w.i);
-        else {
-          this.#open.add(w.i);
-          this.deps.post({ type: "workSaves", i: w.i });
-        }
-        this.#render();
-      };
-      const title = document.createElement("span");
-      title.className = "sb-row-title";
-      title.textContent = w.title;
-      main.append(twist, title);
-      const detail = document.createElement("div");
-      detail.className = "sb-row-detail";
-      detail.textContent = w.detail;
-      row.append(main, detail, button("More…", '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>', () => this.deps.post({ type: "workMenu", i: w.i }), "sb-row-tool"));
-      row.addEventListener("click", (e) => {
-        if ((e.target as HTMLElement).closest("button")) return;
-        if (w.kind === "here") this.deps.post({ type: "workOpen", i: w.i });
-        else this.deps.post({ type: "workMenu", i: w.i });
-      });
-      out.push(row);
-      if (this.#open.has(w.i)) {
-        for (const save of this.#saves.get(w.i) ?? []) {
-          const r = document.createElement("div");
-          r.className = "sb-row save";
-          r.title = save.tip;
-          const m = document.createElement("div");
-          m.className = "sb-row-main";
-          m.textContent = save.when;
-          const d = document.createElement("div");
-          d.className = "sb-row-detail";
-          d.textContent = save.detail;
-          r.append(m, d);
-          r.addEventListener("click", () => this.deps.post({ type: "workSave", i: w.i, j: save.j }));
-          out.push(r);
-        }
-      }
+    for (const [kind, heading] of WORK_SECTIONS) {
+      const works = shown.filter((w) => w.kind === kind);
+      if (!works.length) continue;
+      const h = document.createElement("div");
+      h.className = "sb-day";
+      h.textContent = heading;
+      out.push(h);
+      for (const w of works) out.push(this.#card(w));
     }
     this.#list.replaceChildren(...out);
   }
+
+  #card(w: WorkRow): HTMLElement {
+    const selected = w.i === this.#selected;
+    const card = document.createElement("div");
+    card.className = `sb-row work-card work-${w.kind}${selected ? " selected" : ""}`;
+    card.setAttribute("role", "option");
+    card.setAttribute("aria-selected", String(selected));
+    const main = document.createElement("div");
+    main.className = "sb-row-main";
+    const title = document.createElement("span");
+    title.className = "sb-row-title";
+    title.textContent = w.title;
+    main.append(title);
+    card.append(main);
+    // The file's name, then when it was last saved and how long it is.
+    for (const line of [w.file, [w.at ? `Saved ${shortWhen(new Date(w.at))}` : "", w.words ? `${w.words} words` : ""].filter(Boolean).join(" · ")]) {
+      if (!line) continue;
+      const detail = document.createElement("div");
+      detail.className = "sb-row-detail";
+      detail.textContent = line;
+      card.append(detail);
+    }
+    const tools = document.createElement("div");
+    tools.className = "sb-row-tools";
+    const action = (name: string) => this.deps.post({ type: "workAction", i: w.i, action: name });
+    tools.append(
+      w.kind === "here" ? button("Open", OPEN_ICON, () => action("open")) : button("Restore…", RESTORE_ICON, () => action("restore")),
+    );
+    const menu: MenuItem[] = [
+      ...(w.kind !== "remote" ? [{ label: "Remove from This Computer…", command: "remove" }] : []),
+      { label: "Delete Writing History…", command: "delete", danger: true },
+    ];
+    const more = button("More", MORE_ICON, () => openMenu(more, menu, action));
+    tools.append(more);
+    card.append(tools);
+    if (selected) card.append(this.#savesOf(w));
+    card.addEventListener("mousedown", (e) => {
+      if ((e.target as HTMLElement).closest("button, .work-saves")) return;
+      this.#select(w.i, false);
+    });
+    return card;
+  }
+
+  /** A selected work's saves: newest first; a click shows one (beside the file, when it is here). */
+  #savesOf(w: WorkRow): HTMLElement {
+    const box = document.createElement("div");
+    box.className = "work-saves";
+    const note = (text: string) => {
+      const n = document.createElement("div");
+      n.className = "sb-row-detail";
+      n.textContent = text;
+      box.append(n);
+    };
+    if (w.kind === "remote") note("Its saves are on the mirror. Restore it to see them.");
+    else if (!this.#saves) note("Loading saves…");
+    else if (!this.#saves.length) note("No saves.");
+    for (const save of this.#saves ?? []) {
+      const date = new Date(save.at);
+      const row = document.createElement("div");
+      row.className = "work-save";
+      row.dataset.tip = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.note ? `\n${save.note}` : ""}${save.words ? `\n${save.words} words` : ""}\nClick to see this save${w.kind === "here" ? " beside the file as it is now" : ""}.`;
+      const when = document.createElement("span");
+      when.className = "when";
+      when.textContent = shortWhen(date);
+      const kind = document.createElement("span");
+      kind.className = "kind";
+      kind.textContent = save.kind;
+      const delta = document.createElement("span");
+      delta.className = "hist-delta";
+      delta.textContent = save.delta;
+      row.append(when, kind, delta);
+      row.addEventListener("click", () => this.deps.post({ type: "workSave", i: w.i, j: save.j }));
+      box.append(row);
+    }
+    return box;
+  }
 }
+
+/** The Works panel's ? button. */
+const WORKS_HELP = `
+<h2>Works</h2>
+<p>Every document with a writing history is a work. This panel lists them all, including works saved on your other computers if you use a history mirror.</p>
+
+<h3>The list</h3>
+<p>Works are grouped by where they are:</p>
+<ul>
+<li><b>File on this computer</b>: the work’s file is where it was last saved.</li>
+<li><b>History only</b>: the history is on this computer, but the file isn’t where it was last saved. It may have been moved, renamed or deleted.</li>
+<li><b>Mirror only</b>: the work was saved on another computer, and its history is on the mirror.</li>
+</ul>
+<p>Each shows its file name, when it was last saved, and its word count.</p>
+
+<h3>A work</h3>
+<p>Click a work to see its saves, then:</p>
+<ul>
+<li>${icon(OPEN_ICON)} <b>Open</b> opens the work’s file.</li>
+<li>${icon(RESTORE_ICON)} <b>Restore</b> asks where to save the work, then writes its latest save there. Its history carries on from that file.</li>
+<li>Click a save to see it. If the work’s file is on this computer, the save is shown beside the file with the changes marked.</li>
+<li>${icon(MORE_ICON)} <b>More</b>:
+<ul>
+<li><b>Remove from This Computer</b>: removes the work’s history from this computer. It stays on the mirror, so you can restore it later. You need a mirror to do this.</li>
+<li><b>Delete Writing History</b>: deletes the work’s history for good. With a mirror, you choose whether to delete it everywhere or only on this computer. The file itself is never deleted.</li>
+</ul></li>
+</ul>
+
+<h3>The bottom of the panel</h3>
+<ul>
+<li><b>Filter</b> shows only the works whose name contains what you type.</li>
+<li><b>Sync</b> (with a mirror) checks the mirror for works saved on your other computers.</li>
+</ul>
+`;
 
 /**
  * What follows the pointer while a card is dragged: as in Highland, a small, nearly invisible
