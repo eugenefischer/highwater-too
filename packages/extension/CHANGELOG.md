@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.29
+
+- Fixed: a stray text cursor could stay drawn over the Highwater Editor, fixed in the window whatever you scrolled or switched to. It was the drop caret shown while dragging a Bin card or an image over the text, left behind when the drag was cancelled over the text (Escape): only the text listened for the drag ending, and a drag from the sidebar ends at the sidebar. Any end of a drag anywhere in the page now hides it, as does the pointer moving with no drag under way. Reloading the window clears one left by an earlier version.
+
 ## 0.6.28
 
 - Opening a .highland file (from the Explorer, Finder, Open Recent or a command) goes straight into the Highwater Editor; it no longer shows as text for a moment first. Its script was opened before VS Code had given it its language, so it was taken for plain text.

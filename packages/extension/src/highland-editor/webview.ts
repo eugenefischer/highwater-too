@@ -155,6 +155,13 @@ function showDropCaret(v: EditorView, at: number): void {
 function hideDropCaret(): void {
   if (dropCaret) dropCaret.hidden = true;
 }
+// The caret is the page's, not the text's: a drag from the sidebar ends at its card (dragend goes
+// there, not to the text), and one let go or cancelled outside the text may send the text no
+// dragleave or drop. Any end of a drag anywhere in the page hides it, and so does the pointer
+// moving with no drag under way (mousemove doesn't fire during a drag).
+for (const type of ["dragend", "drop"]) document.addEventListener(type, hideDropCaret, true);
+document.addEventListener("mousemove", () => dropCaret && !dropCaret.hidden && hideDropCaret(), true);
+window.addEventListener("blur", hideDropCaret);
 /** The text being dragged out of the page, while the drag lasts. */
 let dragged: { from: number; to: number; text: string } | null = null;
 const spelling = new Spelling(
