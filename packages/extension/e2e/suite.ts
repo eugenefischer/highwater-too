@@ -612,7 +612,14 @@ const tests: [string, () => Promise<void>][] = [
       const end = Date.now() + 10_000;
       let now: Surface = { view: false };
       while (!((now = await vscode.commands.executeCommand<Surface>("highwater.test.surface")).view && now.selection?.head === want)) {
-        if (Date.now() > end) throw new Error(`The Highland-Style Editor did not keep the line: ${JSON.stringify(now)} (wanted ${want})`);
+        if (Date.now() > end) {
+          // Which tabs there were, to tell a slow swap from a lost one (it failed once on macOS).
+          const tabs = vscode.window.tabGroups.all.map((g) => ({
+            active: g.isActive,
+            tabs: g.tabs.map((t) => ({ label: t.label, active: t.isActive, kind: t.input instanceof vscode.TabInputCustom ? `custom:${t.input.viewType}` : t.input instanceof vscode.TabInputText ? "text" : typeof t.input })),
+          }));
+          throw new Error(`The Highland-Style Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}`);
+        }
         await new Promise((r) => setTimeout(r, 100));
       }
       void doc;

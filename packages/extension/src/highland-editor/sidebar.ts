@@ -116,7 +116,7 @@ export class Sidebar {
     else if (msg.type === "bin") this.#bin.show(msg.items as BinCard[], !!msg.available);
     else if (msg.type === "assets") this.#assets.show(msg.items as AssetCard[], !!msg.available);
     else if (msg.type === "history") this.#history.show(msg as unknown as HistoryMessage);
-    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[], (msg.mirror as { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null) ?? null);
+    else if (msg.type === "works") this.#works.show(msg.items as WorkRow[], (msg.mirror as { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null) ?? null, typeof msg.computer === "string" ? msg.computer : "");
     else if (msg.type === "workSaves") this.#works.saves(msg.i as number, msg.saves as WorkSaveRow[]);
     else if (msg.type === "showPanel" && PANELS.includes(msg.panel as PanelName)) this.show(msg.panel as PanelName);
     else if (msg.type === "toggleSidebar") this.toggle();
@@ -167,6 +167,21 @@ export class Sidebar {
 // own text. Click to go there; drag a scene or section to move it (the move is an ordinary edit,
 // so ⌘Z takes it back); filter by words at the foot, or choose what it lists with the eye.
 
+/** The eye popover's kinds, in Highland's order, with its names and marks. */
+const navSvg = (path: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+const NAV_KINDS: [keyof NavigatorFilters, string, string][] = [
+  ["sectionHeaders", "Sections", "<b>#</b>"],
+  ["synopses", "Synopses", "<b>=</b>"],
+  ["sceneHeaders", "Scene Headers", "<b>I/E</b>"],
+  ["notes", "Notes", "<b>[[ ]]</b>"],
+  ["includedFiles", "Included files", navSvg('<path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5z"/><path d="M14 3v4.5h4.5"/>')],
+  ["images", "Images", navSvg('<rect x="3" y="5" width="18" height="14" rx="1.5"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>')],
+  ["links", "Inline links", navSvg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>')],
+  ["referenceLinks", "Reference links", navSvg('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3" fill="currentColor"/>')],
+  ["markers", "Markers", navSvg('<path d="M7 3h10v18l-5-4-5 4z" fill="currentColor"/>')],
+];
+let closeNavPop: () => void = () => {};
+
 class NavigatorPanel {
   #rows: NavigatorRow[] = [];
   #current = -1;
@@ -185,7 +200,8 @@ class NavigatorPanel {
 
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
-    $("navtypes").onclick = () => deps.post({ type: "navTypes" });
+    const eye = $("navtypes");
+    eye.onclick = () => this.#chooseTypes(eye);
     this.#list.addEventListener("click", (e) => {
       if (this.#justDragged) return;
       const el = (e.target as HTMLElement).closest<HTMLElement>(".row");
@@ -199,6 +215,75 @@ class NavigatorPanel {
   filters(json: string | undefined, chosen: NavigatorFilters | undefined): void {
     this.#filters = chosen ? { ...parseFilters(undefined), ...chosen } : parseFilters(json);
     this.#list_();
+  }
+
+  /**
+   * Highland's eye popover above the eye button: a checkbox for each kind of item, with Hide All
+   * and Show All. Each change applies at once and is kept for the document.
+   */
+  #chooseTypes(eye: HTMLElement): void {
+    const pop = $("navpop");
+    if (!pop.hidden) return closeNavPop();
+    const set = (next: NavigatorFilters) => {
+      this.#filters = next;
+      this.#list_();
+      this.deps.post({ type: "navFiltersSet", filters: next });
+      for (const box of pop.querySelectorAll<HTMLInputElement>("input[data-type]")) box.checked = next[box.dataset.type as keyof NavigatorFilters];
+    };
+    const rows = NAV_KINDS.map(([type, label, glyph]) => {
+      const row = document.createElement("label");
+      row.className = "navpop-row";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.dataset.type = type;
+      box.checked = this.#filters[type];
+      box.onchange = () => set({ ...this.#filters, [type]: box.checked });
+      const icon = document.createElement("span");
+      icon.className = "navpop-icon";
+      icon.innerHTML = glyph;
+      row.append(box, icon, label);
+      return row;
+    });
+    const all = (on: boolean) => set(Object.fromEntries(NAV_KINDS.map(([t]) => [t, on])) as NavigatorFilters);
+    const buttons = document.createElement("div");
+    buttons.className = "navpop-buttons";
+    const hide = document.createElement("button");
+    hide.textContent = "Hide All";
+    hide.onclick = () => all(false);
+    const show = document.createElement("button");
+    show.textContent = "Show All";
+    show.onclick = () => all(true);
+    buttons.append(hide, show);
+    pop.replaceChildren(...rows, buttons);
+    pop.hidden = false;
+    // Above the eye, its arrow pointing down at it, inside the window.
+    const r = eye.getBoundingClientRect();
+    const w = pop.offsetWidth;
+    const left = Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2));
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(Math.max(6, r.top - pop.offsetHeight - 12))}px`;
+    pop.style.setProperty("--arrow", `${Math.round(r.left + r.width / 2 - left)}px`);
+    pop.querySelector<HTMLElement>("input")?.focus();
+    const away = (e: MouseEvent) => {
+      if (!pop.contains(e.target as Node) && !eye.contains(e.target as Node)) closeNavPop();
+    };
+    const keys = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeNavPop();
+        eye.focus();
+      }
+    };
+    document.addEventListener("mousedown", away, true);
+    pop.addEventListener("keydown", keys);
+    window.addEventListener("blur", closeNavPop);
+    closeNavPop = () => {
+      pop.hidden = true;
+      document.removeEventListener("mousedown", away, true);
+      pop.removeEventListener("keydown", keys);
+      window.removeEventListener("blur", closeNavPop);
+      closeNavPop = () => {};
+    };
   }
 
   textChanged(): void {
@@ -1236,7 +1321,9 @@ class WorksPanel {
     });
   }
 
-  show(rows: WorkRow[], mirror: { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null): void {
+  show(rows: WorkRow[], mirror: { busy: boolean; at: number | null; error: string | null; signIn: boolean } | null, computer: string): void {
+    // This computer's name: what saves made here are called on other computers ("on …").
+    $("workcomputer").textContent = computer ? `This computer: ${computer}` : "";
     // Works are matched by title and kind across refreshes (their order may change).
     const was = this.#rows.find((w) => w.i === this.#selected);
     this.#rows = rows;

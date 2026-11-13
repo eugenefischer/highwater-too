@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.25
+
+- The Navigator's eye opens Highland 2's popover above it, in the page (it used to open a VS Code list at the top of the window): a checkbox for each kind of item (Sections, Synopses, Scene Headers, Notes, Included files, Images, Inline links, Reference links, Markers, with Highland's marks), and Hide All and Show All. Each change shows at once and is kept for the document. Escape or a click elsewhere closes it.
+- Works: the top line names this computer ("This computer: …"), the name other computers' histories give saves made here.
+- VS Code's own Navigator view no longer sets its title while hidden (the Highland-Style Editor in front), which VS Code reported as "unknown webview view".
+- Tests: the Search-result end-to-end test reports the open tabs if it fails again (it failed once on macOS, with the Highland-Style Editor not yet in front).
+
 ## 0.6.24
 
 - Works: the ? button is back at the top right, as in the Writing History.

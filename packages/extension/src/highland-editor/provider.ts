@@ -435,6 +435,16 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 #workrefresh.busy svg { animation: sb-spin 0.9s linear infinite; }
 #sbmenu button.danger { color: var(--vscode-errorForeground, #f48771); }
 #sbmenu button.danger:hover, #sbmenu button.danger:focus { background: var(--vscode-errorForeground, #f48771); color: var(--hl-bg); }
+/* Highland's eye popover for the Navigator: what it lists, above the eye button. */
+#navpop { position: fixed; z-index: 45; padding: 10px 12px 10px; background: var(--hl-bg); color: var(--nav-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); font-family: var(--vscode-font-family); font-size: 13px; }
+#navpop[hidden] { display: none; }
+#navpop::after { content: ""; position: absolute; bottom: -7px; left: calc(var(--arrow, 50%) - 6px); width: 12px; height: 12px; background: var(--hl-bg); border-right: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); transform: rotate(45deg); }
+.navpop-row { display: flex; align-items: center; gap: 9px; padding: 4px 2px; cursor: default; white-space: nowrap; }
+.navpop-row input { margin: 0; accent-color: var(--nav-accent); }
+.navpop-icon { width: 30px; display: inline-flex; justify-content: center; color: var(--nav-fg); font-size: 0.92em; }
+.navpop-buttons { display: flex; gap: 8px; margin-top: 8px; }
+.navpop-buttons button { flex: 1; font: inherit; padding: 3px 10px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--nav-fg) 12%, transparent); color: var(--nav-fg); cursor: default; }
+.navpop-buttons button:hover { background: color-mix(in srgb, var(--nav-fg) 20%, transparent); }
 /* The sidebar's menus (the Writing History's gear): a small popup above the button. */
 #sbmenu { position: fixed; z-index: 45; min-width: 200px; max-width: calc(var(--sb-width) + 120px); padding: 4px; background: var(--hl-bg); color: var(--nav-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-family: var(--vscode-font-family); font-size: 13px; }
 #sbmenu[hidden] { display: none; }
@@ -636,7 +646,7 @@ body.previewing #preview { display: flex; }
       </div>
     </section>
     <section data-panel="works" hidden>
-      <div class="sb-head sb-head-help"><span></span><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
+      <div class="sb-head sb-head-help"><span id="workcomputer"></span><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
       <div class="sb-scroll" id="workscroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
       <div id="workstatus" hidden></div>
       <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
@@ -645,6 +655,7 @@ body.previewing #preview { display: flex; }
   <div id="sbgrip" aria-hidden="true"></div>
 </div>
 <div id="sbmenu" role="menu" hidden></div>
+<div id="navpop" role="dialog" aria-label="Show in the Navigator" hidden></div>
 <div id="sbhelp" role="dialog" aria-label="Help" tabindex="-1" hidden><div id="sbhelptext"></div></div>
 <div id="binpop" role="dialog" aria-label="Bin item" hidden><textarea id="binpoptext" spellcheck="false" aria-label="Bin item text"></textarea></div>
 <div id="content">

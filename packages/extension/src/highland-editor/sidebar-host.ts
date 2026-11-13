@@ -6,8 +6,8 @@
 import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import * as vscode from "vscode";
-import { pick } from "../ask.ts";
 import { parseSave } from "../save-message.ts";
+import { computerName } from "@highwater/history";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
 import { extrasApi, type AssetItem, type Owner } from "../panels.ts";
@@ -15,7 +15,7 @@ import { historyApi } from "../history.ts";
 import type { WorkNode } from "../works.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
-import { NAVIGATOR_LABELS, NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
+import { NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
 
 const STATE_KEY = "highwater.sidebar";
 
@@ -152,15 +152,12 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     const json = !chosen && b ? (await store().snapshot(b).catch(() => null))?.getText("navigatorFilters.json") : undefined;
     post({ type: "navFilters", json, filters: chosen });
   };
-  const chooseFilters = async () => {
-    await sendFilters();
-    const current = context.workspaceState.get<NavigatorFilters>(filtersKey());
-    const picks = NAVIGATOR_TYPES.map((t) => ({ label: NAVIGATOR_LABELS[t], type: t, picked: current ? current[t] : true }));
-    const chosen = await pick(picks, { canPickMany: true, title: "Show in the Navigator" });
-    if (!chosen) return;
-    await context.workspaceState.update(filtersKey(), Object.fromEntries(NAVIGATOR_TYPES.map((t) => [t, chosen.some((c) => c.type === t)])));
+  /** The Navigator's eye popover changed what it lists: kept for this document (as before, in the workspace). */
+  const setFilters = async (filters: NavigatorFilters) => {
+    await context.workspaceState.update(filtersKey(), Object.fromEntries(NAVIGATOR_TYPES.map((t) => [t, filters[t] !== false])));
     await sendFilters();
   };
+
 
   // Writing History: this document's saves, newest first, with the state of its recording and the
   // mirror for the panel's foot, and the actions for its gear menu.
@@ -214,7 +211,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote", "").trim();
     const m = historyApi?.mirror();
     const mirror = remote && m ? { busy: m.busy, at: m.at?.getTime() ?? null, error: m.error, signIn: m.signIn } : null;
-    if (!historyApi) return post({ type: "works", items: [], mirror });
+    if (!historyApi) return post({ type: "works", items: [], mirror, computer: computerName() });
     workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
     saveNodes.clear();
     const items = workNodes.map((n, i) => {
@@ -229,7 +226,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         kind: n.here ? "here" : w.local ? "local" : "remote",
       };
     });
-    post({ type: "works", items, mirror });
+    post({ type: "works", items, mirror, computer: computerName() });
   };
   const sendWorkSaves = async (i: number) => {
     const node = workNodes[i];
@@ -299,7 +296,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       } else if (msg.type === "scratchpadExport" && typeof msg.text === "string") {
         // Highland: "Export Scratchpad contents to a new document": an untitled one in the same language.
         void vscode.workspace.openTextDocument({ content: msg.text, language: document().languageId }).then((d) => vscode.window.showTextDocument(d, { preview: false }));
-      } else if (msg.type === "navTypes") void chooseFilters();
+      } else if (msg.type === "navFiltersSet" && msg.filters && typeof msg.filters === "object") void setFilters(msg.filters as NavigatorFilters);
       else if (msg.type === "binAdd" && typeof msg.text === "string") {
         const text = msg.text;
         binTask((o) => extrasApi!.bin.add(text, o));

@@ -68,7 +68,8 @@ export class NavigatorPane implements vscode.WebviewViewProvider {
   #post(): void {
     const view = this.#view;
     if (!view || !this.#ready) return;
-    view.description = this.focused.key ? (this.focused.label.split(/[\\/]/).pop() ?? "") : "";
+    // Not while hidden (as it is with the Highland-Style Editor in front): VS Code no longer knows it then.
+    if (view.visible) view.description = this.focused.key ? (this.focused.label.split(/[\\/]/).pop() ?? "") : "";
     const doc = this.focused.script;
     if (!doc) {
       this.#rows = [];
