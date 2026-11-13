@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.21
+
+- When sending saves to the mirror failed (offline, say), they are sent again as soon as the mirror next answers a check, instead of waiting for the ten-minute retry or the next save.
+
 ## 0.6.20
 
 - Scroll bars in the Highland-Style Editor (the sidebar's panels, the text, the pages, the help and template windows) no longer sit in a band of their own colour: their track is transparent, so it is the colour of whatever is behind it, in every theme.

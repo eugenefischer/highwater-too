@@ -90,8 +90,12 @@ export class HistoryMirror implements vscode.Disposable {
     if (result.ok) {
       // In touch with the mirror: when, for the Writing History panel (a push still failing keeps
       // its error, since this computer's saves have not reached it).
+      const unsent = this.state.error !== null;
       this.state = { at: new Date(), error: this.state.error, signIn: false };
       this.#changed.fire();
+      // A send failed earlier (offline, say) and the mirror answers again: send now, not at the
+      // next retry or save (EJ).
+      if (unsent) this.schedule(0);
       if (result.removed.length) this.#removed.fire(result.removed);
       return result.updated;
     }
