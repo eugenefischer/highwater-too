@@ -3,12 +3,12 @@ import { MODES, type ParseCache } from "./language.ts";
 import { countWords, documentStats } from "./syntax/stats.ts";
 import { onDidChangePageCount, pageCountOf } from "./page-count.ts";
 import { activeDocument, activeSelections, onDidChangeActiveSurface, onDidChangeViewSelection } from "./surface.ts";
+import { debounce } from "./debounce.ts";
 
 /** Word count, the exact page count (once laid out) and reading or screen time, like Highland's stats line. */
 export function registerStatusBar(context: vscode.ExtensionContext, cache: ParseCache): void {
   const item = vscode.window.createStatusBarItem("highwater.stats", vscode.StatusBarAlignment.Right, 100);
   item.name = "Highwater Too: document stats";
-  let timer: NodeJS.Timeout | undefined;
 
   const update = (): void => {
     const active = activeSelections();
@@ -31,14 +31,11 @@ export function registerStatusBar(context: vscode.ExtensionContext, cache: Parse
     item.tooltip = [`${n(stats.words)} words`, pages, time].filter(Boolean).join("\n");
     item.show();
   };
-  const later = (): void => {
-    clearTimeout(timer);
-    timer = setTimeout(update, 300);
-  };
+  const later = debounce(300, update);
 
   context.subscriptions.push(
     item,
-    { dispose: () => clearTimeout(timer) },
+    { dispose: () => later.cancel() },
     onDidChangeActiveSurface(later),
     vscode.window.onDidChangeTextEditorSelection(later),
     onDidChangeViewSelection(later),

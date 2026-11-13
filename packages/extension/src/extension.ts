@@ -17,10 +17,11 @@ import { registerAsk } from "./ask.ts";
 import { registerWorkspaceTools } from "./workspace-tools.ts";
 import { registerWritingTools } from "./writing-tools.ts";
 import { registerStatusBar } from "./status.ts";
-import { pageCountOf, registerPageCounts } from "./page-count.ts";
+import { registerPageCounts } from "./page-count.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
-import { registerHighlandEditor, swapLog } from "./highland-editor/provider.ts";
-import { activeDocument, activeView, registerSurface } from "./surface.ts";
+import { registerHighlandEditor } from "./highland-editor/provider.ts";
+import { registerSurface } from "./surface.ts";
+import { registerTestCommands } from "./test-support.ts";
 
 /** VS Code glue only; all format, parsing and layout logic lives in the other packages. */
 export function activate(context: vscode.ExtensionContext): void {
@@ -34,17 +35,8 @@ export function activate(context: vscode.ExtensionContext): void {
   startPlainExtras(context, { history: currentHistory, historyRoot });
   // The document the panes show.
   focusedDocument(context);
-  if (context.extensionMode === vscode.ExtensionMode.Test) {
-    context.subscriptions.push(
-      // What the panes follow, for the end-to-end tests of the Highwater Editor.
-      vscode.commands.registerCommand("highwater.test.surface", () => {
-        const view = activeView();
-        return { document: activeDocument()?.uri.toString(), view: !!view, ready: view?.ready, pagesSent: view?.pagesSent, selection: view?.selections[0], focused: focusedDocument().key, focusedText: focusedDocument().script?.getText(), pageCount: (() => { const d = activeDocument(); return d ? pageCountOf(d) : undefined; })() };
-      }),
-      vscode.commands.registerCommand("highwater.test.revealInView", (offset: number) => activeView()?.reveal(offset, "center", true)),
-      vscode.commands.registerCommand("highwater.test.swapLog", () => swapLog.splice(0)),
-    );
-  }
+  // Commands only the end-to-end tests use.
+  registerTestCommands(context);
   const fs = new HighlandFileSystem(store);
 
   // Watch every open Highland document's file (VS Code may also ask the provider to watch).

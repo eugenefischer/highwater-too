@@ -17,6 +17,7 @@ import { postTo, type FromPage, type PanelName, type ToPage } from "./messages.t
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
 import { activeOffsets, activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
+import { debounce } from "../debounce.ts";
 
 export { HIGHLAND_EDITOR };
 
@@ -120,14 +121,10 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       postTo(panel, { type: "template", template: template ?? "", templates: template ? TEMPLATES : [] });
     };
     // Highland's counts at the foot of the text: characters, words and pages (the print layout's, page-count.ts).
-    let countsTimer: ReturnType<typeof setTimeout> | undefined;
-    const sendCounts = () => {
-      clearTimeout(countsTimer);
-      countsTimer = setTimeout(() => {
-        const stats = documentStats(parse(document.getText(), { mode: MODES.get(document.languageId) ?? "fountain" }));
-        postTo(panel, { type: "counts", characters: stats.characters, words: stats.words, pages: pageCountOf(document) ?? null });
-      }, 300);
-    };
+    const sendCounts = debounce(300, () => {
+      const stats = documentStats(parse(document.getText(), { mode: MODES.get(document.languageId) ?? "fountain" }));
+      postTo(panel, { type: "counts", characters: stats.characters, words: stats.words, pages: pageCountOf(document) ?? null });
+    });
     // Check Spelling While Typing (highwater.spellCheck) and the learned words.
     const sendSpelling = () => {
       const config = vscode.workspace.getConfiguration("highwater");
@@ -261,7 +258,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     ];
     panel.onDidDispose(() => {
       log(`panel disposed ${document.uri.path.split("/").pop()}`);
-      clearTimeout(countsTimer);
+      sendCounts.cancel();
       subscriptions.forEach((s) => s.dispose());
     });
   }

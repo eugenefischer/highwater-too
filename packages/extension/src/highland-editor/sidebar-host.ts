@@ -17,6 +17,7 @@ import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
 import type { FromPage, ToPage, WorkRow, WorkSaveRow } from "./messages.ts";
 import { NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
+import { debounce } from "../debounce.ts";
 
 const STATE_KEY = "highwater.sidebar";
 
@@ -249,14 +250,10 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     else if (action === "remove") await w.remove(node);
     else if (action === "delete") await w.delete(node);
   };
-  let historyTimer: ReturnType<typeof setTimeout> | undefined;
-  const historyChanged = () => {
-    clearTimeout(historyTimer);
-    historyTimer = setTimeout(() => {
-      void sendHistory();
-      void sendWorks();
-    }, 200);
-  };
+  const historyChanged = debounce(200, () => {
+    void sendHistory();
+    void sendWorks();
+  });
   let historyWatch: vscode.Disposable | undefined;
 
   const subscriptions: vscode.Disposable[] = [

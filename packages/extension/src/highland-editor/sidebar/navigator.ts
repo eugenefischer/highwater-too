@@ -1,5 +1,6 @@
 import { blockAt, currentRow, moveBlock, navigatorItems, navigatorRows, parseFilters, type NavigatorFilters, type NavigatorRow } from "../../syntax/navigator.ts";
 import { $, type SidebarDeps } from "./ui.ts";
+import { debounce } from "../../debounce.ts";
 
 // ---------------------------------------------------------------------------------------------
 // The Navigator: the document's scenes, sections and the rest, worked out here from the page's
@@ -25,7 +26,7 @@ export class NavigatorPanel {
   #rows: NavigatorRow[] = [];
   #current = -1;
   #filters: NavigatorFilters = parseFilters(undefined);
-  #timer: ReturnType<typeof setTimeout> | undefined;
+  readonly #relist = debounce(150, () => this.#list_());
   readonly #list = $("navlist");
   readonly #empty = $("navempty");
   readonly #filter = $<HTMLInputElement>("navfilter");
@@ -126,8 +127,7 @@ export class NavigatorPanel {
   }
 
   textChanged(): void {
-    clearTimeout(this.#timer);
-    this.#timer = setTimeout(() => this.#list_(), 150);
+    this.#relist();
   }
 
   cursorMoved(): void {

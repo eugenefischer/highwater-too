@@ -13,6 +13,7 @@ import { focusedDocument, roleOf, type FocusedDocument } from "./focus.ts";
 import { LANGUAGES } from "./language.ts";
 import { activeColumn, activeDocument, activeSelections, activeView, insertAtSelection, onDidChangeActiveSurface, revealOffset, viewOf } from "./surface.ts";
 import { postTo } from "./highland-editor/messages.ts";
+import { debounce } from "./debounce.ts";
 
 /**
  * The Highland sidebar (M6): Navigator, Bin and Assets as tree views in a "Highwater Too" view
@@ -23,6 +24,7 @@ import { postTo } from "./highland-editor/messages.ts";
 export function registerPanels(context: vscode.ExtensionContext, store: BundleStore, fs: HighlandFileSystem, cache: ParseCache): void {
   const current = focusedDocument(context);
   const navigator = new NavigatorPane(context, store, cache, current);
+  const refreshNavigator = debounce(250, () => navigator.refresh());
   const bin = new BinView(store, fs, current);
   const assets = new AssetsView(store, current);
   extrasApi = { bin, assets };
@@ -40,7 +42,6 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
   current.onDidChange(refreshAll);
   const extras = plainExtras();
 
-  let timer: NodeJS.Timeout | undefined;
   /** Scripts the sidebar has been shown for since they were opened. */
   const shown = new Set<string>();
   context.subscriptions.push(
@@ -50,8 +51,7 @@ export function registerPanels(context: vscode.ExtensionContext, store: BundleSt
     onDidChangeActiveSurface(() => void showSidebar()),
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document !== current.script) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => navigator.refresh(), 250);
+      refreshNavigator();
     }),
     vscode.workspace.onDidCloseTextDocument((d) => shown.delete(d.uri.toString())),
     { dispose: store.onExternalChange((path) => (path === current.bundle ? refreshAll() : undefined)) },
