@@ -1,69 +1,139 @@
 # Highwater Too
 
-A VS Code extension that replaces the discontinued Highland 2: it opens, edits and saves `.highland` files safely, gives screenplays and manuscripts a Highland-style workspace, exports PDFs that match Highland's, and keeps a git writing history as a record of authorship.
+**Write screenplays and manuscripts in VS Code, in the `.highland` files of Highland 2.**
 
-**Status:** version 0.6.33 (M16: Highland's sidebar inside the Highwater Editor) (with M15: the Highwater Editor is the default): the MVP (M0–M8) and M9 are built, with Bin, Scratchpad and Assets for plain files, conversion between `.highland` and plain files, and the second version of the writing history (a catalog of works, fetching on demand, recognising files, the Works panel, reverting, removing and deleting, offering newer saves from other computers, and connecting a file to a work by hand). M10 (more templates) built: all fourteen of Highland 2's templates, the scripts and Plain Text line for line, the eight prose templates line for line with Highland's fonts installed, every print option checked against Highland, and Highland's Document Template window with its font options. In real-world testing. See the spec for decisions and the build plan.
+[![CI](https://github.com/eugenefischer/highwater-too/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenefischer/highwater-too/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-## Plain .fountain, .md and .txt files
+<!-- Screenshot: a screenplay open in the Highwater Editor, sidebar on the Navigator, a mid-script scene in view. Dark theme, window about 1600×1000. -->
+![A screenplay in the Highwater Editor, with the Navigator in the sidebar](docs/images/hero.png)
 
-`.highland` files always open with Highwater Too, and `.fountain` files open as **Highwater Fountain**. Other plain files keep their usual language unless you choose otherwise:
+Highland 2 is no longer developed. Highwater Too picks up where it left off. It opens your existing `.highland` files, gives them a writing space that looks and works like Highland's, prints PDFs laid out the way Highland lays them out, and saves the files so that Highland 2 can still open them. It also adds something Highland never had: a writing history that records every save.
 
-- **One file:** click the language name in the status bar (for example "Markdown") and choose **Highwater Fountain**, **Highwater Markdown** or **Highwater Plain Text**. VS Code remembers the choice for that file.
-- **Every .md file:** run **Highwater Too: Open .md Files with Highwater Too…** and choose everywhere or this workspace (it sets `files.associations`). **Open .md Files as Ordinary Markdown Again** undoes it. VS Code's own Markdown preview and Markdown extensions do not apply to files opened this way, and Highland's Markdown dialect differs from standard Markdown in places (every line is a paragraph, `===` is a page break).
+## Highlights
 
-Plain files get the Navigator, preview, PDF export, Live Margins, the Title Page Builder and the writing history, and the Bin, Scratchpad and Assets too. A plain file can't hold a Bin or Scratchpad, so those are kept with the writing history rather than in the file (only Highwater Too shows them, and a one-time warning says so), and images go in a `<name> assets` folder beside the file, made when the first one is added. **Convert to .highland File…** gathers them all into one `.highland` file, and **Convert to .fountain / .md / .txt File…** goes back; the writing history, Bin, Scratchpad and images move with the work either way. Exports (Export Text) are always separate files outside the history.
+- **Your files, safe.** Every part of a `.highland` file is kept when you save: the text, Bin, Scratchpad, images and settings. Every real Highland file we have tested comes back byte for byte.
+- **A page, not a code editor.** The Highwater Editor shows your script in a page-width column of Courier Prime, with dialogue indented on every line, wrapped lines too. It has Highland's top bar, sidebar, themes and shortcuts.
+- **PDFs that match Highland's.** All fourteen of Highland 2's templates. The screenplay templates print line for line with Highland's own PDFs, and so do the prose templates when Highland's fonts are installed.
+- **A record of how you wrote it.** Every save is kept in a git repository on your computer. You can compare any save with your text now, go back to it, and keep the history in step across computers through any git server.
+- **Plain files too.** `.fountain`, `.md` and `.txt` files get the same editor, preview and history.
 
-## Writing history (new; Highland 2 had nothing like it)
+## Is it for you?
 
-Every save is recorded in a git repository, as a record of how each work was written. It is on by default and needs nothing set up beyond git itself (on a Mac, the Xcode command-line tools).
+Highwater Too is for writers who used Highland 2, or who want to work the way it worked, and are happy to write inside VS Code.
 
-- **What a save holds:** exactly what is inside the `.highland` file, unpacked (zipped, a save is that file): the text (revision marks included), `bin/`, `scratchpad.txt`, `info.json`, `assets/` and the rest. A work kept as a plain `.fountain`, `.md` or `.txt` file has the same files as far as it has them; its Bin and Scratchpad are kept by Highwater Too, not in the file. Each commit names the work's ID, the kind of file it was kept in and the file's name.
-- **When:** each ⌘S at once; autosaves at most every five minutes, and once more when the document closes. Each commit says when it was made and how many words it added or removed (Save, Autosave, Close, or Convert, Revert and Restore for those actions). A failed commit never blocks a save.
-- **Where:** one repository for all your writing, in your system's folder for application data (`~/Library/Application Support/Highwater Too/History` on a Mac, `~/.local/share/highwater-too/history` on Linux, `%LOCALAPPDATA%\Highwater Too\History` on Windows). **Change Writing History Location…** moves it; folders kept in sync by Dropbox, iCloud and the like are best avoided, as syncing can damage git repositories.
-- **One branch per work**, with no history shared between them, so one work's history can be shared or deleted without touching the others. `main` holds a README and a catalog of the works (titles, file names, dates and text hashes; no writing). **Export Writing History…** writes a single work to a git bundle that anyone can open with `git clone`.
-- **Finding a document's history:** a `.highland` file carries an ID in `info.json` (put back if Highland 2 drops it); a plain file is found by its path, or by its ID if it was linked with **Link Writing History to This File**. A file the history does not know is looked up in the catalog by ID, by its exact text, or by its file name, and you are always asked before it is connected. A file that is not the work's latest save asks how it continues (update to the latest, keep this version, join from its text, or keep it as a separate copy); until you choose, its saves are not recorded. A copy of a work's file (the original still there) asks whether it is a separate work or the work's file now; a moved file is followed without asking.
-- **Converting and exporting:** **Convert to .highland File…** and **Convert to .fountain / .md / .txt File…** move a work between kinds of file and keep one history; the file left behind is no longer tracked. Exports are always new files outside the history.
-- **Seeing it:** the **Writing History** panel lists the current document's saves; click one, then Compare to see it beside the text now, or right-click for **Revert to This Save…** (the document is saved and the revert recorded at once; nothing is removed from the writing history). The **Works** panel lists every work, here or only on the mirror. The status bar shows when the last save was recorded.
-- **Mirror (optional):** **Set Up History Mirror…** keeps the repository in step with any git remote: GitHub, GitLab, Gitea or Forgejo, an SSH server, or another disk. It never force-pushes, joins saves made on two computers instead of overwriting either, and can create the remote repository for you. Each computer holds only the works used on it: a work saved elsewhere is fetched only when you restore it (**Open Work from History…** or the Works panel) or connect a file to it. A copy worked on offline and connected later is offered to join its original's history. A remote you do not control also gives your timestamps an independent witness.
-- **Removing and deleting:** **Remove from This Computer…** takes a work's history off this computer, leaving it on the mirror. **Delete Writing History…** deletes it permanently, everywhere or only on this computer. Neither touches the file, which starts a new history if you keep working on it.
-- **Turning it off:** for one document from the panel, or everywhere with the **Writing History** setting.
+It doesn't do everything Highland did. Not built yet:
 
-## Layout
+- Statistics, goals and sprints
+- Revision Mode and Gender Analysis
+- Final Draft (`.fdx`) import and export
+- `.textbundle` files
+
+It has been tested on macOS and Linux. It should work on Windows, but nobody has tried it there yet.
+
+## Install
+
+You need **VS Code 1.100** or later. The writing history also needs **git**. On a Mac, if you don't have git yet, run `xcode-select --install` in Terminal.
+
+1. Download `highwater-too.vsix` from the [latest release](https://github.com/eugenefischer/highwater-too/releases/latest).
+2. In VS Code, open the Extensions view, click **…** at its top, and choose **Install from VSIX…**.
+3. Open a `.highland` file. It opens in the Highwater Editor.
+
+To start from scratch, run **Highwater Too: New Document…** from the Command Palette (⇧⌘P).
+
+## A quick tour
+
+### The Highwater Editor
+
+<!-- Screenshot: the top bar and a page of dialogue, showing wrapped dialogue lines indented. -->
+![Dialogue in the Highwater Editor, wrapped lines indented](docs/images/editor.png)
+
+Documents open in a page-width column, as in Highland 2. The top bar switches between your text and the printed pages (⌘E), and holds the template menu and theme picker. The counts at the foot show characters, words and the exact page count.
+
+Highland's writing keys work: ⌘B, ⌘I, ⌘U, ⌘/ for a note, ⌘Y to omit text, ⌃M for a marker. Character names, scene headings and locations are offered as you type. Spell checking, paragraph numbers and Show Invisibles are there when you want them. **Choose Theme…** applies one of Highland 2's eleven colour themes to the page and the rest of the window.
+
+### The sidebar
+
+<!-- Screenshot: the sidebar's tab row with the Bin open, a few cards visible. -->
+![The Bin in the sidebar](docs/images/sidebar.png)
+
+The sidebar on the left of the page (⌘0) holds Highland's panels:
+
+- **Navigator** (⌘1): scenes, sections, notes and markers. Click one to go there, or drag it to move its text.
+- **Bin** (⌘2): drag text in to keep it for later, and drag a card back to use it.
+- **Assets** (⌘4): images.
+- **Scratchpad** (⌘5): notes.
+
+Two panels are new:
+
+- **Writing History** lists this document's saves by day.
+- **Works** lists everything in your history.
+
+### Print and export
+
+<!-- Screenshot: the pages view with the print options at the foot. -->
+![The printed pages, with print options](docs/images/pages.png)
+
+The pages view shows the PDF exactly as it will export, with Highland's print options at the foot: revision colours, paragraph numbers, synopses, notes and the title page. The template window lists Highland 2's templates with a page of your own text in each.
+
+| Template | Match with Highland 2 |
+|---|---|
+| Screenplay, Multi-Cam, Stage Play, Graphic Novel, Manuscript, Plain Text | Line for line |
+| Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report, Wiki | Line for line with Highland's fonts installed; close otherwise |
+
+You can also export manuscripts as Word documents (`.docx`) built from ordinary Word styles, and any document as plain text.
+
+### Writing history
+
+<!-- Screenshot: the Writing History panel with a save selected, showing its Compare and Revert buttons. -->
+![The Writing History panel](docs/images/history.png)
+
+Every save is recorded, with how many words it added or removed. Select a save to compare it with your text side by side, or revert to it. Reverting is recorded as a save of its own, so nothing is lost. Each work keeps its own history: its text, Bin, Scratchpad and images at every save. You can export one work's history as a file that anyone can open with `git clone`.
+
+To keep your history on more than one computer, use **Set Up History Mirror…** with any git server you like: GitHub, GitLab, Gitea, an SSH server or a shared disk. Saves made on two computers are joined, never overwritten.
+
+## Documentation
+
+- [User guide](packages/extension/README.md): every feature, setting and shortcut. VS Code shows the same guide on the extension's page.
+- [Changelog](packages/extension/CHANGELOG.md): what changed in each version.
+
+## Development
+
+Highwater Too is a TypeScript monorepo. Only `packages/extension` uses the VS Code API; everything else is plain TypeScript with its own tests.
 
 ```
 packages/
-  parser/      Fountain + Markdown + Highland directives -> document tree with exact spans
-  bundle/      .highland ZIP read/write, info.json model, unknown-entry passthrough
-  pdf/         layout engine for Highland's Screenplay and Manuscript templates, on PDFKit
-  history/     the writing history: one git repo, a branch per work, catalog on main, mirror
-  extension/   VS Code glue: file system provider, tree views, commands, decorations, PDF viewer
+  parser/      Fountain, Highland Markdown and directives → a document tree with exact source spans
+  bundle/      reading and writing .highland files (ZIP), keeping entries it doesn't know
+  pdf/         our own layout engine for all fourteen templates, drawn with PDFKit
+  history/     the writing history: one git repository, a branch per work, a catalog on main, the mirror
+  extension/   the VS Code extension, including the Highwater Editor (CodeMirror 6 in a custom editor)
 tools/
-  pdf-compare/ PDF line/position comparison (+ pixel backup) against Highland's reference PDFs
-  scripts/     design-phase Python helpers
-fixtures/      generated Highland samples and their reference PDFs
+  pdf-compare/ compares two PDFs line by line (with a pixel diff as backup)
+  scripts/     probe generators and release checks
+fixtures/      generated sample documents and Highland 2's PDFs of them
 ```
-
-Only `packages/extension` may import `vscode`.
-
-## Commands
 
 ```sh
 npm install
-npm run ci            # typecheck + tests + build
-npm test              # Vitest
-HIGHWATER_PRIVATE_FIXTURES=… npm test   # also runs the tests on the private Highland samples
-npm run test:e2e -w highwater-too       # end-to-end tests in a downloaded VS Code
-npm run package -w highwater-too        # builds highwater-too.vsix
-npm run pdf-compare -- expected.pdf actual.pdf [--tolerance 1] [--pixels]
-node --experimental-strip-types tools/scripts/check-documents.ts <folder>   # release check: every .highland file opens, saves unchanged and lays out
+npm run ci                               # typecheck, tests and build
+npm test                                 # unit tests (Vitest)
+npm run test:e2e -w highwater-too        # end-to-end tests in a downloaded VS Code
+npm run package -w highwater-too         # builds highwater-too.vsix
 ```
 
-**Releasing:** set the version in `packages/extension/package.json`, add it to `packages/extension/CHANGELOG.md`, commit, then tag and push (`git tag v0.1.0 && git push origin v0.1.0`). The Release workflow tests, builds the `.vsix` and attaches it to a GitHub Release. The extension's own page text is `packages/extension/README.md`.
+Some tests use real Highland documents that can't be published. Set `HIGHWATER_PRIVATE_FIXTURES` to a folder of your own `.highland` files to run them. Without it, those tests are skipped, as they are in CI. To check a folder of documents before a release, run `node --experimental-strip-types tools/scripts/check-documents.ts <folder>`. It opens every file, saves it unchanged and lays it out. The pixel comparison needs poppler (`brew install poppler`).
 
-The pixel comparison needs poppler's `pdftoppm` (`brew install poppler`); its tests are skipped without it.
+**Releasing:** bump the version in `packages/extension/package.json` and add an entry to its CHANGELOG. Then tag and push (`git tag v1.2.3 && git push origin v1.2.3`). The Release workflow tests, packages and attaches the `.vsix` to a GitHub Release.
+
+## Acknowledgements
+
+Thanks to Highland 2 and its makers, Quote-Unquote Apps, for years of a great writing app. Highwater Too is not affiliated with them.
+
+The PDF engine is our own, measured against Highland 2's output. Its handling of dual dialogue and (MORE)/(CONT'D) follows the approach of [Better Fountain](https://github.com/piersdeseilligny/betterfountain) by Piers Deseilligny (MIT), but no code is copied from it.
+
+Bundled fonts (Courier Prime, Amiri, Lato, Merriweather, Highland Sans, Gelasio, Tinos, TeX Gyre Schola, Cormorant Garamond, Spectral) are under the SIL Open Font License or similar open licences; each has its licence beside it. The spelling dictionary is Hunspell's en_US from SCOWL (MIT and BSD).
 
 ## Licence
 
-MIT. The PDF engine is our own, written against Highland 2's measured layouts; its approach to dual dialogue and (MORE)/(CONT'D) follows [Better Fountain](https://github.com/piersdeseilligny/betterfountain) (MIT, © Piers Deseilligny), but no code is copied from it.
-
-`packages/pdf/fonts` holds Courier Prime 1.203 (the version Highland 2 embeds), © The Courier Prime Project Authors, under the SIL Open Font License 1.1 (`packages/pdf/fonts/OFL.txt`). The Highwater Editor's spelling dictionary is the `dictionary-en` package (Hunspell en_US from SCOWL; MIT and BSD), bundled from `node_modules` at build time with its licence.
+[MIT](LICENSE)
