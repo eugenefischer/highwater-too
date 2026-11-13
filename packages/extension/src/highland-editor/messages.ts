@@ -128,7 +128,6 @@ export type ToPage =
   | { type: "spelling"; on: boolean; words: string[] }
   | { type: "nextMisspelling" }
   | { type: "counts"; characters: number; words: number; pages: number | null }
-  | { type: "recordDrag" }
   /** Compare with a save: its text as the page holds text, and when it was saved (ms). */
   | { type: "compare"; base: string; hash: string; at: number }
   /** An edit from the extension (a writing key, a Bin item) was refused while comparing. */
@@ -167,7 +166,6 @@ export type FromPage =
   | { type: "scroll"; top: number }
   | { type: "chooseTheme" }
   | { type: "learnWord"; word: string }
-  | { type: "dragRecord"; lines: string[] }
   /** A comparison started or ended: the text can't be changed meanwhile. */
   | { type: "comparing"; on: boolean }
   // The pages and the template window.

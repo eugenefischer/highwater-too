@@ -157,11 +157,6 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       sidebar,
       panel.webview.onDidReceiveMessage((msg: FromPage) => {
         if (sidebar.handle(msg)) return;
-        if (msg.type === "dragRecord") {
-          const lines = (msg as unknown as { lines: string[] }).lines;
-          void vscode.workspace.openTextDocument({ content: `Highwater Too: one drag, as the page saw it (time in ms, event, element, whether a handler accepted it, the drop effect)\n\n${lines.join("\n")}\n` }).then((d) => vscode.window.showTextDocument(d, { preview: false, viewColumn: vscode.ViewColumn.Beside }));
-          return;
-        }
         if (msg.type === "pageFocus") return editorFocused();
         if (msg.type === "comparing") {
           view.comparing = msg.on;
@@ -523,12 +518,6 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
     // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highwater Editor.
-    vscode.commands.registerCommand("highwater.recordDrag", () => {
-      const v = activeView();
-      if (!v) return void vscode.window.showInformationMessage("Open a document in the Highwater Editor, run this, then drag once.");
-      postTo(v.panel, { type: "recordDrag" });
-      void vscode.window.showInformationMessage("Recording the next drag in this document: drag a Bin card over the text and let go.");
-    }),
     vscode.commands.registerCommand("highwater.toggleEditorSidebar", () => {
       const v = activeView();
       if (v) postTo(v.panel, { type: "toggleSidebar" });

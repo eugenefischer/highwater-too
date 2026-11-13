@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.43
+
+- Record a Drag (diagnostics) is gone: it was there only to track down the drag cursor, which is fixed.
+
 ## 0.6.42
 
 - Nothing opens VS Code's comparison view any more; comparing a save is always Compare in the Highwater Editor.
