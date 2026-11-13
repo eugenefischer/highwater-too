@@ -64,7 +64,7 @@ export const WORKS_HELP = `
 <ul>
 <li>${icon(OPEN_ICON)} <b>Open</b> opens the work’s file.</li>
 <li>${icon(RESTORE_ICON)} <b>Restore</b> asks where to save the work, then writes its latest save there. Its history carries on from that file.</li>
-<li>Click a save to see it. For the document you have open here, its changes since that save are marked in your text, as Compare does in the Writing History; for another work whose file is on this computer, it opens beside that file with the changes marked.</li>
+<li>Its saves are listed to show its history. To compare with one or revert to it, open the work, then use its Writing History.</li>
 <li>${icon(MORE_ICON)} <b>More</b>:
 <ul>
 <li><b>Remove from This Computer</b>: removes the work’s history from this computer. It stays on the mirror, so you can restore it later. You need a mirror to do this.</li>

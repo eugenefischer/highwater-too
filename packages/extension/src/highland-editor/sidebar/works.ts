@@ -6,7 +6,7 @@ import { WORKS_HELP } from "./help.ts";
 // ---------------------------------------------------------------------------------------------
 // Works: every work in the writing history, under where it is (its file on this computer, only its
 // history, or only on the mirror). A click selects a work: it shows Open (or Restore) and More, and
-// its saves beneath (a click on one shows it). The Filter narrows the list; the sync button (with a
+// its saves beneath, only to read (a save is looked into from the document's Writing History). The Filter narrows the list; the sync button (with a
 // mirror) brings in works saved on other computers.
 
 const WORK_SECTIONS: [WorkRow["kind"], string][] = [
@@ -177,7 +177,7 @@ export class WorksPanel {
     return card;
   }
 
-  /** A selected work's saves: newest first; a click shows one (beside the file, when it is here). */
+  /** A selected work's saves, newest first: a record to read, not clickable. */
   #savesOf(w: WorkRow): HTMLElement {
     const box = document.createElement("div");
     box.className = "work-saves";
@@ -194,7 +194,7 @@ export class WorksPanel {
       const date = new Date(save.at);
       const row = document.createElement("div");
       row.className = "work-save";
-      row.dataset.tip = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.note ? `\n${save.note}` : ""}${save.words ? `\n${save.words} words` : ""}\nClick to see this save${w.kind === "here" ? " beside the file as it is now" : ""}.`;
+      row.dataset.tip = `${save.kind}, ${date.toLocaleString([], { dateStyle: "full", timeStyle: "short" })}${save.note ? `\n${save.note}` : ""}${save.words ? `\n${save.words} words` : ""}`;
       const when = document.createElement("span");
       when.className = "when";
       when.textContent = shortWhen(date);
@@ -205,7 +205,6 @@ export class WorksPanel {
       delta.className = "hist-delta";
       delta.textContent = save.delta;
       row.append(when, kind, delta);
-      row.addEventListener("click", () => this.deps.post({ type: "workSave", i: w.i, j: save.j }));
       box.append(row);
     }
     return box;

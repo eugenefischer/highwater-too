@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.42
+
+- Nothing opens VS Code's comparison view any more; comparing a save is always Compare in the Highwater Editor.
+  - **Works:** a work's saves are listed to show its history, and aren't clickable. To compare with one or revert to it, open the work and use its Writing History.
+  - **Compare with the Latest** (was Open the Latest Beside It), offered when a file has changes the newest save from another computer doesn't: opens the file in the Highwater Editor comparing with that save.
+  - **The writing-history item in the status bar**, clicked while the document is in VS Code's text editor: opens it in the Highwater Editor with the Writing History panel (it showed a list of saves to compare in VS Code's comparison view).
+- The Export Text button in the title bar has the same icon as the other export buttons.
+
 ## 0.6.41
 
 - VS Code's text editor is no longer a second way to work on a document. Removed: the code and book buttons in the title bar, the Navigator, Bin, Assets, Writing History and Works views in VS Code's sidebar (the Highwater Editor's sidebar has them all), Live Margins (⌘L), the side-by-side PDF Preview, and the `highwater.highlandEditor` and `highwater.showSidebarOnOpen` settings.

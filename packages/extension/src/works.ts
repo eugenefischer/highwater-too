@@ -17,7 +17,6 @@ export interface WorksHost {
   openFile(path: string): Promise<void>;
   restoreWork(work: WorkInfo): Promise<void>;
   /** A save's text, read only, beside the work's file if it is here. */
-  showSave(path: string | null, title: string, commit: CommitInfo): Promise<void>;
   /** The history changed: refresh the panels and the status bar. */
   changed(): void;
   /** Waits until the document's latest save is in its history. */
@@ -70,11 +69,6 @@ export class Works {
   async restore(node: Node): Promise<void> {
     await this.#host.restoreWork(node.work);
     this.#host.changed();
-  }
-
-  async showSave(node: Node): Promise<void> {
-    if (node.kind !== "save") return;
-    await this.#host.showSave(node.here ?? null, node.work.title, node.commit);
   }
 
   /** Remove from This Computer: the history goes from here (sent to the mirror first), and stays there. */

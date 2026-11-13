@@ -9,7 +9,7 @@ import { activeDocument, onDidChangeActiveSurface } from "./surface.ts";
  * the file on disk beside unsaved edits, output, source-control views. Moving to one keeps the
  * focused document.
  */
-const NEUTRAL_SCHEMES = new Set(["highwater-history", "highland-disk", "output", "git", "comment", "vscode-scm", "debug"]);
+const NEUTRAL_SCHEMES = new Set(["highland-disk", "output", "git", "comment", "vscode-scm", "debug"]);
 
 /** What a text document is to Highwater Too. */
 export type DocumentRole =

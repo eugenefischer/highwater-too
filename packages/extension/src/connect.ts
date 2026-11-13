@@ -34,7 +34,7 @@ export interface ConnectorHost {
   store: BundleStore;
   /** Records a save now (a Convert, when a file of another form becomes the work's file). */
   commit(key: string, kind: SaveKind, note: string): Promise<void>;
-  /** Shows a save beside a file, to compare. */
+  /** Compares a file with a save, in the Highwater Editor. */
   compare(key: string, commit: CommitInfo): Promise<void>;
   changed(): void;
 }
@@ -265,10 +265,10 @@ export class Connector {
         {
           modal: true,
           detail:
-            "Open the latest beside it: compare the latest save with this file, then choose.\n\nKeep this version: your next save continues from this file, recorded as going back to the save of " +
+            "Compare with the latest: what this file has that the latest save doesn't is marked in green, and what it lacks in red. Then choose.\n\nKeep this version: your next save continues from this file, recorded as going back to the save of " +
             `${when} with edits.\n\nKeep as a separate copy: this file gets a history of its own.`,
         },
-        "Open the Latest Beside It",
+        "Compare with the Latest",
         "Keep This Version",
         "Keep as a Separate Copy",
       );
@@ -341,7 +341,7 @@ export class Connector {
     const dirty = this.#openDocument(key)?.isDirty ?? false;
     // Replacing is offered only while the file is exactly the older save.
     const compare = dirty || edited;
-    const go = compare ? "Open the Latest Beside It" : "Update to the Latest";
+    const go = compare ? "Compare with the Latest" : "Update to the Latest";
     const choice = await ask(
       "warning",
       `“${p.title}” has newer saves from another computer.`,
@@ -351,7 +351,7 @@ export class Connector {
           (edited ? `${name} began as the version saved on ${when}, and has been edited since.` : `${name} is the version saved on ${when}.`) +
           ` The newest version was saved on ${latest}.\n\n` +
           (compare
-            ? "Open the Latest Beside It: show the newest version next to this file, to compare before choosing. This file has changes the newest version doesn't, so it isn't replaced.\n\n"
+            ? "Compare with the Latest: what this file has that the newest version doesn't is marked in green, and what it lacks in red, before you choose. This file has changes the newest version doesn't, so it isn't replaced.\n\n"
             : "Update to the Latest: replace this file (with its Bin and Scratchpad) with the newest version.\n\n") +
           "Keep This Version: carry on with the currently open file, edits included. When you next save, it becomes the newest version.\n\nUntil you choose, your saves aren't recorded.",
       },

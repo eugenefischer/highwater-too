@@ -16,7 +16,7 @@ import { pageHtml } from "./page-html.ts";
 import { postTo, type FromPage, type PanelName, type ToPage } from "./messages.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
-import { activeOffsets, activeView, editorDefaults, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
+import { activeOffsets, activeView, editorDefaults, HIGHLAND_EDITOR, highlandViews, highwaterOpener, revealOffset, viewOf, type HighlandView } from "../surface.ts";
 import { debounce } from "../debounce.ts";
 
 export { HIGHLAND_EDITOR };
@@ -88,8 +88,13 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready) postTo(panel, msg);
         else pendingReveal = msg;
       },
+      showPanel: (name) => whenReady(() => postTo(panel, { type: "showPanel", panel: name })),
+      compareWith: (hash, at) => whenReady(() => sidebar.compare(hash, at)),
     };
     let pendingReveal: ToPage | undefined;
+    /** What waits for the page's script to start (it drops messages sent before). */
+    const waiting: (() => void)[] = [];
+    const whenReady = (run: () => void) => (view.ready ? run() : waiting.push(run));
     /** Preview mode: the page shows the printed pages, laid out here. */
     let previewing = false;
     let layout = 0;
@@ -178,6 +183,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendCounts();
           if (pendingReveal) postTo(panel, pendingReveal);
           pendingReveal = undefined;
+          for (const run of waiting.splice(0)) run();
         } else if (msg.type === "selection" && msg.ranges) {
           view.selections = msg.ranges.map((r) => ({ anchor: toDocument(r.anchor), head: toDocument(r.head) }));
           highlandViews.selected(view);
@@ -490,9 +496,30 @@ function swapSoon(uri: vscode.Uri): void {
   setTimeout(attempt, 0);
 }
 
+/** A document in the Highwater Editor, asked for by the extension (the writing history's choices). */
+async function openInHighwater(doc: vscode.TextDocument): Promise<HighlandView | undefined> {
+  const uri = doc.uri.toString();
+  wantsText.delete(uri); // asked for here, so no longer the writer's text-editor choice
+  const open = viewOf(doc, true);
+  if (open) {
+    open.panel.reveal(open.panel.viewColumn, false);
+    return open;
+  }
+  const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+  if (tab?.input instanceof vscode.TabInputText && tab.input.uri.toString() === uri) await swapActive(doc.uri, HIGHLAND_EDITOR);
+  else await vscode.commands.executeCommand("vscode.openWith", doc.uri, HIGHLAND_EDITOR, { preview: false });
+  for (let waited = 0; waited < 10_000; waited += 100) {
+    const view = viewOf(doc, true);
+    if (view) return view;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return undefined;
+}
+
 /** The Highwater Editor, its commands, and turning scripts opened as text into Highwater Editor tabs. */
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore): void {
   registerSidebarNote(context);
+  highwaterOpener.open = openInHighwater;
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store), { webviewOptions: { retainContextWhenHidden: true } }),
     // Highland's sidebar keys (⌘0 shows or hides it, ⌘1… a panel) in the Highwater Editor.

@@ -92,7 +92,6 @@ export interface WorkRow {
 }
 
 export interface WorkSaveRow {
-  j: number;
   at: number;
   kind: string;
   note: string;
@@ -197,8 +196,7 @@ export type FromPage =
   | { type: "historyRevert"; hash: string }
   | { type: "worksRefresh" }
   | { type: "workAction"; i: number; action: string }
-  | { type: "workSaves"; i: number }
-  | { type: "workSave"; i: number; j: number };
+  | { type: "workSaves"; i: number };
 
 /** Sends a message to a Highwater Editor page (as `void panel.webview.postMessage(msg)`, typed). */
 export function postTo(panel: { webview: { postMessage(message: unknown): unknown } }, msg: ToPage): void {

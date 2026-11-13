@@ -47,6 +47,8 @@ export interface SidebarHost {
   handle(msg: FromPage): boolean;
   /** The page is ready (again): send it everything. */
   ready(): void;
+  /** Compares the text with a save (Compare in the Writing History, or the catalog's latest save). */
+  compare(hash: string, at: Date): void;
   dispose(): void;
 }
 
@@ -209,14 +211,12 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
   };
   // Works: every work in the writing history; a work here opens, others can be restored.
   let workNodes: WorkNode[] = [];
-  const saveNodes = new Map<number, WorkNode[]>();
   const sendWorks = async () => {
     const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote", "").trim();
     const m = historyApi?.mirror();
     const mirror = remote && m ? { busy: m.busy, at: m.at?.getTime() ?? null, error: m.error, signIn: m.signIn } : null;
     if (!historyApi) return post({ type: "works", items: [], mirror, computer: computerName() });
     workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
-    saveNodes.clear();
     const items = workNodes.map((n, i): WorkRow => {
       const w = n.work;
       const words = w.latest ? parseSave(w.latest.message).words : "";
@@ -235,11 +235,10 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     const node = workNodes[i];
     if (!node || !historyApi) return;
     const saves = (await historyApi.works.getChildren(node).catch(() => [])) as WorkNode[];
-    saveNodes.set(i, saves);
     post({
       type: "workSaves",
       i,
-      saves: saves.map((n, j) => (n.kind === "save" ? { j, at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter((s): s is WorkSaveRow => s !== null),
+      saves: saves.map((n) => (n.kind === "save" ? { at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter((s): s is WorkSaveRow => s !== null),
     });
   };
   /** Compare: the save's text to the page, which marks what changed since (compare.ts). */
@@ -299,6 +298,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
   ];
 
   return {
+    compare: (hash, at) => void compareInPage(hash, at),
     handle(msg) {
       if (msg.type === "sidebarState") void context.globalState.update(STATE_KEY, msg.state);
       else if (msg.type === "scratchpadSave" && typeof msg.text === "string") {
@@ -361,12 +361,6 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       } else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");
       else if (msg.type === "workAction" && typeof msg.i === "number" && typeof msg.action === "string") void workAction(msg.i, msg.action);
       else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
-      else if (msg.type === "workSave" && typeof msg.i === "number" && typeof msg.j === "number") {
-        const node = saveNodes.get(msg.i)?.[msg.j];
-        // A save of the document in this page: compared here; any other work's, as before.
-        if (node?.kind === "save" && node.here && node.here === (bundle() ?? plain())) void compareInPage(node.commit.hash, node.commit.date);
-        else if (node && historyApi) void historyApi.works.showSave(node);
-      }
       else return false;
       return true;
     },

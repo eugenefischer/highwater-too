@@ -16,6 +16,12 @@ export const HIGHLAND_EDITOR = "highwater.highlandEditor";
  */
 export const editorDefaults = { highwater: true };
 
+/**
+ * Opens a document in the Highwater Editor (in place of its text tab, if that is in front), or
+ * brings its Highwater Editor to the front; resolves to the view once it exists. Set by the provider.
+ */
+export const highwaterOpener: { open(doc: vscode.TextDocument): Promise<HighlandView | undefined> } = { open: async () => undefined };
+
 /** A Highwater Editor showing a document, as its provider reports it. */
 export interface HighlandView {
   readonly document: vscode.TextDocument;
@@ -36,6 +42,10 @@ export interface HighlandView {
   select(ranges: readonly { anchor: number; head: number }[]): void;
   /** Scrolls to an offset (at the top, or centred if out of view); with `select`, puts the cursor there and focuses the editor. */
   reveal(offset: number, how: "top" | "center", select: boolean): void;
+  /** Opens a sidebar panel (held until the page has started). */
+  showPanel(name: "history"): void;
+  /** Compares the text with a save, as the Writing History's Compare does (held until the page has started). */
+  compareWith(hash: string, at: Date): void;
 }
 
 const views = new Set<HighlandView>();
@@ -132,7 +142,7 @@ export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode
     await vscode.window.showTextDocument(doc, { viewColumn: textTab.group.viewColumn, preview: false });
     return;
   }
-  // A script opens in the Highwater Editor when that is the default (highwater.highlandEditor).
+  // A script opens in the Highwater Editor (unless the end-to-end tests turned that off).
   // A .highland file's script counts even before VS Code has given it its language (it does so a
   // moment after opening): otherwise it would show as text first, then switch.
   const script = doc.languageId.startsWith("highland-") || (doc.uri.scheme === "highland" && /\.highland$/i.test(doc.uri.path));

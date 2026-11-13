@@ -16,13 +16,11 @@ import { withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
 import { focusedDocument } from "./focus.ts";
 import { deletedElsewhere, revertTo, Works, type WorksHost } from "./works.ts";
-import { activeView } from "./surface.ts";
-import { postTo } from "./highland-editor/messages.ts";
+import { activeView, highwaterOpener } from "./surface.ts";
 import { restoreCommands } from "./history-restore.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
-const HISTORY_SCHEME = "highwater-history";
 const NOTICE_KEY = "highwater.historyNoticeShown";
 
 /** The history folder: the writer's choice, else the system's application-data folder. */
@@ -178,10 +176,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     mirror,
     store,
     commit: (key, kind, note) => commitNow(key, kind, note),
-    compare: async (key, commit) => {
-      const doc = vscode.workspace.textDocuments.find((d) => keyOf(d) === key && !(d.uri.scheme === SCHEME && splitBundlePath(d.uri.fsPath)?.entry));
-      if (doc) await compare(doc, key, commit);
-    },
+    compare: async (key, commit) => (await highwaterOpener.open(await documentFor(key)))?.compareWith(commit.hash, commit.date),
     changed: () => void updateStatus(),
   });
   mirror.onDidChange(() => void updateStatus());
@@ -380,35 +375,14 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     await history().idle();
   }
 
+  /** The Writing History panel of the document in front (in the Highwater Editor; from the text editor too). */
   async function showHistory(): Promise<void> {
-    // In the Highwater Editor, its sidebar's Writing History panel.
-    const hv = activeView();
-    if (hv) {
-      postTo(hv.panel, { type: "showPanel", panel: "history" });
-      return;
-    }
-    const key = focus.key;
-    const doc = await focus.document();
-    if (!doc || !key) {
+    const doc = activeView()?.document ?? (await focus.document());
+    if (!doc || !focus.key) {
       void vscode.window.showInformationMessage("Open a document to see its writing history.");
       return;
     }
-    const found = await lookup(key);
-    const commits = found ? await history().log(found.id) : [];
-    if (!commits.length) {
-      void vscode.window.showInformationMessage("No history yet: it starts with the next save.");
-      return;
-    }
-    const picked = await pick(
-      commits.map((c) => ({ label: c.message, description: c.hash.slice(0, 7), commit: c })),
-      { title: `Writing history: ${basename(key)}`, placeHolder: "Pick a save to compare with the script as it is now" },
-    );
-    if (picked) await compare(doc, key, picked.commit);
-  }
-
-  async function compare(doc: vscode.TextDocument, key: string, commit: CommitInfo): Promise<void> {
-    const left = vscode.Uri.from({ scheme: HISTORY_SCHEME, path: `/${basename(key)} (${commit.hash.slice(0, 7)})`, query: JSON.stringify({ hash: commit.hash }) });
-    await vscode.commands.executeCommand("vscode.diff", left, doc.uri, `${basename(key)}: ${commit.message} ↔ now`);
+    (await highwaterOpener.open(doc))?.showPanel("history");
   }
 
   async function togglePause(): Promise<void> {
@@ -464,13 +438,6 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     record: async (key, kind, note) => {
       await inflight.get(key);
       await commitNow(key, kind, note);
-    },
-    showSave: async (path, title, commit) => {
-      const left = vscode.Uri.from({ scheme: HISTORY_SCHEME, path: `/${title} (${commit.hash.slice(0, 7)})`, query: JSON.stringify({ hash: commit.hash }) });
-      if (path && existsSync(path)) {
-        const right = path.toLowerCase().endsWith(".highland") ? vscode.Uri.file(path).with({ scheme: SCHEME }) : vscode.Uri.file(path);
-        await vscode.commands.executeCommand("vscode.diff", left, right, `${title}: ${commit.message} ↔ now`);
-      } else await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(left), { preview: true });
     },
     changed: () => {
       view.refresh();
@@ -533,12 +500,6 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     vscode.workspace.onDidCloseTextDocument((doc) => {
       const key = keyOf(doc);
       if (key && enabled()) void batcher.saved(key, "close");
-    }),
-    vscode.workspace.registerTextDocumentContentProvider(HISTORY_SCHEME, {
-      provideTextDocumentContent: async (uri) => {
-        const q = JSON.parse(uri.query) as { hash: string };
-        return history().scriptAt(q.hash);
-      },
     }),
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
     // Refreshing the Works panel brings the catalog up to date from the mirror first.

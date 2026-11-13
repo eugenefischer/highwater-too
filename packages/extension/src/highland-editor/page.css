@@ -158,8 +158,7 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .work-card.selected .sb-row-tools { display: flex; }
 .work-card.work-local .sb-row-title, .work-card.work-remote .sb-row-title { font-weight: 500; color: color-mix(in srgb, var(--nav-fg) 75%, var(--nav-muted)); }
 .work-saves { margin: 4px -4px 0; padding-top: 4px; border-top: 1px solid color-mix(in srgb, var(--nav-muted) 25%, transparent); max-height: 230px; overflow-y: auto; }
-.work-save { display: flex; gap: 6px; align-items: baseline; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
-.work-save:hover { background: var(--nav-hover); }
+.work-save { display: flex; gap: 6px; align-items: baseline; padding: 3px 4px; }
 .work-save .when { flex: none; }
 .work-save .kind { color: var(--nav-muted); font-size: 0.9em; }
 .work-save .hist-delta { margin-left: auto; }
