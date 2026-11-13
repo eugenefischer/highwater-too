@@ -20,7 +20,7 @@ export const HISTORY_HELP = `
 <h3>Compare or go back</h3>
 <p>Click a save, then:</p>
 <ul>
-<li>${icon(COMPARE_ICON)} <b>Compare</b> shows that save beside your current text, with the changes marked.</li>
+<li>${icon(COMPARE_ICON)} <b>Compare</b> marks what has changed since that save in your text: added text in green, removed text in red and struck through. Unchanged passages are folded away; click one to open it. Use ‹ and › at the top to move between changes, <b>Revert</b> to go back to that save, and <b>Done</b> or Escape to stop comparing.</li>
 <li>${icon(REVERT_ICON)} <b>Revert</b> puts that save’s text, Bin and Scratchpad back and saves the document. The revert is added to the list straight away, and nothing is ever removed from the work history, so you can always go back again. If you have unsaved changes, you can save them first or leave them out.</li>
 </ul>
 
@@ -64,7 +64,7 @@ export const WORKS_HELP = `
 <ul>
 <li>${icon(OPEN_ICON)} <b>Open</b> opens the work’s file.</li>
 <li>${icon(RESTORE_ICON)} <b>Restore</b> asks where to save the work, then writes its latest save there. Its history carries on from that file.</li>
-<li>Click a save to see it. If the work’s file is on this computer, the save is shown beside the file with the changes marked.</li>
+<li>Click a save to see it. For the document you have open here, its changes since that save are marked in your text, as Compare does in the Writing History; for another work whose file is on this computer, it opens beside that file with the changes marked.</li>
 <li>${icon(MORE_ICON)} <b>More</b>:
 <ul>
 <li><b>Remove from This Computer</b>: removes the work’s history from this computer. It stays on the mirror, so you can restore it later. You need a mirror to do this.</li>

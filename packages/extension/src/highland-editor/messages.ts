@@ -130,6 +130,8 @@ export type ToPage =
   | { type: "nextMisspelling" }
   | { type: "counts"; characters: number; words: number; pages: number | null }
   | { type: "recordDrag" }
+  /** Compare with a save: its text as the page holds text, and when it was saved (ms). */
+  | { type: "compare"; base: string; hash: string; at: number }
   // The pages (preview mode) and the template window.
   | { type: "togglePreview" }
   | PdfMessage

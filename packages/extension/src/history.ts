@@ -78,6 +78,8 @@ export let historyApi:
       saves(key: string): Promise<{ state: "on" | "paused" | "off" | "none"; commits: CommitInfo[] }>;
       compare(key: string, hash: string): Promise<void>;
       revert(key: string, hash: string): Promise<void>;
+      /** A save's text (the script), for comparing in the page. */
+      saveText(hash: string): Promise<string>;
       works: WorksView;
       /** The mirror's last outcome (when it last synced, its error, whether it waits for a sign-in). */
       mirror(): { at: Date | null; error: string | null; signIn: boolean; busy: boolean };
@@ -496,6 +498,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const commit = r && (await history().log(r.id)).find((c) => c.hash === hash);
       if (commit) await revertTo(worksHost, await documentFor(key), key, commit);
     },
+    saveText: (hash) => history().scriptAt(hash),
     works,
     mirror: () => ({ ...mirror.state, busy: mirror.busy }),
     onDidChange: (listener) => {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.37
+
+- **Compare in the page again**, now built on CodeMirror's own merge view (`@codemirror/merge`). Compare on a save in the Writing History (or a click on a save of the open document in Works) marks what has changed since that save in your text:
+  - Added text is tinted green, and removed text is shown in red and struck through. A change within a line shows in that line, so dialogue keeps its layout.
+  - Long unchanged passages fold into a bar ("645 unchanged lines"); click one to open it.
+  - The bar at the top reads "Comparing with Nov 11, 7:55 PM · 3 changes", with ‹ › to move between changes ("2 of 3"), Revert… and Done. Escape stops comparing.
+  - Typing while comparing goes in as usual, and the marks follow it.
+  - There are no marks beside the scroll bar: they could not be placed reliably (0.6.31–0.6.34), and folding the unchanged text makes them unnecessary.
 ## 0.6.36
 
 - Internal cleanup, with no change to what the app does:

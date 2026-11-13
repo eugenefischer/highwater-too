@@ -13,6 +13,7 @@ import { screenplayCompletion } from "./complete.ts";
 import { Pages } from "./pages.ts";
 import { TemplateWindow } from "./template-window.ts";
 import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
+import { Compare } from "./compare.ts";
 import type { BinOp, FromPage, ToPage } from "./messages.ts";
 
 /**
@@ -187,8 +188,14 @@ const spelling = new Spelling(
   (msg) => vscode.postMessage(msg),
 );
 const spellingMarks = spellingPlugin(spelling);
+/** Comparing a save in the page (Writing History's Compare). */
+const compare = new Compare(
+  () => view,
+  (msg) => vscode.postMessage(msg),
+);
 
 function start(text: string): void {
+  compare.end();
   view?.destroy();
   view = new EditorView({
     parent: document.getElementById("editor")!,
@@ -257,6 +264,7 @@ function start(text: string): void {
         dropCursor(),
         styling,
         spellingMarks,
+        compare.extension,
         invisibles.of(invisibleMarks(showInvisibles)),
         screenplayCompletion(() => (mode === "fountain" ? parsed : null)),
         EditorView.updateListener.of((u) => {
@@ -429,6 +437,7 @@ function showCounts(c: { characters: number; words: number; pages: number | null
 
 function togglePreview(): void {
   if (pages.shown) return pages.hide();
+  compare.end();
   if (!view) return;
   const at = topOffset();
   view.contentDOM.blur();
@@ -506,6 +515,10 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "togglePreview") togglePreview();
   else if (msg.type === "recordDrag") dragRecord = [];
+  else if (msg.type === "compare") {
+    if (pages.shown) pages.hide();
+    compare.start(msg.base, msg.hash, msg.at);
+  }
   else if (msg.type === "toBin") toBin(!!msg.cut);
   else if (msg.type === "binRefused" && view) undo(view);
   else if (msg.type === "pdf") void pages.receive(msg);

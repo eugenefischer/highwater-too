@@ -15,6 +15,7 @@ import { historyApi } from "../history.ts";
 import type { WorkNode } from "../works.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
+import { pageForm } from "./offsets.ts";
 import type { FromPage, ToPage, WorkRow, WorkSaveRow } from "./messages.ts";
 import { NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
 import { debounce } from "../debounce.ts";
@@ -241,6 +242,17 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       saves: saves.map((n, j) => (n.kind === "save" ? { j, at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter((s): s is WorkSaveRow => s !== null),
     });
   };
+  /** Compare: the save's text to the page, which marks what changed since (compare.ts). */
+  const compareInPage = async (hash: string, at?: Date) => {
+    const k = bundle() ?? plain();
+    if (!k || !historyApi) return;
+    try {
+      const when = at ?? (await historyApi.saves(k)).commits.find((c) => c.hash === hash)?.date ?? new Date();
+      post({ type: "compare", hash, at: when.getTime(), base: pageForm(await historyApi.saveText(hash)) });
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Could not read that save: ${(e as Error).message}`);
+    }
+  };
   const workAction = async (i: number, action: string) => {
     const node = workNodes[i];
     if (!node || !historyApi) return;
@@ -339,10 +351,8 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         const item = assetItems.find((a) => a.name === msg.name);
         if (item) void vscode.commands.executeCommand("highwater.assets.open", item);
       }
-      else if (msg.type === "historyCompare" && typeof msg.hash === "string") {
-        const k = bundle() ?? plain();
-        if (k && historyApi) void historyApi.compare(k, msg.hash);
-      } else if (msg.type === "historyRevert" && typeof msg.hash === "string") {
+      else if (msg.type === "historyCompare" && typeof msg.hash === "string") void compareInPage(msg.hash);
+      else if (msg.type === "historyRevert" && typeof msg.hash === "string") {
         const k = bundle() ?? plain();
         if (k && historyApi) void historyApi.revert(k, msg.hash);
       } else if (msg.type === "historyCommand" && typeof msg.command === "string" && HISTORY_COMMANDS.has(msg.command)) {
@@ -352,7 +362,9 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
       else if (msg.type === "workSave" && typeof msg.i === "number" && typeof msg.j === "number") {
         const node = saveNodes.get(msg.i)?.[msg.j];
-        if (node && historyApi) void historyApi.works.showSave(node);
+        // A save of the document in this page: compared here; any other work's, as before.
+        if (node?.kind === "save" && node.here && node.here === (bundle() ?? plain())) void compareInPage(node.commit.hash, node.commit.date);
+        else if (node && historyApi) void historyApi.works.showSave(node);
       }
       else return false;
       return true;
