@@ -30,8 +30,6 @@ await build({ bundle: true, platform: "browser", format: "iife", target: "chrome
 await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/spell-worker.ts")], outfile: join(root, "dist/spell-worker.js") });
 const dictionary = dirname(require.resolve("dictionary-en")); // its exports hide the files themselves
 for (const f of ["index.aff", "index.dic", "license"]) cpSync(join(dictionary, f), join(root, "dist/dictionary-en", f));
-// The Navigator pane's page.
-await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/navigator-pane/page.ts")], outfile: join(root, "dist/navigator.js") });
 if (e2e) await build({ ...common, entryPoints: [join(root, "e2e/suite.ts")], outfile: join(root, "dist/e2e/suite.cjs") });
 
 // Courier Prime, and PDFKit's standard-font metrics, which it loads at run time as

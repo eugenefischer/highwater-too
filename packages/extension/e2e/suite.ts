@@ -202,27 +202,15 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.commands.executeCommand("highwater.openScratchpad");
       await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.path.endsWith("/scratchpad.txt") === true);
       assert.equal((await readBundle(path)).bundle.scratchpad, "");
-      await vscode.commands.executeCommand("highwater.navigator.focus");
     },
   ],
   [
-    "toggles Live Margins and opens the Title Page Builder",
+    "opens the Title Page Builder",
     async () => {
       const path = await copyOf("Tools");
       await openScript(path);
-      await vscode.commands.executeCommand("highwater.toggleLiveMargins");
-      await vscode.commands.executeCommand("highwater.toggleLiveMargins");
       await vscode.commands.executeCommand("highwater.titlePageBuilder");
       await waitFor("title page panel", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label === "Title Page")));
-    },
-  ],
-  [
-    "opens the PDF preview beside the script",
-    async () => {
-      const path = await copyOf("Preview");
-      await openScript(path);
-      await vscode.commands.executeCommand("highwater.preview");
-      await waitFor("preview panel", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label === "Preview: Preview.highland")));
     },
   ],
   [
@@ -264,8 +252,6 @@ const tests: [string, () => Promise<void>][] = [
         }, 30_000);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
-  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
         await vscode.workspace.getConfiguration("highwater").update("historyRemote", undefined, vscode.ConfigurationTarget.Global);
       }
     },
@@ -308,7 +294,7 @@ const tests: [string, () => Promise<void>][] = [
         await append("\n\nThird line.");
         assert.ok(doc.isDirty);
         await vscode.commands.executeCommand("highwater.test.answer", "Save and Revert");
-        await vscode.commands.executeCommand("highwater.history.revert", { key: path, commit: { hash: first.hash, date: first.date, message: first.message } });
+        await vscode.commands.executeCommand("highwater.test.revert", path, first.hash);
         const asked = (await vscode.commands.executeCommand("highwater.test.asked")) as { message: string; choices: string[] }[];
         assert.ok(asked.some((a) => a.message.includes("has unsaved changes") && a.choices.includes("Revert Without Saving")), JSON.stringify(asked));
         await waitFor("the revert in the history", () => log()[0]?.message.startsWith("Revert") ?? false, 20_000);
@@ -364,8 +350,6 @@ const tests: [string, () => Promise<void>][] = [
         }, 20_000);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
-  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
   ],
@@ -411,8 +395,6 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(execFileSync("git", ["diff", `${entry.branch}~2`, entry.branch, "--", "text.fountain", "bin"], { cwd: repo, encoding: "utf8" }), "", `the text and Bin are unchanged; the branch:\n${record()}`);
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
-  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
   ],
@@ -464,8 +446,6 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal(await idOf(taken), id, "it keeps the work's ID");
       } finally {
         await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
-  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
       }
     },
   ],
@@ -518,34 +498,9 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "swaps between the text editor and the Highwater Editor in place, unsaved changes and all",
+    "opens scripts in the Highwater Editor, except after Reopen Editor With → Text Editor",
     async () => {
-      const path = join(dir, "Swap.fountain");
-      await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello.\n");
-      const doc = await vscode.workspace.openTextDocument(path);
-      await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
-      const editor = await vscode.window.showTextDocument(doc, { preview: false });
-      await editor.edit((e) => e.insert(new vscode.Position(4, 0), "\nShe waits.\n"));
-      assert.ok(doc.isDirty);
-      const uri = doc.uri.toString();
-      const tabs = () => vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri);
-      const within = <T>(what: string, p: Thenable<T>) =>
-        Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${what} did not finish (a save-or-discard question?)`)), 10_000))]);
-      await within("Open in Highwater Editor", vscode.commands.executeCommand("highwater.openHighlandEditor"));
-      await waitFor("one Highwater Editor tab", () => tabs().length === 1 && tabs()[0]!.input instanceof vscode.TabInputCustom);
-      assert.ok(doc.isDirty, "the unsaved changes are kept");
-      await within("Open in Text Editor", vscode.commands.executeCommand("highwater.openTextEditor"));
-      await waitFor("one text tab", () => tabs().length === 1 && tabs()[0]!.input instanceof vscode.TabInputText);
-      assert.ok(doc.getText().includes("She waits."));
-      await doc.save();
-      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
-    },
-  ],
-  [
-    "opens scripts in the Highwater Editor when it is the default, except after the code button",
-    async () => {
-      const config = vscode.workspace.getConfiguration("highwater");
-      await config.update("highlandEditor", true, vscode.ConfigurationTarget.Global);
+      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
       // Every tab event and the extension's own decisions over the whole test, printed with any
       // failure, so a failure says what happened rather than leaving it to be guessed at.
       const events: string[] = [];
@@ -576,20 +531,8 @@ const tests: [string, () => Promise<void>][] = [
         note("showTextDocument");
         await vscode.window.showTextDocument(doc, { preview: false });
         await until("the Highwater Editor instead of text", () => kinds().join() === "highland");
-        note("code button (highwater.openTextEditor)");
-        await vscode.commands.executeCommand("highwater.openTextEditor");
-        note(`openTextEditor returned; tabs now ${kinds().join()}`);
-        await until("the text editor", () => kinds().join() === "text");
-        // It stays text: the code button was the writer's choice.
-        await new Promise((r) => setTimeout(r, 1000));
-        assert.equal(kinds().join(), "text", `The code button's text editor was undone.${await record()}`);
-        note("closeActiveEditor");
-        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
         // VS Code's own Reopen Editor With… → Text Editor (the editor menu in the breadcrumbs bar)
-        // is the writer's choice too: it stays text, not switched straight back.
-        note("showTextDocument");
-        await vscode.window.showTextDocument(doc, { preview: false });
-        await until("the Highwater Editor again", () => kinds().join() === "highland");
+        // is the writer's choice: it stays text, not switched straight back.
         note("reopenActiveEditorWith default");
         await vscode.commands.executeCommand("reopenActiveEditorWith", "default");
         note(`reopenActiveEditorWith returned; tabs now ${kinds().join()}`);
@@ -600,15 +543,14 @@ const tests: [string, () => Promise<void>][] = [
       } finally {
         watch.dispose();
         watchEditor.dispose();
-        await config.update("highlandEditor", false, vscode.ConfigurationTarget.Global);
+        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
       }
     },
   ],
   [
     "opens a .highland file from the Explorer straight into the Highwater Editor, never showing it as text first",
     async () => {
-      const config = vscode.workspace.getConfiguration("highwater");
-      await config.update("highlandEditor", true, vscode.ConfigurationTarget.Global);
+      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
       const path = await copyOf("NoFlash");
       const script = highland(path).toString();
       let shownAsText = false;
@@ -623,7 +565,7 @@ const tests: [string, () => Promise<void>][] = [
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       } finally {
         watch.dispose();
-        await config.update("highlandEditor", false, vscode.ConfigurationTarget.Global);
+        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
       }
     },
   ],
@@ -651,45 +593,41 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "a .highland script's own URI with a line (as a Search result opens it) lands on that line, and keeps it when switched to the Highwater Editor",
+    "a .highland script's own URI with a line (as a Search result opens it) opens the Highwater Editor on that line",
     async () => {
-      const path = await copyOf("SearchResult");
-      const doc = await vscode.workspace.openTextDocument(highland(path));
-      await waitFor("Fountain language", () => vscode.workspace.textDocuments.some((d) => d.uri.toString() === highland(path).toString() && d.languageId === "highland-fountain"));
-      const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === highland(path).toString())!;
-      const line = Math.min(10, live.lineCount - 1);
-      await vscode.commands.executeCommand("vscode.open", highland(path), { selection: new vscode.Range(line, 0, line, 0) });
-      await waitFor("a text editor on the result's line", () => {
-        const e = vscode.window.activeTextEditor;
-        return e?.document.uri.toString() === highland(path).toString() && e.selection.active.line === line;
-      });
-      await vscode.commands.executeCommand("highwater.openHighlandEditor");
-      type Surface = { view: boolean; selection?: { anchor: number; head: number } };
-      const want = live.offsetAt(new vscode.Position(line, 0));
-      const end = Date.now() + 10_000;
-      let now: Surface = { view: false };
-      while (!((now = await vscode.commands.executeCommand<Surface>("highwater.test.surface")).view && now.selection?.head === want)) {
-        if (Date.now() > end) {
-          // Which tabs there were, to tell a slow swap from a lost one (it failed once on macOS).
-          const tabs = vscode.window.tabGroups.all.map((g) => ({
-            active: g.isActive,
-            tabs: g.tabs.map((t) => ({ label: t.label, active: t.isActive, kind: t.input instanceof vscode.TabInputCustom ? `custom:${t.input.viewType}` : t.input instanceof vscode.TabInputText ? "text" : typeof t.input })),
-          }));
-          throw new Error(`The Highwater Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}`);
+      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
+      try {
+        const path = await copyOf("SearchResult");
+        const doc = await vscode.workspace.openTextDocument(highland(path));
+        await waitFor("Fountain language", () => vscode.workspace.textDocuments.some((d) => d.uri.toString() === highland(path).toString() && d.languageId === "highland-fountain"));
+        const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === highland(path).toString())!;
+        const line = Math.min(10, live.lineCount - 1);
+        await vscode.commands.executeCommand("vscode.open", highland(path), { selection: new vscode.Range(line, 0, line, 0) });
+        type Surface = { view: boolean; selection?: { anchor: number; head: number } };
+        const want = live.offsetAt(new vscode.Position(line, 0));
+        const end = Date.now() + 10_000;
+        let now: Surface = { view: false };
+        while (!((now = await vscode.commands.executeCommand<Surface>("highwater.test.surface")).view && now.selection?.head === want)) {
+          if (Date.now() > end) {
+            // Which tabs there were, to tell a slow swap from a lost one (it failed once on macOS).
+            const tabs = vscode.window.tabGroups.all.map((g) => ({
+              active: g.isActive,
+              tabs: g.tabs.map((t) => ({ label: t.label, active: t.isActive, kind: t.input instanceof vscode.TabInputCustom ? `custom:${t.input.viewType}` : t.input instanceof vscode.TabInputText ? "text" : typeof t.input })),
+            }));
+            throw new Error(`The Highwater Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}`);
+          }
+          await new Promise((r) => setTimeout(r, 100));
         }
-        await new Promise((r) => setTimeout(r, 100));
+        void doc;
+        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+      } finally {
+        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
       }
-      void doc;
-      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     },
   ],
   [
-    "⌘E in the Highwater Editor lays out the pages in place, not in a side-by-side Preview",
+    "⌘E in the Highwater Editor lays out the pages in place",
     async () => {
-      // A side-by-side Preview left open by an earlier test would follow this document (and take
-      // its name): close it first, so only a Preview this test opens could fail it.
-      const previews = vscode.window.tabGroups.all.flatMap((g) => g.tabs.filter((t) => t.label.startsWith("Preview")));
-      if (previews.length) await vscode.window.tabGroups.close(previews);
       const path = await copyOf("PreviewInPlace");
       await vscode.commands.executeCommand("vscode.openWith", highland(path), "highwater.highlandEditor");
       type Surface = { view: boolean; ready?: boolean; pagesSent?: number; pageCount?: number };
@@ -707,8 +645,6 @@ const tests: [string, () => Promise<void>][] = [
       await until("the page count", (s) => typeof s.pageCount === "number" && s.pageCount >= 1);
       await vscode.commands.executeCommand("highwater.preview");
       await until("the pages", (s) => (s.pagesSent ?? 0) >= 1);
-      // The side-by-side Preview didn't open: ⌘E shows the pages in place.
-      assert.ok(!vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label.startsWith("Preview: PreviewInPlace"))));
       await vscode.commands.executeCommand("highwater.preview");
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     },
@@ -732,7 +668,7 @@ export async function run(): Promise<void> {
   // Writing history only in its own test: its info.json write would race the other tests' checks.
   await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
   // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
-  await vscode.workspace.getConfiguration("highwater").update("highlandEditor", false, vscode.ConfigurationTarget.Global);
+  await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
   const failed: string[] = [];
   for (const [name, test] of tests) {
     try {

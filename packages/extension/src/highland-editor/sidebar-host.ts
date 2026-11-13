@@ -10,7 +10,7 @@ import { parseSave } from "../save-message.ts";
 import { computerName } from "@highwater/history";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
-import { extrasApi, type AssetItem, type Owner } from "../panels.ts";
+import { extrasApi, type AssetItem, type Owner } from "../bin-assets.ts";
 import { historyApi } from "../history.ts";
 import type { WorkNode } from "../works.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";

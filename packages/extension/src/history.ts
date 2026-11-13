@@ -15,11 +15,10 @@ import { ID_NOTE, idNote, noteId } from "./extras-folder.ts";
 import { withoutSavedText } from "./to-bundle.ts";
 import { Connector } from "./connect.ts";
 import { focusedDocument } from "./focus.ts";
-import { deletedElsewhere, revertTo, WorksView, type WorksHost } from "./works.ts";
+import { deletedElsewhere, revertTo, Works, type WorksHost } from "./works.ts";
 import { activeView } from "./surface.ts";
 import { postTo } from "./highland-editor/messages.ts";
 import { restoreCommands } from "./history-restore.ts";
-import { HistoryView, when, type HistoryItem } from "./history-view.ts";
 
 /** Our key in info.json: { documentId } ties a .highland file to its branch in the history. */
 const INFO_KEY = "highwaterToo";
@@ -57,6 +56,13 @@ async function stillHas(path: string, id: string): Promise<boolean> {
   return named === null || named === id;
 }
 
+/** "14:03" today, else "11 Oct". */
+function when(d: Date): string {
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString([], { day: "numeric", month: "short" });
+}
+
 /** The document ID a file names: in a .highland file's info.json, or a plain file's ID note. */
 async function fileId(path: string): Promise<string | null> {
   if (path.toLowerCase().endsWith(".highland")) {
@@ -76,12 +82,11 @@ export let historyApi:
   | {
       /** A document's saves, newest first, and whether its history is on, paused, off, or not begun. */
       saves(key: string): Promise<{ state: "on" | "paused" | "off" | "none"; commits: CommitInfo[] }>;
-      compare(key: string, hash: string): Promise<void>;
       /** True once the document holds the save's text (false if cancelled or it failed). */
       revert(key: string, hash: string): Promise<boolean>;
       /** A save's text (the script), for comparing in the page. */
       saveText(hash: string): Promise<string>;
-      works: WorksView;
+      works: Works;
       /** The mirror's last outcome (when it last synced, its error, whether it waits for a sign-in). */
       mirror(): { at: Date | null; error: string | null; signIn: boolean; busy: boolean };
       onDidChange(listener: () => void): vscode.Disposable;
@@ -416,7 +421,6 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     const r = await resolve(key);
     await history().setPaused(r.id, !r.paused);
     void vscode.window.showInformationMessage(r.paused ? `Writing history is on again for ${basename(key)}.` : `Writing history is off for ${basename(key)}; earlier saves are kept.`);
-    void vscode.commands.executeCommand("setContext", "highwater.historyPaused", !r.paused);
     view.refresh();
   }
 
@@ -439,15 +443,10 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     if (mirror.url && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
   }
 
-  // The Writing History panel: the current script's saves; click one to compare it with now.
-  const view = new HistoryView(async () => {
-    const key = focus.key;
-    if (!key || !enabled()) return null;
-    const r = await peek(key);
-    void vscode.commands.executeCommand("setContext", "highwater.historyPaused", r?.paused ?? false);
-    return r ? { key, commits: await history().log(r.id) } : null;
-  });
-  /** The document a save in the Writing History pane belongs to (opened if need be). */
+  // The saves changed (the Highwater Editor's Writing History panel listens).
+  const changedSaves = new vscode.EventEmitter<void>();
+  const view = { refresh: () => changedSaves.fire() };
+  /** The document a save belongs to (opened if need be). */
   const documentFor = async (key: string): Promise<vscode.TextDocument> =>
     vscode.workspace.textDocuments.find((d) => keyOf(d) === key && !(d.uri.scheme === SCHEME && splitBundlePath(d.uri.fsPath)?.entry) && d.uri.scheme !== EXTRAS_SCHEME) ??
     vscode.workspace.openTextDocument(key.toLowerCase().endsWith(".highland") ? vscode.Uri.file(key).with({ scheme: SCHEME }) : vscode.Uri.file(key));
@@ -479,7 +478,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       void updateStatus();
     },
   };
-  const works = new WorksView(worksHost);
+  const works = new Works(worksHost);
   // Open Work, Connect, Restore and what follows a pull (history-restore.ts).
   const { openWork, connectToWork, restoreWork, openFile, pulled } = restoreCommands({ history, historyRoot, enabled, mirror, connector, store, extras, focus, settle, lookup, commitNow, updateStatus, view, works, worksHost, askedJoins });
   // For the Highwater Editor's sidebar (sidebar-host.ts): the same history, for one document.
@@ -488,11 +487,6 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (!enabled()) return { state: "off", commits: [] };
       const r = await peek(key).catch(() => null);
       return { state: !r ? "none" : r.paused ? "paused" : "on", commits: r ? await history().log(r.id) : [] };
-    },
-    async compare(key, hash) {
-      const r = await lookup(key);
-      const commit = r && (await history().log(r.id)).find((c) => c.hash === hash);
-      if (commit) await compare(await documentFor(key), key, commit);
     },
     async revert(key, hash) {
       const r = await lookup(key);
@@ -503,8 +497,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     works,
     mirror: () => ({ ...mirror.state, busy: mirror.busy }),
     onDidChange: (listener) => {
-      const a = view.onDidChangeTreeData(listener);
-      const b = works.onDidChangeTreeData(listener);
+      const a = changedSaves.event(listener);
+      const b = works.onDidChange(listener);
       const c = mirror.onDidChange(listener);
       const d = vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("highwater") && listener());
       return { dispose: () => (a.dispose(), b.dispose(), c.dispose(), d.dispose()) };
@@ -516,8 +510,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   context.subscriptions.push(
     status,
     { dispose: () => batcher.dispose() },
-    vscode.window.registerTreeDataProvider("highwater.history", view),
-    vscode.window.registerTreeDataProvider("highwater.works", works),
+    changedSaves,
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("highwater.historyFolder") || e.affectsConfiguration("highwater.writingHistory")) {
         // One History per folder, kept: a second one for the same folder would race the first.
@@ -548,17 +541,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       },
     }),
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
-    vscode.commands.registerCommand("highwater.history.revert", async (item: HistoryItem) => revertTo(worksHost, await documentFor(item.key), item.key, item.commit)),
     // Refreshing the Works panel brings the catalog up to date from the mirror first.
     vscode.commands.registerCommand("highwater.works.refresh", async () => {
       if (enabled() && mirror.url) await pulled(mirror.pull(true));
       works.refresh();
     }),
-    vscode.commands.registerCommand("highwater.works.open", (node: Parameters<WorksView["open"]>[0]) => works.open(node)),
-    vscode.commands.registerCommand("highwater.works.restore", (node: Parameters<WorksView["restore"]>[0]) => works.restore(node)),
-    vscode.commands.registerCommand("highwater.works.showSave", (node: Parameters<WorksView["showSave"]>[0]) => works.showSave(node)),
-    vscode.commands.registerCommand("highwater.works.remove", (node: Parameters<WorksView["remove"]>[0]) => works.remove(node)),
-    vscode.commands.registerCommand("highwater.works.delete", (node: Parameters<WorksView["delete"]>[0]) => works.delete(node)),
     vscode.commands.registerCommand("highwater.history.decide", async () => {
       const key = (focus.key ?? null);
       if (key) await connector.check(key);
@@ -584,7 +571,6 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (enabled()) await commitNow(path, "convert", note);
       view.refresh();
     }),
-    vscode.commands.registerCommand("highwater.history.compare", async (item: HistoryItem) => compare(await documentFor(item.key), item.key, item.commit)),
     vscode.commands.registerCommand("highwater.changeHistoryLocation", () => changeLocation()),
     vscode.commands.registerCommand("highwater.toggleDocumentHistory", () => togglePause()),
     mirror,

@@ -10,6 +10,12 @@ import { postTo } from "./highland-editor/messages.ts";
 /** The view type of the Highwater Editor. */
 export const HIGHLAND_EDITOR = "highwater.highlandEditor";
 
+/**
+ * Scripts open in the Highwater Editor. The end-to-end tests that drive VS Code's text editor turn
+ * this off (highwater.test.textEditorDefault); nothing else does.
+ */
+export const editorDefaults = { highwater: true };
+
 /** A Highwater Editor showing a document, as its provider reports it. */
 export interface HighlandView {
   readonly document: vscode.TextDocument;
@@ -130,7 +136,7 @@ export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode
   // A .highland file's script counts even before VS Code has given it its language (it does so a
   // moment after opening): otherwise it would show as text first, then switch.
   const script = doc.languageId.startsWith("highland-") || (doc.uri.scheme === "highland" && /\.highland$/i.test(doc.uri.path));
-  if (script && vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) {
+  if (script && editorDefaults.highwater) {
     await vscode.commands.executeCommand("vscode.openWith", doc.uri, HIGHLAND_EDITOR, { viewColumn: viewColumn ?? vscode.ViewColumn.Active, preview: false });
     return;
   }

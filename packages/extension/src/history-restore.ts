@@ -154,7 +154,6 @@ export function restoreCommands(core: RestoreCore) {
       await commitNow(key, kind(kept, form), `to ${name}, connected by hand`);
     }
     extras.forget();
-    await vscode.commands.executeCommand("highwater.panels.refresh");
     view.refresh();
     works.refresh();
     void updateStatus();

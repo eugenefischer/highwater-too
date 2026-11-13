@@ -2,9 +2,9 @@ import * as vscode from "vscode";
 import { activeView, onDidChangeActiveSurface } from "../surface.ts";
 
 /**
- * VS Code's Highwater Too sidebar while a Highwater Editor is in front: its five views are
- * hidden (the editor's own sidebar has them), and this sixth view, only a note, keeps the icon.
- * Whenever a Highwater Editor is given focus, the Highwater Too sidebar closes if it is open.
+ * VS Code's Highwater Too sidebar: one view, only a note pointing to the Highwater Editor's own
+ * sidebar, which has the panels. Whenever a Highwater Editor is given focus, the Highwater Too
+ * sidebar closes if it is open.
  */
 export const NOTE_VIEW = "highwater.inEditor";
 
@@ -26,7 +26,7 @@ export function registerSidebarNote(context: vscode.ExtensionContext): void {
   let last = activeView();
   context.subscriptions.push(
     note,
-    // VS Code swaps the views a moment after the editor comes to the front; catch the note appearing then.
+    // The sidebar can show a moment after the editor comes to the front; catch the note appearing then.
     note.onDidChangeVisibility((e) => {
       if (e.visible && Date.now() - asked < 600) closeIfShown();
     }),

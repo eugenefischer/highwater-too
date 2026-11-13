@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.41
+
+- VS Code's text editor is no longer a second way to work on a document. Removed: the code and book buttons in the title bar, the Navigator, Bin, Assets, Writing History and Works views in VS Code's sidebar (the Highwater Editor's sidebar has them all), Live Margins (⌘L), the side-by-side PDF Preview, and the `highwater.highlandEditor` and `highwater.showSidebarOnOpen` settings.
+- Documents always open in the Highwater Editor. **Reopen Editor With… → Text Editor** still opens one as plain text, with highlighting, completion and the writing keys; ⌘5 opens the Scratchpad in a tab there.
+- VS Code's Highwater Too sidebar now only points to the Highwater Editor's sidebar, with Open Document… and New Document… when no Highwater Editor is in front.
+
 ## 0.6.40
 
 - Compare: the save being compared is outlined in the Writing History, in the same colour as the border.

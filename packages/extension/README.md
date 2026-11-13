@@ -40,7 +40,7 @@ Your script appears in a page-width column of Courier Prime, as in Highland 2. E
 - **Paragraph numbers, Go to Paragraph and Show Invisibles:** as in Highland.
 - **Text size:** ⌘+ and ⌘− change it. ⌥⌘0 resets it.
 
-The code button in the title bar turns the tab into VS Code's ordinary text editor, which is useful for other extensions or for multiple cursors. The book button turns it back. In the text editor, **Live Margins** (⌘L) indents cues, parentheticals and dialogue as on the page.
+To edit a document as plain text, for other extensions or multiple cursors, use VS Code's **Reopen Editor With… → Text Editor**. It keeps the highlighting, completion and writing keys, but not the sidebar, the pages or Compare.
 
 ## The sidebar
 
@@ -55,8 +55,6 @@ The sidebar on the left of the page (⌘0 shows or hides it) has Highland's pane
 - **Scratchpad** (⌘5): notes, saved as you type.
 - **Writing History:** this document's saves (see [Writing history](#writing-history)).
 - **Works:** everything in your writing history.
-
-When you use VS Code's text editor instead, the same panels appear in VS Code's own sidebar, under the Highwater Too icon.
 
 ## Print and export
 
@@ -137,26 +135,23 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 | ⌃M, ⌃⌥M | Insert marker, go to next marker |
 | ⌃G | Go to paragraph |
 | ⌥⌘X, ⌥⌘C | Cut to Bin, copy to Bin |
-| ⌘E | Text or pages (in the text editor: Preview) |
+| ⌘E | Text or pages |
 | ⌘0 | Show or hide the sidebar |
 | ⌘1, ⌘2, ⌘4, ⌘5 | Navigator, Bin, Assets, Scratchpad |
 | ⇧⌘I | Show Invisibles |
 | ⌘+, ⌘−, ⌥⌘0 | Larger, smaller, reset text size |
-| ⌘L | Live Margins (text editor) |
 
 ## Settings
 
 | Setting | Default | What it does |
 |---|---|---|
-| `highwater.highlandEditor` | on | Open documents in the Highwater Editor. Off: they open in the text editor. |
 | `highwater.theme` | Match VS Code | Highland 2's colour theme for the Highwater Editor and the Navigator. |
 | `highwater.themeWindow` | on | Choose Theme… also colours the rest of VS Code to match. |
 | `highwater.fontSize` | 0 | Text size in the Highwater Editor, in pixels. 0 follows VS Code's font size, scaled to about Highland's. |
 | `highwater.paragraphNumbers` | off | Paragraph numbers in the margin. |
 | `highwater.spellCheck` | off | Check spelling while typing (American English). |
 | `highwater.spellingWords` | none | Words added with Learn Spelling. |
-| `highwater.highlandShortcuts` | on | Highland 2's shortcuts instead of VS Code's. Off: Preview is ⌃⌥P and Live Margins ⌃⌥L. |
-| `highwater.showSidebarOnOpen` | on | Show the Highwater Too views when a document opens in the text editor. |
+| `highwater.highlandShortcuts` | on | Highland 2's shortcuts instead of VS Code's. Off: Preview is ⌃⌥P. |
 | `highwater.docxFont` | Courier New | Font for Export Word Document: Courier New, or Courier Prime embedded. |
 | `highwater.templates.*` | Highland's | Each template's options, such as fonts. Easiest to change in the template window. |
 | `highwater.writingHistory` | on | Record saves in the writing history. |
@@ -168,7 +163,6 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 
 - **Not built yet:** statistics, goals and sprints (the sidebar's Statistics panel is a placeholder), Revision Mode, Gender Analysis, Final Draft (`.fdx`) files, `.textbundle` files.
 - **Prose template fonts:** the prose templates use Highland 2's fonts. Highland Sans, Amiri, Lato and Merriweather come with Highwater Too. Georgia, Times New Roman and Avenir Next are used when they're installed, and SF Pro Display and New York when Highland 2 is. Otherwise a stand-in prints (you're told when you export), and lines and pages can fall differently. Nested list items are indented, where Highland prints them flat.
-- **Live Margins (text editor only):** it can't indent the continuation of a wrapped line, and while you start typing a line VS Code may briefly show "…" in the margin.
 - **Windows:** not tested yet.
 
 ## Licence

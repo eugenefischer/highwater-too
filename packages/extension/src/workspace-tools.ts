@@ -1,43 +1,12 @@
 import * as vscode from "vscode";
-import { LANGUAGES, type ParseCache } from "./language.ts";
-import { liveMargins } from "./syntax/margins.ts";
+import { type ParseCache } from "./language.ts";
+import { postTo } from "./highland-editor/messages.ts";
 import { BUILDER_FIELDS, readBuilderValues, titlePageEdit, type BuilderValues } from "./syntax/title-builder.ts";
 import { activeColumn, activeDocument, viewOf } from "./surface.ts";
 
-const SELECTOR: vscode.DocumentSelector = Object.values(LANGUAGES).map((language) => ({ language }));
-
-/** Live Margins (⌘L) and the Title Page Builder (M6). */
+/** The Title Page Builder (M6). */
 export function registerWorkspaceTools(context: vscode.ExtensionContext, cache: ParseCache): void {
-  const KEY = "highwater.liveMargins";
-  let on = context.globalState.get<boolean>(KEY, false);
-  void vscode.commands.executeCommand("setContext", KEY, on);
-
-  // Live Margins are inlay hints of spaces at the start of lines, not decorations: VS Code wraps
-  // lines around inlay hints, but not around decorations, which pushed long lines past the edge.
-  const changed = new vscode.EventEmitter<void>();
-  const provider: vscode.InlayHintsProvider = {
-    onDidChangeInlayHints: changed.event,
-    provideInlayHints(document, range) {
-      if (!on) return [];
-      const from = document.offsetAt(range.start);
-      const to = document.offsetAt(range.end);
-      return liveMargins(cache.get(document))
-        .filter(({ at }) => at >= from && at <= to)
-        .map(({ at, indent }) => new vscode.InlayHint(document.positionAt(at), "\u00a0".repeat(indent)));
-    },
-  };
-
-  context.subscriptions.push(
-    changed,
-    vscode.languages.registerInlayHintsProvider(SELECTOR, provider),
-    vscode.commands.registerCommand("highwater.toggleLiveMargins", async () => {
-      on = !on;
-      await context.globalState.update(KEY, on);
-      void vscode.commands.executeCommand("setContext", KEY, on);
-      changed.fire();
-    }),
-    vscode.commands.registerCommand("highwater.titlePageBuilder", () => openBuilder(context, cache)),
-  );
+  context.subscriptions.push(vscode.commands.registerCommand("highwater.titlePageBuilder", () => openBuilder(context, cache)));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -48,6 +17,12 @@ async function openBuilder(context: vscode.ExtensionContext, cache: ParseCache):
   const column = activeColumn();
   if (!document || !document.languageId.startsWith("highland-")) {
     void vscode.window.showInformationMessage("Open a document to build its title page.");
+    return;
+  }
+  // A comparison is read-only: the Highwater Editor says so instead.
+  const hv = viewOf(document);
+  if (hv?.comparing) {
+    postTo(hv.panel, { type: "compareRefused" });
     return;
   }
   const values = readBuilderValues(cache.get(document));

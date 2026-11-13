@@ -171,8 +171,6 @@ export class FocusedDocument implements vscode.Disposable {
     this.bundle = bundle;
     this.plain = plain;
     if (!changed) return;
-    void vscode.commands.executeCommand("setContext", "highwater.inBundle", bundle !== undefined);
-    void vscode.commands.executeCommand("setContext", "highwater.hasExtras", bundle !== undefined || plain !== undefined);
     void vscode.commands.executeCommand("setContext", "highwater.hasDocument", bundle !== undefined || plain !== undefined);
     this.#emitter.fire();
   }

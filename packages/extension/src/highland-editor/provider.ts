@@ -16,7 +16,7 @@ import { pageHtml } from "./page-html.ts";
 import { postTo, type FromPage, type PanelName, type ToPage } from "./messages.ts";
 import { askText } from "../ask.ts";
 import { roleOf } from "../focus.ts";
-import { activeOffsets, activeView, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
+import { activeOffsets, activeView, editorDefaults, HIGHLAND_EDITOR, highlandViews, revealOffset, viewOf, type HighlandView } from "../surface.ts";
 import { debounce } from "../debounce.ts";
 
 export { HIGHLAND_EDITOR };
@@ -301,7 +301,7 @@ function log(what: string): void {
   swapLog.push(`${Date.now() % 1_000_000} ${what}`);
   if (swapLog.length > 400) swapLog.splice(0, 100);
 }
-/** Documents the writer switched to the text editor with the code button: left as text until closed. */
+/** Documents the writer switched to the text editor (Reopen Editor With…): left as text until closed. */
 const wantsText = new Set<string>();
 
 /**
@@ -324,7 +324,7 @@ function noteFront(): void {
   front = now;
   log(`front ${now ? `${now.highwater ? "highwater" : "text"} ${now.uri.split("/").pop()}` : "none"}`);
   // From a Highwater tab straight to a text tab of the same document: the writer chose the text
-  // editor (the breadcrumbs bar's editor menu, or the code button), if the Highwater tab is gone.
+  // editor (Reopen Editor With…, or the breadcrumbs bar's editor menu), if the Highwater tab is gone.
   // Not gated on \`swapping\`: that stays on for half a second after our own swap to the Highwater
   // Editor, and a choice made in that time was missed (CI's log, 0.6.28).
   // (A Search result opened as text beside a Highwater tab keeps that tab: it goes back there.)
@@ -349,7 +349,7 @@ function choseText(uri: string): boolean {
 }
 
 /**
- * Swaps run one at a time. Two at once (the code button pressed while the switch into the
+ * Swaps run one at a time. Two at once (a second swap asked for while the switch into the
  * Highwater Editor was still finishing) left VS Code with both tabs open (CI's log on Linux, 0.6.28).
  */
 let swapQueue: Promise<void> = Promise.resolve();
@@ -490,7 +490,7 @@ function swapSoon(uri: vscode.Uri): void {
   setTimeout(attempt, 0);
 }
 
-/** Opens the active document in the Highwater Editor, or back in the text editor. */
+/** The Highwater Editor, its commands, and turning scripts opened as text into Highwater Editor tabs. */
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore): void {
   registerSidebarNote(context);
   context.subscriptions.push(
@@ -510,10 +510,8 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       const v = activeView();
       if (typeof panel === "string" && v) postTo(v.panel, { type: "showPanel", panel: panel as PanelName });
     }),
-    vscode.commands.registerCommand("highwater.openHighlandEditor", async (uri?: vscode.Uri) => {
-      const target = uri ?? vscode.window.activeTextEditor?.document.uri;
-      if (target) await swapActive(target, HIGHLAND_EDITOR);
-    }),
+    // ⌘E: the printed pages in place of the text, as in Highland 2.
+    vscode.commands.registerCommand("highwater.preview", () => activeView()?.togglePreview()),
     // Highland's themes, tried out as you move through the list (Escape puts the old one back).
     vscode.commands.registerCommand("highwater.chooseTheme", async () => {
       const before = { theme: vscode.workspace.getConfiguration("highwater").get<string>("theme", "vscode"), window: windowTheme() };
@@ -584,16 +582,8 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("paragraphNumbers", !config.get<boolean>("paragraphNumbers", false), vscode.ConfigurationTarget.Global);
     }),
-    vscode.commands.registerCommand("highwater.openTextEditor", async (uri?: vscode.Uri) => {
-      const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
-      const target = uri ?? (tab?.input instanceof vscode.TabInputCustom ? tab.input.uri : undefined);
-      if (!target) return;
-      wantsText.add(target.toString()); // not switched back by the default below
-      log(`code button: ${target.path.split("/").pop()} wants text`);
-      await swapActive(target, "default");
-    }),
-    // The Highwater Editor is the default (highwater.highlandEditor): a script opened as text
-    // becomes a Highwater Editor tab, unless the writer chose the text editor for it with the code button.
+    // A script opened as text (from Search, the Explorer's Open With, a link) becomes a Highwater
+    // Editor tab, unless the writer chose the text editor for it (Reopen Editor With… → Text Editor).
     vscode.window.tabGroups.onDidChangeTabGroups(() => noteFront()),
     vscode.window.tabGroups.onDidChangeTabs((e) => {
       noteFront();
@@ -604,7 +594,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
         const still = vscode.window.tabGroups.all.flatMap((g) => g.tabs).some((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri);
         if (!still && wantsText.delete(uri)) log(`wantsText cleared for ${uri.split("/").pop()} (its last tab closed)`);
       }
-      if (swapping || !vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) return;
+      if (swapping || !editorDefaults.highwater) return;
       for (const opened of e.opened) {
         // Not opened.isActive: a tab is usually reported active only in a later event. Checked below.
         if (!(opened.input instanceof vscode.TabInputText)) continue;
@@ -613,7 +603,7 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
     }),
     // Also when a script's text tab comes to the front: the tab events don't always say it is active.
     vscode.window.onDidChangeActiveTextEditor((e) => {
-      if (e && vscode.workspace.getConfiguration("highwater").get<boolean>("highlandEditor", true)) swapSoon(e.document.uri);
+      if (e && editorDefaults.highwater) swapSoon(e.document.uri);
     }),
     // A script opened in the text editor (from Search, say) while it is open in the Highwater
     // Editor: show it there instead, at the same place, so there is one tab per document. Only when it has no unsaved

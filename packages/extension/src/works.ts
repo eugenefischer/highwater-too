@@ -31,13 +31,14 @@ export type WorkNode = Node;
 type Node = { kind: "work"; work: WorkInfo; here: string | undefined } | { kind: "save"; work: WorkInfo; here: string | undefined; commit: CommitInfo };
 
 /**
- * The Works panel (Writing history 2): every work in the catalog, newest save first, and for works
+ * The works for the Highwater Editor's Works panel (Writing history 2): every work in the catalog, newest save first, and for works
  * on this computer their saves. From here a work is opened, restored, removed from this computer,
  * or its history deleted.
  */
-export class WorksView implements vscode.TreeDataProvider<Node> {
+export class Works {
   readonly #changed = new vscode.EventEmitter<void>();
-  readonly onDidChangeTreeData = this.#changed.event;
+  /** The catalog or a work's saves changed. */
+  readonly onDidChange = this.#changed.event;
   readonly #host: WorksHost;
 
   constructor(host: WorksHost) {
@@ -46,26 +47,6 @@ export class WorksView implements vscode.TreeDataProvider<Node> {
 
   refresh(): void {
     this.#changed.fire();
-  }
-
-  getTreeItem(node: Node): vscode.TreeItem {
-    if (node.kind === "save") {
-      const t = new vscode.TreeItem(`${node.commit.date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`);
-      t.description = node.commit.message.replace(/^(\S+) \S+ \S+, /, "$1, ");
-      t.tooltip = `${node.commit.message}\n${node.commit.hash}`;
-      t.iconPath = new vscode.ThemeIcon("history");
-      t.command = { command: "highwater.works.showSave", title: "Show", arguments: [node] };
-      return t;
-    }
-    const w = node.work;
-    const t = new vscode.TreeItem(w.title, w.local ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-    t.description = node.here ? basename(node.here) : w.local ? "history on this computer" : "on the mirror";
-    const kind = w.form === "highland" ? ".highland file" : w.form ? `.${w.form} file` : "file";
-    t.tooltip = `${w.title}\nKept as a ${kind}${w.file ? ` (${w.file})` : ""}${w.lastSave ? `\nLast saved ${w.lastSave.toLocaleString()}` : ""}\n${node.here ? `Here: ${node.here}` : w.local ? "Its history is on this computer; its file is not." : "Only on the mirror."}`;
-    t.iconPath = new vscode.ThemeIcon(node.here ? "file" : w.local ? "history" : "cloud");
-    t.contextValue = node.here ? "work.here" : w.local ? "work.local" : "work.remote";
-    if (node.here) t.command = { command: "highwater.works.open", title: "Open", arguments: [node] };
-    return t;
   }
 
   async getChildren(node?: Node): Promise<Node[]> {
@@ -319,7 +300,6 @@ export async function revertTo(host: WorksHost, doc: vscode.TextDocument, key: s
     host.connector.takeNext(key);
     await host.record(key, "revert", note);
   }
-  await vscode.commands.executeCommand("highwater.panels.refresh");
   host.changed();
   return true;
 }

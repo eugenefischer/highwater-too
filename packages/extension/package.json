@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.40",
+  "version": "0.6.41",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -169,17 +169,6 @@
         "category": "Highwater Too"
       },
       {
-        "command": "highwater.navigator.filter",
-        "title": "Show or Hide Item Types…",
-        "category": "Highwater Too",
-        "icon": "$(filter)"
-      },
-      {
-        "command": "highwater.navigator.reveal",
-        "title": "Go to Item",
-        "category": "Highwater Too"
-      },
-      {
         "command": "highwater.copyToBin",
         "title": "Copy to Bin",
         "category": "Highwater Too"
@@ -190,73 +179,15 @@
         "category": "Highwater Too"
       },
       {
-        "command": "highwater.bin.new",
-        "title": "New Bin Item",
-        "category": "Highwater Too",
-        "icon": "$(add)"
-      },
-      {
-        "command": "highwater.bin.open",
-        "title": "Open Bin Item",
-        "category": "Highwater Too"
-      },
-      {
-        "command": "highwater.bin.insert",
-        "title": "Insert into Script",
-        "category": "Highwater Too",
-        "icon": "$(insert)"
-      },
-      {
-        "command": "highwater.bin.moveUp",
-        "title": "Move Up",
-        "category": "Highwater Too",
-        "icon": "$(arrow-up)"
-      },
-      {
-        "command": "highwater.bin.moveDown",
-        "title": "Move Down",
-        "category": "Highwater Too",
-        "icon": "$(arrow-down)"
-      },
-      {
-        "command": "highwater.bin.delete",
-        "title": "Delete",
-        "category": "Highwater Too",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "highwater.assets.add",
-        "title": "Add Image…",
-        "category": "Highwater Too",
-        "icon": "$(add)"
-      },
-      {
-        "command": "highwater.assets.insert",
-        "title": "Insert into Script",
-        "category": "Highwater Too",
-        "icon": "$(insert)"
-      },
-      {
         "command": "highwater.assets.open",
         "title": "Open Image",
         "category": "Highwater Too"
-      },
-      {
-        "command": "highwater.assets.delete",
-        "title": "Delete",
-        "category": "Highwater Too",
-        "icon": "$(trash)"
       },
       {
         "command": "highwater.openScratchpad",
         "title": "Open Scratchpad",
         "category": "Highwater Too",
         "icon": "$(notebook)"
-      },
-      {
-        "command": "highwater.toggleLiveMargins",
-        "title": "Toggle Live Margins",
-        "category": "Highwater Too"
       },
       {
         "command": "highwater.titlePageBuilder",
@@ -298,45 +229,10 @@
         "icon": "$(circle-slash)"
       },
       {
-        "command": "highwater.history.compare",
-        "title": "Compare with Now",
-        "category": "Highwater Too"
-      },
-      {
-        "command": "highwater.history.revert",
-        "title": "Revert to This Save…",
-        "category": "Highwater Too"
-      },
-      {
         "command": "highwater.works.refresh",
         "title": "Refresh",
         "category": "Highwater Too",
         "icon": "$(refresh)"
-      },
-      {
-        "command": "highwater.works.open",
-        "title": "Open",
-        "category": "Highwater Too"
-      },
-      {
-        "command": "highwater.works.restore",
-        "title": "Restore…",
-        "category": "Highwater Too"
-      },
-      {
-        "command": "highwater.works.showSave",
-        "title": "Show This Save",
-        "category": "Highwater Too"
-      },
-      {
-        "command": "highwater.works.remove",
-        "title": "Remove from This Computer…",
-        "category": "Highwater Too"
-      },
-      {
-        "command": "highwater.works.delete",
-        "title": "Delete Writing History…",
-        "category": "Highwater Too"
       },
       {
         "command": "highwater.setUpHistoryMirror",
@@ -406,18 +302,6 @@
         "title": "Syntax Cheat Sheet",
         "category": "Highwater Too",
         "icon": "$(question)"
-      },
-      {
-        "command": "highwater.openHighlandEditor",
-        "title": "Open in Highwater Editor",
-        "category": "Highwater Too",
-        "icon": "$(book)"
-      },
-      {
-        "command": "highwater.openTextEditor",
-        "title": "Reopen in Text Editor",
-        "category": "Highwater Too",
-        "icon": "$(code)"
       },
       {
         "command": "highwater.goToLine",
@@ -523,12 +407,7 @@
         "highwater.highlandShortcuts": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Writing shortcuts in documents: ⌘E for Preview, ⌘L for Live Margins, ⌘0 for the sidebar, ⌘1 for the Navigator, ⌘2 for the Bin, ⌘4 for Assets and ⌘5 for the Scratchpad and ⇧⌘I for Show Invisibles, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P and Live Margins ⌃⌥L."
-        },
-        "highwater.showSidebarOnOpen": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Switch the sidebar to Highwater Too (Navigator, Bin, Assets) when a document is opened in the text editor. (The Highwater Editor has these panels in its own sidebar; VS Code's Highwater Too sidebar closes when it is given focus.)"
+          "markdownDescription": "Writing shortcuts in documents: ⌘E for Preview, ⌘0 for the sidebar, ⌘1 to ⌘5 for its panels and ⇧⌘I for Show Invisibles, instead of VS Code's meanings for those keys. With it off, Preview is ⌃⌥P."
         },
         "highwater.docxFont": {
           "type": "string",
@@ -561,11 +440,6 @@
           "minimum": 1,
           "scope": "application",
           "markdownDescription": "A file this computer has no writing history for is recognised as a work in the history when its text is exactly one of that work's saves, but only if it has at least this many words, so empty files and templates never match. (It is always asked before anything is fetched.)"
-        },
-        "highwater.highlandEditor": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Open screenplays and manuscripts (`.highland`, `.fountain`, and `.md` files Highwater Too handles) in the Highwater Editor. Off: they open as text. Either way, the book and code buttons in the editor's title bar switch a document between the two."
         },
         "highwater.theme": {
           "type": "string",
@@ -1329,10 +1203,6 @@
     ],
     "configurationDefaults": {
       "[highland-fountain]": {
-        "editor.inlayHints.maximumLength": 0,
-        "editor.dropIntoEditor.preferences": [
-          "highwater.asset"
-        ],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -1347,14 +1217,9 @@
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
         "editor.stickyScroll.enabled": true,
-        "editor.inlayHints.enabled": "on",
         "editor.lineNumbers": "off"
       },
       "[highland-markdown]": {
-        "editor.inlayHints.maximumLength": 0,
-        "editor.dropIntoEditor.preferences": [
-          "highwater.asset"
-        ],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -1369,14 +1234,9 @@
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
         "editor.stickyScroll.enabled": true,
-        "editor.inlayHints.enabled": "on",
         "editor.lineNumbers": "off"
       },
       "[highland-plain]": {
-        "editor.inlayHints.maximumLength": 0,
-        "editor.dropIntoEditor.preferences": [
-          "highwater.asset"
-        ],
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
@@ -1391,7 +1251,6 @@
         "editor.renderWhitespace": "none",
         "editor.guides.indentation": false,
         "editor.stickyScroll.enabled": true,
-        "editor.inlayHints.enabled": "on",
         "editor.lineNumbers": "off"
       }
     },
@@ -1458,39 +1317,7 @@
           "when": "highwater.docLang =~ /^highland-/"
         },
         {
-          "command": "highwater.navigator.reveal",
-          "when": "false"
-        },
-        {
-          "command": "highwater.bin.open",
-          "when": "false"
-        },
-        {
-          "command": "highwater.bin.insert",
-          "when": "false"
-        },
-        {
-          "command": "highwater.bin.moveUp",
-          "when": "false"
-        },
-        {
-          "command": "highwater.bin.moveDown",
-          "when": "false"
-        },
-        {
-          "command": "highwater.bin.delete",
-          "when": "false"
-        },
-        {
-          "command": "highwater.assets.insert",
-          "when": "false"
-        },
-        {
           "command": "highwater.assets.open",
-          "when": "false"
-        },
-        {
-          "command": "highwater.assets.delete",
           "when": "false"
         },
         {
@@ -1502,48 +1329,16 @@
           "when": "highwater.docLang =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
         },
         {
-          "command": "highwater.toggleLiveMargins",
-          "when": "editorLangId =~ /^highland-/"
-        },
-        {
           "command": "highwater.titlePageBuilder",
           "when": "highwater.docLang =~ /^highland-(fountain|markdown)$/"
         },
         {
           "command": "highwater.preview",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.showHistory",
           "when": "highwater.docLang =~ /^highland-/"
-        },
-        {
-          "command": "highwater.history.compare",
-          "when": "false"
-        },
-        {
-          "command": "highwater.history.revert",
-          "when": "false"
-        },
-        {
-          "command": "highwater.works.open",
-          "when": "false"
-        },
-        {
-          "command": "highwater.works.restore",
-          "when": "false"
-        },
-        {
-          "command": "highwater.works.showSave",
-          "when": "false"
-        },
-        {
-          "command": "highwater.works.remove",
-          "when": "false"
-        },
-        {
-          "command": "highwater.works.delete",
-          "when": "false"
         },
         {
           "command": "highwater.toggleDocumentHistory",
@@ -1576,10 +1371,6 @@
         {
           "command": "highwater.nextMarker",
           "when": "highwater.docLang =~ /^highland-/"
-        },
-        {
-          "command": "highwater.openTextEditor",
-          "when": "activeCustomEditorId == highwater.highlandEditor"
         },
         {
           "command": "highwater.showSidebarPanel",
@@ -1641,11 +1432,6 @@
           "group": "5_convert"
         },
         {
-          "command": "highwater.preview",
-          "when": "editorLangId =~ /^highland-/",
-          "group": "navigation@1"
-        },
-        {
           "command": "highwater.export",
           "when": "editorLangId =~ /^highland-/ && resourceScheme != highwater-extras",
           "group": "navigation@2"
@@ -1654,16 +1440,6 @@
           "command": "highwater.newDocument",
           "when": "editorLangId =~ /^highland-/ && resourceScheme != highwater-extras",
           "group": "navigation@3"
-        },
-        {
-          "command": "highwater.openHighlandEditor",
-          "when": "editorLangId =~ /^highland-/",
-          "group": "navigation@0"
-        },
-        {
-          "command": "highwater.openTextEditor",
-          "when": "activeCustomEditorId == highwater.highlandEditor",
-          "group": "navigation@0"
         },
         {
           "command": "highwater.export",
@@ -1689,155 +1465,6 @@
           "command": "highwater.toggleSpelling",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "1_highwater@3"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "highwater.newDocument",
-          "when": "view == highwater.navigator",
-          "group": "navigation@0"
-        },
-        {
-          "command": "highwater.bin.new",
-          "when": "view == highwater.bin && highwater.hasExtras",
-          "group": "navigation@1"
-        },
-        {
-          "command": "highwater.openScratchpad",
-          "when": "view == highwater.bin && highwater.hasExtras",
-          "group": "navigation@2"
-        },
-        {
-          "command": "highwater.assets.add",
-          "when": "view == highwater.assets && highwater.hasExtras",
-          "group": "navigation"
-        },
-        {
-          "command": "highwater.works.refresh",
-          "when": "view == highwater.works",
-          "group": "navigation"
-        },
-        {
-          "command": "highwater.openHistoryFolder",
-          "when": "view == highwater.history",
-          "group": "navigation@1"
-        },
-        {
-          "command": "highwater.toggleDocumentHistory",
-          "when": "view == highwater.history",
-          "group": "navigation@2"
-        },
-        {
-          "command": "highwater.changeHistoryLocation",
-          "when": "view == highwater.history",
-          "group": "1_settings"
-        },
-        {
-          "command": "highwater.openWorkFromHistory",
-          "when": "view == highwater.history",
-          "group": "navigation@2"
-        },
-        {
-          "command": "highwater.exportHistory",
-          "when": "view == highwater.history",
-          "group": "navigation@3"
-        },
-        {
-          "command": "highwater.connectToWork",
-          "when": "view == highwater.history && highwater.hasDocument",
-          "group": "0_document"
-        },
-        {
-          "command": "highwater.setUpHistoryMirror",
-          "when": "view == highwater.history",
-          "group": "1_settings"
-        },
-        {
-          "command": "highwater.pushHistoryNow",
-          "when": "view == highwater.history && config.highwater.historyRemote",
-          "group": "1_settings"
-        },
-        {
-          "command": "highwater.signInHistoryMirror",
-          "when": "view == highwater.history && config.highwater.historyRemote",
-          "group": "1_settings"
-        },
-        {
-          "command": "highwater.forgetHistoryMirrorSignIn",
-          "when": "view == highwater.history && config.highwater.historyRemote",
-          "group": "1_settings"
-        },
-        {
-          "command": "highwater.cheatSheet",
-          "when": "view == highwater.navigator",
-          "group": "navigation@9"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "highwater.history.revert",
-          "when": "view == highwater.history && viewItem == save",
-          "group": "1_history"
-        },
-        {
-          "command": "highwater.works.open",
-          "when": "view == highwater.works && viewItem == work.here",
-          "group": "1_open@1"
-        },
-        {
-          "command": "highwater.works.restore",
-          "when": "view == highwater.works && (viewItem == work.local || viewItem == work.remote)",
-          "group": "1_open@2"
-        },
-        {
-          "command": "highwater.works.remove",
-          "when": "view == highwater.works && (viewItem == work.here || viewItem == work.local)",
-          "group": "2_manage@1"
-        },
-        {
-          "command": "highwater.works.delete",
-          "when": "view == highwater.works && viewItem =~ /^work\\./",
-          "group": "2_manage@2"
-        },
-        {
-          "command": "highwater.bin.insert",
-          "when": "view == highwater.bin && viewItem == binItem",
-          "group": "inline@1"
-        },
-        {
-          "command": "highwater.bin.moveUp",
-          "when": "view == highwater.bin && viewItem == binItem",
-          "group": "1_move@1"
-        },
-        {
-          "command": "highwater.bin.moveDown",
-          "when": "view == highwater.bin && viewItem == binItem",
-          "group": "1_move@2"
-        },
-        {
-          "command": "highwater.bin.insert",
-          "when": "view == highwater.bin && viewItem == binItem",
-          "group": "0_use"
-        },
-        {
-          "command": "highwater.bin.delete",
-          "when": "view == highwater.bin && viewItem == binItem",
-          "group": "9_delete"
-        },
-        {
-          "command": "highwater.assets.insert",
-          "when": "view == highwater.assets && viewItem == asset",
-          "group": "inline@1"
-        },
-        {
-          "command": "highwater.assets.insert",
-          "when": "view == highwater.assets && viewItem == asset",
-          "group": "0_use"
-        },
-        {
-          "command": "highwater.assets.delete",
-          "when": "view == highwater.assets && viewItem == asset",
-          "group": "9_delete"
         }
       ],
       "editor/context": [
@@ -1957,12 +1584,6 @@
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
       },
       {
-        "command": "workbench.action.toggleSidebarVisibility",
-        "key": "ctrl+0",
-        "mac": "cmd+0",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
-      },
-      {
         "command": "highwater.toggleEditorSidebar",
         "key": "ctrl+0",
         "mac": "cmd+0",
@@ -1993,12 +1614,6 @@
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
       },
       {
-        "command": "highwater.navigator.focus",
-        "mac": "cmd+1",
-        "key": "ctrl+1",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
-      },
-      {
         "command": "highwater.showSidebarPanel",
         "mac": "cmd+1",
         "key": "ctrl+1",
@@ -2006,23 +1621,11 @@
         "args": "navigator"
       },
       {
-        "command": "highwater.bin.focus",
-        "mac": "cmd+2",
-        "key": "ctrl+2",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
-      },
-      {
         "command": "highwater.showSidebarPanel",
         "mac": "cmd+2",
         "key": "ctrl+2",
         "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts",
         "args": "bin"
-      },
-      {
-        "command": "highwater.assets.focus",
-        "mac": "cmd+4",
-        "key": "ctrl+4",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.showSidebarPanel",
@@ -2045,34 +1648,10 @@
         "args": "scratchpad"
       },
       {
-        "command": "highwater.toggleLiveMargins",
-        "mac": "cmd+l",
-        "key": "ctrl+l",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
-      },
-      {
-        "command": "highwater.toggleLiveMargins",
-        "mac": "ctrl+alt+l",
-        "key": "ctrl+alt+l",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
-      },
-      {
-        "command": "highwater.preview",
-        "mac": "cmd+e",
-        "key": "ctrl+e",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
-      },
-      {
         "command": "highwater.preview",
         "mac": "cmd+e",
         "key": "ctrl+e",
         "when": "activeCustomEditorId == 'highwater.highlandEditor' && config.highwater.highlandShortcuts"
-      },
-      {
-        "command": "highwater.preview",
-        "mac": "ctrl+alt+p",
-        "key": "ctrl+alt+p",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && !config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.preview",
@@ -2166,39 +1745,7 @@
     "views": {
       "highwater": [
         {
-          "id": "highwater.navigator",
-          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
-          "name": "Navigator",
-          "icon": "media/highwater.svg",
-          "type": "webview"
-        },
-        {
-          "id": "highwater.bin",
-          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
-          "name": "Bin",
-          "icon": "media/highwater.svg"
-        },
-        {
-          "id": "highwater.assets",
-          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
-          "name": "Assets",
-          "icon": "media/highwater.svg"
-        },
-        {
-          "id": "highwater.history",
-          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
-          "name": "Writing History",
-          "icon": "media/highwater.svg"
-        },
-        {
-          "id": "highwater.works",
-          "when": "activeCustomEditorId != 'highwater.highlandEditor'",
-          "name": "Works",
-          "icon": "media/highwater.svg"
-        },
-        {
           "id": "highwater.inEditor",
-          "when": "activeCustomEditorId == 'highwater.highlandEditor'",
           "name": "Highwater Editor"
         }
       ]
@@ -2206,62 +1753,13 @@
     "viewsWelcome": [
       {
         "view": "highwater.inEditor",
-        "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highwater Editor's own sidebar, at the left of the page.\n[Show or Hide the Sidebar (⌘0)](command:highwater.toggleEditorSidebar)\nThis sidebar closes whenever you go back to the page. Switch the tab to the text editor (the code button) to use VS Code's versions of these views."
+        "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highwater Editor's own sidebar, at the left of the page.\n[Show or Hide the Sidebar (⌘0)](command:highwater.toggleEditorSidebar)\nThis sidebar closes whenever you go back to the page.",
+        "when": "activeCustomEditorId == 'highwater.highlandEditor'"
       },
       {
-        "view": "highwater.works",
-        "contents": "Every work in your writing history appears here, including works saved only on another computer and kept on the mirror. Save a document to start.\n[Open Work from History…](command:highwater.openWorkFromHistory)",
-        "when": "config.highwater.writingHistory"
-      },
-      {
-        "view": "highwater.works",
-        "contents": "The writing history is off.",
-        "when": "!config.highwater.writingHistory"
-      },
-      {
-        "view": "highwater.navigator",
-        "contents": "Open a .highland, .fountain or .md document to see its scenes, sections and notes, or start a new one.\n[New Document…](command:highwater.newDocument)\n[Open Document…](command:highwater.open)",
-        "when": "!highwater.hasDocument"
-      },
-      {
-        "view": "highwater.bin",
-        "contents": "The Bin holds text cut or copied from the script (⌥⌘X, ⌥⌘C) to use later. It is kept inside the .highland file.\n[New Bin Item](command:highwater.bin.new)\n[Open Scratchpad](command:highwater.openScratchpad)",
-        "when": "highwater.inBundle"
-      },
-      {
-        "view": "highwater.bin",
-        "contents": "The Bin holds text cut or copied from the script (⌥⌘X, ⌥⌘C) to use later. For a plain .fountain or .md file, the Bin and Scratchpad are kept with the writing history, not in the file: only Highwater Too shows them. Convert it to a .highland file to keep them in the file.\n[New Bin Item](command:highwater.bin.new)\n[Open Scratchpad](command:highwater.openScratchpad)",
-        "when": "highwater.hasExtras && !highwater.inBundle"
-      },
-      {
-        "view": "highwater.bin",
-        "contents": "Open a document to use its Bin and Scratchpad.",
-        "when": "!highwater.hasExtras"
-      },
-      {
-        "view": "highwater.assets",
-        "contents": "Images kept inside this .highland file. Drag one into the text to show it in the manuscript.\n[Add Image…](command:highwater.assets.add)",
-        "when": "highwater.inBundle"
-      },
-      {
-        "view": "highwater.assets",
-        "contents": "Images for this document. For a plain .fountain or .md file they go in a folder next to the file, made when you add the first one. Drag one into the text to show it in the manuscript.\n[Add Image…](command:highwater.assets.add)",
-        "when": "highwater.hasExtras && !highwater.inBundle"
-      },
-      {
-        "view": "highwater.assets",
-        "contents": "Open a document to add images to it.",
-        "when": "!highwater.hasExtras"
-      },
-      {
-        "view": "highwater.history",
-        "contents": "Each save of a document is recorded here: one git repository for all your writing, with a branch per script. Open a script to see its saves, or open any work in the history, including ones saved on another computer.\n[Open Work from History…](command:highwater.openWorkFromHistory)\n[Change Location…](command:highwater.changeHistoryLocation)",
-        "when": "config.highwater.writingHistory"
-      },
-      {
-        "view": "highwater.history",
-        "contents": "Writing history is off.\n[Turn On](command:workbench.action.openSettings?%5B%22highwater.writingHistory%22%5D)",
-        "when": "!config.highwater.writingHistory"
+        "view": "highwater.inEditor",
+        "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highwater Editor's own sidebar, at the left of the page.\n[Open Document…](command:highwater.open)\n[New Document…](command:highwater.newDocument)",
+        "when": "activeCustomEditorId != 'highwater.highlandEditor'"
       }
     ],
     "themes": [

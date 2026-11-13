@@ -7,8 +7,7 @@ import { OPEN_VIEW_TYPE, OpenRedirect, openHighland } from "./open.ts";
 import { registerCommands } from "./commands.ts";
 import { registerConversions } from "./convert.ts";
 import { registerLanguageFeatures } from "./language.ts";
-import { registerPanels } from "./panels.ts";
-import { registerPreview } from "./preview.ts";
+import { registerBinAndAssets } from "./bin-assets.ts";
 import { registerTemplateStatus, watchTemplateOptions } from "./render-document.ts";
 import { currentHistory, historyRoot, registerHistory } from "./history.ts";
 import { startPlainExtras } from "./extras.ts";
@@ -87,10 +86,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ["status bar", () => registerStatusBar(context, cache)],
     ["commands", () => registerCommands(context, store)],
     ["conversions and exports", () => registerConversions(context, store)],
-    ["sidebar panels", () => registerPanels(context, store, fs, cache)],
-    ["Live Margins and Title Page Builder", () => registerWorkspaceTools(context, cache)],
+    ["Bin and Assets", () => registerBinAndAssets(context, store, fs)],
+    ["Title Page Builder", () => registerWorkspaceTools(context, cache)],
     ["completion, markers and cheat sheet", () => registerWritingTools(context, cache)],
-    ["preview", () => registerPreview(context, store)],
     ["template indicator", () => registerTemplateStatus(context, store)],
     ["template options", () => watchTemplateOptions(context)],
     ["writing history", () => registerHistory(context, store)],
