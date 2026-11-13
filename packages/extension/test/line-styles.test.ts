@@ -30,7 +30,8 @@ describe("Highwater Editor line styles", () => {
     const m = lineStyles(doc);
     expect(columnWidth(doc)).toBe(65);
     expect(columnMinimum(doc)).toBe(0);
-    expect(m.get(0)).toMatchObject({ kind: "heading", level: 1, align: "center" });
+    expect(m.get(0)).toMatchObject({ kind: "heading", level: 1 });
+    expect(m.get(0)?.align).toBeUndefined(); // left, the "#" hanging in the margin, as in Highland's editor
     expect(m.get(at(md, "> A quote"))).toMatchObject({ kind: "quote", indent: 3 });
   });
 

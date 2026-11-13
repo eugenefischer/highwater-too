@@ -24,6 +24,9 @@ export interface HighlandTheme {
   removed: string;
 }
 
+/** Show Invisibles: the same blue in every theme, as in Highland 2 (EJ, 2026-11-13). */
+export const INVISIBLES = "#2faad1";
+
 export const HIGHLAND_THEMES: Record<string, HighlandTheme> = {
   "classic": { name: "Classic", mode: "light", background: "#ffffff", text: "#2d333b", sidebarBackground: "#3f4752", sidebarText: "#c4cace", primary: "#b36795", secondary: "#2faad1", inactive: "#9bacba", sceneHeading: "#3f4752", notes: "#499c91", cursor: "#f85e66", added: "#2da44e", removed: "#cf222e" },
   "clean": { name: "Clean", mode: "light", background: "#ffffff", text: "#2d333b", sidebarBackground: "#f3f3f3", sidebarText: "#4a4a4a", primary: "#2faad1", secondary: "#b36795", inactive: "#888888", sceneHeading: "#06455f", notes: "#499c91", cursor: "#f85e66", added: "#2da44e", removed: "#cf222e" },
@@ -62,7 +65,9 @@ export function pageColors(t: HighlandTheme): Record<string, string> {
     "--hl-border": `color-mix(in srgb, ${t.inactive} 50%, transparent)`,
     "--hl-accent": t.primary,
     "--hl-accent-fg": onColor(t.primary),
-    "--hl-whitespace": `color-mix(in srgb, ${t.inactive} 60%, transparent)`,
+    "--hl-whitespace": INVISIBLES,
+    // Section headings (# lines) in the text: Theme Primary, bold (EJ's screenshot of Highland).
+    "--hl-section": t.primary,
   };
 }
 
@@ -73,7 +78,11 @@ export function navigatorColors(t: HighlandTheme): Record<string, string> {
     "--nav-fg": t.sidebarText,
     "--nav-section": t.secondary,
     "--nav-muted": t.inactive,
-    "--nav-current": `color-mix(in srgb, ${t.primary} 28%, transparent)`,
+    // A selected row (the Navigator's current item, a Bin card, a save, a work): Sidebar Text at
+    // 20% over Sidebar Background, measured from EJ's screenshot of Highland.
+    "--nav-current": `color-mix(in srgb, ${t.sidebarText} 20%, transparent)`,
+    // The selected sidebar tab: Theme Secondary (the top bar's selected button is Theme Primary).
+    "--nav-tab": t.secondary,
     "--nav-hover": `color-mix(in srgb, ${t.sidebarText} 10%, transparent)`,
     "--nav-accent": t.primary,
     "--nav-input-bg": `color-mix(in srgb, ${t.sidebarText} 10%, ${t.sidebarBackground})`,
@@ -165,7 +174,7 @@ export function colorTheme(t: HighlandTheme): object {
       "editor.lineHighlightBorder": "#00000000",
       "editorLineNumber.foreground": alpha(t.inactive, 0.6),
       "editorLineNumber.activeForeground": t.inactive,
-      "editorWhitespace.foreground": alpha(t.inactive, 0.6),
+      "editorWhitespace.foreground": INVISIBLES,
       "editorIndentGuide.background1": alpha(t.inactive, 0.15),
       "editorInlayHint.foreground": t.inactive,
       "editorInlayHint.background": "#00000000",
@@ -261,9 +270,9 @@ export function colorTheme(t: HighlandTheme): object {
     semanticTokenColors: {
       sceneHeading: { foreground: t.sceneHeading, bold: true },
       sceneNumber: t.sceneHeading,
-      section: t.inactive,
+      section: { foreground: t.primary, bold: true },
       synopsis: t.inactive,
-      heading: { foreground: t.text, bold: true },
+      heading: { foreground: t.primary, bold: true },
       note: { foreground: t.notes, italic: true },
       directive: t.inactive,
       markup: t.inactive,

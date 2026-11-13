@@ -38,7 +38,7 @@
     "editor.lineHighlightBorder": "#00000000",
     "editorLineNumber.foreground": "#69696999",
     "editorLineNumber.activeForeground": "#696969",
-    "editorWhitespace.foreground": "#69696999",
+    "editorWhitespace.foreground": "#2faad1",
     "editorIndentGuide.background1": "#69696926",
     "editorInlayHint.foreground": "#696969",
     "editorInlayHint.background": "#00000000",
@@ -130,10 +130,13 @@
       "bold": true
     },
     "sceneNumber": "#84697c",
-    "section": "#696969",
+    "section": {
+      "foreground": "#326878",
+      "bold": true
+    },
     "synopsis": "#696969",
     "heading": {
-      "foreground": "#333333",
+      "foreground": "#326878",
       "bold": true
     },
     "note": {

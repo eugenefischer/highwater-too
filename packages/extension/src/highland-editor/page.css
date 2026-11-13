@@ -8,12 +8,12 @@
   --hl-panel-bg: var(--vscode-editorWidget-background); --hl-panel-fg: var(--vscode-editorWidget-foreground);
   --hl-input-bg: var(--vscode-input-background); --hl-border: var(--vscode-input-border, var(--vscode-editorWidget-border, transparent));
   --hl-accent: var(--vscode-button-background); --hl-accent-fg: var(--vscode-button-foreground);
-  --hl-whitespace: var(--vscode-editorWhitespace-foreground);
+  --hl-whitespace: var(--vscode-editorWhitespace-foreground); --hl-section: var(--hl-accent);
   /* The sidebar's colours: VS Code's sidebar, unless a Highland theme sets these. */
   --nav-bg: var(--vscode-sideBar-background, var(--hl-panel-bg)); --nav-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground));
   --nav-section: var(--vscode-textLink-foreground); --nav-muted: var(--vscode-descriptionForeground);
   --nav-current: var(--vscode-list-inactiveSelectionBackground); --nav-hover: var(--vscode-list-hoverBackground);
-  --nav-accent: var(--vscode-focusBorder); --nav-input-bg: var(--vscode-input-background);
+  --nav-accent: var(--vscode-focusBorder); --nav-tab: var(--nav-accent); --nav-input-bg: var(--vscode-input-background);
   --sb-width: 264px;
 }
 html, body { height: 100%; margin: 0; padding: 0; background: var(--hl-bg); color: var(--hl-fg); }
@@ -28,8 +28,8 @@ body.sb-closed #sidebar { display: none; }
 #sbicons .tb-icon.sb-on::after { top: 31px; }
 #sbicons .tb-icon { color: var(--nav-muted); }
 #sbicons .tb-icon:hover { color: var(--nav-fg); }
-#sbicons .tb-icon.sb-on { color: var(--nav-accent); }
-#sbicons .tb-icon.sb-on::after { content: ""; position: absolute; left: 50%; top: 31px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--nav-accent); }
+#sbicons .tb-icon.sb-on { color: var(--nav-tab); }
+#sbicons .tb-icon.sb-on::after { content: ""; position: absolute; left: 50%; top: 31px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--nav-tab); }
 #sbicons .sb-ours { margin-left: auto; }
 #sbicons .sb-ours::before { content: ""; position: absolute; left: -6px; top: 9px; height: 16px; border-left: 1px solid color-mix(in srgb, var(--nav-muted) 40%, transparent); }
 #sbpanels { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -83,7 +83,7 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 #binlist { gap: 10px; outline: none; }
 .bincard { padding: 8px 10px; border-radius: 8px; }
 .bincard-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--nav-muted); font-size: 0.92em; line-height: 1.25; min-height: 5.2em; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
-.bincard.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
+.bincard.selected { background: var(--nav-current); }
 .bincard.selected .bincard-text { color: color-mix(in srgb, var(--nav-fg) 45%, var(--nav-muted)); padding-right: 20px; }
 .bincard-delete { position: absolute; top: 5px; right: 5px; display: none; padding: 1px; }
 .bincard-delete:hover { background: none; }
@@ -115,7 +115,7 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .hist-row { padding-right: 8px; cursor: default; user-select: none; }
 .hist-row .sb-row-main { gap: 6px; }
 .hist-delta { margin-left: auto; flex: none; color: var(--nav-muted); font-size: 0.9em; font-variant-numeric: tabular-nums; }
-.hist-row.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
+.hist-row.selected { background: var(--nav-current); }
 .hist-row.selected .hist-delta { visibility: hidden; }
 /* The save being compared in the page: outlined in the accent colour of the border round the page. */
 .hist-row.compared { box-shadow: inset 0 0 0 2px var(--hl-accent); }
@@ -152,7 +152,7 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 #workstatus.attention { color: var(--nav-fg); text-decoration: underline; cursor: pointer; }
 #workstatus.busy::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: -1px; border: 1.5px solid color-mix(in srgb, var(--nav-muted) 35%, transparent); border-top-color: var(--nav-muted); border-radius: 50%; animation: sb-spin 0.8s linear infinite; }
 .work-card { padding-right: 8px; cursor: default; user-select: none; }
-.work-card.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
+.work-card.selected { background: var(--nav-current); }
 .work-card.selected .sb-row-main { padding-right: 52px; }
 .work-card .sb-row-tools { position: absolute; top: 2px; right: 3px; display: none; }
 .work-card.selected .sb-row-tools { display: flex; }
@@ -272,8 +272,7 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 .hl-right { text-align: right; }
 .hl-center { text-align: center; }
 .hl-lyric { font-style: italic; }
-.hl-section, .hl-synopsis, .hl-directive, .hl-pageBreak, .hl-boneyard, .hl-title { color: var(--hl-muted); }
-.hl-heading { font-weight: bold; }
+.hl-synopsis, .hl-directive, .hl-pageBreak, .hl-boneyard, .hl-title { color: var(--hl-muted); }
 /* Highland's paragraph numbers, in the margin left of the text (highwater.paragraphNumbers). */
 .cm-editor .cm-content .cm-line { position: relative; }
 .hl-numbers .cm-line[data-n]::before { content: attr(data-n); position: absolute; left: -6.5em; width: 4.5em; text-align: right; font-size: 0.65em; line-height: calc(1.3em / 0.65); color: var(--hl-muted); font-family: var(--vscode-font-family); pointer-events: none; user-select: none; }
@@ -285,6 +284,15 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 .hl-strike { text-decoration: line-through; }
 .hl-highlight { background: rgba(252, 255, 38, 0.35); }
 .hl-note { color: var(--hl-note); font-style: italic; }
+/* Sections and headings: Theme Primary, bold, with the "#"s and their space hanging in the margin
+   (Highland's editor, EJ's screenshot): "# " hangs two characters, "## " three, and so on. */
+.hl-section, .hl-heading { color: var(--hl-section); font-weight: 700; }
+.hl-section.hl-level-1, .hl-heading.hl-level-1 { text-indent: -2ch; }
+.hl-section.hl-level-2, .hl-heading.hl-level-2 { text-indent: -3ch; }
+.hl-section.hl-level-3, .hl-heading.hl-level-3 { text-indent: -4ch; }
+.hl-section.hl-level-4, .hl-heading.hl-level-4 { text-indent: -5ch; }
+.hl-section.hl-level-5, .hl-heading.hl-level-5 { text-indent: -6ch; }
+.hl-section.hl-level-6, .hl-heading.hl-level-6 { text-indent: -7ch; }
 .hl-omitted { color: var(--hl-muted); }
 /* Show Invisibles. */
 .hl-eol { color: var(--hl-whitespace); }

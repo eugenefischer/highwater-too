@@ -114,7 +114,7 @@ export function lineStyles(doc: Document): Map<number, LineStyle> {
         each("directive");
         break;
       case "heading":
-        each("heading", { level: e.level, align: "center" });
+        each("heading", { level: e.level });
         break;
       case "blockQuote":
         each("quote", { indent: MARGINS.quote }); // Highland's editor (EJ's screenshot): "> " three characters in
