@@ -1212,6 +1212,10 @@ class WorksPanel {
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
     this.#sync.onclick = () => deps.post({ type: "worksRefresh" });
+    const status = $("workstatus");
+    status.onclick = () => {
+      if (status.classList.contains("attention")) deps.post({ type: "historyCommand", command: "highwater.signInHistoryMirror" });
+    };
     const help = $("workhelp");
     help.onclick = () => openHelp(help, WORKS_HELP);
     // A click anywhere in the list's area but on a work (between works, or below them) lets go.
@@ -1261,7 +1265,10 @@ class WorksPanel {
             : mirror.at
               ? `Synced with the mirror ${shortWhen(new Date(mirror.at))}`
               : "Not synced with the mirror yet";
-    if (mirror?.error) status.dataset.tip = mirror.error;
+    // As in the Writing History: a needed sign-in is done from here, with a click.
+    status.classList.toggle("attention", !!mirror?.signIn && !mirror.busy);
+    if (mirror?.error && !mirror.signIn) status.dataset.tip = mirror.error;
+    else if (mirror?.signIn) status.dataset.tip = "Click to sign in to the history mirror";
     else delete status.dataset.tip;
     this.#render();
   }
@@ -1418,7 +1425,7 @@ const WORKS_HELP = `
 <h3>The bottom of the panel</h3>
 <ul>
 <li><b>Filter</b> shows only the works whose name contains what you type.</li>
-<li><b>Sync</b> (with a mirror) checks the mirror for works saved on your other computers. The line above says when it last synced.</li>
+<li><b>Sync</b> (with a mirror) checks the mirror for works saved on your other computers. The line above says when it last synced. If it says the mirror needs you to sign in, click it to sign in.</li>
 </ul>
 `;
 

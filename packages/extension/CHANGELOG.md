@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.24
+
+- Works: the ? button is back at the top right, as in the Writing History.
+- Works: when the mirror needs you to sign in, the status line says so and signs in when clicked, as the Writing History's does.
+
 ## 0.6.23
 
 - Works panel, from EJ's review:
@@ -7,7 +12,7 @@
   - A click anywhere in the list's area but on a work clears the selection, below the works as well as between them (the Writing History too), and works have a little space between them.
   - Open has its own icon, a page; the arrow out of a box means Export everywhere.
   - A status line above the foot always shows when the mirror last synced (or that it is syncing, or not yet mirrored); the sync button's tooltip is just "Sync with the mirror".
-  - The sections are LOCAL WORKS, LOCAL HISTORY ONLY and MIRROR ONLY; the "All works" heading is gone, and the ? button sits in the foot.
+  - The sections are LOCAL WORKS, LOCAL HISTORY ONLY and MIRROR ONLY; the "All works" heading is gone.
 
 ## 0.6.22
 

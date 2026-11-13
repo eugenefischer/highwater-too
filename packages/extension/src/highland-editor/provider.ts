@@ -417,6 +417,7 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 #worklist { outline: none; gap: 6px; }
 #workstatus { padding: 4px 12px 0; color: var(--nav-muted); font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #workstatus[hidden] { display: none; }
+#workstatus.attention { color: var(--nav-fg); text-decoration: underline; cursor: pointer; }
 #workstatus.busy::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: -1px; border: 1.5px solid color-mix(in srgb, var(--nav-muted) 35%, transparent); border-top-color: var(--nav-muted); border-radius: 50%; animation: sb-spin 0.8s linear infinite; }
 .work-card { padding-right: 8px; cursor: default; user-select: none; }
 .work-card.selected { background: color-mix(in srgb, var(--nav-fg) 13%, transparent); }
@@ -635,9 +636,10 @@ body.previewing #preview { display: flex; }
       </div>
     </section>
     <section data-panel="works" hidden>
+      <div class="sb-head sb-head-help"><span></span><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
       <div class="sb-scroll" id="workscroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
       <div id="workstatus" hidden></div>
-      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
+      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
     </section>
   </div>
   <div id="sbgrip" aria-hidden="true"></div>
