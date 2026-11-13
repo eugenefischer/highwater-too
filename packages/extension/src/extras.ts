@@ -98,7 +98,9 @@ export class PlainExtras implements vscode.Disposable {
     else {
       const text = await this.#text(path);
       const doc = { id: noteId(text), path, text };
-      const looked = await h.find(doc);
+      // Only looking (not making a folder): don't queue behind the history's other work, such as a
+      // mirror's pull or push, which held up the template, print options, Bin and Scratchpad.
+      const looked = await h.find(doc, { wait: create || standIn.exists });
       // A copy of a work's file, undecided: its Bin and Scratchpad stay its own meanwhile.
       const found = looked?.copyOf ? null : create || standIn.exists ? await h.resolve(doc) : looked;
       if (looked?.copyOf) folder = standIn.exists || create ? standIn : null;

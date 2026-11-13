@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.52
+
+- Plain .fountain and .md files no longer wait for a sync with the history mirror before showing their pages, page count, page breaks, Bin or Scratchpad. Their template and print options are kept with the writing history, and reading them used to queue behind the sync, which can take seconds.
+
 ## 0.6.51
 
 - The editor wraps lines where the printed page does. The space after a full line's last word hangs past the edge, as on the page; before, a line that filled the page's width lost its last word to the next line. Dialogue wraps at 34 characters, as printed (it was 35).

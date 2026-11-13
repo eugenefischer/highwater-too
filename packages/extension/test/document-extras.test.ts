@@ -215,3 +215,17 @@ describe("the Scratchpad", () => {
     expect(await readFile(uri.fsPath, "utf8")).toBe("");
   });
 });
+
+describe("a plain file's extras while the history is busy", () => {
+  it("are found without waiting for the history's other work (a mirror's pull or push)", async () => {
+    const folder = (await plainExtras().folder(w.plain, true))!;
+    await folder.updateSettings({ templateName: "Stage Play" });
+    plainExtras().forget(); // as after a pull that brought something in
+    let synced = false;
+    const sync = w.history.exclusive(() => new Promise<void>((r) => setTimeout(() => ((synced = true), r()), 1500)));
+    const found = await plainExtras().folder(w.plain);
+    expect(synced).toBe(false);
+    expect((await found?.settings())?.templateName).toBe("Stage Play");
+    await sync;
+  });
+});
