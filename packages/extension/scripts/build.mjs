@@ -18,6 +18,8 @@ const common = {
   external: ["vscode"],
   define: { "import.meta.url": "__import_meta_url" },
   banner: { js: "const __import_meta_url = require('url').pathToFileURL(__filename).href;" },
+  // The Highwater Editor's stylesheet is inlined into its page as text (page-html.ts).
+  loader: { ".css": "text" },
   logLevel: "warning",
 };
 
