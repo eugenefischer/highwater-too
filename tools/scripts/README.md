@@ -1,11 +1,10 @@
-# Design-phase scripts (Python)
+# Scripts
 
-Run with `python3 -I`. The two PDF scripts need PyMuPDF (`pip install pymupdf`).
+Run with `node --experimental-strip-types`.
 
-- `gen_samples.py <out-dir>`: writes the edge-case `.highland` samples in `fixtures/generated/`. Filler lines are counted so page-break cases land on chosen lines (screenplay: 54 content lines per page; manuscript: about 23).
-- `pdf_dump_lines.py <file.pdf>`: prints every line with y, x-start, x-end and font.
-- `pdf_line_extents.py <file.pdf>`: line counts and first/last y for pages 2–6.
+- `check-documents.ts <folder>`: opens every `.highland` file in a folder, saves it, and checks that the output is unchanged and lays out.
+- `gen-edge-cases.ts <out-dir>`: the edge-case samples in `fixtures/generated/` (ScreenplayEdgeCases with IncludedScene.fountain, ManuscriptEdgeCases with its test image). Filler lines are counted so page-break cases land on chosen lines (screenplay: 54 content lines per page; manuscript: about 23).
+- `gen-layout-probes.ts` and `gen-manuscript-probes.ts`: the Screenplay and Manuscript probes, in `fixtures/generated/`.
+- `gen-template-probes.ts <out-dir>`: one probe per other template (M10); scripts share one Fountain text, prose templates one Markdown text.
 
-TypeScript generators (run with `node --experimental-strip-types`): `gen-layout-probes.ts` and `gen-manuscript-probes.ts` (Screenplay and Manuscript probes, in `fixtures/generated/`), and `gen-template-probes.ts <out-dir>` (M10: one probe per other template; scripts share one Fountain text, prose templates one Markdown text).
-
-The TypeScript comparison tool in `tools/pdf-compare` supersedes the PDF scripts for tests.
+PDFs are compared with the tool in `tools/pdf-compare`.
