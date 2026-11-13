@@ -753,16 +753,32 @@ function choseText(uri: string): boolean {
   return wantsText.has(uri);
 }
 
-async function swapActive(target: vscode.Uri, viewType: string): Promise<void> {
-  swapping = true;
-  log(`swapActive ${target.path.split("/").pop()} → ${viewType === HIGHLAND_EDITOR ? "highwater" : viewType}`);
-  try {
-    await swapInPlace(target, viewType);
-  } finally {
-    log(`swapActive ${target.path.split("/").pop()} done`);
-    // The old tab closes just after the command returns.
-    setTimeout(() => (swapping = false), 500);
-  }
+/**
+ * Swaps run one at a time. Two at once (the code button pressed while the switch into the
+ * Highwater Editor was still finishing) left VS Code with both tabs open (CI's log on Linux, 0.6.28).
+ */
+let swapQueue: Promise<void> = Promise.resolve();
+let swapDepth = 0;
+
+function swapActive(target: vscode.Uri, viewType: string): Promise<void> {
+  const name = target.path.split("/").pop();
+  const to = viewType === HIGHLAND_EDITOR ? "highwater" : viewType;
+  log(`swapActive ${name} → ${to} asked`);
+  const run = swapQueue.then(async () => {
+    swapDepth++;
+    swapping = true;
+    log(`swapActive ${name} → ${to} starts`);
+    try {
+      await swapInPlace(target, viewType);
+    } finally {
+      log(`swapActive ${name} → ${to} done`);
+      // The old tab closes just after the command returns. (Counted, so an earlier swap's timer
+      // doesn't end a later one's.)
+      setTimeout(() => (swapping = --swapDepth > 0), 500);
+    }
+  });
+  swapQueue = run.catch(() => undefined);
+  return run;
 }
 
 async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> {
