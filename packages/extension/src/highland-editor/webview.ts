@@ -24,7 +24,6 @@ const opposite = (op: BinOp): BinOp => (op.kind === "move" ? { kind: "move", fro
 const binHistory = invertedEffects.of((tr) => tr.effects.filter((e) => e.is(binEffect)).map((e) => binEffect.of(opposite(e.value as BinOp))));
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
-import { Compare } from "./compare.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -187,14 +186,8 @@ const spelling = new Spelling(
   (msg) => vscode.postMessage(msg),
 );
 const spellingMarks = spellingPlugin(spelling);
-/** Comparing a save in the page (Writing History's Compare). */
-const compare = new Compare(
-  () => view,
-  (msg) => vscode.postMessage(msg),
-);
 
 function start(text: string): void {
-  compare.end();
   view?.destroy();
   view = new EditorView({
     parent: document.getElementById("editor")!,
@@ -263,7 +256,6 @@ function start(text: string): void {
         dropCursor(),
         styling,
         spellingMarks,
-        compare.extension,
         invisibles.of(invisibleMarks(showInvisibles)),
         screenplayCompletion(() => (mode === "fountain" ? parsed : null)),
         EditorView.updateListener.of((u) => {
@@ -275,8 +267,6 @@ function start(text: string): void {
         }),
         // After the edit, so the extension reads the offsets against the edited document.
         EditorView.updateListener.of((u) => {
-          // Any change to the text ends a comparison: its marks are of the text as it was.
-          if (u.docChanged && compare.active) compare.end();
           if (u.selectionSet || u.docChanged) vscode.postMessage({ type: "selection", ranges: u.state.selection.ranges.map((r) => ({ anchor: r.anchor, head: r.head })) });
           if (u.docChanged) sidebar.textChanged();
           for (const tr of u.transactions) for (const e of tr.effects) if (e.is(binEffect)) vscode.postMessage({ type: "binOp", op: e.value });
@@ -438,7 +428,6 @@ function showCounts(c: { characters: number; words: number; pages: number | null
 
 function togglePreview(): void {
   if (pages.shown) return pages.hide();
-  compare.end();
   if (!view) return;
   const at = topOffset();
   view.contentDOM.blur();
@@ -516,11 +505,6 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "togglePreview") togglePreview();
   else if (msg.type === "recordDrag") dragRecord = [];
-  else if (msg.type === "compare") {
-    const c = event.data as { base: string; hash: string; at: number };
-    if (pages.shown) pages.hide();
-    compare.start(c.base, c.hash, c.at);
-  }
   else if (msg.type === "toBin") toBin(!!(event.data as { cut?: boolean }).cut);
   else if (msg.type === "binRefused" && view) undo(view);
   else if (msg.type === "pdf") void pages.receive(event.data as PdfMessage);

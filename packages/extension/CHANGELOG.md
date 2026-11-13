@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.35
+
+- Compare goes back to VS Code's side-by-side comparison, from the Writing History and from a save in Works. The in-page comparison (0.6.31–0.6.34) is removed: its scroll-bar marks never matched where the changes were in VS Code. Its code is kept on the in-page-compare branch.
+- Kept from 0.6.33–0.6.34: the drag cursor fix, the Revert wording, and Record a Drag.
+
 ## 0.6.34
 
 - Compare: the marks beside the scroll bar are now measured, not estimated. 0.6.33 worked out each line's rows from its length; measured against real line heights in a full-length screenplay, that was off by 150–300 pixels of text, more than half a screen, which put a mark outside the scroll thumb at the change it belonged to. The text is now laid out once, off the page, exactly as the editor lays it out (same width, line styles, italics and removed text), and each mark goes at the middle of its change's row. They are placed again when the window, sidebar or text size changes, and still don't move as you scroll.
