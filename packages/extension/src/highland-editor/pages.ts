@@ -112,6 +112,10 @@ export class Pages {
     this.shown = true;
     this.#pending = at;
     document.body.classList.add("previewing");
+    // The last layout's pages show until the new one arrives: put them at the text's place now,
+    // rather than at the place they were left, which then jumped when the new layout came.
+    this.#placedTop = null;
+    this.#place(at, "top");
     this.#busy();
     this.post({ type: "preview", at });
   }
@@ -120,12 +124,24 @@ export class Pages {
   reveal(offset: number, how: "top" | "center"): void {
     if (!this.shown) return;
     if (this.#pending !== null || !this.#anchors.length) {
-      this.#pending = offset; // still laying out: open there
+      this.#pending = offset; // still laying out: open there (and go there on the pages showing meanwhile)
+      this.#place(offset, how);
       return;
     }
     const top = this.#positionOf(offset);
     if (top === null) return;
     this.#pages.scrollTop = Math.max(0, how === "center" ? top - this.#pages.clientHeight / 2 : top);
+  }
+
+  /** Where #place last put the pages, until the new layout arrives (null: not placed). */
+  #placedTop: number | null = null;
+
+  /** Scrolls the pages showing (the last layout's, while a new one is made) to where `offset` printed. */
+  #place(offset: number, how: "top" | "center"): void {
+    const top = this.#positionOf(offset);
+    if (top === null) return;
+    this.#pages.scrollTop = Math.max(0, how === "center" ? top - this.#pages.clientHeight / 2 : top);
+    this.#placedTop = this.#pages.scrollTop;
   }
 
   /** Back to the text: at what the pages showed at their top, or (double-click) a chosen place. */
@@ -150,8 +166,11 @@ export class Pages {
         const v = (await doc.getPage(i)).getViewport({ scale: 1 });
         sizes.push([v.width, v.height]);
       }
-      // Re-laid out (a template or option changed): stay at the same place in the text.
-      const keep = this.#pending ?? this.#offsetAtTop();
+      // Re-laid out (a template or option changed): stay at the same place in the text. Opening,
+      // the place asked for, unless the reader has scrolled the pages showing meanwhile: then theirs.
+      const scrolled = this.#placedTop !== null && Math.abs(this.#pages.scrollTop - this.#placedTop) > 1;
+      const keep = (scrolled ? this.#offsetAtTop() : this.#pending) ?? this.#offsetAtTop();
+      this.#placedTop = null;
       void this.#pdf?.loadingTask?.destroy();
       this.#pdf = doc;
       this.#sizes = sizes;

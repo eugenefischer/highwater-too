@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.50
+
+- Switching to the pages a second time opens them at your place in the text straight away. They used to show where you left them, then jump a second later, losing any scrolling you had done.
+
 ## 0.6.49
 
 - Page breaks in the editor land on the line the printed page starts with (they could be a line or so off in a long paragraph).
