@@ -596,6 +596,7 @@ const tests: [string, () => Promise<void>][] = [
     "a .highland script's own URI with a line (as a Search result opens it) opens the Highwater Editor on that line",
     async () => {
       await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
+      await vscode.commands.executeCommand("highwater.test.swapLog"); // from here on
       try {
         const path = await copyOf("SearchResult");
         const doc = await vscode.workspace.openTextDocument(highland(path));
@@ -614,7 +615,8 @@ const tests: [string, () => Promise<void>][] = [
               active: g.isActive,
               tabs: g.tabs.map((t) => ({ label: t.label, active: t.isActive, kind: t.input instanceof vscode.TabInputCustom ? `custom:${t.input.viewType}` : t.input instanceof vscode.TabInputText ? "text" : typeof t.input })),
             }));
-            throw new Error(`The Highwater Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}`);
+            const swaps = ((await vscode.commands.executeCommand<string[]>("highwater.test.swapLog")) ?? []).join("\n");
+            throw new Error(`The Highwater Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}\nExtension's log:\n${swaps}`);
           }
           await new Promise((r) => setTimeout(r, 100));
         }

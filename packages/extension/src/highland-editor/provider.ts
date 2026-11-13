@@ -384,6 +384,7 @@ async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> 
   // Where the cursor is, to put it back in the other editor (a Search result's line, say).
   const here = activeOffsets();
   const at = here && here.document.uri.toString() === target.toString() ? here.selections[0]?.head : undefined;
+  log(`swapInPlace ${target.path.split("/").pop()}: cursor ${at ?? "unknown"} (active editor ${vscode.window.activeTextEditor?.document.uri.path.split("/").pop() ?? "none"})`);
   let swapped = false;
   if (active === target.toString()) {
     try {
@@ -397,8 +398,17 @@ async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> 
   if (at === undefined || at === 0) return;
   const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === target.toString());
   if (!doc) return;
-  if (viewType === HIGHLAND_EDITOR) viewOf(doc, true)?.reveal(at, "center", true); // held until the page has started
-  else {
+  if (viewType === HIGHLAND_EDITOR) {
+    // The new Highwater Editor can register a moment after the command returns: wait for it, then
+    // put the cursor there (held until its page has started).
+    let view = viewOf(doc, true);
+    for (let waited = 0; !view && waited < 5000; waited += 100) {
+      await new Promise((r) => setTimeout(r, 100));
+      view = viewOf(doc, true);
+    }
+    log(`swapInPlace ${target.path.split("/").pop()}: ${view ? `cursor put at ${at}` : "no Highwater Editor after 5 s"}`);
+    view?.reveal(at, "center", true);
+  } else {
     const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
     if (!editor) return;
     const pos = doc.positionAt(at);
@@ -482,6 +492,9 @@ function swapSoon(uri: vscode.Uri): void {
     const active = vscode.window.tabGroups.activeTabGroup.activeTab;
     const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === key);
     if (swapping || !(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== key || !doc || !doc.languageId.startsWith("highland-")) return again();
+    // The text editor itself, not only its tab: it holds the line it was opened at (a Search
+    // result's), which the swap carries over. Its tab can be in front before it exists.
+    if (vscode.window.activeTextEditor?.document.uri.toString() !== key) return again();
     swapsPending.delete(key);
     if (roleOf(doc).kind !== "script" || viewOf(doc, true)) return log(`swapSoon: not swapping (view open=${!!viewOf(doc, true)})`);
     log(`swapSoon: swapping ${key.split("/").pop()} to the Highwater Editor`);

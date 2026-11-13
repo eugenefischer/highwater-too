@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.44
+
+- A Search result in a script opens in the Highwater Editor at the result's line again (it could land at the top: the switch to the Highwater Editor read the cursor before the text editor had it, or moved it before the Highwater Editor was there).
+
 ## 0.6.43
 
 - Record a Drag (diagnostics) is gone: it was there only to track down the drag cursor, which is fixed.
