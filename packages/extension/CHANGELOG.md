@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.26
+
+- Empty panels look like Highland 2's: a short line in the middle of the panel, a little larger, in the quiet colour (Navigator, Bin, Assets, Writing History, Works). An empty Scratchpad shows "Click here to edit" at the top and "The Scratchpad is a place to make notes about your document." in the middle (it showed nothing).
+- Shortcuts in the page are written for the computer: ⌥⌘X on a Mac, Ctrl+Alt+X elsewhere (the Bin's empty line, and labels such as Show Preview); "Finder" becomes "your files" off a Mac.
+- The ? buttons' tooltips read "Help".
+
 ## 0.6.25
 
 - The Navigator's eye opens Highland 2's popover above it, in the page (it used to open a VS Code list at the top of the window): a checkbox for each kind of item (Sections, Synopses, Scene Headers, Notes, Included files, Images, Inline links, Reference links, Markers, with Highland's marks), and Hide All and Show All. Each change shows at once and is kept for the document. Escape or a click elsewhere closes it.

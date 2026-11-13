@@ -7,6 +7,24 @@
 import type { Document } from "@highwater/parser";
 import { blockAt, currentRow, moveBlock, navigatorItems, navigatorRows, parseFilters, type NavigatorFilters, type NavigatorRow } from "../syntax/navigator.ts";
 
+/** On a Mac, shortcuts are written as Highland writes them (⌥⌘X); elsewhere as VS Code does there (Ctrl+Alt+X). */
+export const MAC = /Mac/.test(navigator.platform || navigator.userAgent);
+/** The page's own labels and tooltips, with their shortcuts written for this computer. */
+export function localizeKeys(root: ParentNode): void {
+  if (MAC) return;
+  const fix = (t: string) => t.replace(/[⌃⌥⇧⌘]+[A-Z0-9=+\-↑↓]/g, (m) => keys(m));
+  for (const el of root.querySelectorAll<HTMLElement>("[aria-label], [data-tip]")) {
+    const label = el.getAttribute("aria-label");
+    if (label) el.setAttribute("aria-label", fix(label));
+    if (el.dataset.tip) el.dataset.tip = fix(el.dataset.tip);
+  }
+}
+export function keys(mac: string): string {
+  if (MAC) return mac;
+  const mods = [mac.includes("⌃") || mac.includes("⌘") ? "Ctrl" : "", mac.includes("⌥") ? "Alt" : "", mac.includes("⇧") ? "Shift" : ""].filter(Boolean);
+  return [...mods, mac.replace(/[⌃⌘⌥⇧]/g, "")].join("+");
+}
+
 export const PANELS = ["navigator", "bin", "stats", "assets", "scratchpad", "history", "works"] as const;
 export type PanelName = (typeof PANELS)[number];
 
@@ -60,6 +78,7 @@ export class Sidebar {
     this.#assets = new AssetsPanel(deps);
     this.#history = new HistoryPanel(deps);
     this.#works = new WorksPanel(deps);
+    localizeKeys(document);
     for (const b of document.querySelectorAll<HTMLButtonElement>("#sbicons [data-panel]")) b.onclick = () => this.show(b.dataset.panel as PanelName);
     $("tbsidebar").onclick = () => this.toggle();
     this.#resizer();
@@ -466,6 +485,7 @@ class ScratchpadPanel {
 
   constructor(private readonly deps: SidebarDeps) {
     this.#area.addEventListener("input", () => {
+      this.#showEmpty();
       clearTimeout(this.#timer);
       this.#timer = setTimeout(() => this.#flush(), 600);
     });
@@ -507,6 +527,12 @@ class ScratchpadPanel {
     this.#saved = text;
     if (!this.#loaded || force || !edited) this.#area.value = text;
     this.#loaded = true;
+    this.#showEmpty();
+  }
+
+  /** Highland's empty Scratchpad: "Click here to edit" at the top, a line about it in the middle. */
+  #showEmpty(): void {
+    $("scratchempty").hidden = this.#area.value !== "";
   }
 
   saved(text: string): void {
@@ -638,7 +664,7 @@ class BinPanel {
       }
     }
     $("binnew").hidden = $("binexport").hidden = !available;
-    this.#empty.textContent = available ? "The Bin holds text you set aside. Drag text here, or use Cut to Bin (⌥⌘X) and Copy to Bin (⌥⌘C)." : "Open a document to use its Bin.";
+    this.#empty.textContent = available ? `The Bin holds blocks of text. Drag and drop text in and out, or use Cut to Bin (${keys("⌥⌘X")}) and Copy to Bin (${keys("⌥⌘C")}).` : "Open a document to use its Bin.";
   }
 
   #render(): void {
@@ -839,7 +865,7 @@ class AssetsPanel {
     this.#cards = cards;
     this.#list.replaceChildren(...cards.map((c) => this.#card(c)));
     this.#empty.hidden = cards.length > 0;
-    this.#empty.textContent = available ? "Images for this document. Add them with +, or hold Shift and drag them in from Finder; drag one into the text to use it." : "Open a document to see its assets.";
+    this.#empty.textContent = available ? `The Assets list shows images imported into your document. Add them with +, or hold Shift and drag them in from ${MAC ? "Finder" : "your files"}; drag one into the text to use it.` : "Open a document to see its assets.";
     $("assetadd").hidden = !available;
   }
 

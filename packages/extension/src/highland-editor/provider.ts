@@ -333,15 +333,19 @@ body.nav-dragging, body.nav-dragging #navlist .row { cursor: grabbing; }
 #navlist .markers::before { content: "◆ "; font-size: 0.8em; color: var(--nav-accent); }
 #navdrop { position: absolute; right: 6px; height: 2px; background: var(--nav-accent); pointer-events: none; }
 #navdrop::before { content: ""; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--nav-accent); }
-#navempty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 24px; text-align: center; color: var(--nav-muted); pointer-events: none; }
+#navempty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 28px; text-align: center; color: var(--nav-muted); font-size: 1.15em; line-height: 1.4; pointer-events: none; }
 #navempty[hidden] { display: none; }
 /* The Scratchpad: plain text, Highland's export button at the bottom right. */
+#scratchwrap { position: relative; flex: 1; min-height: 0; display: flex; }
+#scratch::placeholder { color: var(--nav-muted); font-style: italic; font-family: var(--vscode-font-family); }
 #scratch { flex: 1; min-height: 0; resize: none; border: 0; outline: none; margin: 0; padding: 12px 14px; background: transparent; color: var(--nav-fg); font-family: var(--vscode-editor-font-family, monospace); font-size: var(--vscode-editor-font-size, 13px); line-height: 1.45; }
 #scratchfoot, .sb-foot-end { justify-content: flex-end; }
 /* The Bin's and Assets' cards. */
 .sb-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 8px 4px; }
 .sb-cards { display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px; }
-.sb-note { padding: 16px 10px; text-align: center; color: var(--nav-muted); line-height: 1.4; }
+/* Empty panels, as Highland's: a short line in the middle of the panel, in the quiet colour. */
+.sb-scroll { position: relative; }
+.sb-note { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 28px; text-align: center; color: var(--nav-muted); font-size: 1.15em; line-height: 1.4; pointer-events: none; }
 .sb-note[hidden] { display: none; }
 /* Shown until the extension's first answer (reading the history can take a few seconds). */
 .sb-loading::before { content: ""; display: block; width: 16px; height: 16px; margin: 0 auto 8px; border: 2px solid color-mix(in srgb, var(--nav-muted) 35%, transparent); border-top-color: var(--nav-muted); border-radius: 50%; animation: sb-spin 0.8s linear infinite; }
@@ -632,11 +636,11 @@ body.previewing #preview { display: flex; }
       <div class="sb-foot sb-foot-end"><button id="assetadd" class="sb-button" data-tip="Add images…" aria-label="Add images…"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
     </section>
     <section data-panel="scratchpad" hidden>
-      <textarea id="scratch" spellcheck="false" aria-label="Scratchpad"></textarea>
+      <div id="scratchwrap"><textarea id="scratch" spellcheck="false" aria-label="Scratchpad" placeholder="Click here to edit"></textarea><div id="scratchempty" class="sb-note">The Scratchpad is a place to make notes about your document.</div></div>
       <div id="scratchfoot" class="sb-foot"><button id="scratchexport" class="sb-button" data-tip="Export Scratchpad contents to a new document" aria-label="Export Scratchpad contents to a new document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></button></div>
     </section>
     <section data-panel="history" hidden>
-      <div class="sb-head sb-head-help"><span id="histtitle"></span><button id="histhelp" class="sb-button sb-help" data-tip="How the Writing History works" aria-label="How the Writing History works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
+      <div class="sb-head sb-head-help"><span id="histtitle"></span><button id="histhelp" class="sb-button sb-help" data-tip="Help" aria-label="Writing History help" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
       <div class="sb-scroll" id="histscroll"><div id="histlist" class="sb-rows" tabindex="0" role="listbox" aria-label="Saves"></div><div id="histnote" class="sb-note sb-loading">Loading history…</div></div>
       <div class="sb-foot">
         <div id="histstatus"><div id="histstate"></div><div id="histmirror" hidden></div></div>
@@ -646,7 +650,7 @@ body.previewing #preview { display: flex; }
       </div>
     </section>
     <section data-panel="works" hidden>
-      <div class="sb-head sb-head-help"><span id="workcomputer"></span><button id="workhelp" class="sb-button sb-help" data-tip="How Works works" aria-label="How Works works" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
+      <div class="sb-head sb-head-help"><span id="workcomputer"></span><button id="workhelp" class="sb-button sb-help" data-tip="Help" aria-label="Works help" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
       <div class="sb-scroll" id="workscroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
       <div id="workstatus" hidden></div>
       <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
