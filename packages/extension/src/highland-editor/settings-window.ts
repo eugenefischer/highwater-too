@@ -123,7 +123,9 @@ class GeneralPane {
   }
 
   update(values: GeneralSettings): void {
-    this.#values = values;
+    // A copy: choosing an option changes it before the extension confirms, and the page must
+    // still see the old value then (a new column width lays the text out again).
+    this.#values = { ...values };
     this.#fill();
   }
 

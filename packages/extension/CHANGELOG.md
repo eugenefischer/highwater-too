@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.54
+
+- Settings → General → Column Width works: choosing Medium or Wide widens the text (it stayed at the printed width).
+
 ## 0.6.53
 
 - **The Settings window**, as Highland 2's: **Settings…** in the Highwater Editor's ⋯ menu (or the Command Palette) opens it, with a **General** tab and a **Themes** tab (the theme window; **Manage Themes…** opens this tab). Document and International come next.

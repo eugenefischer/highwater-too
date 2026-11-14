@@ -499,7 +499,7 @@ const themePane = new ThemePane((m) => vscode.postMessage(m), document.getElemen
 /** The General settings: the text's font, spacing and column, the invisibles, and the sidebar. */
 function applyGeneral(next: GeneralSettings): void {
   const restyled = next.columnWidth !== general.columnWidth;
-  general = next;
+  general = { ...next };
   const root = document.documentElement.style;
   root.setProperty("--hl-font", `"${next.editorFont}"`);
   root.setProperty("--hl-line-height", String(LINE_HEIGHTS[next.lineSpacing]));
