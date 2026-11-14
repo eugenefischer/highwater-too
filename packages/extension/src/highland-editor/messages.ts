@@ -9,6 +9,7 @@ import type { Mode } from "@highwater/parser";
 import type { NavigatorFilters } from "../syntax/navigator.ts";
 import type { CustomTheme } from "./themes.ts";
 import type { GeneralSettings } from "./general-settings.ts";
+import type { DocumentSettings } from "./document-settings.ts";
 
 export const PANELS = ["navigator", "bin", "stats", "assets", "scratchpad", "history", "works"] as const;
 export type PanelName = (typeof PANELS)[number];
@@ -129,9 +130,9 @@ export type ToPage =
   /** Choose Theme… from the Command Palette: the theme menu drops down. */
   | { type: "showThemePane" }
   /** The General settings (Settings window, and how the page and sidebar look). */
-  | { type: "settings"; general: GeneralSettings }
+  | { type: "settings"; general: GeneralSettings; document: DocumentSettings }
   /** Settings… from the Command Palette or the editor's menu: the Settings window opens at a tab. */
-  | { type: "showSettings"; tab: "general" | "themes" }
+  | { type: "showSettings"; tab: "general" | "document" | "themes" }
   | { type: "fontSize"; px: number | null }
   | { type: "numbers"; on: boolean }
   /** Show Page Breaks: where each page starts, as [page offset, page number] pairs (none when off). */
@@ -186,7 +187,7 @@ export type FromPage =
   | { type: "darkPagesSet"; on: boolean }
   // The Settings window: a General setting changed, or a tab's Restore Defaults.
   | { type: "settingSet"; key: string; value: string | number | boolean }
-  | { type: "settingsRestore"; tab: "general" }
+  | { type: "settingsRestore"; tab: "general" | "document" }
   | { type: "copyText"; text: string; note: string }
   | { type: "learnWord"; word: string }
   /** A comparison started or ended: the text can't be changed meanwhile. */

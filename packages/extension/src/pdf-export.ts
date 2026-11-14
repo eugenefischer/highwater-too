@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type PrintMarks, type SourceRange } from "@highwater/pdf";
+import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type PrintMarks, type ScriptDocumentOptions, type SourceRange } from "@highwater/pdf";
 import type { Document, Element, MergedElement } from "@highwater/parser";
 import { paragraphNumbers } from "./highland-editor/line-styles.ts";
 
@@ -42,6 +42,8 @@ export interface ScriptExportOptions extends ExportOptions {
   font?: string;
   /** Multi-Cam's Uppercase action option (on by default). */
   uppercaseAction?: boolean;
+  /** The Document settings that change how scripts print (scene headings, MORE/CONT'D, synopses). */
+  document?: ScriptDocumentOptions;
 }
 
 export interface ManuscriptExportOptions extends ExportOptions {
@@ -76,6 +78,7 @@ export async function exportScreenplay(options: ScriptExportOptions): Promise<Ex
     ...(options.date ? { date: options.date } : {}),
     ...(options.titlePage === false ? { titlePage: false } : {}),
     template: script(options),
+    ...(options.document ? { document: options.document } : {}),
     ...(options.font ? { font: options.font, fontDir: options.fontDir } : {}),
     ...marksOf(doc, options.print),
   });

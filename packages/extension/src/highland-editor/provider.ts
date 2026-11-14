@@ -10,7 +10,7 @@ import { parse, type Document } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { handleThemeMessage, registerThemes, themesMessage, themeVars } from "./theme-host.ts";
-import { affectsGeneral, currentGeneral, generalMessage, handleSettingsMessage, registerSettings } from "./settings-host.ts";
+import { affectsSettings, currentGeneral, handleSettingsMessage, registerSettings, settingsMessage } from "./settings-host.ts";
 import { editorFocused, registerSidebarNote } from "./sidebar-note.ts";
 import { sidebarHost } from "./sidebar-host.ts";
 import { pageHtml } from "./page-html.ts";
@@ -184,7 +184,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sidebar.ready();
           pageText = pageForm(document.getText());
           // The General settings first: the column width shapes the text's first layout.
-          postTo(panel, generalMessage());
+          postTo(panel, settingsMessage());
           postTo(panel, { type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
           previewing = false;
@@ -261,7 +261,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && (e.affectsConfiguration("highwater.theme") || e.affectsConfiguration("highwater.customThemes") || e.affectsConfiguration("highwater.darkPages"))) sendTheme();
         if (view.ready && e.affectsConfiguration(SETTINGS_PREFIX)) sendTemplateValues();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
-        if (view.ready && affectsGeneral(e)) postTo(panel, generalMessage());
+        if (view.ready && affectsSettings(e)) postTo(panel, settingsMessage());
         if (view.ready && e.affectsConfiguration("highwater.excludeNotesFromWordCount")) sendCounts();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
         if (view.ready && e.affectsConfiguration("highwater.pageBreaks")) sendPageBreaks();

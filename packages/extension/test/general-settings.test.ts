@@ -66,3 +66,21 @@ describe("word count and notes", () => {
     expect(documentStats(doc, { notes: true }).words).toBe(10);
   });
 });
+
+describe("Document settings", () => {
+  it("are each a VS Code setting with the same default", async () => {
+    const { DOCUMENT_DEFAULTS } = await import("../src/highland-editor/document-settings.ts");
+    const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { contributes: { configuration: { properties: Record<string, { default: unknown }> } } };
+    for (const [key, value] of Object.entries(DOCUMENT_DEFAULTS)) expect(manifest.contributes.configuration.properties[`highwater.${key}`]?.default, key).toEqual(value);
+  });
+
+  it("put a whole scene heading in capitals, but not its notes, and nothing else", async () => {
+    const { uppercasedHeading } = await import("../src/highland-editor/document-settings.ts");
+    expect(uppercasedHeading("int. kitchen - day")).toBe("INT. KITCHEN - DAY");
+    expect(uppercasedHeading("ext kitchen [[check this]] - night")).toBe("EXT KITCHEN [[check this]] - NIGHT");
+    expect(uppercasedHeading("i/e. car - day")).toBe("I/E. CAR - DAY");
+    expect(uppercasedHeading("INT. KITCHEN - DAY")).toBeNull();
+    expect(uppercasedHeading("Interior design is hard.")).toBeNull();
+    expect(uppercasedHeading("int")).toBeNull();
+  });
+});

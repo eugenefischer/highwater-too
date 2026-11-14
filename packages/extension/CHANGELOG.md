@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.55
+
+- **Settings → Document**, as Highland 2's (each also a VS Code setting):
+  - **Scene Headers:** Bold (on) and Underlined (off), in the editor and the printed pages; Double-Spaced (on), two blank lines before each heading on the pages, or one.
+  - **Auto-uppercase INT. and EXT.** (on): typing a scene heading puts the whole heading in capitals.
+  - **Auto-complete locations** and **Auto-complete character names** (both on).
+  - **MORE/CONT'D for dialogue across page breaks** (on): off, they're left out, and the speech still breaks in the same place.
+  - **Synopses Italicized** (off): in the editor, and on the pages when synopses are printed.
+
 ## 0.6.54
 
 - Settings → General → Column Width works: choosing Medium or Wide widens the text (it stayed at the printed width).

@@ -198,3 +198,45 @@ describe("markers", () => {
     expect(lines.some(([, t]) => String(t).includes("{{"))).toBe(false);
   });
 });
+
+describe("Document settings", () => {
+  const speech = Array.from({ length: 12 }, (_, i) => `Sentence number ${i + 1} goes on.`).join(" ");
+  const script = (n: number) => `INT. HOUSE - DAY\n\nShe waits.\n\nEXT. GARDEN - NIGHT\n\n${Array.from({ length: n }, (_, i) => `Action line ${i + 1}.`).join("\n\n")}\n\nBOB\n${speech}\n\nShe leaves.`;
+  const text = (it: { runs: { text: string }[] }) => it.runs.map((r) => r.text).join("");
+  // Enough action that the speech breaks across the first page.
+  const n = Array.from({ length: 20 }, (_, i) => 15 + i).find((k) => layoutScreenplay(parse(script(k), { mode: "fountain" })).pages.some((p) => p.items.some((it) => text(it) === "(MORE)")))!;
+  const src = script(n);
+  const lay = (document = {}) => layoutScreenplay(parse(src, { mode: "fountain" }), { document });
+  const find = (l: ReturnType<typeof lay>, t: string) => l.pages.flatMap((p) => p.items).find((it) => text(it) === t)!;
+
+  it("prints scene headings bold by default, and plain, underlined or both as set", () => {
+    expect(find(lay(), "INT. HOUSE - DAY").runs[0]!.style).toEqual({ bold: true });
+    expect(find(lay({ sceneHeadingBold: false, sceneHeadingUnderline: true }), "INT. HOUSE - DAY").runs[0]!.style).toEqual({ underline: true });
+  });
+
+  it("prints synopses in italics when set (with synopses printed)", () => {
+    const doc = () => parse("INT. HOUSE - DAY\n\n= The synopsis.\n\nShe waits.", { mode: "fountain" });
+    const style = (synopsesItalic: boolean) => layoutScreenplay(doc(), { print: { synopses: true }, document: { synopsesItalic } }).pages.flatMap((p) => p.items).find((it) => text(it) === "The synopsis.")!.runs[0]!.style;
+    expect(style(false).italic).toBeUndefined();
+    expect(style(true).italic).toBe(true);
+  });
+
+  it("puts one blank line before a scene heading instead of two when Double-Spaced is off", () => {
+    const gap = (l: ReturnType<typeof lay>) => find(l, "EXT. GARDEN - NIGHT").y - find(l, "She waits.").y;
+    expect(gap(lay())).toBe(36);
+    expect(gap(lay({ sceneHeadingDoubleSpaced: false }))).toBe(24);
+  });
+
+  it("leaves out (MORE) and (CONT’D) when set, breaking the speech in the same place", () => {
+    const on = lay();
+    const off = lay({ moreContd: false });
+    const lines = (l: ReturnType<typeof lay>) => l.pages.map((p) => p.items.map(text));
+    const printed = lines(on).flat();
+    expect(printed).toContain("(MORE)");
+    expect(printed).toContain("BOB (CONT’D)");
+    expect(lines(off).flat()).not.toContain("(MORE)");
+    expect(lines(off).flat()).not.toContain("BOB (CONT’D)");
+    // The same lines on each page, less the two.
+    expect(lines(off)).toEqual(lines(on).map((p) => p.filter((t) => t !== "(MORE)").map((t) => (t === "BOB (CONT’D)" ? "BOB" : t))));
+  });
+});

@@ -1,14 +1,15 @@
 import { COLUMN_WIDTHS, EDITOR_FONTS, GENERAL_DEFAULTS, LINE_SPACINGS, SIDEBAR_TEXTS, type GeneralSettings } from "./general-settings.ts";
+import { DOCUMENT_DEFAULTS, type DocumentSettings } from "./document-settings.ts";
 import type { FromPage } from "./messages.ts";
 import { ThemeWindow } from "./theme-window.ts";
 
-export const SETTINGS_TABS = ["general", "themes"] as const;
+export const SETTINGS_TABS = ["general", "document", "themes"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
-const TAB_NAMES: Record<SettingsTab, string> = { general: "General", themes: "Themes" };
+const TAB_NAMES: Record<SettingsTab, string> = { general: "General", document: "Document", themes: "Themes" };
 
 /**
- * The Settings window, as Highland 2's: a tab for each group of settings (General and Themes so
- * far; Document and International to come). Settings are for every document and kept as VS Code
+ * The Settings window, as Highland 2's: a tab for each group of settings (General, Document and
+ * Themes so far; International to come). Settings are for every document and kept as VS Code
  * settings; each change is saved as it is made.
  */
 export class SettingsWindow {
@@ -17,6 +18,7 @@ export class SettingsWindow {
   readonly #panes = new Map<SettingsTab, HTMLElement>();
   readonly themes: ThemeWindow;
   readonly #general: GeneralPane;
+  readonly #document: DocumentPane;
   #tab: SettingsTab = "general";
 
   constructor(post: (msg: FromPage) => void) {
@@ -35,6 +37,7 @@ export class SettingsWindow {
     for (const t of SETTINGS_TABS) this.#panes.set(t, this.#root.querySelector<HTMLElement>(`[data-pane="${t}"]`)!);
     for (const b of this.#root.querySelectorAll<HTMLButtonElement>(".st-tabs button")) b.onclick = () => this.#show(b.dataset.tab as SettingsTab);
     this.#general = new GeneralPane(post, this.#panes.get("general")!);
+    this.#document = new DocumentPane(post, this.#panes.get("document")!);
     this.themes = new ThemeWindow(post, this.#panes.get("themes")!);
     this.#root.querySelector<HTMLButtonElement>(".tw-done")!.onclick = () => this.close();
     this.#root.addEventListener("mousedown", (e) => e.target === this.#root && this.close());
@@ -66,6 +69,11 @@ export class SettingsWindow {
   /** The General settings' values, from the extension. */
   general(values: GeneralSettings): void {
     this.#general.update(values);
+  }
+
+  /** The Document settings' values, from the extension. */
+  document(values: DocumentSettings): void {
+    this.#document.update(values);
   }
 
   #show(tab: SettingsTab): void {
@@ -146,6 +154,46 @@ class GeneralPane {
     for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.checked = v[input.dataset.key!] === true;
     const range = this.root.querySelector<HTMLInputElement>(".st-range")!;
     if (document.activeElement !== range) range.value = String(v.invisiblesBrightness);
+  }
+}
+
+/** The Document tab, laid out as Highland's: scene headers, dialogue, synopses. */
+class DocumentPane {
+  #values: DocumentSettings = { ...DOCUMENT_DEFAULTS };
+
+  constructor(
+    private readonly post: (msg: FromPage) => void,
+    private readonly root: HTMLElement,
+  ) {
+    const box = (key: keyof DocumentSettings, label: string) => `<label class="st-check"><input type="checkbox" data-key="${key}"> ${label}</label>`;
+    root.innerHTML = `<div class="st-form">
+  <div class="st-row"><span class="st-label">Scene Headers:</span><span class="st-checks">${box("sceneHeadingBold", "Bold")}${box("sceneHeadingUnderline", "Underlined")}${box("sceneHeadingDoubleSpaced", "Double-Spaced")}</span></div>
+  <div class="st-row"><span class="st-label"></span>${box("autoUppercaseSceneHeadings", "Auto-uppercase INT. and EXT.")}</div>
+  <div class="st-row"><span class="st-label"></span>${box("autoCompleteLocations", "Auto-complete locations")}</div>
+  <div class="st-rule"></div>
+  <div class="st-row"><span class="st-label">Dialogue:</span>${box("autoCompleteCharacterNames", "Auto-complete character names")}</div>
+  <div class="st-row"><span class="st-label"></span>${box("moreContd", "MORE/CONT’D for dialogue across page breaks")}</div>
+  <div class="st-rule"></div>
+  <div class="st-row"><span class="st-label">Synopses:</span>${box("synopsesItalic", "Italicized")}</div>
+  <div class="st-foot"><button class="st-restore">Restore Defaults</button></div>
+</div>`;
+    for (const input of root.querySelectorAll<HTMLInputElement>("input[type=checkbox]"))
+      input.onchange = () => {
+        const key = input.dataset.key as keyof DocumentSettings;
+        this.#values[key] = input.checked;
+        this.post({ type: "settingSet", key, value: input.checked });
+      };
+    root.querySelector<HTMLButtonElement>(".st-restore")!.onclick = () => this.post({ type: "settingsRestore", tab: "document" });
+    this.#fill();
+  }
+
+  update(values: DocumentSettings): void {
+    this.#values = { ...values };
+    this.#fill();
+  }
+
+  #fill(): void {
+    for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.checked = this.#values[input.dataset.key as keyof DocumentSettings];
   }
 }
 

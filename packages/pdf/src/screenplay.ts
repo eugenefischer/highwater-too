@@ -156,7 +156,26 @@ export interface ScreenplayOptions {
   /** Bundled fonts (default: this package's) and the folders installed fonts are looked for in. */
   fontDir?: string;
   fontDirs?: string[];
+  /** Highland's Document settings (for every script); default Highland's own. */
+  document?: ScriptDocumentOptions;
 }
+
+/** Highland 2's Document settings that change how a script prints. */
+export interface ScriptDocumentOptions {
+  /** Scene headings bold (default on) and underlined (default off). */
+  sceneHeadingBold?: boolean;
+  sceneHeadingUnderline?: boolean;
+  /** Two blank lines before a scene heading (default on); off, one. */
+  sceneHeadingDoubleSpaced?: boolean;
+  /** "(MORE)" and "(CONT’D)" where a speech breaks across pages (default on); off, the speech still breaks in the same place. */
+  moreContd?: boolean;
+  /** Printed synopses in italics (default off). */
+  synopsesItalic?: boolean;
+}
+
+const DOCUMENT_DEFAULTS: Required<ScriptDocumentOptions> = { sceneHeadingBold: true, sceneHeadingUnderline: false, sceneHeadingDoubleSpaced: true, moreContd: true, synopsesItalic: false };
+/** The Document settings during a layout (set with `active`). */
+let settings: Required<ScriptDocumentOptions> = DOCUMENT_DEFAULTS;
 
 /** The fonts printed in the same widths as Courier Prime (7.2 pt a character at 12 pt). */
 const MONOSPACED = new Set(["Courier Prime", "Courier", "Highland Sans"]);
@@ -242,14 +261,17 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
   const family = options.font ?? "Courier Prime";
   const set = withFont(options.template ?? SCREENPLAY, family, options);
   const previous = active;
+  const previousSettings = settings;
   const previousMeasure = setMeasure(set.measure);
   active = set.template;
+  settings = { ...DOCUMENT_DEFAULTS, ...options.document };
   try {
     const result: Layout = layout(doc, options, family);
     if (family !== "Courier Prime") result.fonts = { ...set.faces, ...result.fonts };
     return { ...result, substituted: set.substituted };
   } finally {
     active = previous;
+    settings = previousSettings;
     setMeasure(previousMeasure);
   }
 }
@@ -528,19 +550,21 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
     nextIndex = i;
     switch (e.kind) {
       case "sceneHeading": {
-        const runs = toRuns(e.inline, ctx, { bold: true });
+        const look: TextStyle = { ...(settings.sceneHeadingBold ? { bold: true } : {}), ...(settings.sceneHeadingUnderline ? { underline: true } : {}) };
+        const runs = toRuns(e.inline, ctx, look);
         const rows = wrapAt(S.sceneHeading.x, runs, S.sceneHeading.width);
         if (e.sceneNumber && rows[0]) {
-          const n: Run[] = [{ text: e.sceneNumber.text, style: { bold: true } }];
+          const n: Run[] = [{ text: e.sceneNumber.text, style: look }];
           rows[0].items.unshift({ x: S.sceneNumberLeft, runs: n });
           rows[0].items.push({ x: S.sceneNumberRight, runs: n });
         }
         // Two blank lines before a scene heading, but one when it follows the previous element
-        // without a blank line in the source (">CUT TO:" directly above it, in Astounding).
+        // without a blank line in the source (">CUT TO:" directly above it, in Astounding), or
+        // when the Document settings' Double-Spaced is off.
         const prevEl = elements[i - 1];
-        const joined = prevEl !== undefined && sameParagraph(source, prevEl, e);
+        const single = (prevEl !== undefined && sameParagraph(source, prevEl, e)) || !settings.sceneHeadingDoubleSpaced;
         // The second blank line before a scene heading is 12 pt in any font (GraphicNovelProbe-TimesNewRoman).
-        out.push({ kind: e.kind, rows, space: joined ? 1 : 2, empty: joined ? 0 : 1, keepWithNext: true });
+        out.push({ kind: e.kind, rows, space: single ? 1 : 2, empty: single ? 0 : 1, keepWithNext: true });
         printed = true;
         break;
       }
@@ -634,7 +658,7 @@ function toBlocks(elements: Element[], source: string, ctx: InlineContext, leadi
       case "synopsis":
         if (ctx.print?.marks.synopses) {
           // Grey, half an inch in from the action, a paragraph of its own (ScreenplayPrintProbe-synopses).
-          const runs = toRuns(e.inline, ctx, { color: SYNOPSIS_COLOR });
+          const runs = toRuns(e.inline, ctx, { color: SYNOPSIS_COLOR, ...(settings.synopsesItalic ? { italic: true } : {}) });
           if (plain(runs).trim()) {
             out.push({ kind: e.kind, rows: wrapAt(S.sceneHeading.x + 36, runs, S.sceneHeading.width - 5), space: 1 });
             printed = true;
@@ -758,11 +782,13 @@ function dialogueBlock(cue: string, parts: Part[], space: number, cueStyle: Text
           // A parenthetical goes with the line after it, never just before (MORE).
           if (head.at(-1)!.kind === "parenthetical" || head.at(-1)!.kind === "empty") continue;
           const headRows = partRows(head, null);
-          if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: continued(dialogueBlock(contd(cue), best.tail, 0, cueStyle)) };
-          best = { head: [rows[0]!, ...headRows, { items: [{ x: S.parenthetical.x + runsWidth([{ text: " ", style: {} }]), runs: [{ text: "(MORE)", style: {} }] }], added: "more" }], tail };
+          // "(MORE)" takes its line even when the Document settings leave it out: the speech breaks in the same place.
+          if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: continued(dialogueBlock(settings.moreContd ? contd(cue) : cue, best.tail, 0, cueStyle)) };
+          const more: Row[] = settings.moreContd ? [{ items: [{ x: S.parenthetical.x + runsWidth([{ text: " ", style: {} }]), runs: [{ text: "(MORE)", style: {} }] }], added: "more" }] : [];
+          best = { head: [rows[0]!, ...headRows, ...more], tail };
         }
       }
-      return best && { head: best.head, tail: continued(dialogueBlock(contd(cue), best.tail, 0, cueStyle)) };
+      return best && { head: best.head, tail: continued(dialogueBlock(settings.moreContd ? contd(cue) : cue, best.tail, 0, cueStyle)) };
     },
   };
 }

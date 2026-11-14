@@ -289,6 +289,7 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 #setwin .st-seg button.st-on { background: var(--hl-accent); color: var(--hl-accent-fg); }
 .st-range { flex: 1; accent-color: var(--hl-accent); }
 .st-check { display: flex; align-items: center; gap: 6px; }
+.st-checks { flex: 1; display: flex; flex-wrap: wrap; gap: 6px 28px; }
 .st-check input { accent-color: var(--hl-accent); }
 .st-rule { height: 1px; margin: 4px 0 4px 182px; background: var(--hl-border); }
 .st-foot { display: flex; justify-content: flex-end; margin-top: 6px; }
@@ -368,7 +369,9 @@ body.dark-pages #pages { background: var(--hl-bg); }
 .cm-editor .cm-searchMatch { background: var(--hl-match); outline: 1px solid var(--vscode-editor-findMatchHighlightBorder, transparent); }
 .cm-editor .cm-searchMatch-selected, .cm-editor .cm-searchMatch-selected * { background: var(--hl-match-current); outline: 1px solid var(--vscode-editor-findMatchBorder, transparent); }
 .cm-selectionBackground, .cm-content ::selection { background: var(--hl-selection) !important; }
-.hl-scene { font-weight: bold; color: var(--hl-scene); }
+/* The Document settings: scene headings bold and/or underlined, synopses italic. */
+.hl-scene { font-weight: var(--hl-scene-weight, bold); text-decoration: var(--hl-scene-underline, none); color: var(--hl-scene); }
+.hl-synopsis { font-style: var(--hl-synopsis-style, normal); }
 .hl-right { text-align: right; }
 .hl-center { text-align: center; }
 .hl-lyric { font-style: italic; }

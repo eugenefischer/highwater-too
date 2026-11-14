@@ -9,6 +9,7 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 import { activeDocument, onDidChangeActiveSurface } from "./surface.ts";
 import { SETTINGS_PREFIX, templateOptions } from "./template-options.ts";
+import { documentSettings, PRINTED_DOCUMENT_SETTINGS } from "./highland-editor/document-settings.ts";
 
 /** Highland templates we can print. Highland stores the chosen one as templateName in info.json. */
 export const TEMPLATES = ["Screenplay", "Multi-Cam", "Stage Play", "Graphic Novel", "Manuscript", "Novel", "Treatment", "Modern Standard", "Article", "Bulletin", "Speech", "MLA Report", "Wiki", "Plain Text"] as const;
@@ -46,11 +47,11 @@ const templateChanged = new vscode.EventEmitter<vscode.TextDocument>();
 /** Fires when a document's template is changed (from the preview or the status bar). */
 export const onDidChangeTemplate = templateChanged.event;
 
-/** A template option changed (they are settings, for every document): lay open documents out again. */
+/** A template option or a printed Document setting changed (settings for every document): lay open documents out again. */
 export function watchTemplateOptions(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (!e.affectsConfiguration(SETTINGS_PREFIX)) return;
+      if (!e.affectsConfiguration(SETTINGS_PREFIX) && !PRINTED_DOCUMENT_SETTINGS.some((k) => e.affectsConfiguration(`highwater.${k}`))) return;
       for (const doc of vscode.workspace.textDocuments) if (doc.languageId.startsWith("highland-")) templateChanged.fire(doc);
     }),
   );
@@ -195,7 +196,13 @@ export async function renderDocument(context: vscode.ExtensionContext, store: Bu
     const fonts = { ...(typeof o.headers === "string" ? { headers: o.headers } : {}), ...(typeof o.body === "string" ? { body: o.body } : {}) };
     return { ...(await exportProse({ ...base, template: chosen, fonts, image: await loadImages(base.text, read) })), template: chosen };
   }
-  if (chosen !== "Manuscript") return { ...(await exportScreenplay({ ...base, template: chosen, ...font, ...(o.uppercaseAction === false ? { uppercaseAction: false } : {}) })), template: chosen };
+  if (chosen !== "Manuscript") {
+    // The Document settings that change how scripts print.
+    const c = vscode.workspace.getConfiguration("highwater");
+    const d = documentSettings((key) => c.get(key));
+    const document = { sceneHeadingBold: d.sceneHeadingBold, sceneHeadingUnderline: d.sceneHeadingUnderline, sceneHeadingDoubleSpaced: d.sceneHeadingDoubleSpaced, moreContd: d.moreContd, synopsesItalic: d.synopsesItalic };
+    return { ...(await exportScreenplay({ ...base, template: chosen, ...font, document, ...(o.uppercaseAction === false ? { uppercaseAction: false } : {}) })), template: chosen };
+  }
   const manuscript = { ...(o.indentLeading === true ? { indentLeading: true } : {}), ...(o.spaceBeforeSections === false ? { spaceBeforeSections: false } : {}) };
   return { ...(await exportManuscript({ ...base, ...font, ...manuscript, image: await loadImages(base.text, read) })), template: chosen };
 }

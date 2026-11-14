@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.54",
+  "version": "0.6.55",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -856,6 +856,46 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Leave the words in notes out of the document's word count. Also in **Settings…** (General)."
+        },
+        "highwater.sceneHeadingBold": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Scene headings in bold, in the Highwater Editor and on the printed pages. Also in **Settings…** (Document)."
+        },
+        "highwater.sceneHeadingUnderline": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Scene headings underlined, in the Highwater Editor and on the printed pages. Also in **Settings…** (Document)."
+        },
+        "highwater.sceneHeadingDoubleSpaced": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Two blank lines before each scene heading on the printed pages (off: one). Also in **Settings…** (Document)."
+        },
+        "highwater.autoUppercaseSceneHeadings": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Typing a scene heading (starting INT., EXT., EST. or I/E) puts the whole heading in capitals. Also in **Settings…** (Document)."
+        },
+        "highwater.autoCompleteLocations": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Suggest the script's locations after a scene heading's INT. or EXT. Also in **Settings…** (Document)."
+        },
+        "highwater.autoCompleteCharacterNames": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Suggest the script's character names when you start a cue. Also in **Settings…** (Document)."
+        },
+        "highwater.moreContd": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Print (MORE) and (CONT'D) where a speech breaks across pages. Off, they're left out; the speech still breaks in the same place. Also in **Settings…** (Document)."
+        },
+        "highwater.synopsesItalic": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Synopses in italics, in the Highwater Editor and when synopses are printed. Also in **Settings…** (Document)."
         }
       }
     },

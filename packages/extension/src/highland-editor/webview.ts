@@ -15,6 +15,7 @@ import { TemplateWindow } from "./template-window.ts";
 import { ThemePane } from "./theme-pane.ts";
 import { SettingsWindow } from "./settings-window.ts";
 import { GENERAL_DEFAULTS, invisiblesOpacity, LINE_HEIGHTS, SIDEBAR_SCALES, type GeneralSettings } from "./general-settings.ts";
+import { DOCUMENT_DEFAULTS, uppercasedHeading, type DocumentSettings } from "./document-settings.ts";
 import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
 import { Compare } from "./compare.ts";
 import type { BinOp, FromPage, ToPage } from "./messages.ts";
@@ -46,6 +47,34 @@ const MARKS = Object.fromEntries(
 let parsed: Document | null = null;
 /** The General settings (Settings window); the column width shapes the lines. */
 let general: GeneralSettings = { ...GENERAL_DEFAULTS };
+/** The Document settings (scripts): scene headings, completion, synopses. */
+let documentSettings: DocumentSettings = { ...DOCUMENT_DEFAULTS };
+
+/**
+ * Auto-uppercase INT. and EXT. (Document settings): typing in a scene heading's line puts the
+ * whole heading in capitals, as part of the same edit (one undo). Each letter is changed in place,
+ * so the cursor stays where it is.
+ */
+const uppercaseHeadings = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged || mode !== "fountain" || !documentSettings.autoUppercaseSceneHeadings || !tr.isUserEvent("input")) return tr;
+  const doc = tr.newDoc;
+  const changes: ChangeSpec[] = [];
+  const seen = new Set<number>();
+  tr.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+    for (let pos = fromB; pos <= toB && pos <= doc.length; ) {
+      const line = doc.lineAt(pos);
+      if (!seen.has(line.number)) {
+        seen.add(line.number);
+        // A heading follows a blank line (or starts the text).
+        const afterBlank = line.number === 1 || doc.line(line.number - 1).text.trim() === "";
+        const up = afterBlank ? uppercasedHeading(line.text) : null;
+        if (up) for (let i = 0; i < up.length; i++) if (up[i] !== line.text[i]) changes.push({ from: line.from + i, to: line.from + i + 1, insert: up[i]! });
+      }
+      pos = line.to + 1;
+    }
+  });
+  return changes.length ? [tr, { changes, sequential: true }] : tr;
+});
 
 function decorate(doc: Text): DecorationSet {
   parsed = parse(doc.toString(), { mode });
@@ -334,7 +363,11 @@ function start(text: string): void {
         spellingMarks,
         compare.extension,
         invisibles.of(invisibleMarks(showInvisibles)),
-        screenplayCompletion(() => (mode === "fountain" ? parsed : null)),
+        screenplayCompletion(
+          () => (mode === "fountain" ? parsed : null),
+          () => ({ locations: documentSettings.autoCompleteLocations, characters: documentSettings.autoCompleteCharacterNames }),
+        ),
+        uppercaseHeadings,
         EditorView.updateListener.of((u) => {
           if (!u.docChanged || u.transactions.some((t) => t.annotation(remote))) return;
           const changes: { from: number; to: number; insert: string }[] = [];
@@ -496,6 +529,16 @@ document.getElementById("tbpages")!.onclick = () => !pages.shown && togglePrevie
 const settingsWindow = new SettingsWindow((m) => vscode.postMessage(m));
 const themePane = new ThemePane((m) => vscode.postMessage(m), document.getElementById("tbtheme")!, () => settingsWindow.open("themes"));
 
+/** The Document settings: scene headings and synopses as they look in the text (the rest act as you type). */
+function applyDocument(next: DocumentSettings): void {
+  documentSettings = { ...next };
+  const root = document.documentElement.style;
+  root.setProperty("--hl-scene-weight", next.sceneHeadingBold ? "bold" : "normal");
+  root.setProperty("--hl-scene-underline", next.sceneHeadingUnderline ? "underline" : "none");
+  root.setProperty("--hl-synopsis-style", next.synopsesItalic ? "italic" : "normal");
+  settingsWindow.document(next);
+}
+
 /** The General settings: the text's font, spacing and column, the invisibles, and the sidebar. */
 function applyGeneral(next: GeneralSettings): void {
   const restyled = next.columnWidth !== general.columnWidth;
@@ -617,7 +660,10 @@ window.addEventListener("message", (event: MessageEvent) => {
     pages.darkPages(msg.darkPages);
   } else if (msg.type === "showThemePane") {
     if (!themePane.shown) themePane.open();
-  } else if (msg.type === "settings") applyGeneral(msg.general);
+  } else if (msg.type === "settings") {
+    applyDocument(msg.document);
+    applyGeneral(msg.general);
+  }
   else if (msg.type === "showSettings") settingsWindow.open(msg.tab);
   else if (msg.type === "pageBreaks") view?.dispatch({ effects: setPageBreaks.of(msg.starts), annotations: remote.of(true) });
   else if (msg.type === "numbers") {

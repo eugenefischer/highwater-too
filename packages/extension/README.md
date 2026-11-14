@@ -144,7 +144,7 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 
 ## Settings
 
-**Settings…** (in the Highwater Editor's ⋯ menu, or the Command Palette) opens the Settings window, laid out as Highland 2's: a General tab and a Themes tab. Each setting there is also a VS Code setting, listed below.
+**Settings…** (in the Highwater Editor's ⋯ menu, or the Command Palette) opens the Settings window, laid out as Highland 2's: General, Document and Themes tabs. Each setting there is also a VS Code setting, listed below.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -156,6 +156,14 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 | `highwater.sidebarText` | Normal | The sidebar's text size: Normal, Large or Largest. |
 | `highwater.navigatorMarkup` | off | The Navigator shows sections, synopses and notes with their markup (`#`, `=`, `[[ ]]`). |
 | `highwater.excludeNotesFromWordCount` | off | Leave the words in notes out of the word count. |
+| `highwater.sceneHeadingBold` | on | Scene headings in bold, in the editor and the printed pages. |
+| `highwater.sceneHeadingUnderline` | off | Scene headings underlined, in the editor and the printed pages. |
+| `highwater.sceneHeadingDoubleSpaced` | on | Two blank lines before each scene heading on the printed pages (off: one). |
+| `highwater.autoUppercaseSceneHeadings` | on | Typing a scene heading (INT., EXT., EST. or I/E) puts the whole heading in capitals. |
+| `highwater.autoCompleteLocations` | on | Suggest the script's locations after INT. or EXT. |
+| `highwater.autoCompleteCharacterNames` | on | Suggest the script's character names when you start a cue. |
+| `highwater.moreContd` | on | Print (MORE) and (CONT'D) where a speech breaks across pages; off, the speech still breaks in the same place. |
+| `highwater.synopsesItalic` | off | Synopses in italics, in the editor and when synopses are printed. |
 | `highwater.theme` | Match VS Code | The colour theme for the Highwater Editor: VS Code's colours, one of Highland 2's, or one of your own. |
 | `highwater.customThemes` | none | Your own themes (easiest to change with Manage Themes…). |
 | `highwater.themeWindow` | on | Choosing a theme also colours the rest of VS Code to match. |

@@ -13,14 +13,16 @@ import { suggest, vocabulary } from "../syntax/completion.ts";
 const TYPES = { character: "variable", scene: "keyword", location: "namespace", time: "enum", transition: "keyword" } as const;
 
 /** `current()` gives the latest parse of the text, or null when the document isn't a screenplay. */
-export function screenplayCompletion(current: () => Document | null) {
+export function screenplayCompletion(current: () => Document | null, allowed: () => { locations: boolean; characters: boolean } = () => ({ locations: true, characters: true })) {
   const source = (context: CompletionContext): CompletionResult | null => {
     const doc = current();
     if (!doc) return null;
     const line = context.state.doc.lineAt(context.pos);
     const before = line.text.slice(0, context.pos - line.from);
     const afterBlank = line.number === 1 || context.state.doc.line(line.number - 1).text.trim() === "";
-    let list = suggest(before, afterBlank, vocabulary(doc));
+    // The Document settings' Auto-complete locations and Auto-complete character names.
+    const allow = allowed();
+    let list = suggest(before, afterBlank, vocabulary(doc)).filter((s) => (s.kind !== "location" || allow.locations) && (s.kind !== "character" || allow.characters));
     // A typed space only brings up a heading's location or time, never the cue list.
     if (!context.explicit && before.endsWith(" ")) list = list.filter((s) => s.kind === "location" || s.kind === "time");
     if (!list.length) return null;
