@@ -84,3 +84,34 @@ describe("Document settings", () => {
     expect(uppercasedHeading("int")).toBeNull();
   });
 });
+
+describe("International settings", () => {
+  it("are each a VS Code setting with the same default", async () => {
+    const { INTERNATIONAL_DEFAULTS } = await import("../src/highland-editor/international-settings.ts");
+    const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { contributes: { configuration: { properties: Record<string, { default: unknown }> } } };
+    for (const [key, value] of Object.entries(INTERNATIONAL_DEFAULTS)) expect(manifest.contributes.configuration.properties[`highwater.${key}`]?.default, key).toEqual(value);
+  });
+
+  it("decide what is a scene heading or transition, and what completion offers, only with custom terms on", async () => {
+    const { setScriptTerms } = await import("@highwater/parser");
+    const { INTERNATIONAL_DEFAULTS, completionTermsOf, scriptTermsOf, internationalSettings } = await import("../src/highland-editor/international-settings.ts");
+    const { suggest, vocabulary } = await import("../src/syntax/completion.ts");
+    const german = { ...INTERNATIONAL_DEFAULTS, useCustomTerms: true, customLocations: ["INNEN.", "AUSSEN."], customTimes: ["TAG", "NACHT"], customTransitions: ["SCHNITT:"] };
+    expect(internationalSettings((k) => (k === "customLocations" ? [" INNEN. ", ""] : undefined)).customLocations).toEqual(["INNEN."]);
+    const src = "INNEN. KÜCHE - TAG\n\nBrenda wartet.\n\nHARTER SCHNITT:\n\nINT. GARAGE - NIGHT\n\nShe waits.\n";
+    try {
+      setScriptTerms(scriptTermsOf(german));
+      const doc = parse(src, { mode: "fountain" });
+      expect(doc.elements.map((e) => e.kind)).toEqual(["sceneHeading", "action", "transition", "action", "action"]);
+      expect(vocabulary(doc).locations).toEqual(["KÜCHE"]);
+      expect(suggest("INNEN. KÜCHE - ", true, vocabulary(doc), completionTermsOf(german)).map((s) => s.label)).toEqual(["TAG", "NACHT"]);
+      expect(suggest("IN", true, vocabulary(doc), completionTermsOf(german)).filter((s) => s.kind === "scene").map((s) => s.label)).toEqual(["INNEN.", "AUSSEN."]);
+      setScriptTerms(scriptTermsOf({ ...german, customLocations: ["INT"] }));
+      expect(parse("INTERIOR DESIGN IS HARD.\n", { mode: "fountain" }).elements[0]!.kind).not.toBe("sceneHeading");
+      expect(parse("INT KITCHEN\n", { mode: "fountain" }).elements[0]!.kind).toBe("sceneHeading");
+    } finally {
+      setScriptTerms(null);
+    }
+    expect(parse(src, { mode: "fountain" }).elements.map((e) => e.kind)).toEqual(["action", "action", "action", "sceneHeading", "action"]);
+  });
+});

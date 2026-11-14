@@ -13,3 +13,4 @@ export { classifyMarkdown, classifyPlain } from "./markdown.ts";
 export { inlineText, parseInline, parseInlineLines } from "./inline.ts";
 export { collectDirectives, directivesInLine, formatTimestamp, parseDirective, seriesCounter } from "./directives.ts";
 export { resolveIncludes, type IncludeFile, type IncludeLoader, type IncludeProblem, type IncludeResult, type MergedElement, type ResolvedDocument, type ResolvedInclude } from "./includes.ts";
+export { isSceneHeadingText, isTransitionText, sceneHeadingPrefix, scriptTerms, scriptTermsGeneration, setScriptTerms, type ScriptTerms } from "./terms.ts";

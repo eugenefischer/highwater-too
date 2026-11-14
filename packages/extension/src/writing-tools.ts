@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { completionTermsOf } from "./highland-editor/international-settings.ts";
+import { currentInternational } from "./script-terms.ts";
 import { askText } from "./ask.ts";
 import { join } from "node:path";
 import { LANGUAGES, type ParseCache } from "./language.ts";
@@ -26,7 +28,7 @@ export function registerWritingTools(context: vscode.ExtensionContext, cache: Pa
           const config = vscode.workspace.getConfiguration("highwater");
           const locations = config.get<boolean>("autoCompleteLocations", true);
           const characters = config.get<boolean>("autoCompleteCharacterNames", true);
-          let list = suggest(before, afterBlank, vocabulary(cache.get(document))).filter((s) => (s.kind !== "location" || locations) && (s.kind !== "character" || characters));
+          let list = suggest(before, afterBlank, vocabulary(cache.get(document)), completionTermsOf(currentInternational())).filter((s) => (s.kind !== "location" || locations) && (s.kind !== "character" || characters));
           // A typed space only brings up a heading's location or time, never the cue list.
           if (context.triggerKind === vscode.CompletionTriggerKind.TriggerCharacter) list = list.filter((s) => s.kind === "location" || s.kind === "time");
           // Not what is already typed: the line being typed is in the parse too ("INT. K" makes a location "K").

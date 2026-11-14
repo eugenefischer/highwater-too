@@ -144,7 +144,7 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 
 ## Settings
 
-**Settings…** (in the Highwater Editor's ⋯ menu, or the Command Palette) opens the Settings window, laid out as Highland 2's: General, Document and Themes tabs. Each setting there is also a VS Code setting, listed below.
+**Settings…** (in the Highwater Editor's ⋯ menu, or the Command Palette) opens the Settings window, laid out as Highland 2's: General, Document, International and Themes tabs. Each setting there is also a VS Code setting, listed below.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -164,6 +164,11 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 | `highwater.autoCompleteCharacterNames` | on | Suggest the script's character names when you start a cue. |
 | `highwater.moreContd` | on | Print (MORE) and (CONT'D) where a speech breaks across pages; off, the speech still breaks in the same place. |
 | `highwater.synopsesItalic` | off | Synopses in italics, in the editor and when synopses are printed. |
+| `highwater.useCustomTerms` | off | Use your own scene-heading prefixes, times of day, transitions and (MORE)/(CONT'D) words, below. They decide what counts as a scene heading or transition, what completion offers, and what prints where a speech breaks across pages. |
+| `highwater.customLocations` | INT., EXT., EST., I./E., E./I. | A line starting with one of these is a scene heading. |
+| `highwater.customTimes` | DAY, NIGHT, … | Times of day completion offers after a heading's ` - `. |
+| `highwater.customTransitions` | TO:, FADE OUT. | A line in capitals ending with one of these is a transition. |
+| `highwater.customMore`, `highwater.customContd` | (MORE), (CONT'D) | Printed where a speech breaks across pages. |
 | `highwater.theme` | Match VS Code | The colour theme for the Highwater Editor: VS Code's colours, one of Highland 2's, or one of your own. |
 | `highwater.customThemes` | none | Your own themes (easiest to change with Manage Themes…). |
 | `highwater.themeWindow` | on | Choosing a theme also colours the rest of VS Code to match. |

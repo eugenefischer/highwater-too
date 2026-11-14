@@ -8,7 +8,7 @@ import { history, defaultKeymap, historyKeymap, indentWithTab, invertedEffects, 
 import { search, searchKeymap } from "@codemirror/search";
 import { Annotation, Compartment, EditorSelection, EditorState, RangeSetBuilder, StateEffect, StateField, Transaction, type ChangeSpec, type Range, type Text } from "@codemirror/state";
 import { Decoration, dropCursor, EditorView, highlightWhitespace, keymap, layer, ViewPlugin, WidgetType, type DecorationSet, type KeyBinding, type LayerMarker, type ViewUpdate } from "@codemirror/view";
-import { parse, type Document, type Mode } from "@highwater/parser";
+import { parse, scriptTermsGeneration, setScriptTerms, type Document, type Mode } from "@highwater/parser";
 import { screenplayCompletion } from "./complete.ts";
 import { Pages } from "./pages.ts";
 import { TemplateWindow } from "./template-window.ts";
@@ -16,6 +16,8 @@ import { ThemePane } from "./theme-pane.ts";
 import { SettingsWindow } from "./settings-window.ts";
 import { GENERAL_DEFAULTS, invisiblesOpacity, LINE_HEIGHTS, SIDEBAR_SCALES, type GeneralSettings } from "./general-settings.ts";
 import { DOCUMENT_DEFAULTS, uppercasedHeading, type DocumentSettings } from "./document-settings.ts";
+import { completionTermsOf, scriptTermsOf, type InternationalSettings } from "./international-settings.ts";
+import type { CompletionTerms } from "../syntax/completion.ts";
 import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
 import { Compare } from "./compare.ts";
 import type { BinOp, FromPage, ToPage } from "./messages.ts";
@@ -49,6 +51,8 @@ let parsed: Document | null = null;
 let general: GeneralSettings = { ...GENERAL_DEFAULTS };
 /** The Document settings (scripts): scene headings, completion, synopses. */
 let documentSettings: DocumentSettings = { ...DOCUMENT_DEFAULTS };
+/** The International settings' lists for completion (null: the built-in ones). */
+let completionTerms: CompletionTerms | null = null;
 
 /**
  * Auto-uppercase INT. and EXT. (Document settings): typing in a scene heading's line puts the
@@ -365,7 +369,7 @@ function start(text: string): void {
         invisibles.of(invisibleMarks(showInvisibles)),
         screenplayCompletion(
           () => (mode === "fountain" ? parsed : null),
-          () => ({ locations: documentSettings.autoCompleteLocations, characters: documentSettings.autoCompleteCharacterNames }),
+          () => ({ locations: documentSettings.autoCompleteLocations, characters: documentSettings.autoCompleteCharacterNames, terms: completionTerms }),
         ),
         uppercaseHeadings,
         EditorView.updateListener.of((u) => {
@@ -529,6 +533,18 @@ document.getElementById("tbpages")!.onclick = () => !pages.shown && togglePrevie
 const settingsWindow = new SettingsWindow((m) => vscode.postMessage(m));
 const themePane = new ThemePane((m) => vscode.postMessage(m), document.getElementById("tbtheme")!, () => settingsWindow.open("themes"));
 
+/** The International settings: custom terms decide what is a scene heading or transition, and what completion offers. */
+function applyInternational(next: InternationalSettings): void {
+  const before = scriptTermsGeneration();
+  setScriptTerms(scriptTermsOf(next));
+  completionTerms = completionTermsOf(next);
+  settingsWindow.international(next);
+  if (scriptTermsGeneration() !== before) {
+    view?.dispatch({ effects: restyle.of(null), annotations: remote.of(true) });
+    sidebar.textChanged();
+  }
+}
+
 /** The Document settings: scene headings and synopses as they look in the text (the rest act as you type). */
 function applyDocument(next: DocumentSettings): void {
   documentSettings = { ...next };
@@ -661,6 +677,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   } else if (msg.type === "showThemePane") {
     if (!themePane.shown) themePane.open();
   } else if (msg.type === "settings") {
+    applyInternational(msg.international);
     applyDocument(msg.document);
     applyGeneral(msg.general);
   }

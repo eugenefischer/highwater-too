@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.55",
+  "version": "0.6.56",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -896,6 +896,68 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Synopses in italics, in the Highwater Editor and when synopses are printed. Also in **Settings…** (Document)."
+        },
+        "highwater.useCustomTerms": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Use your own scene-heading prefixes, times of day, transitions and (MORE)/(CONT'D) words (below) instead of the usual English ones. They decide what counts as a scene heading or transition, what completion offers, and what prints where a speech breaks across pages. Also in **Settings…** (International)."
+        },
+        "highwater.customLocations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "INT.",
+            "EXT.",
+            "EST.",
+            "I./E.",
+            "E./I."
+          ],
+          "markdownDescription": "With **Use custom terms**: a line starting with one of these is a scene heading. Also in **Settings…** (International)."
+        },
+        "highwater.customTimes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "DAY",
+            "NIGHT",
+            "LATER",
+            "CONTINUOUS",
+            "MORNING",
+            "AFTERNOON",
+            "DAWN",
+            "DUSK",
+            "EVENING",
+            "SUNSET",
+            "MAGIC HOUR",
+            "THE NEXT DAY",
+            "MOMENTS LATER"
+          ],
+          "markdownDescription": "With **Use custom terms**: the times of day completion offers after a scene heading's ` - `. Also in **Settings…** (International)."
+        },
+        "highwater.customTransitions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "TO:",
+            "FADE OUT."
+          ],
+          "markdownDescription": "With **Use custom terms**: a line in capitals ending with one of these is a transition. Also in **Settings…** (International)."
+        },
+        "highwater.customMore": {
+          "type": "string",
+          "default": "(MORE)",
+          "markdownDescription": "With **Use custom terms**: printed at the foot of a page where a speech continues. Also in **Settings…** (International)."
+        },
+        "highwater.customContd": {
+          "type": "string",
+          "default": "(CONT’D)",
+          "markdownDescription": "With **Use custom terms**: printed after the character's name where a speech continues on the next page. Also in **Settings…** (International)."
         }
       }
     },

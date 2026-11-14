@@ -7,6 +7,7 @@ import { OPEN_VIEW_TYPE, OpenRedirect, openHighland } from "./open.ts";
 import { registerCommands } from "./commands.ts";
 import { registerConversions } from "./convert.ts";
 import { registerLanguageFeatures } from "./language.ts";
+import { applyScriptTerms } from "./script-terms.ts";
 import { registerBinAndAssets } from "./bin-assets.ts";
 import { registerTemplateStatus, watchTemplateOptions } from "./render-document.ts";
 import { registerHistory } from "./history.ts";
@@ -46,6 +47,12 @@ export function activate(context: vscode.ExtensionContext): void {
     if (p && !watching.has(doc.uri.toString())) watching.set(doc.uri.toString(), store.watch(p.bundle));
   };
   vscode.workspace.textDocuments.forEach(track);
+  // The International settings' custom terms, before anything is parsed.
+  try {
+    applyScriptTerms();
+  } catch {
+    // Fountain's own terms then.
+  }
   const cache = registerLanguageFeatures(context, store);
 
   context.subscriptions.push(

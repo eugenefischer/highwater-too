@@ -1,15 +1,16 @@
 import { COLUMN_WIDTHS, EDITOR_FONTS, GENERAL_DEFAULTS, LINE_SPACINGS, SIDEBAR_TEXTS, type GeneralSettings } from "./general-settings.ts";
 import { DOCUMENT_DEFAULTS, type DocumentSettings } from "./document-settings.ts";
+import { INTERNATIONAL_DEFAULTS, type InternationalSettings } from "./international-settings.ts";
 import type { FromPage } from "./messages.ts";
 import { ThemeWindow } from "./theme-window.ts";
 
-export const SETTINGS_TABS = ["general", "document", "themes"] as const;
+export const SETTINGS_TABS = ["general", "document", "international", "themes"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
-const TAB_NAMES: Record<SettingsTab, string> = { general: "General", document: "Document", themes: "Themes" };
+const TAB_NAMES: Record<SettingsTab, string> = { general: "General", document: "Document", international: "International", themes: "Themes" };
 
 /**
- * The Settings window, as Highland 2's: a tab for each group of settings (General, Document and
- * Themes so far; International to come). Settings are for every document and kept as VS Code
+ * The Settings window, as Highland 2's: a tab for each group of settings (General, Document,
+ * International and Themes; Highland's Backup is the writing history's job here). Settings are for every document and kept as VS Code
  * settings; each change is saved as it is made.
  */
 export class SettingsWindow {
@@ -19,6 +20,7 @@ export class SettingsWindow {
   readonly themes: ThemeWindow;
   readonly #general: GeneralPane;
   readonly #document: DocumentPane;
+  readonly #international: InternationalPane;
   #tab: SettingsTab = "general";
 
   constructor(post: (msg: FromPage) => void) {
@@ -38,6 +40,7 @@ export class SettingsWindow {
     for (const b of this.#root.querySelectorAll<HTMLButtonElement>(".st-tabs button")) b.onclick = () => this.#show(b.dataset.tab as SettingsTab);
     this.#general = new GeneralPane(post, this.#panes.get("general")!);
     this.#document = new DocumentPane(post, this.#panes.get("document")!);
+    this.#international = new InternationalPane(post, this.#panes.get("international")!);
     this.themes = new ThemeWindow(post, this.#panes.get("themes")!);
     this.#root.querySelector<HTMLButtonElement>(".tw-done")!.onclick = () => this.close();
     this.#root.addEventListener("mousedown", (e) => e.target === this.#root && this.close());
@@ -74,6 +77,11 @@ export class SettingsWindow {
   /** The Document settings' values, from the extension. */
   document(values: DocumentSettings): void {
     this.#document.update(values);
+  }
+
+  /** The International settings' values, from the extension. */
+  international(values: InternationalSettings): void {
+    this.#international.update(values);
   }
 
   #show(tab: SettingsTab): void {
@@ -194,6 +202,116 @@ class DocumentPane {
 
   #fill(): void {
     for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.checked = this.#values[input.dataset.key as keyof DocumentSettings];
+  }
+}
+
+type ListKey = "customLocations" | "customTimes" | "customTransitions";
+
+/**
+ * The International tab, laid out as Highland's: Use custom terms, three lists (scene-heading
+ * prefixes, times of day, transitions) with + and −, and the words for MORE and CONTINUED. The
+ * lists and words can be changed only with Use custom terms on.
+ */
+class InternationalPane {
+  #values: InternationalSettings = structuredClone(INTERNATIONAL_DEFAULTS);
+  readonly #selected: Record<ListKey, number> = { customLocations: -1, customTimes: -1, customTransitions: -1 };
+
+  constructor(
+    private readonly post: (msg: FromPage) => void,
+    private readonly root: HTMLElement,
+  ) {
+    const list = (key: ListKey, label: string) =>
+      `<div class="st-list" data-key="${key}"><div class="st-list-head">${label}</div><div class="st-list-items" role="listbox" aria-label="${label}"></div><div class="st-list-foot"><button class="st-add" aria-label="Add">+</button><button class="st-remove" aria-label="Remove">−</button></div></div>`;
+    root.innerHTML = `<div class="st-form st-intl">
+  <label class="st-check st-center"><input type="checkbox" class="st-custom"> Use custom terms</label>
+  <div class="st-lists">${list("customLocations", "Location")}${list("customTimes", "Time of Day")}${list("customTransitions", "Transition")}</div>
+  <div class="st-words"><label>MORE: <input type="text" class="st-word" data-key="customMore" spellcheck="false"></label><label>CONTINUED: <input type="text" class="st-word" data-key="customContd" spellcheck="false"></label></div>
+  <div class="st-foot"><button class="st-restore">Restore Defaults</button></div>
+</div>`;
+    const custom = root.querySelector<HTMLInputElement>(".st-custom")!;
+    custom.onchange = () => this.#set("useCustomTerms", custom.checked);
+    for (const box of root.querySelectorAll<HTMLElement>(".st-list")) {
+      const key = box.dataset.key as ListKey;
+      box.querySelector<HTMLButtonElement>(".st-add")!.onclick = () => {
+        const items = [...this.#values[key], ""];
+        this.#values[key] = items;
+        this.#selected[key] = items.length - 1;
+        this.#fill();
+        box.querySelector<HTMLInputElement>(`.st-item[data-i="${items.length - 1}"]`)?.focus();
+      };
+      box.querySelector<HTMLButtonElement>(".st-remove")!.onclick = () => {
+        const i = this.#selected[key];
+        if (i < 0) return;
+        this.#set(key, this.#values[key].filter((_, k) => k !== i));
+        this.#selected[key] = Math.min(i, this.#values[key].length - 1);
+        this.#fill();
+      };
+    }
+    for (const input of root.querySelectorAll<HTMLInputElement>(".st-word"))
+      input.onchange = () => {
+        const key = input.dataset.key as "customMore" | "customContd";
+        if (input.value.trim()) this.#set(key, input.value.trim());
+        else input.value = this.#values[key];
+      };
+    root.querySelector<HTMLButtonElement>(".st-restore")!.onclick = () => this.post({ type: "settingsRestore", tab: "international" });
+    this.#fill();
+  }
+
+  update(values: InternationalSettings): void {
+    // An item being typed (not yet saved) stays.
+    if (this.root.contains(document.activeElement) && document.activeElement?.classList.contains("st-item")) return;
+    this.#values = structuredClone(values);
+    this.#fill();
+  }
+
+  #set<K extends keyof InternationalSettings>(key: K, value: InternationalSettings[K]): void {
+    this.#values[key] = value;
+    this.#fill();
+    this.post({ type: "settingSet", key, value });
+  }
+
+  #fill(): void {
+    const on = this.#values.useCustomTerms;
+    this.root.querySelector<HTMLInputElement>(".st-custom")!.checked = on;
+    this.root.querySelector(".st-intl")!.classList.toggle("st-off", !on);
+    for (const box of this.root.querySelectorAll<HTMLElement>(".st-list")) {
+      const key = box.dataset.key as ListKey;
+      const items = box.querySelector<HTMLElement>(".st-list-items")!;
+      items.replaceChildren(
+        ...this.#values[key].map((text, i) => {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.className = `st-item${i === this.#selected[key] ? " st-selected" : ""}`;
+          input.dataset.i = String(i);
+          input.value = text;
+          input.disabled = !on;
+          input.spellcheck = false;
+          input.onfocus = () => {
+            this.#selected[key] = i;
+            for (const el of items.querySelectorAll(".st-item")) el.classList.toggle("st-selected", el === input);
+          };
+          // Saved when you leave the item or press Enter; an emptied item goes.
+          const save = () => {
+            const list = this.#values[key].map((t, k) => (k === i ? input.value.trim() : t)).filter(Boolean);
+            if (JSON.stringify(list) !== JSON.stringify(this.#values[key].filter(Boolean))) this.#set(key, list);
+            else if (!input.value.trim()) {
+              this.#values[key] = list;
+              this.#fill();
+            }
+          };
+          input.onblur = save;
+          input.onkeydown = (e) => {
+            if (e.key === "Enter") input.blur();
+          };
+          return input;
+        }),
+      );
+      for (const b of box.querySelectorAll<HTMLButtonElement>("button")) b.disabled = !on;
+    }
+    for (const input of this.root.querySelectorAll<HTMLInputElement>(".st-word")) {
+      input.disabled = !on;
+      if (document.activeElement !== input) input.value = this.#values[input.dataset.key as "customMore" | "customContd"];
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 import { directivesInLine } from "./directives.ts";
+import { isSceneHeadingText, isTransitionText } from "./terms.ts";
 import { offsetAt } from "./overlays.ts";
 import type { Dialogue, DialoguePart, Element, Span, TextNode } from "./ast.ts";
 import { inlineText, parseInline, parseInlineLines } from "./inline.ts";
@@ -12,8 +13,6 @@ export const DIRECTIVES_ONLY = /^(?:\s*\{\{[^{}]*\}\})+\s*$/;
 export const CENTERED = /^>\s*(.*?)\s*<$/;
 const FORCED_TRANSITION = /^>\s*(.+?)\s*$/;
 const FORCED_SCENE = /^\.(?![.])\s*(.+)$/;
-const SCENE = /^(?:INT\.?\/EXT|INT\/EXT|I\/E|INT|EXT|EST)[.\s]/i;
-const TRANSITION = /^[^\p{Ll}]*TO:$/u;
 const SCENE_NUMBER = /\s*#([\w.-]+)#\s*$/;
 export const RIGHT_ALIGNED = /^(.*\S)\s*>$/;
 const PARENTHETICAL = /^\(.*\)$/;
@@ -109,8 +108,8 @@ function classifySingle(l: L, atStart: boolean, next: L | undefined): Element | 
   }
   m = FORCED_SCENE.exec(t);
   if (m) return sceneHeading(l, true);
-  if (atStart && SCENE.test(t)) return sceneHeading(l, false);
-  if (atStart && TRANSITION.test(t) && (!next || next.text === "" || SCENE.test(next.text) || FORCED_SCENE.test(next.text))) {
+  if (atStart && isSceneHeadingText(t)) return sceneHeading(l, false);
+  if (atStart && isTransitionText(t) && (!next || next.text === "" || isSceneHeadingText(next.text) || FORCED_SCENE.test(next.text))) {
     const inline = parseInline(trimmed(l));
     return { kind: "transition", text: t, inline, forced: false, ...base };
   }
@@ -139,7 +138,7 @@ function readDialogue(lines: L[], i: number): { element: Dialogue; next: number 
   let t = cueLine.text;
   const forced = t.startsWith("@");
   if (forced) t = t.slice(1);
-  else if (SCENE.test(t) || TRANSITION.test(t) || /^[\d\s.,:;!?'"-]+$/.test(t)) return null;
+  else if (isSceneHeadingText(t) || isTransitionText(t) || /^[\d\s.,:;!?'"-]+$/.test(t)) return null;
   const m = CUE.exec(t) ?? (forced ? /^(.*?)\s*((?:\([^)]*\)\s*)*)(\^)?\s*$/.exec(t) : null);
   if (!m) return null;
   const [, character = "", extensionsText = "", dual] = m;

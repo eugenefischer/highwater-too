@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.56
+
+- **Settings → International**, as Highland 2's: **Use custom terms**, then your own lists of scene-heading prefixes (Location), times of day and transitions, each with + and −, and the words printed for MORE and CONTINUED. With custom terms on, the lists decide what counts as a scene heading or a transition (in the editor, the Navigator, the pages and exports), what completion offers, and the words printed where a speech breaks across pages: both MORE and CONT'D (Highland 2 prints only its MORE).
+
 ## 0.6.55
 
 - **Settings → Document**, as Highland 2's (each also a VS Code setting):

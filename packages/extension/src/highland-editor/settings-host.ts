@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { GENERAL_DEFAULTS, generalSettings, type GeneralSettings } from "./general-settings.ts";
 import { DOCUMENT_DEFAULTS, documentSettings, type DocumentSettings } from "./document-settings.ts";
+import { internationalSettings } from "./international-settings.ts";
+import { affectsInternational, currentInternational, INTERNATIONAL_KEYS } from "../script-terms.ts";
 import { postTo, type FromPage, type ToPage } from "./messages.ts";
 import { activeView } from "../surface.ts";
 
@@ -10,7 +12,7 @@ import { activeView } from "../surface.ts";
  */
 const GENERAL_KEYS = Object.keys(GENERAL_DEFAULTS) as (keyof GeneralSettings)[];
 const DOCUMENT_KEYS = Object.keys(DOCUMENT_DEFAULTS) as (keyof DocumentSettings)[];
-const KEYS: string[] = [...GENERAL_KEYS, ...DOCUMENT_KEYS];
+const KEYS: string[] = [...GENERAL_KEYS, ...DOCUMENT_KEYS, ...INTERNATIONAL_KEYS];
 const config = () => vscode.workspace.getConfiguration("highwater");
 
 /** The General settings as they stand. */
@@ -26,26 +28,26 @@ export function currentDocument(): DocumentSettings {
 }
 
 export function settingsMessage(): ToPage {
-  return { type: "settings", general: currentGeneral(), document: currentDocument() };
+  return { type: "settings", general: currentGeneral(), document: currentDocument(), international: currentInternational() };
 }
 
 /** Whether a configuration change touches the Settings window's settings. */
 export function affectsSettings(e: vscode.ConfigurationChangeEvent): boolean {
-  return KEYS.some((k) => e.affectsConfiguration(`highwater.${k}`));
+  return affectsInternational(e) || KEYS.some((k) => e.affectsConfiguration(`highwater.${k}`));
 }
 
 /** A setting changed in the Settings window, or a tab's Restore Defaults. True if it was one of these. */
 export function handleSettingsMessage(msg: FromPage): boolean {
   if (msg.type === "settingSet") {
     // Only a value the setting can take (the page can't store anything else).
-    const general = GENERAL_KEYS.includes(msg.key as keyof GeneralSettings);
     if (!KEYS.includes(msg.key)) return true;
-    const next = (general ? generalSettings((k) => (k === msg.key ? msg.value : undefined)) : documentSettings((k) => (k === msg.key ? msg.value : undefined))) as unknown as Record<string, unknown>;
-    if (next[msg.key] === msg.value) void config().update(msg.key, msg.value, vscode.ConfigurationTarget.Global);
+    const read = (k: string) => (k === msg.key ? msg.value : undefined);
+    const next = (GENERAL_KEYS.includes(msg.key as keyof GeneralSettings) ? generalSettings(read) : DOCUMENT_KEYS.includes(msg.key as keyof DocumentSettings) ? documentSettings(read) : internationalSettings(read)) as unknown as Record<string, unknown>;
+    if (JSON.stringify(next[msg.key]) === JSON.stringify(msg.value)) void config().update(msg.key, msg.value, vscode.ConfigurationTarget.Global);
     return true;
   }
   if (msg.type === "settingsRestore") {
-    const keys: string[] = msg.tab === "document" ? DOCUMENT_KEYS : GENERAL_KEYS;
+    const keys: string[] = msg.tab === "document" ? DOCUMENT_KEYS : msg.tab === "international" ? INTERNATIONAL_KEYS : GENERAL_KEYS;
     void (async () => {
       for (const k of keys) await config().update(k, undefined, vscode.ConfigurationTarget.Global);
     })();

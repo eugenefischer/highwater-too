@@ -171,9 +171,12 @@ export interface ScriptDocumentOptions {
   moreContd?: boolean;
   /** Printed synopses in italics (default off). */
   synopsesItalic?: boolean;
+  /** The words printed for "(MORE)" and "(CONT’D)" (the International settings' custom terms). */
+  more?: string;
+  contd?: string;
 }
 
-const DOCUMENT_DEFAULTS: Required<ScriptDocumentOptions> = { sceneHeadingBold: true, sceneHeadingUnderline: false, sceneHeadingDoubleSpaced: true, moreContd: true, synopsesItalic: false };
+const DOCUMENT_DEFAULTS: Required<ScriptDocumentOptions> = { sceneHeadingBold: true, sceneHeadingUnderline: false, sceneHeadingDoubleSpaced: true, moreContd: true, synopsesItalic: false, more: "(MORE)", contd: "(CONT’D)" };
 /** The Document settings during a layout (set with `active`). */
 let settings: Required<ScriptDocumentOptions> = DOCUMENT_DEFAULTS;
 
@@ -264,7 +267,7 @@ export function layoutScreenplay(doc: Document, options: ScreenplayOptions = {})
   const previousSettings = settings;
   const previousMeasure = setMeasure(set.measure);
   active = set.template;
-  settings = { ...DOCUMENT_DEFAULTS, ...options.document };
+  settings = { ...DOCUMENT_DEFAULTS, ...(Object.fromEntries(Object.entries(options.document ?? {}).filter(([, v]) => v !== undefined)) as ScriptDocumentOptions) };
   try {
     const result: Layout = layout(doc, options, family);
     if (family !== "Courier Prime") result.fonts = { ...set.faces, ...result.fonts };
@@ -784,7 +787,7 @@ function dialogueBlock(cue: string, parts: Part[], space: number, cueStyle: Text
           const headRows = partRows(head, null);
           // "(MORE)" takes its line even when the Document settings leave it out: the speech breaks in the same place.
           if (1 + headRows.length + 1 > available) return best && { head: best.head, tail: continued(dialogueBlock(settings.moreContd ? contd(cue) : cue, best.tail, 0, cueStyle)) };
-          const more: Row[] = settings.moreContd ? [{ items: [{ x: S.parenthetical.x + runsWidth([{ text: " ", style: {} }]), runs: [{ text: "(MORE)", style: {} }] }], added: "more" }] : [];
+          const more: Row[] = settings.moreContd ? [{ items: [{ x: S.parenthetical.x + runsWidth([{ text: " ", style: {} }]), runs: [{ text: settings.more, style: {} }] }], added: "more" }] : [];
           best = { head: [rows[0]!, ...headRows, ...more], tail };
         }
       }
@@ -802,7 +805,8 @@ function continued(block: Block): Block {
 }
 
 function contd(cue: string): string {
-  return /\(CONT['’]D\)/i.test(cue) ? cue : `${cue} (CONT’D)`;
+  // A cue that already says it (as typed, or in the custom words) isn't marked twice.
+  return /\(CONT['’]D\)/i.test(cue) || cue.toUpperCase().includes(settings.contd.toUpperCase()) ? cue : `${cue} ${settings.contd}`;
 }
 
 function partRows(parts: Part[], side: "left" | "right" | null): Row[] {

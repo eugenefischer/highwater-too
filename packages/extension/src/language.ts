@@ -1,4 +1,4 @@
-import { parse, type Document, type Mode } from "@highwater/parser";
+import { parse, scriptTermsGeneration, type Document, type Mode } from "@highwater/parser";
 import * as vscode from "vscode";
 import { SCHEME } from "./fs-provider.ts";
 import { EXTRAS_SCHEME } from "./extras.ts";
@@ -14,13 +14,15 @@ export const LEGEND = new vscode.SemanticTokensLegend([...TOKEN_TYPES], []);
 
 /** One parse per document version, shared by highlighting, outline and folding. */
 export class ParseCache {
-  readonly #docs = new Map<string, { version: number; doc: Document }>();
+  readonly #docs = new Map<string, { version: number; terms: number; doc: Document }>();
   get(document: vscode.TextDocument): Document {
     const key = document.uri.toString();
     const hit = this.#docs.get(key);
-    if (hit && hit.version === document.version) return hit.doc;
+    // A parse from before the custom terms changed is stale too.
+    const terms = scriptTermsGeneration();
+    if (hit && hit.version === document.version && hit.terms === terms) return hit.doc;
     const doc = parse(document.getText(), { mode: MODES.get(document.languageId) ?? "plain" });
-    this.#docs.set(key, { version: document.version, doc });
+    this.#docs.set(key, { version: document.version, terms, doc });
     return doc;
   }
   forget(document: vscode.TextDocument): void {

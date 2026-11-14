@@ -1,3 +1,5 @@
+import { isSceneHeadingText } from "@highwater/parser";
+
 /**
  * The Document settings, as Highland 2's Settings window has them (for every script, kept as VS
  * Code settings `highwater.<key>`). EJ (2026-11-14): Auto-uppercase makes the whole heading
@@ -48,7 +50,8 @@ export function documentSettings(read: (key: keyof DocumentSettings) => unknown)
  * nothing to change. Characters whose capital is longer (ß) stay, so offsets don't move.
  */
 export function uppercasedHeading(line: string): string | null {
-  if (!/^(?:INT\.?\/EXT|INT|EXT|EST|I\/E)[.\s]/i.test(line)) return null;
+  // Fountain's prefixes, or the International settings' when custom terms are on (the parser knows which).
+  if (!isSceneHeadingText(line)) return null;
   let out = "";
   let inNote = false;
   for (let i = 0; i < line.length; i++) {

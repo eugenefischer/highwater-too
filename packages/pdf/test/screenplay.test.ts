@@ -240,3 +240,16 @@ describe("Document settings", () => {
     expect(lines(off)).toEqual(lines(on).map((p) => p.filter((t) => t !== "(MORE)").map((t) => (t === "BOB (CONT’D)" ? "BOB" : t))));
   });
 });
+
+describe("International settings' words for MORE and CONT'D", () => {
+  it("prints the custom words where a speech breaks across pages", () => {
+    const speech = Array.from({ length: 12 }, (_, i) => `Sentence number ${i + 1} goes on.`).join(" ");
+    const script = (n: number) => `INT. HOUSE - DAY\n\n${Array.from({ length: n }, (_, i) => `Action line ${i + 1}.`).join("\n\n")}\n\nBOB\n${speech}\n\nShe leaves.`;
+    const text = (it: { runs: { text: string }[] }) => it.runs.map((r) => r.text).join("");
+    const n = Array.from({ length: 20 }, (_, i) => 15 + i).find((k) => layoutScreenplay(parse(script(k), { mode: "fountain" })).pages.some((p) => p.items.some((it) => text(it) === "(MORE)")))!;
+    const printed = layoutScreenplay(parse(script(n), { mode: "fountain" }), { document: { more: "(MEHR)", contd: "(WEITER)" } }).pages.flatMap((p) => p.items.map(text));
+    expect(printed).toContain("(MEHR)");
+    expect(printed).toContain("BOB (WEITER)");
+    expect(printed).not.toContain("(MORE)");
+  });
+});
