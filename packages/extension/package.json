@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.52",
+  "version": "0.6.53",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -359,6 +359,11 @@
         "command": "highwater.showSidebarPanel",
         "title": "Show a Sidebar Panel",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.openSettings",
+        "title": "Settings…",
+        "category": "Highwater Too"
       }
     ],
     "customEditors": [
@@ -447,7 +452,7 @@
         "highwater.theme": {
           "type": "string",
           "default": "vscode",
-          "markdownDescription": "Colours for the Highwater Editor and its sidebar: `vscode` (VS Code's own colours), one of Highland 2's themes, or a custom theme (`custom:<id>`). Easiest to choose with the theme button at the top right of the Highwater Editor, or **Choose Theme…**.",
+          "markdownDescription": "Colours for the Highwater Editor and its sidebar: `vscode` (VS Code's own colours), one of the built-in themes, or a custom theme (`custom:<id>`). Easiest to choose with the theme button at the top right of the Highwater Editor, or **Choose Theme…**.",
           "examples": [
             "vscode",
             "classic",
@@ -466,7 +471,7 @@
         "highwater.customThemes": {
           "type": "array",
           "default": [],
-          "markdownDescription": "Your own themes, made or imported with **Manage Themes…** in the Highwater Editor's theme menu: Highland 2's ten theme colours, a name, and light or dark.",
+          "markdownDescription": "Your own themes, made or imported with **Manage Themes…** in the Highwater Editor's theme menu: ten theme colours, a name, and light or dark.",
           "items": {
             "type": "object",
             "required": [
@@ -566,7 +571,7 @@
         "highwater.pageBreaks": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Show where each printed page starts in the Highwater Editor's text: a short line in the right margin with the page number, as Highland 2's Show Page Breaks. Updated a second after typing stops."
+          "markdownDescription": "Show where each printed page starts in the Highwater Editor's text: a short line in the right margin with the page number. Updated a second after typing stops."
         },
         "highwater.spellCheck": {
           "type": "boolean",
@@ -785,6 +790,72 @@
           "default": "Georgia",
           "scope": "application",
           "markdownDescription": "The Wiki template's Body font (Template Options): everything but the headings. Choose it in the Highwater Editor's template window too. Fonts that aren't installed print in a bundled stand-in."
+        },
+        "highwater.editorFont": {
+          "type": "string",
+          "enum": [
+            "Courier Prime",
+            "Highland Sans"
+          ],
+          "default": "Courier Prime",
+          "markdownDescription": "The Highwater Editor's font. Both have the same character width, so the editor's lines still match the printed pages. Also in **Settings…** (General)."
+        },
+        "highwater.columnWidth": {
+          "type": "string",
+          "enum": [
+            "narrow",
+            "medium",
+            "wide"
+          ],
+          "enumDescriptions": [
+            "The printed page's width: lines break where they print.",
+            "Wider than the page; lines no longer break where they print.",
+            "Wider still."
+          ],
+          "default": "narrow",
+          "markdownDescription": "How wide the Highwater Editor's text column is. Also in **Settings…** (General)."
+        },
+        "highwater.lineSpacing": {
+          "type": "string",
+          "enum": [
+            "tight",
+            "normal",
+            "loose"
+          ],
+          "default": "normal",
+          "markdownDescription": "The space between lines in the Highwater Editor. Also in **Settings…** (General)."
+        },
+        "highwater.invisiblesBrightness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 100,
+          "markdownDescription": "How bright **Show Invisibles**' marks are, from 0 (faint) to 100. Also in **Settings…** (General)."
+        },
+        "highwater.saveCursorPosition": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Reopening a document in the Highwater Editor puts the cursor back where it was. Also in **Settings…** (General)."
+        },
+        "highwater.sidebarText": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "large",
+            "largest"
+          ],
+          "default": "normal",
+          "markdownDescription": "The size of the Highwater Editor's sidebar text. Also in **Settings…** (General)."
+        },
+        "highwater.navigatorMarkup": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "The Navigator shows sections, synopses and notes as written: `# Act One`, `= synopsis`, `[[note]]`. Also in **Settings…** (General)."
+        },
+        "highwater.excludeNotesFromWordCount": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Leave the words in notes out of the document's word count. Also in **Settings…** (General)."
         }
       }
     },
@@ -1533,6 +1604,11 @@
           "command": "highwater.togglePageBreaks",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "1_highwater@3"
+        },
+        {
+          "command": "highwater.openSettings",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "1_highwater@9"
         }
       ],
       "editor/context": [

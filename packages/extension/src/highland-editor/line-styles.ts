@@ -1,5 +1,6 @@
 import type { Document } from "@highwater/parser";
 import { MARGINS } from "../syntax/margins.ts";
+import type { ColumnWidth } from "./general-settings.ts";
 
 /**
  * How the Highwater Editor shows each source line: a kind, for its look, and an indent
@@ -43,9 +44,22 @@ export interface LineStyle {
 export const DIALOGUE_WIDTH = 34;
 export const PAREN_WIDTH = 28;
 
-/** The page column's width in characters, as the printed page: 63 for scripts, 65 for prose. */
-export function columnWidth(doc: Document): number {
-  return doc.mode === "fountain" ? MARGINS.width : MARGINS.manuscriptWidth;
+/**
+ * The General settings' Column Width. Narrow is the printed page; Medium and Wide widen the column
+ * (measured from Highland, a screenplay's action: Narrow 63, Medium 77–78, Wide 97–99 characters)
+ * and move speeches right: dialogue, parenthetical and cue start these many characters in
+ * (measured: 11.5 / 15.5 / 21.1, 17.4 / 22.8 / 30.5, 23.1 / 29.7 / 39.3). Speeches keep their widths.
+ */
+const WIDER: Record<ColumnWidth, number> = { narrow: 0, medium: 15, wide: 35 };
+const SPEECH: Record<ColumnWidth, { dialogue: number; parenthetical: number; cue: number }> = {
+  narrow: { dialogue: MARGINS.dialogue, parenthetical: MARGINS.parenthetical, cue: MARGINS.cue },
+  medium: { dialogue: 17, parenthetical: 22, cue: 30 },
+  wide: { dialogue: 23, parenthetical: 29, cue: 39 },
+};
+
+/** The page column's width in characters: at Narrow, the printed page's (63 for scripts, 65 for prose). */
+export function columnWidth(doc: Document, width: ColumnWidth = "narrow"): number {
+  return (doc.mode === "fountain" ? MARGINS.width : MARGINS.manuscriptWidth) + WIDER[width];
 }
 
 /**
@@ -53,12 +67,13 @@ export function columnWidth(doc: Document): number {
  * space between dialogue and the right edge first, and stops where dialogue would have to reflow.
  * Prose has no such limit.
  */
-export function columnMinimum(doc: Document): number {
-  return doc.mode === "fountain" ? MARGINS.dialogue + DIALOGUE_WIDTH : 0;
+export function columnMinimum(doc: Document, width: ColumnWidth = "narrow"): number {
+  return doc.mode === "fountain" ? SPEECH[width].dialogue + DIALOGUE_WIDTH : 0;
 }
 
 /** Each source line's style, keyed by the offset where the line starts. Lines not listed are plain. */
-export function lineStyles(doc: Document): Map<number, LineStyle> {
+export function lineStyles(doc: Document, width: ColumnWidth = "narrow"): Map<number, LineStyle> {
+  const speech = SPEECH[width];
   const out = new Map<number, LineStyle>();
   const set = (at: number, style: LineStyle) => out.set(at, style);
   if (doc.titlePage) {
@@ -82,15 +97,15 @@ export function lineStyles(doc: Document): Map<number, LineStyle> {
         break;
       case "dialogue": {
         const first = e.lines[0];
-        if (first) set(first.span.start, { kind: "cue", indent: MARGINS.cue });
+        if (first) set(first.span.start, { kind: "cue", indent: speech.cue });
         for (const p of e.parts) {
           if (p.kind === "empty") continue;
-          set(p.line.span.start, p.kind === "parenthetical" ? { kind: "parenthetical", indent: MARGINS.parenthetical, width: PAREN_WIDTH } : { kind: p.kind === "lyric" ? "lyric" : "dialogue", indent: MARGINS.dialogue, width: DIALOGUE_WIDTH });
+          set(p.line.span.start, p.kind === "parenthetical" ? { kind: "parenthetical", indent: speech.parenthetical, width: PAREN_WIDTH } : { kind: p.kind === "lyric" ? "lyric" : "dialogue", indent: speech.dialogue, width: DIALOGUE_WIDTH });
         }
         break;
       }
       case "lyric":
-        each("lyric", { indent: MARGINS.dialogue, width: DIALOGUE_WIDTH });
+        each("lyric", { indent: speech.dialogue, width: DIALOGUE_WIDTH });
         break;
       case "transition":
         each("transition", { align: "right" });

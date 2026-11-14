@@ -41,6 +41,11 @@ export class Sidebar {
     this.#apply();
   }
 
+  /** The General settings' "Show markup (#, =, [[ ]]) in Navigator". */
+  navigatorMarkup(on: boolean): void {
+    this.#nav.markup(on);
+  }
+
   /** The saved state, from the extension. */
   restore(state: Partial<SidebarState>): void {
     this.#state = {

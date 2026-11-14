@@ -2,8 +2,9 @@ import { HIGHLAND_THEMES, navigatorColors, pageColors, fromCustom, parseThemeLin
 import type { FromPage } from "./messages.ts";
 
 /**
- * The theme window (Manage Themes… in the theme menu): your own themes, made, imported from a
- * theme link, edited and deleted, as Highland 2's Themes settings and its theme builder together.
+ * The Settings window's Themes tab (also Manage Themes… in the theme menu): your own themes, made,
+ * imported from a theme link, edited and deleted, as Highland 2's Themes settings and its theme
+ * builder together.
  * A theme is Highland's ten colours, a name and light or dark; its link is the one Highland's
  * theme builder writes, so themes travel both ways. Changes are saved as you make them, and a
  * theme in use changes on the page as you edit it.
@@ -22,17 +23,18 @@ export class ThemeWindow {
   #current = "vscode";
   #selected: string | null = null;
   #saveTimer: ReturnType<typeof setTimeout> | undefined;
+  #visible = false;
 
-  constructor(private readonly post: (msg: FromPage) => void) {
-    this.#root = document.createElement("div");
-    this.#root.id = "thwin";
-    this.#root.hidden = true;
+  /** Builds the tab's content in `container` (the Settings window's Themes pane). */
+  constructor(
+    private readonly post: (msg: FromPage) => void,
+    container: HTMLElement,
+  ) {
+    this.#root = container;
     const rows = THEME_COLORS.map(
       (c) => `<label class="tm-color"><span>${c.label}</span><input type="color" data-key="${c.key}" aria-label="${c.label}"><input type="text" class="tm-hex" data-key="${c.key}" spellcheck="false" maxlength="7" aria-label="${c.label} (hex)"></label>`,
     ).join("");
-    this.#root.innerHTML = `<div class="tw-sheet tm-sheet" role="dialog" aria-modal="true" aria-labelledby="tm-title">
-  <div class="tw-head"><h1 id="tm-title">Themes</h1><button class="tw-done">Done</button></div>
-  <div class="tw-body">
+    this.#root.innerHTML = `<div class="tw-body">
     <div class="tm-side">
       <div class="tw-group">CUSTOM THEMES</div>
       <div class="tm-list" role="listbox" aria-label="Custom themes"></div>
@@ -52,9 +54,7 @@ export class ThemeWindow {
       </div>
     </div>
   </div>
-  <label class="tm-dark"><input type="checkbox" class="tm-dark-box"> Show dark PDF pages with dark themes</label>
-</div>`;
-    document.body.append(this.#root);
+  <label class="tm-dark"><input type="checkbox" class="tm-dark-box"> Show dark PDF pages with dark themes</label>`;
     const q = <T extends HTMLElement>(sel: string) => this.#root.querySelector(sel) as T;
     this.#list = q(".tm-list");
     this.#editor = q(".tm-editor");
@@ -64,15 +64,6 @@ export class ThemeWindow {
     this.#import = q(".tm-import");
     this.#importText = q(".tm-import-text");
     this.#importNote = q(".tm-import-note");
-    q<HTMLButtonElement>(".tw-done").onclick = () => this.close();
-    this.#root.addEventListener("mousedown", (e) => e.target === this.#root && this.close());
-    this.#root.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        this.close();
-      }
-    });
     q<HTMLButtonElement>(".tm-new").onclick = () => this.#new();
     const dark = q<HTMLInputElement>(".tm-dark-box");
     dark.onchange = () => this.post({ type: "darkPagesSet", on: dark.checked });
@@ -104,7 +95,7 @@ export class ThemeWindow {
   }
 
   get shown(): boolean {
-    return !this.#root.hidden;
+    return this.#visible;
   }
 
   update(current: string, customs: CustomTheme[], darkPages: boolean): void {
@@ -116,17 +107,18 @@ export class ThemeWindow {
     if (this.shown) this.#render();
   }
 
+  /** The tab is showing. */
   open(): void {
-    this.#root.hidden = false;
+    this.#visible = true;
     this.#selected ??= this.#current.startsWith("custom:") ? this.#current.slice(7) : (this.#customs[0]?.id ?? null);
     this.#import.hidden = true;
     this.#render();
-    this.#root.querySelector<HTMLButtonElement>(".tw-done")!.focus();
   }
 
+  /** The tab is hidden or the window closed: unsaved changes go now. */
   close(): void {
     this.#flush();
-    this.#root.hidden = true;
+    this.#visible = false;
   }
 
   #theme(): CustomTheme | undefined {

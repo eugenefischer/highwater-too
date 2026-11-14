@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.53
+
+- **The Settings window**, as Highland 2's: **Settings…** in the Highwater Editor's ⋯ menu (or the Command Palette) opens it, with a **General** tab and a **Themes** tab (the theme window; **Manage Themes…** opens this tab). Document and International come next.
+- General settings, each also a VS Code setting:
+  - **Editor Font:** Courier Prime or Highland Sans. Both have the same character width, so lines still break where they print.
+  - **Column Width:** Narrow (the printed width, the default), Medium or Wide. Medium and Wide widen the column and move speeches right, as Highland does; their lines no longer break where they print.
+  - **Line Spacing:** Tight, Normal or Loose, measured from Highland.
+  - **Invisibles Brightness**, **Save cursor position in document**, **Sidebar Text** (Normal, Large, Largest), **Show markup (#, =, [[ ]]) in Navigator**.
+  - **Exclude notes from document word count**, off by default as in Highland: the word count now includes the words in notes unless you turn this on.
 ## 0.6.52
 
 - Plain .fountain and .md files no longer wait for a sync with the history mirror before showing their pages, page count, page breaks, Bin or Scratchpad. Their template and print options are kept with the writing history, and reading them used to queue behind the sync, which can take seconds.

@@ -144,8 +144,18 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 
 ## Settings
 
+**Settings…** (in the Highwater Editor's ⋯ menu, or the Command Palette) opens the Settings window, laid out as Highland 2's: a General tab and a Themes tab. Each setting there is also a VS Code setting, listed below.
+
 | Setting | Default | What it does |
 |---|---|---|
+| `highwater.editorFont` | Courier Prime | The editor's font: Courier Prime or Highland Sans (the same width, so lines still break where they print). |
+| `highwater.columnWidth` | Narrow | The text column: Narrow is the printed page's width; Medium and Wide are wider, and their lines no longer break where they print. |
+| `highwater.lineSpacing` | Normal | Tight, Normal or Loose. |
+| `highwater.invisiblesBrightness` | 100 | How bright Show Invisibles' marks are (0 to 100). |
+| `highwater.saveCursorPosition` | off | Reopening a document puts the cursor back where it was. |
+| `highwater.sidebarText` | Normal | The sidebar's text size: Normal, Large or Largest. |
+| `highwater.navigatorMarkup` | off | The Navigator shows sections, synopses and notes with their markup (`#`, `=`, `[[ ]]`). |
+| `highwater.excludeNotesFromWordCount` | off | Leave the words in notes out of the word count. |
 | `highwater.theme` | Match VS Code | The colour theme for the Highwater Editor: VS Code's colours, one of Highland 2's, or one of your own. |
 | `highwater.customThemes` | none | Your own themes (easiest to change with Manage Themes…). |
 | `highwater.themeWindow` | on | Choosing a theme also colours the rest of VS Code to match. |

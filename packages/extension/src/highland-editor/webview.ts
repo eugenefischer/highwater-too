@@ -13,7 +13,8 @@ import { screenplayCompletion } from "./complete.ts";
 import { Pages } from "./pages.ts";
 import { TemplateWindow } from "./template-window.ts";
 import { ThemePane } from "./theme-pane.ts";
-import { ThemeWindow } from "./theme-window.ts";
+import { SettingsWindow } from "./settings-window.ts";
+import { GENERAL_DEFAULTS, invisiblesOpacity, LINE_HEIGHTS, SIDEBAR_SCALES, type GeneralSettings } from "./general-settings.ts";
 import { ASSET_TYPE, BIN_TYPE, Sidebar } from "./sidebar.ts";
 import { Compare } from "./compare.ts";
 import type { BinOp, FromPage, ToPage } from "./messages.ts";
@@ -43,13 +44,15 @@ const MARKS = Object.fromEntries(
 ) as Record<InlineMark["kind"], Decoration>;
 /** The latest parse of the text, for completion. */
 let parsed: Document | null = null;
+/** The General settings (Settings window); the column width shapes the lines. */
+let general: GeneralSettings = { ...GENERAL_DEFAULTS };
 
 function decorate(doc: Text): DecorationSet {
   parsed = parse(doc.toString(), { mode });
-  const styles = lineStyles(parsed);
-  const column = columnWidth(parsed);
+  const styles = lineStyles(parsed, general.columnWidth);
+  const column = columnWidth(parsed, general.columnWidth);
   document.documentElement.style.setProperty("--column", `${column}ch`);
-  document.documentElement.style.setProperty("--column-min", `${columnMinimum(parsed)}ch`);
+  document.documentElement.style.setProperty("--column-min", `${columnMinimum(parsed, general.columnWidth)}ch`);
   const numbers = paragraphNumbers(parsed);
   const ranges: Range<Decoration>[] = [];
   for (let n = 1; n <= doc.lines; n++) {
@@ -144,9 +147,11 @@ const pageBreakMarks = layer({
   },
 });
 
+/** The lines' look changed without the text changing (a new column width). */
+const restyle = StateEffect.define<null>();
 const styling = StateField.define<DecorationSet>({
   create: (state) => decorate(state.doc),
-  update: (value, tr) => (tr.docChanged ? decorate(tr.state.doc) : value),
+  update: (value, tr) => (tr.docChanged || tr.effects.some((e) => e.is(restyle)) ? decorate(tr.state.doc) : value),
   provide: (f) => EditorView.decorations.from(f),
 });
 
@@ -487,9 +492,24 @@ const sidebar = new Sidebar({
 // The top bar: Text and Pages (as ⌘E), and Choose Theme.
 document.getElementById("tbtext")!.onclick = () => pages.shown && togglePreview();
 document.getElementById("tbpages")!.onclick = () => !pages.shown && togglePreview();
-// The theme menu under the theme button, and the theme window its Manage Themes… opens.
-const themeWindow = new ThemeWindow((m) => vscode.postMessage(m));
-const themePane = new ThemePane((m) => vscode.postMessage(m), document.getElementById("tbtheme")!, () => themeWindow.open());
+// The theme menu under the theme button, and the Settings window (its Manage Themes… opens the Themes tab).
+const settingsWindow = new SettingsWindow((m) => vscode.postMessage(m));
+const themePane = new ThemePane((m) => vscode.postMessage(m), document.getElementById("tbtheme")!, () => settingsWindow.open("themes"));
+
+/** The General settings: the text's font, spacing and column, the invisibles, and the sidebar. */
+function applyGeneral(next: GeneralSettings): void {
+  const restyled = next.columnWidth !== general.columnWidth;
+  general = next;
+  const root = document.documentElement.style;
+  root.setProperty("--hl-font", `"${next.editorFont}"`);
+  root.setProperty("--hl-line-height", String(LINE_HEIGHTS[next.lineSpacing]));
+  root.setProperty("--hl-ws-opacity", String(invisiblesOpacity(next.invisiblesBrightness)));
+  root.setProperty("--sb-scale", String(SIDEBAR_SCALES[next.sidebarText]));
+  sidebar.navigatorMarkup(next.navigatorMarkup);
+  settingsWindow.general(next);
+  if (restyled) view?.dispatch({ effects: restyle.of(null), annotations: remote.of(true) });
+  view?.requestMeasure();
+}
 document.getElementById("tbtheme")!.onclick = () => themePane.toggle();
 
 /** Highland's counts at the foot of the text. */
@@ -593,11 +613,12 @@ window.addEventListener("message", (event: MessageEvent) => {
   else if (msg.type === "theme") applyTheme(msg.vars ?? null);
   else if (msg.type === "themes") {
     themePane.update(msg.current, msg.customs);
-    themeWindow.update(msg.current, msg.customs, msg.darkPagesSetting);
+    settingsWindow.themes.update(msg.current, msg.customs, msg.darkPagesSetting);
     pages.darkPages(msg.darkPages);
   } else if (msg.type === "showThemePane") {
     if (!themePane.shown) themePane.open();
-  }
+  } else if (msg.type === "settings") applyGeneral(msg.general);
+  else if (msg.type === "showSettings") settingsWindow.open(msg.tab);
   else if (msg.type === "pageBreaks") view?.dispatch({ effects: setPageBreaks.of(msg.starts), annotations: remote.of(true) });
   else if (msg.type === "numbers") {
     document.documentElement.classList.toggle("hl-numbers", !!msg.on);

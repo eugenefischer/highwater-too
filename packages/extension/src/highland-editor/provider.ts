@@ -10,6 +10,7 @@ import { parse, type Document } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { handleThemeMessage, registerThemes, themesMessage, themeVars } from "./theme-host.ts";
+import { affectsGeneral, currentGeneral, generalMessage, handleSettingsMessage, registerSettings } from "./settings-host.ts";
 import { editorFocused, registerSidebarNote } from "./sidebar-note.ts";
 import { sidebarHost } from "./sidebar-host.ts";
 import { pageHtml } from "./page-html.ts";
@@ -136,7 +137,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     };
     // Highland's counts at the foot of the text: characters, words and pages (the print layout's, page-count.ts).
     const sendCounts = debounce(300, () => {
-      const stats = documentStats(parsed(this.cache(), document));
+      const stats = documentStats(parsed(this.cache(), document), { notes: !currentGeneral().excludeNotesFromWordCount });
       postTo(panel, { type: "counts", characters: stats.characters, words: stats.words, pages: pageCountOf(document) ?? null });
     });
     // Check Spelling While Typing (highwater.spellCheck) and the learned words.
@@ -154,6 +155,14 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     // Show Invisibles follows the text editor's whitespace setting for the document's language.
     const sendInvisibles = () =>
       postTo(panel, { type: "invisibles", on: vscode.workspace.getConfiguration("editor", document).get<string>("renderWhitespace", "none") !== "none" });
+    // Save cursor position in document: the cursor's place, kept for this workspace by document.
+    const cursorKey = () => `cursor:${document.uri.toString()}`;
+    let cursorAt = 0;
+    const storeCursor = debounce(500, () => void this.context.workspaceState.update(cursorKey(), cursorAt));
+    const saveCursor = (offset: number) => {
+      cursorAt = offset;
+      storeCursor();
+    };
     const send = () => {
       pageText = pageForm(document.getText());
       postTo(panel, { type: "update", text: pageText });
@@ -174,6 +183,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           view.comparing = false;
           sidebar.ready();
           pageText = pageForm(document.getText());
+          // The General settings first: the column width shapes the text's first layout.
+          postTo(panel, generalMessage());
           postTo(panel, { type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
           previewing = false;
@@ -185,12 +196,18 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendSpelling();
           void sendTemplate();
           sendCounts();
+          // Save cursor position in document (General settings): back where it was, unless opened at a place.
+          const saved = this.context.workspaceState.get<number>(cursorKey());
           if (pendingReveal) postTo(panel, pendingReveal);
+          else if (currentGeneral().saveCursorPosition && typeof saved === "number" && saved <= document.getText().length)
+            postTo(panel, { type: "reveal", offset: toPage(saved), how: "center", select: true });
           pendingReveal = undefined;
           for (const run of waiting.splice(0)) run();
         } else if (msg.type === "selection" && msg.ranges) {
           view.selections = msg.ranges.map((r) => ({ anchor: toDocument(r.anchor), head: toDocument(r.head) }));
           highlandViews.selected(view);
+          const head = view.selections[0]?.head;
+          if (head !== undefined && currentGeneral().saveCursorPosition) saveCursor(head);
         } else if (msg.type === "preview") {
           previewing = true;
           void sendPages(typeof msg.at === "number" ? msg.at : null);
@@ -213,6 +230,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           void vscode.commands.executeCommand(msg.kind === "docx" ? "highwater.exportDocx" : "highwater.exportPdf", document.uri);
         } else if (handleThemeMessage(this.context, msg)) {
           // (theme-host.ts)
+        } else if (handleSettingsMessage(msg)) {
+          // (settings-host.ts)
         } else if (msg.type === "learnWord" && typeof msg.word === "string" && msg.word.trim()) {
           // Learn Spelling: kept in the writer's settings (all documents; Settings Sync carries it).
           const config = vscode.workspace.getConfiguration("highwater");
@@ -242,6 +261,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && (e.affectsConfiguration("highwater.theme") || e.affectsConfiguration("highwater.customThemes") || e.affectsConfiguration("highwater.darkPages"))) sendTheme();
         if (view.ready && e.affectsConfiguration(SETTINGS_PREFIX)) sendTemplateValues();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
+        if (view.ready && affectsGeneral(e)) postTo(panel, generalMessage());
+        if (view.ready && e.affectsConfiguration("highwater.excludeNotesFromWordCount")) sendCounts();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
         if (view.ready && e.affectsConfiguration("highwater.pageBreaks")) sendPageBreaks();
         if (view.ready && (e.affectsConfiguration("highwater.spellCheck") || e.affectsConfiguration("highwater.spellingWords"))) sendSpelling();
@@ -524,6 +545,7 @@ async function openInHighwater(doc: vscode.TextDocument): Promise<HighlandView |
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore, cache: () => ParseCache): void {
   registerSidebarNote(context);
   registerThemes(context);
+  registerSettings(context);
   highwaterOpener.open = openInHighwater;
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(HIGHLAND_EDITOR, new HighlandEditorProvider(context, store, cache), { webviewOptions: { retainContextWhenHidden: true } }),

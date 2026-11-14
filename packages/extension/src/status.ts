@@ -17,7 +17,8 @@ export function registerStatusBar(context: vscode.ExtensionContext, cache: Parse
       item.hide();
       return;
     }
-    const stats = documentStats(cache.get(doc));
+    // The words in notes count unless the General settings leave them out.
+    const stats = documentStats(cache.get(doc), { notes: !vscode.workspace.getConfiguration("highwater").get<boolean>("excludeNotesFromWordCount", false) });
     const n = (x: number) => x.toLocaleString("en-US");
     const selected = active.ranges.reduce((sum, s) => sum + (s.isEmpty ? 0 : countWords(doc.getText(s))), 0);
     const words = selected > 0 ? `${n(selected)} of ${n(stats.words)} words` : `${n(stats.words)} words`;
@@ -44,6 +45,7 @@ export function registerStatusBar(context: vscode.ExtensionContext, cache: Parse
       if (e.document === activeDocument()) later();
     }),
     vscode.workspace.onDidOpenTextDocument(later), // language changes reopen the document
+    vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("highwater.excludeNotesFromWordCount") && later()),
   );
   update();
 }

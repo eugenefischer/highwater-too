@@ -27,6 +27,10 @@ export function pageHtml(p: PageAddresses): string {
 @font-face { font-family: "Courier Prime"; font-weight: bold; src: url("${p.font("CourierPrime-Bold.ttf")}"); }
 @font-face { font-family: "Courier Prime"; font-style: italic; src: url("${p.font("CourierPrime-Italic.ttf")}"); }
 @font-face { font-family: "Courier Prime"; font-weight: bold; font-style: italic; src: url("${p.font("CourierPrime-BoldItalic.ttf")}"); }
+@font-face { font-family: "Highland Sans"; src: url("${p.font("Highland Sans.ttf")}"); }
+@font-face { font-family: "Highland Sans"; font-weight: bold; src: url("${p.font("Highland Sans Bold.ttf")}"); }
+@font-face { font-family: "Highland Sans"; font-style: italic; src: url("${p.font("Highland Sans Italic.ttf")}"); }
+@font-face { font-family: "Highland Sans"; font-weight: bold; font-style: italic; src: url("${p.font("Highland Sans Bold Italic.ttf")}"); }
 ${css}</style></head>
 <body data-pdfjs="${p.pdfjs("pdf.min.mjs")}" data-worker="${p.pdfjs("pdf.worker.min.mjs")}" data-spell-worker="${p.spellWorker}" data-dict-aff="${p.dict("index.aff")}" data-dict-dic="${p.dict("index.dic")}">
 <div id="sidebar">

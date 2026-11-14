@@ -126,6 +126,15 @@ export class NavigatorPanel {
     };
   }
 
+  #markup = false;
+
+  /** Names shown with their markup ("# Act One", "= …", "[[…]]"), or without (General settings). */
+  markup(on: boolean): void {
+    if (on === this.#markup) return;
+    this.#markup = on;
+    if (!this.#dragging) this.#render();
+  }
+
   textChanged(): void {
     this.#relist();
   }
@@ -151,13 +160,14 @@ export class NavigatorPanel {
     const words = this.#filter.value.trim().toLowerCase();
     this.#list.replaceChildren();
     this.#rows.forEach((row, i) => {
-      if (words && !row.label.toLowerCase().includes(words)) return;
+      const name = this.#markup && row.markup ? row.markup : row.label;
+      if (words && !name.toLowerCase().includes(words)) return;
       const el = document.createElement("div");
       el.className = `row ${row.type}${i === this.#current ? " current" : ""}`;
       el.dataset.index = String(i);
       el.style.paddingLeft = `${10 + (words ? 0 : row.depth) * 12}px`;
-      el.textContent = row.label;
-      el.title = row.label;
+      el.textContent = name;
+      el.title = name;
       // Scenes, sections and headings can be dragged (not while filtering: the gaps would be hidden).
       if (row.blockEnd !== null && !words) el.dataset.draggable = "true";
       this.#list.append(el);

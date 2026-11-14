@@ -179,16 +179,22 @@ export interface NavigatorRow {
   depth: number;
   /** Where the item starts in the source. */
   start: number;
+  /** Sections, synopses and notes: the name as written, markup and all ("# Act One", "= …", "[[…]]"), for the General settings' "Show markup". */
+  markup: string | null;
   /** Scenes, sections and headings: the end of the text they cover (they can be dragged, and dropped before). */
   blockEnd: number | null;
 }
+
+/** The items whose markup "Show markup (#, =, [[ ]]) in Navigator" shows. */
+const MARKUP = new Set<NavigatorType>(["sectionHeaders", "synopses", "notes"]);
 
 export function navigatorRows(doc: Document, items: NavigatorItem[]): NavigatorRow[] {
   const rows: NavigatorRow[] = [];
   const visit = (list: NavigatorItem[], depth: number) => {
     for (const item of list) {
       const movable = item.type === "sceneHeaders" || item.type === "sectionHeaders";
-      rows.push({ type: item.type, label: item.label, depth, start: item.span.start, blockEnd: movable ? (blockAt(doc, item.span.start)?.end ?? null) : null });
+      const written = MARKUP.has(item.type) ? (doc.source.slice(item.span.start, item.span.end).split("\n")[0]?.trim() ?? "") : "";
+      rows.push({ type: item.type, label: item.label, depth, start: item.span.start, blockEnd: movable ? (blockAt(doc, item.span.start)?.end ?? null) : null, markup: written || null });
       visit(item.children, depth + 1);
     }
   };

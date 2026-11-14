@@ -49,6 +49,37 @@ export function printedText(e: Element): string[] {
   }
 }
 
+/** The text of every note in an element ([[like this]]), however deep in its emphasis or links. */
+function notesOf(e: Element): string[] {
+  const out: string[] = [];
+  const walk = (nodes: Inline[]) => {
+    for (const n of nodes) {
+      if (n.kind === "note") out.push(n.text);
+      else if (n.kind === "styled" || n.kind === "link") walk(n.children);
+    }
+  };
+  for (const inline of inlineOf(e)) walk(inline);
+  return out;
+}
+
+/** Every inline array in an element. */
+function inlineOf(e: Element): Inline[][] {
+  switch (e.kind) {
+    case "dialogue":
+      return e.parts.flatMap((p) => (p.kind === "empty" ? [] : [p.inline]));
+    case "blockQuote":
+      return e.paragraphs.map((p) => p.inline);
+    case "list":
+      return e.items.map((i) => i.inline);
+    case "termList":
+      return e.items.flatMap((i) => [i.termInline, i.definitionInline]);
+    case "table":
+      return [...e.header, ...e.rows.flat()].map((c) => c.inline);
+    default:
+      return "inline" in e ? [e.inline] : [];
+  }
+}
+
 function plain(inline: Inline[]): string {
   return inlineText(inline.filter((n) => n.kind !== "directive"));
 }
@@ -77,7 +108,12 @@ function wrapped(text: string, width: number): number {
   return lines;
 }
 
-export function documentStats(doc: Document): DocumentStats {
+/**
+ * The document's counts. With `notes` (the General settings' "Exclude notes from document word
+ * count" off, as Highland has it by default), the words in notes count too; characters and
+ * pages are always the printed text's.
+ */
+export function documentStats(doc: Document, { notes = false }: { notes?: boolean } = {}): DocumentStats {
   let words = 0;
   let characters = 0;
   for (const e of doc.elements)
@@ -85,6 +121,7 @@ export function documentStats(doc: Document): DocumentStats {
       words += countWords(s);
       characters += s.length;
     }
+  if (notes) for (const e of doc.elements) for (const text of notesOf(e)) words += countWords(text);
   if (doc.mode === "fountain") {
     // Screenplay layout (measured from Highland): 54 lines a page, action 61 characters wide,
     // dialogue 35, parentheticals 28; one blank line between elements, two before scene headings.
