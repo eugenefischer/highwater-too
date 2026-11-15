@@ -145,6 +145,9 @@ interface OpenPage {
   number: number;
 }
 
+/** The bottom of a page's text box (prose and manuscript templates, measured from Highland's PDFs). */
+const BOX_BOTTOM = 720;
+
 export function layoutManuscript(doc: Document, options: ManuscriptOptions = {}): Layout & { substituted: Record<string, string> } {
   const family = options.font ?? "Courier Prime";
   const set = withFont(family, options);
@@ -222,6 +225,10 @@ function run(doc: Document, options: ManuscriptOptions, tocPages: Map<number, nu
     if (p.lines.length === 0) return true;
     const limit = M.lines + (line.opens ? 1 : 0);
     if (used + line.height / M.pitch > limit + 1e-6) return false;
+    // And where it lands: a line that doesn't open a paragraph must end inside the text box
+    // (Highland's: y 72–720); counting lines alone let one run past it on a page whose spacing
+    // isn't whole lines (ManuscriptProbe page 3: a list item's last line, then two more below the page).
+    if (!byCount && !line.opens && line.items.length > 0 && y + line.height > BOX_BOTTOM + 0.5) return false;
     // Lines also stop where the page ends: baselines down to about 734 (Courier Prime's fifteenth
     // line after a dropped heading at 730.8; Times New Roman's at 738.5 goes over; headings, whose
     // space after doesn't count as a line, past it: ManuscriptProbe-NoSectionSpace).

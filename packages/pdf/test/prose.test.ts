@@ -118,3 +118,25 @@ describe("fonts", () => {
     expect(wrapMeasured(runs, 7, 7, w).map((l) => l.map((x) => x.text).join(""))).toEqual(["aaa bbb", "ccccccc", "ccc dd"]);
   });
 });
+
+describe("Novel after centred text", () => {
+  // NovelProbe-Default p. 4: the line after centred text opens like the first paragraph after a
+  // heading (small caps), and a note counts as that line, printed or not.
+  const src = "TL: Me\n\nA paragraph.\n\n> Centred text <\n\n[[A note.]]\n\n= A synopsis.\n\nThe last paragraph.";
+  const lines = (notes: boolean) =>
+    layoutProse(parse(src, { mode: "markdown" }), PROSE_TEMPLATES.Novel!, { fontDir: defaultFontDir(), ...(notes ? { print: { notes: true } } : {}) })
+      .pages.flatMap((p) => p.items)
+      .map((it) => ({ x: it.x, text: it.runs.map((r) => r.text).join("") }));
+  it("prints a note after centred text in small caps, then indents the next paragraph", () => {
+    const out = lines(true);
+    expect(out.find((l) => /note/i.test(l.text))!.text).toBe("[[A NOTE.]]");
+    const last = out.find((l) => /last paragraph/i.test(l.text))!;
+    expect(last.text).toBe("The last paragraph.");
+    expect(last.x).toBeGreaterThan(PROSE_TEMPLATES.Novel!.left);
+  });
+  it("lets an unprinted note take the small caps too", () => {
+    const last = lines(false).find((l) => /last paragraph/i.test(l.text))!;
+    expect(last.text).toBe("The last paragraph.");
+    expect(last.x).toBeGreaterThan(PROSE_TEMPLATES.Novel!.left);
+  });
+});

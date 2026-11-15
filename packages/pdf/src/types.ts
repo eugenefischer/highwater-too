@@ -112,13 +112,15 @@ export function assignSources(lines: { range: SourceRange | undefined; items: Pl
       // The line before: where it starts (when found) and how long it printed.
       let previous: { at: number; length: number } | null = { at: range.start, length: -1 };
       const offsets: (number | undefined)[] = [];
+      // The range's words, found once (looking each line up in them needs no pattern per line).
+      const words = source && n > 1 ? wordsIn(source, range) : [];
       for (let k = 0; k < n; k++) {
         if (lines[i + k]!.added) continue;
         const text = lines[i + k]!.items.map((it) => runsText(it.runs)).join(" ");
         const shared = range.start + Math.floor(((range.end - range.start) * k) / n);
         // Next after the line before (its printed length and a space), else the shared-out guess.
         const estimate: number = previous && previous.length >= 0 ? previous.at + previous.length + 1 : shared;
-        const exact: number | null = source && k > 0 ? lineStart(source, range, text, estimate, floor) : null;
+        const exact: number | null = source && k > 0 ? lineStart(source, range, words, text, estimate, floor) : null;
         const offset = exact ?? (k === 0 ? range.start : shared);
         if (exact !== null) floor = exact + 1;
         previous = exact !== null || k === 0 ? { at: offset, length: text.trimEnd().length } : null;
@@ -138,23 +140,44 @@ export function assignSources(lines: { range: SourceRange | undefined; items: Pl
   }
 }
 
+/** A word of the source (letters and digits), where it starts, lower-cased for comparing. */
+interface Word {
+  at: number;
+  word: string;
+}
+
+const WORD = /[\p{L}\p{N}]+/gu;
+
+function wordsIn(source: string, range: SourceRange): Word[] {
+  const out: Word[] = [];
+  const text = source.slice(range.start, range.end);
+  for (const m of text.matchAll(WORD)) out.push({ at: range.start + m.index, word: m[0].toLowerCase() });
+  return out;
+}
+
 /**
  * Where a printed line starts in the source: its first three words (else two, else one) found
- * with anything between them that isn't a letter or digit (markup, dashes, quotes, line breaks),
- * the occurrence at or after `floor` nearest `estimate`, moved back over the punctuation the
- * printed line opens with (an opening quote). Null if the words aren't there (text from an included file, say).
+ * one after another in the range's words (whatever lies between them that isn't a letter or digit:
+ * markup, dashes, quotes, line breaks), the occurrence at or after `floor` nearest `estimate`,
+ * moved back over the punctuation the printed line opens with (an opening quote). Null if the
+ * words aren't there (text from an included file, say).
  */
-function lineStart(source: string, range: SourceRange, text: string, estimate: number, floor: number): number | null {
-  const words = text.match(/[\p{L}\p{N}]+/gu) ?? [];
-  const within = source.slice(range.start, range.end);
-  for (let count = Math.min(3, words.length); count >= 1; count--) {
-    const pattern = new RegExp(words.slice(0, count).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[^\\p{L}\\p{N}]+"), "giu");
+function lineStart(source: string, range: SourceRange, words: Word[], text: string, estimate: number, floor: number): number | null {
+  const printed = (text.match(WORD) ?? []).map((w) => w.toLowerCase());
+  // The first word that may start the line: each line starts after the one before.
+  let first = 0;
+  for (let lo = 0, hi = words.length; lo < hi; ) {
+    const mid = (lo + hi) >> 1;
+    if (words[mid]!.at < floor) lo = first = mid + 1;
+    else hi = mid;
+  }
+  for (let count = Math.min(3, printed.length); count >= 1; count--) {
     let best: number | null = null;
-    // Step one character at a time so repeated words still match at every start.
-    for (let m = pattern.exec(within); m; pattern.lastIndex = m.index + 1, m = pattern.exec(within)) {
-      const at = range.start + m.index;
-      if (m.index > 0 && /[\p{L}\p{N}]/u.test(within[m.index - 1]!)) continue;
-      if (at < floor) continue;
+    for (let w = first; w + count <= words.length; w++) {
+      let same = true;
+      for (let c = 0; c < count && same; c++) same = words[w + c]!.word === printed[c];
+      if (!same) continue;
+      const at = words[w]!.at;
       if (best === null || Math.abs(at - estimate) < Math.abs(best - estimate)) best = at;
       else if (at > estimate) break;
     }

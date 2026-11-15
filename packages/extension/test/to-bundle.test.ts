@@ -85,3 +85,17 @@ describe("the Navigator", () => {
     expect(JSON.stringify(items)).toContain("check this");
   });
 });
+
+describe("toTextBundle", () => {
+  it("holds the text, an info.json naming its type, and the images in assets/ with the text pointing there", async () => {
+    const { toTextBundle } = await import("../src/to-bundle.ts");
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const files = toTextBundle("# Story\n\n![Map](Story%20assets/map.png)\n", "markdown", [{ name: "map.png", data: png }], "Story assets");
+    expect(files.map((f) => f.path)).toEqual(["text.md", "info.json", "assets/map.png"]);
+    expect(new TextDecoder().decode(files[0]!.data)).toBe("# Story\n\n![Map](assets/map.png)\n");
+    expect(JSON.parse(new TextDecoder().decode(files[1]!.data))).toEqual({ version: 2, type: "net.daringfireball.markdown", transient: false, creatorIdentifier: "eugenefischer.highwater-too" });
+    const script = toTextBundle("INT. HOUSE - DAY\n", "fountain", [], "assets");
+    expect(script.map((f) => f.path)).toEqual(["text.fountain", "info.json"]);
+    expect(JSON.parse(new TextDecoder().decode(script[1]!.data)).type).toBe("com.quoteunquoteapps.fountain");
+  });
+});

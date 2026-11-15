@@ -64,7 +64,7 @@ The sidebar on the left of the page (⌘0 shows or hides it) has Highland's pane
 
 - **Pages** (⌘E): the PDF exactly as it will export, in place of the text, keeping your place. Clicking in the Navigator moves around the pages too. The print options are at the foot: revision colours and stars, paragraph numbers, synopses, notes and the title page. **Save As PDF** is beside them.
 - **Export Word Document** (manuscripts only): a `.docx` built from ordinary Word styles, with a real header, page numbers, lists and tables, so it can be edited and sent out. Word works out its own page breaks, so the page count can differ a little from the PDF. The `highwater.docxFont` setting chooses between Courier New and Courier Prime (embedded in the file).
-- **Export Text:** the text as `.fountain`, `.md` or `.txt`, without revision marks. Exports are always new files, separate from the writing history.
+- **Export Text:** the text as `.fountain`, `.md` or `.txt`, or as a `.textbundle` (the text with its images, for apps that read TextBundles), without revision marks. Exports are always new files, separate from the writing history.
 
 **Templates.** These six print line for line with Highland 2's own PDFs: Screenplay, Multi-Cam, Stage Play, Graphic Novel, Manuscript and Plain Text. The eight prose templates (Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report, Wiki) also match line for line when Highland's fonts are available, and closely otherwise (see [Known limitations](#known-limitations)). The chosen template is saved in the document, as Highland saves it.
 

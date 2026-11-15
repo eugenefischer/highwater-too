@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { HighlandBundle } from "@highwater/bundle";
@@ -231,5 +231,21 @@ describe("source offsets for scroll sync", () => {
     }
     expect(body.length).toBe(5);
     expect(body.map((it) => it.source)).toEqual([src.indexOf("One."), ...starts, src.indexOf("# Head")]);
+  });
+});
+
+describe("the page's text box", () => {
+  // ManuscriptProbe with every print option: counting lines alone put a list item's last line
+  // past the text box on page 3, and two more lines below the page.
+  const file = priv ? join(priv, "Template Probes", "ManuscriptProbe.highland") : "";
+  it.skipIf(!priv || !existsSync(file))("keeps every line that doesn't open a paragraph inside it", async () => {
+    const { paragraphNumbers } = await import("../../extension/src/highland-editor/line-styles.ts");
+    const text = HighlandBundle.fromZip(new Uint8Array(readFileSync(file))).text;
+    const doc = parse(text, { mode: "markdown" });
+    const l = layoutManuscript(doc, { highlandQuirks: true, date: new Date(2026, 10, 12), print: { notes: true, synopses: true, revisionColor: true, revisionStars: true, numbers: paragraphNumbers(doc, { notes: false }) } });
+    // Baselines (18 pt below a line's top): a paragraph's first line may start just above the
+    // box's bottom (720), so nothing sits lower than 738.
+    const lowest = Math.max(...l.pages.slice(1).flatMap((p) => p.items.filter((it) => it.x > 60).map((it) => it.y)));
+    expect(lowest).toBeLessThan(738);
   });
 });

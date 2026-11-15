@@ -100,3 +100,24 @@ function parseJson(data: Uint8Array): Record<string, unknown> | null {
     return null;
   }
 }
+
+/** The text's type in a TextBundle's info.json (as Highland writes it in a .highland file). */
+const TEXT_TYPES: Record<DocumentMode, { file: string; type: string }> = {
+  fountain: { file: "text.fountain", type: "com.quoteunquoteapps.fountain" },
+  markdown: { file: "text.md", type: "net.daringfireball.markdown" },
+  plain: { file: "text.txt", type: "public.plain-text" },
+};
+
+/**
+ * A TextBundle (Export Text as .textbundle, one of Highland 2's export formats): the text and its
+ * images, for other apps — no Bin, Scratchpad or Highland settings. `imagesFolder` is where the
+ * text's images point now ("assets" in a .highland file, the folder beside a plain file); in the
+ * bundle they are in assets/. Files are relative to the .textbundle folder.
+ */
+export function toTextBundle(text: string, mode: DocumentMode, images: { name: string; data: Uint8Array }[], imagesFolder: string): { path: string; data: Uint8Array }[] {
+  const { file, type } = TEXT_TYPES[mode];
+  const body = images.length && imagesFolder !== "assets" ? relinkAssets(text, imagesFolder, "assets") : text;
+  const info = { version: 2, type, transient: false, creatorIdentifier: "eugenefischer.highwater-too" };
+  const encode = (s: string) => new TextEncoder().encode(s);
+  return [{ path: file, data: encode(body) }, { path: "info.json", data: encode(`${JSON.stringify(info, null, 2)}\n`) }, ...images.map((i) => ({ path: `assets/${i.name}`, data: i.data }))];
+}

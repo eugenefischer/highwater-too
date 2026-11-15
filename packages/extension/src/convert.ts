@@ -13,7 +13,7 @@ import { LANGUAGES } from "./language.ts";
 import { openHighland } from "./open.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags } from "./syntax/edits.ts";
-import { toBundle, toPlain } from "./to-bundle.ts";
+import { toBundle, toPlain, toTextBundle } from "./to-bundle.ts";
 import { activeDocument } from "./surface.ts";
 
 /**
@@ -33,7 +33,7 @@ export function registerConversions(context: vscode.ExtensionContext, store: Bun
     vscode.commands.registerCommand("highwater.convertToFountain", toPlainFile),
     vscode.commands.registerCommand("highwater.convertToMarkdown", toPlainFile),
     vscode.commands.registerCommand("highwater.convertToText", toPlainFile),
-    vscode.commands.registerCommand("highwater.export", () => exportText()),
+    vscode.commands.registerCommand("highwater.export", () => exportText(store)),
   );
 }
 
@@ -158,7 +158,32 @@ async function convertToPlain(store: BundleStore, chosen?: vscode.Uri, uri?: vsc
  * Export Text: the script as .fountain, .md or .txt without revision marks. An export is a new
  * file outside the writing history: if it is edited and saved, it starts a history of its own.
  */
-async function exportText(): Promise<void> {
+/**
+ * A .textbundle folder: the text and its images (a .highland file's assets/, or the folder of
+ * images beside a plain file). One already there is moved to the Trash first (the save dialog has
+ * asked), so no old images are left in it.
+ */
+async function writeTextBundle(store: BundleStore, target: vscode.Uri, text: string, mode: "fountain" | "markdown" | "plain", plain: string | null, bundle: string | null): Promise<void> {
+  let images: { name: string; data: Uint8Array }[] = [];
+  let folder = "assets";
+  if (bundle) {
+    const b = await store.snapshot(bundle);
+    images = b.paths.filter((p) => /^assets\/[^/]+$/.test(p)).map((p) => ({ name: p.slice("assets/".length), data: b.get(p)! }));
+  } else if (plain) {
+    const assets = await plainExtras().assetsFolder(plain);
+    folder = assets.name;
+    const names = await plainExtras().assets(plain).catch(() => [] as string[]);
+    images = await Promise.all(names.map(async (name) => ({ name, data: new Uint8Array(await readFile(join(assets.dir, name))) })));
+  }
+  if (existsSync(target.fsPath)) await vscode.workspace.fs.delete(target, { recursive: true, useTrash: true });
+  for (const f of toTextBundle(text, mode, images, folder)) {
+    const uri = vscode.Uri.joinPath(target, f.path);
+    await mkdir(dirname(uri.fsPath), { recursive: true });
+    await vscode.workspace.fs.writeFile(uri, f.data);
+  }
+}
+
+async function exportText(store: BundleStore): Promise<void> {
   const doc = activeDocument();
   const parts = doc?.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
   const plain = doc && plainExtras().isPlain(doc) ? doc.uri.fsPath : null;
@@ -170,8 +195,8 @@ async function exportText(): Promise<void> {
   const ext = PLAIN_EXT[doc.languageId] ?? "txt";
   const target = await vscode.window.showSaveDialog({
     defaultUri: vscode.Uri.file(join(dirname(from), `${basename(from, extname(from))}${plain ? " (export)" : ""}.${ext}`)),
-    // Its own kind first; plain text is always offered too (the dialog's format menu switches).
-    filters: ext === "txt" ? { "Plain Text": ["txt"] } : { [ext === "fountain" ? "Fountain" : "Markdown"]: [ext], "Plain Text": ["txt"] },
+    // Its own kind first; plain text and TextBundle are always offered too (the dialog's format menu switches).
+    filters: ext === "txt" ? { "Plain Text": ["txt"], TextBundle: ["textbundle"] } : { [ext === "fountain" ? "Fountain" : "Markdown"]: [ext], "Plain Text": ["txt"], TextBundle: ["textbundle"] },
     title: "Export Text",
   });
   if (!target) return;
@@ -181,7 +206,9 @@ async function exportText(): Promise<void> {
     return;
   }
   // Without the note linking a plain file to its history: the export is a separate copy.
-  await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(withoutIdNote(stripRevisionTags(doc.getText()))));
+  const text = withoutIdNote(stripRevisionTags(doc.getText()));
+  if (target.fsPath.toLowerCase().endsWith(".textbundle")) await writeTextBundle(store, target, text, ext === "fountain" ? "fountain" : ext === "md" ? "markdown" : "plain", plain, parts?.bundle ?? null);
+  else await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(text));
   if (history) await history.retire(target.fsPath);
   void vscode.window.showInformationMessage(`Exported ${basename(target.fsPath)}. It is a separate copy, outside the writing history.`);
 }

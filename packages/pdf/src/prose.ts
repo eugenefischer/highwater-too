@@ -448,6 +448,10 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
     const caps = !!T.smallCapsAfterHeading && afterHeading;
     for (const line of paragraph(notes, B, T.left, T.left, T.right, { smallCaps: caps })) push(line);
     notes = [];
+    // A paragraph to Highland: it takes the small caps that follow a heading or centred text, and
+    // the paragraph after it is indented (NovelProbe-Default p. 4).
+    afterHeading = false;
+    afterParagraph = true;
     return true;
   };
   for (let i = 0; i < elements.length; i++) {
@@ -483,9 +487,12 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           }
           break;
         }
-        // Only a note: not printed, but an empty paragraph to Highland (BulletinProbe, NovelProbe).
+        // Only a note: not printed, but an empty paragraph to Highland (BulletinProbe, NovelProbe):
+        // it takes the small caps after centred text, and the next paragraph is indented (NovelProbe p. 4).
         if (plain(runs).trim() === "") {
           if (printed) push(empty());
+          afterHeading = false;
+          afterParagraph = true;
           break;
         }
         const indent = T.indent.rule === "all" || (T.indent.rule === "afterParagraph" && afterParagraph) ? T.indent.first : 0;
@@ -558,9 +565,10 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
           push(bodyLine([{ x: e.kind === "centered" ? (T.left + T.right) / 2 - w / 2 : T.right - w, runs: r }]));
         }
         printed = true;
-        // Paragraphs to Highland: the next paragraph is indented (NovelProbe p. 4).
-        afterParagraph = true;
-        afterHeading = false;
+        // Like a heading to what follows: in Novel, the next printed paragraph opens in small caps
+        // (NovelProbe-Default p. 4, a note printed after "Centred text"); elsewhere it's indented.
+        afterHeading = !!T.smallCapsAfterHeading;
+        afterParagraph = !afterHeading;
         break;
       }
       case "list": {

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.57
+
+- **Export Text → TextBundle:** the save dialog's format menu offers TextBundle, writing a `.textbundle` with the text and its images (the format Highland 2 exports too, read by apps such as Ulysses and Bear). No Bin, Scratchpad or settings go in it.
+- Laying out the pages (the page count, page breaks and the pages themselves) is about three times faster again, back to its speed before 0.6.49.
+- Manuscript: on a page whose spacing isn't whole lines, a wrapped line could run past the bottom of the text area, with the lines after it printed below the page. It now goes to the next page.
+- Novel: the line after centred text opens in small caps, like the first paragraph after a heading, and a note counts as that line, printed or not; the paragraph after it is indented. This matches Highland's Novel probe.
+
 ## 0.6.56
 
 - **Settings → International**, as Highland 2's: **Use custom terms**, then your own lists of scene-heading prefixes (Location), times of day and transitions, each with + and −, and the words printed for MORE and CONTINUED. With custom terms on, the lists decide what counts as a scene heading or a transition (in the editor, the Navigator, the pages and exports), what completion offers, and the words printed where a speech breaks across pages: both MORE and CONT'D (Highland 2 prints only its MORE).
