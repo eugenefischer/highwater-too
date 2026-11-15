@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.57",
+  "version": "0.6.58",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -79,7 +79,7 @@
       },
       {
         "command": "highwater.export",
-        "title": "Export Text (.fountain / .md / .txt)…",
+        "title": "Export Text (.fountain / .md / .txt / .fdx)…",
         "category": "Highwater Too",
         "icon": {
           "light": "media/export-light.svg",
@@ -373,6 +373,16 @@
         "selector": [
           {
             "filenamePattern": "file:/**/*.highland"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "highwater.importFdx",
+        "displayName": "Final Draft File (converted to .highland)",
+        "selector": [
+          {
+            "filenamePattern": "file:/**/*.fdx"
           }
         ],
         "priority": "default"

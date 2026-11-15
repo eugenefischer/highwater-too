@@ -652,6 +652,19 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "opening a Final Draft file converts it to a .highland file beside it",
+    async () => {
+      const fdx = join(dir, "Imported.fdx");
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<FinalDraft DocumentType="Script" Template="No" Version="4"><Content><Paragraph Type="Scene Heading"><Text>Int. hall - day</Text></Paragraph><Paragraph Type="Action"><Text>The clock strikes.</Text></Paragraph></Content></FinalDraft>\n`;
+      await writeFile(fdx, xml);
+      await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(fdx));
+      const path = join(dir, "Imported.highland");
+      await waitFor("the converted script open", () => vscode.window.activeTextEditor?.document.uri.toString() === highland(path).toString());
+      assert.equal((await readBundle(path)).bundle.text, "INT. HALL - DAY\n\nThe clock strikes.\n");
+      assert.equal(await readFile(fdx, "utf8"), xml, "the .fdx file is unchanged");
+    },
+  ],
+  [
     "exports a manuscript as a Word document",
     async () => {
       const path = join(dir, "DocxExport.highland");

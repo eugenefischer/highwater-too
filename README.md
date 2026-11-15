@@ -39,7 +39,7 @@ The print options (revision colours, paragraph numbers, synopses, notes, title p
 
 From the Writing History panel you can compare any save with the current text (VS Code's diff view), revert to it, or export one work's history as a git bundle. The repository can optionally be mirrored to any git remote, which keeps several computers in step. Concurrent saves from different computers are joined with merge commits, never force-pushed.
 
-**Not implemented:** statistics, goals and sprints; Revision Mode; Gender Analysis; Final Draft (`.fdx`) import and export; `.textbundle` files. Testing has been on macOS and Linux; Windows is untested.
+**Not implemented:** statistics, goals and sprints; Revision Mode; Gender Analysis; opening `.textbundle` files. Testing has been on macOS and Linux; Windows is untested.
 
 ## Installing
 

@@ -64,7 +64,7 @@ The sidebar on the left of the page (⌘0 shows or hides it) has Highland's pane
 
 - **Pages** (⌘E): the PDF exactly as it will export, in place of the text, keeping your place. Clicking in the Navigator moves around the pages too. The print options are at the foot: revision colours and stars, paragraph numbers, synopses, notes and the title page. **Save As PDF** is beside them.
 - **Export Word Document** (manuscripts only): a `.docx` built from ordinary Word styles, with a real header, page numbers, lists and tables, so it can be edited and sent out. Word works out its own page breaks, so the page count can differ a little from the PDF. The `highwater.docxFont` setting chooses between Courier New and Courier Prime (embedded in the file).
-- **Export Text:** the text as `.fountain`, `.md` or `.txt`, or as a `.textbundle` (the text with its images, for apps that read TextBundles), without revision marks. Exports are always new files, separate from the writing history.
+- **Export Text:** the text as `.fountain`, `.md` or `.txt`, or as a `.textbundle` (the text with its images, for apps that read TextBundles), without revision marks. A screenplay can also go out as a Final Draft `.fdx` file, which keeps revisions (a revision set for each colour) and notes; sections are left out. Exports are always new files, separate from the writing history.
 
 **Templates.** These six print line for line with Highland 2's own PDFs: Screenplay, Multi-Cam, Stage Play, Graphic Novel, Manuscript and Plain Text. The eight prose templates (Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report, Wiki) also match line for line when Highland's fonts are available, and closely otherwise (see [Known limitations](#known-limitations)). The chosen template is saved in the document, as Highland saves it.
 
@@ -80,6 +80,8 @@ Plain files get everything, including the Bin, Scratchpad and Assets. A plain fi
 - **Convert to .fountain / .md / .txt File…** goes the other way.
 
 The writing history, Bin, Scratchpad and images move with the work either way.
+
+Opening a Final Draft (`.fdx`) file converts it, as Highland 2 does: a new `.highland` screenplay is made beside it and opens. The `.fdx` file is left as it was.
 
 ## Writing history
 
@@ -188,7 +190,7 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 
 ## Known limitations
 
-- **Not built yet:** statistics, goals and sprints (the sidebar's Statistics panel is a placeholder), Revision Mode, Gender Analysis, Final Draft (`.fdx`) files, `.textbundle` files.
+- **Not built yet:** statistics, goals and sprints (the sidebar's Statistics panel is a placeholder), Revision Mode, Gender Analysis, opening `.textbundle` files.
 - **Prose template fonts:** the prose templates use Highland 2's fonts. Highland Sans, Amiri, Lato and Merriweather come with Highwater Too. Georgia, Times New Roman and Avenir Next are used when they're installed, and SF Pro Display and New York when Highland 2 is. Otherwise a stand-in prints (you're told when you export), and lines and pages can fall differently. Nested list items are indented, where Highland prints them flat.
 - **Windows:** not tested yet.
 

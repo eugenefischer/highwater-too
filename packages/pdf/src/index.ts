@@ -11,6 +11,8 @@ export { NOTE_COLOR, SYNOPSIS_COLOR, plain, toRuns, wrapRuns, type InlineContext
 export { NUMBER, addPrintMarks } from "./marks.ts";
 export { MANUSCRIPT, imageSize, layoutManuscript, manuscriptHeadingPages, type ManuscriptOptions } from "./manuscript.ts";
 export { PLAIN_TEXT, layoutPlainText } from "./plain.ts";
+export { screenplayFdx, fdColor, type FdxElement, type FdxOptions } from "./fdx.ts";
+export { fdxToFountain } from "./fdx-import.ts";
 export { manuscriptDocx, DOCX_FONTS, type DocxFont, type DocxOptions } from "./docx.ts";
 export { Measurer, findFamily, resolveFonts, systemFontDirs, type FontFace, type FontFaces, type ResolvedFonts } from "./fonts.ts";
 export { layoutProse, wrapMeasured, type ProseLayout, type ProseOptions } from "./prose.ts";

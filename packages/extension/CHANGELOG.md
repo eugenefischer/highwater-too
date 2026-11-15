@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.58
+
+- **Final Draft files.** Opening a `.fdx` file converts it to a new `.highland` screenplay beside it, as Highland 2 does; the `.fdx` file is left as it was. Revisions become revision marks (in a readable shade of each revision set's colour), notes come across as notes (those not attached to any text at the end), dual dialogue stays dual, the title page's fields go to Title, Credit, Author, Source, Draft date and Contact, and trailing spaces are trimmed. Where Highland 2 drops dual dialogue, splits emphasis at a curly apostrophe or loses transitions that don't end in TO:, these come across intact.
+- **Export Text → Final Draft** (screenplays): the save dialog's format menu offers Final Draft, written as Highland 2 writes it, with its bugs fixed: each revision colour gets a revision set of its own, notes on their own line are kept, {{HEADER}} and {{FOOTER}} aren't written out as text, and included files are merged in.
+
 ## 0.6.57
 
 - **Export Text → TextBundle:** the save dialog's format menu offers TextBundle, writing a `.textbundle` with the text and its images (the format Highland 2 exports too, read by apps such as Ulysses and Bear). No Bin, Scratchpad or settings go in it.

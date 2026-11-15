@@ -10,7 +10,9 @@ import { assetsFolderName, withoutIdNote } from "./extras-folder.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { currentHistory } from "./history-location.ts";
 import { LANGUAGES } from "./language.ts";
+import { currentDocument } from "./highland-editor/settings-host.ts";
 import { openHighland } from "./open.ts";
+import { exportScreenplayFdx } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags } from "./syntax/edits.ts";
 import { toBundle, toPlain, toTextBundle } from "./to-bundle.ts";
@@ -155,10 +157,6 @@ async function convertToPlain(store: BundleStore, chosen?: vscode.Uri, uri?: vsc
 }
 
 /**
- * Export Text: the script as .fountain, .md or .txt without revision marks. An export is a new
- * file outside the writing history: if it is edited and saved, it starts a history of its own.
- */
-/**
  * A .textbundle folder: the text and its images (a .highland file's assets/, or the folder of
  * images beside a plain file). One already there is moved to the Trash first (the save dialog has
  * asked), so no old images are left in it.
@@ -183,6 +181,11 @@ async function writeTextBundle(store: BundleStore, target: vscode.Uri, text: str
   }
 }
 
+/**
+ * Export Text: the script as .fountain, .md or .txt without revision marks, as a TextBundle, or
+ * (a screenplay) as a Final Draft file. An export is a new file outside the writing history: if it
+ * is edited and saved, it starts a history of its own.
+ */
 async function exportText(store: BundleStore): Promise<void> {
   const doc = activeDocument();
   const parts = doc?.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
@@ -196,7 +199,12 @@ async function exportText(store: BundleStore): Promise<void> {
   const target = await vscode.window.showSaveDialog({
     defaultUri: vscode.Uri.file(join(dirname(from), `${basename(from, extname(from))}${plain ? " (export)" : ""}.${ext}`)),
     // Its own kind first; plain text and TextBundle are always offered too (the dialog's format menu switches).
-    filters: ext === "txt" ? { "Plain Text": ["txt"], TextBundle: ["textbundle"] } : { [ext === "fountain" ? "Fountain" : "Markdown"]: [ext], "Plain Text": ["txt"], TextBundle: ["textbundle"] },
+    filters:
+      ext === "txt"
+        ? { "Plain Text": ["txt"], TextBundle: ["textbundle"] }
+        : ext === "fountain"
+          ? { Fountain: ["fountain"], "Plain Text": ["txt"], TextBundle: ["textbundle"], "Final Draft": ["fdx"] }
+          : { Markdown: ["md"], "Plain Text": ["txt"], TextBundle: ["textbundle"] },
     title: "Export Text",
   });
   if (!target) return;
@@ -207,7 +215,12 @@ async function exportText(store: BundleStore): Promise<void> {
   }
   // Without the note linking a plain file to its history: the export is a separate copy.
   const text = withoutIdNote(stripRevisionTags(doc.getText()));
-  if (target.fsPath.toLowerCase().endsWith(".textbundle")) await writeTextBundle(store, target, text, ext === "fountain" ? "fountain" : ext === "md" ? "markdown" : "plain", plain, parts?.bundle ?? null);
+  if (ext === "fountain" && target.fsPath.toLowerCase().endsWith(".fdx")) {
+    // Final Draft keeps revisions (as revision sets) and notes, so it starts from the text as written.
+    const { fdx, problems } = await exportScreenplayFdx({ text: withoutIdNote(doc.getText()), path: from, document: currentDocument() });
+    await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(fdx));
+    for (const p of problems) void vscode.window.showWarningMessage(p);
+  } else if (target.fsPath.toLowerCase().endsWith(".textbundle")) await writeTextBundle(store, target, text, ext === "fountain" ? "fountain" : ext === "md" ? "markdown" : "plain", plain, parts?.bundle ?? null);
   else await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(text));
   if (history) await history.retire(target.fsPath);
   void vscode.window.showInformationMessage(`Exported ${basename(target.fsPath)}. It is a separate copy, outside the writing history.`);

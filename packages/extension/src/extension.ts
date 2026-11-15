@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { LANGUAGES } from "./language.ts";
 import { DISK_SCHEME, DiskVersionProvider, handleExternalChange } from "./conflicts.ts";
 import { HighlandFileSystem, SCHEME } from "./fs-provider.ts";
+import { FDX_VIEW_TYPE, FdxOpener, importFdx } from "./fdx-open.ts";
 import { OPEN_VIEW_TYPE, OpenRedirect, openHighland } from "./open.ts";
 import { registerCommands } from "./commands.ts";
 import { registerConversions } from "./convert.ts";
@@ -65,15 +66,17 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.registerFileSystemProvider(SCHEME, fs, { isCaseSensitive: true }),
     vscode.workspace.registerTextDocumentContentProvider(DISK_SCHEME, new DiskVersionProvider(fs)),
     vscode.window.registerCustomEditorProvider(OPEN_VIEW_TYPE, new OpenRedirect()),
+    vscode.window.registerCustomEditorProvider(FDX_VIEW_TYPE, new FdxOpener()),
     { dispose: store.onExternalChange((bundle, entries) => void handleExternalChange(fs, bundle, entries)) },
     vscode.commands.registerCommand("highwater.open", async () => {
       const picked = await vscode.window.showOpenDialog({
         canSelectMany: true,
         title: "Open Document",
-        filters: { Documents: ["highland", "fountain", "md", "markdown"], ".highland files": ["highland"], Fountain: ["fountain"], Markdown: ["md", "markdown"] },
+        filters: { Documents: ["highland", "fountain", "md", "markdown", "fdx"], ".highland files": ["highland"], Fountain: ["fountain"], Markdown: ["md", "markdown"], "Final Draft (converted to .highland)": ["fdx"] },
       });
       for (const uri of picked ?? []) {
         if (/\.highland$/i.test(uri.fsPath)) await openHighland(uri);
+        else if (/\.fdx$/i.test(uri.fsPath)) await importFdx(uri);
         else {
           const doc = await vscode.workspace.openTextDocument(uri);
           const md = /\.(md|markdown)$/i.test(uri.fsPath) && doc.languageId === "markdown";

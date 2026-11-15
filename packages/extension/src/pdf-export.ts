@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type PrintMarks, type ScriptDocumentOptions, type SourceRange } from "@highwater/pdf";
+import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, screenplayFdx, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type PrintMarks, type ScriptDocumentOptions, type SourceRange } from "@highwater/pdf";
 import type { Document, Element, MergedElement } from "@highwater/parser";
 import { paragraphNumbers } from "./highland-editor/line-styles.ts";
 
@@ -171,6 +171,20 @@ export async function exportManuscriptDocx(options: ManuscriptExportOptions & { 
     ...(options.image ? { image: options.image } : {}),
   });
   return { docx, problems: merged.problems.map((p) => p.message) };
+}
+
+/** A screenplay as a Final Draft file, with {{INCLUDE}} files merged in (their revisions not kept). */
+export async function exportScreenplayFdx(options: { text: string; path: string; date?: Date; document?: { sceneHeadingBold: boolean; sceneHeadingUnderline: boolean } }): Promise<{ fdx: string; problems: string[] }> {
+  const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
+  const merged = await resolveIncludes(root, "fountain", includeLoader);
+  const doc = parse(options.text, { mode: "fountain" });
+  const own = (m: MergedElement) => m.file === root || m.file.id === root.id;
+  const fdx = screenplayFdx(doc, {
+    elements: merged.elements.map((m) => ({ element: m.element, source: own(m) ? doc.source : m.file.source, own: own(m) })),
+    ...(options.date ? { date: options.date } : {}),
+    ...(options.document ? { sceneHeadingBold: options.document.sceneHeadingBold, sceneHeadingUnderline: options.document.sceneHeadingUnderline } : {}),
+  });
+  return { fdx, problems: merged.problems.map((p) => p.message) };
 }
 
 /** Reads every image a manuscript names, so layout (which is synchronous) can look them up. */
