@@ -25,15 +25,15 @@ export const HISTORY_HELP = `
 </ul>
 
 <h3>The bottom of the panel</h3>
-<p>The status line says when the document was last saved and, if you use a mirror, when it last synced. A save made while recording was off is marked <b>UNRECORDED</b>.</p>
+<p>The status line says when the document was last saved and, if you use a mirror, when it last synced. If the history is turned off for this document, it says <b>History disabled for this document</b>.</p>
 <ul>
-<li><b>Record document history</b> turns the history off or on for this document only. Existing saves are kept.</li>
 <li>${icon('<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>')} <b>Export</b> saves this document’s whole history as one file (git bundle) you can share or archive.</li>
 <li>${icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>')} <b>More</b> holds the less common actions, described below.</li>
 </ul>
 
 <h3>More actions</h3>
 <ul>
+<li><b>Disable History for This Document</b> (or <b>Enable</b>): stops or restarts recording this document’s saves. Existing saves are kept.</li>
 <li><b>Connect to a Work’s History</b>: if a copied or renamed file lost its history, joins it back up. You’ll be asked to confirm.</li>
 <li><b>Link Writing History to This File</b> (.fountain and .md files): adds a short line at the end of the file so its history, Bin and Scratchpad follow it if you move or rename it. .highland files don’t need this.</li>
 <li><b>Set Up History Mirror</b>: keeps a backup of all your history on a remote git server you choose, such as a private GitHub repository. Your other computers can then see and restore your work.</li>

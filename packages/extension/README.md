@@ -99,7 +99,7 @@ Every save is recorded in a git repository on your computer, as a record of how 
 - **Compare** marks what has changed since the save in your text: added text in green, removed text in red and struck through. ‹ and › at the top move between changes. The text can’t be changed while comparing: double-click a spot to stop and edit there, or press **Done** or Escape. **Revert** in the bar goes back to the save and stops comparing.
 - **Revert** puts that save's text, Bin and Scratchpad back and saves the document. The revert is recorded as a save, so nothing is removed from the history.
 
-Under the saves, a line shows when the document was last saved and when the mirror last synced; a save made while recording was off is marked UNRECORDED. The foot has **Record document history** (on or off for this document only), Export and the ⚙ menu with the rest: connect to another work, sync. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.
+The panel's foot shows when the document was last saved and when the mirror last synced, beside Export and the ⚙ menu with the rest: turning the history off or on for this document, connecting to another work, syncing. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.
 
 **In the Works panel**, every work is listed by where it is: on this computer, in the history only, or on the mirror only. Select a work to open or restore it and see its saves. Its **More** menu has two options:
 

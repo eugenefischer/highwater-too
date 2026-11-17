@@ -81,8 +81,6 @@ export interface HistoryMessage {
   saves: HistorySave[];
   state: "on" | "paused" | "off" | "none";
   document: boolean;
-  /** When the file was last saved (its modification time), milliseconds since 1970; null if never. */
-  lastSaved: number | null;
   mirror: MirrorStatus | null;
   menu: MenuItem[];
 }

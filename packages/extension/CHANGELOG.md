@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.60
+
+- Writing History panel: the **Record document history** switch is gone. Turning the history off or on for this document is now **Disable History for This Document** (or **Enable**) in the gear menu. While it's off, the foot says **History disabled for this document** in the theme's emphasis colour. The status line is back on the foot's single row, beside Export and the gear, so nothing can cover it in a narrow sidebar.
+
 ## 0.6.59
 
 - **Every save is recorded in the writing history**, ⌘S and autosaves alike. Autosaves were recorded at most every five minutes; how often VS Code autosaves is now up to you (its **Auto Save** setting; a Highwater Too setting for it comes with Settings → Backup).

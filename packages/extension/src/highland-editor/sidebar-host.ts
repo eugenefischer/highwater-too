@@ -3,7 +3,6 @@
  * it was left (for every document), the Navigator's kinds to list, and the Scratchpad, read from
  * and saved to the .highland file or a plain file's extras.
  */
-import { stat } from "node:fs/promises";
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { parseSave } from "../save-message.ts";
@@ -168,10 +167,9 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
             ? "The writing history is off for this document."
             : "No saves yet: the history starts with the next save.";
     const saves = commits.map((c) => ({ hash: c.hash, at: c.date.getTime(), ...parseSave(c.message) }));
-    // The file's own last save, which may not be in the history (made while recording was off).
-    const lastSaved = k ? await stat(k).then((s) => s.mtimeMs, () => null) : null;
     const menu: { label: string; command: string; sep?: boolean }[] = [
-      ...(k ? [{ label: "Connect to a Work's History…", command: "highwater.connectToWork" }] : []),
+      ...(k && !off ? [{ label: state === "paused" ? "Enable History for This Document" : "Disable History for This Document", command: "highwater.toggleDocumentHistory" }] : []),
+      ...(k ? [{ label: "Connect to a Work's History…", command: "highwater.connectToWork", sep: !off }] : []),
       ...(plain() ? [{ label: "Link Writing History to This File", command: "highwater.linkHistoryToFile" }] : []),
       { label: remote ? "Change History Mirror…" : "Set Up History Mirror…", command: "highwater.setUpHistoryMirror", sep: !!k },
       ...(remote
@@ -191,7 +189,6 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       saves,
       state: off ? "off" : state,
       document: !!k,
-      lastSaved,
       mirror: remote && mirror ? { at: mirror.at?.getTime() ?? null, error: mirror.error, signIn: mirror.signIn, busy: mirror.busy } : null,
       menu,
     });
