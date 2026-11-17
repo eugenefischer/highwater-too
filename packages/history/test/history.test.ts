@@ -3,8 +3,8 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
-import { CommitBatcher, commitMessage, formOf, History, mergeMain, moveHistory, textHash, wordCount } from "../src/index.ts";
+import { describe, expect, it } from "vitest";
+import { commitMessage, formOf, History, mergeMain, moveHistory, textHash, wordCount } from "../src/index.ts";
 
 const folder = () => mkdtemp(join(tmpdir(), "highwater-history-"));
 const script = "INT. HOUSE - DAY\n\nShe enters.\n\nBOB\nHello there.\n";
@@ -111,31 +111,6 @@ describe("helpers", () => {
     expect(commitMessage("autosave", new Date(2026, 0, 2, 3, 4), "one two three", "one")).toBe("Autosave 2026-01-02 03:04, −2 words (1)");
   });
 
-});
-
-describe("CommitBatcher", () => {
-  it("commits saves at once, autosaves at most every interval, and flushes on close", async () => {
-    vi.useFakeTimers();
-    let now = 0;
-    const commits: string[] = [];
-    const b = new CommitBatcher(async (_k, kind) => void commits.push(kind), 1000, () => now);
-    await b.saved("doc", "autosave");
-    b.saved("doc", "autosave");
-    b.saved("doc", "autosave");
-    expect(commits).toEqual(["autosave"]);
-    now = 1000;
-    vi.advanceTimersByTime(1000);
-    expect(commits).toEqual(["autosave", "autosave"]);
-    now = 1500;
-    b.saved("doc", "autosave");
-    await b.saved("doc", "close");
-    expect(commits).toEqual(["autosave", "autosave", "close"]);
-    expect(b.saved("doc", "close")).toBeNull();
-    await b.saved("doc", "save");
-    expect(commits.at(-1)).toBe("save");
-    b.dispose();
-    vi.useRealTimers();
-  });
 });
 
 describe("the catalog on main", () => {

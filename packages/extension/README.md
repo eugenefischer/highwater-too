@@ -91,7 +91,7 @@ Opening a Final Draft (`.fdx`) file converts it, as Highland 2 does: a new `.hig
 Every save is recorded in a git repository on your computer, as a record of how each work was written. It's on from the first save and needs nothing set up beyond git.
 
 - **What's recorded:** everything in the document at each save: text, Bin, Scratchpad, settings and images. Each save notes how many words it added or removed.
-- **When:** every ⌘S. Autosaves are recorded at most every five minutes, and once more when the document closes.
+- **When:** every save, whether ⌘S or an autosave. How often VS Code autosaves is up to you (its **Auto Save** setting).
 - **Where:** one repository for all your writing, in your system's application-data folder, with one branch per work. **Change Writing History Location…** moves it. Avoid folders synced by Dropbox, iCloud and the like, which can damage git repositories.
 
 **In the Writing History panel**, select a save to see two buttons:
@@ -99,7 +99,7 @@ Every save is recorded in a git repository on your computer, as a record of how 
 - **Compare** marks what has changed since the save in your text: added text in green, removed text in red and struck through. ‹ and › at the top move between changes. The text can’t be changed while comparing: double-click a spot to stop and edit there, or press **Done** or Escape. **Revert** in the bar goes back to the save and stops comparing.
 - **Revert** puts that save's text, Bin and Scratchpad back and saves the document. The revert is recorded as a save, so nothing is removed from the history.
 
-The panel's foot shows whether saves are being recorded and mirrored. The ⚙ menu has the rest: pause, export, connect to another work, sync. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.
+Under the saves, a line shows when the document was last saved and when the mirror last synced; a save made while recording was off is marked UNRECORDED. The foot has **Record document history** (on or off for this document only), Export and the ⚙ menu with the rest: connect to another work, sync. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.
 
 **In the Works panel**, every work is listed by where it is: on this computer, in the history only, or on the mirror only. Select a work to open or restore it and see its saves. Its **More** menu has two options:
 

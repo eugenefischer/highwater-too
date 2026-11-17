@@ -12,7 +12,7 @@ export const HISTORY_HELP = `
 <ul>
 <li><b>Save</b>: you saved.</li>
 <li><b>Autosave</b>: VS Code saved for you.</li>
-<li><b>Close</b>: saved as the document closed.</li>
+<li><b>Close</b>: an autosave recorded as the document closed (older saves).</li>
 <li><b>Revert</b>: you went back to an earlier save (its note says which).</li>
 <li><b>Restore</b>, <b>Convert</b>, <b>Connect</b>: the document was brought back from its history, changed to another file type, or joined to another document’s history.</li>
 </ul>
@@ -25,9 +25,9 @@ export const HISTORY_HELP = `
 </ul>
 
 <h3>The bottom of the panel</h3>
-<p>The status line says whether this document’s save history is being kept, and when the last one was. If you use a mirror, a second line says when it was last updated.</p>
+<p>The status line says when the document was last saved and, if you use a mirror, when it last synced. A save made while recording was off is marked <b>UNRECORDED</b>.</p>
 <ul>
-<li>${icon('<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>')} <b>Record</b> pauses or resumes the history for this document. Existing saves are kept.</li>
+<li><b>Record document history</b> turns the history off or on for this document only. Existing saves are kept.</li>
 <li>${icon('<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>')} <b>Export</b> saves this document’s whole history as one file (git bundle) you can share or archive.</li>
 <li>${icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>')} <b>More</b> holds the less common actions, described below.</li>
 </ul>

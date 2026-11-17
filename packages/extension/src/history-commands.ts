@@ -115,7 +115,7 @@ export function registerHistoryCommands(context: vscode.ExtensionContext, core: 
     vscode.commands.registerCommand("highwater.showHistory", () => showHistory()),
     // Refreshing the Works panel brings the catalog up to date from the mirror first.
     vscode.commands.registerCommand("highwater.works.refresh", async () => {
-      if (enabled() && mirror.url) await pulled(mirror.pull(true));
+      if (enabled() && mirror.url) await pulled(mirror.sync(true));
       works.refresh();
     }),
     vscode.commands.registerCommand("highwater.history.decide", async () => {

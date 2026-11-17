@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.59
+
+- **Every save is recorded in the writing history**, ⌘S and autosaves alike. Autosaves were recorded at most every five minutes; how often VS Code autosaves is now up to you (its **Auto Save** setting; a Highwater Too setting for it comes with Settings → Backup).
+- **Writing History panel foot**, in two rows like the Works panel:
+  - Row 1: "Last save 3:42 PM • synced with mirror 3:45 PM". When a save was made while recording was off for this document, it says **UNRECORDED**. The mirror part still signs in when clicked, if the mirror needs it.
+  - Row 2: a **Record document history** switch (this document only), then Export and the gear. It replaces the record button and the word "Recording".
+- The Works panel's **Sync** button now does a full sync (brings in saves from the mirror, then sends this computer's), the same as Sync Writing History Now. It only brought saves in.
+
 ## 0.6.58
 
 - **Final Draft files.** Opening a `.fdx` file converts it to a new `.highland` screenplay beside it, as Highland 2 does; the `.fdx` file is left as it was. Revisions become revision marks (in a readable shade of each revision set's colour), notes come across as notes (those not attached to any text at the end), dual dialogue stays dual, the title page's fields go to Title, Credit, Author, Source, Draft date and Contact, and trailing spaces are trimmed. Where Highland 2 drops dual dialogue, splits emphasis at a curly apostrophe or loses transitions that don't end in TO:, these come across intact.

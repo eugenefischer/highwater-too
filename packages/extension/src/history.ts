@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { CommitBatcher, formOf, type CommitInfo, type SaveKind } from "@highwater/history";
+import { formOf, type CommitInfo, type SaveKind } from "@highwater/history";
 import * as vscode from "vscode";
 import { ask } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
@@ -36,8 +36,9 @@ export let historyApi:
 
 /**
  * The writing history (M7): each save commits the script text, Bin and Scratchpad to the
- * document's branch in the history repository. Explicit saves commit at once; autosaves at most every
- * five minutes, and once more when the document closes. A failed commit never blocks a save.
+ * document's branch in the history repository. Every save is recorded, ⌘S and autosaves alike (how
+ * often autosaves come is the writer's choice), one at a time per document. A failed commit never
+ * blocks a save.
  *
  * Here: the recording, the status bar and the events; the commands are in history-commands.ts,
  * reading what is recorded in history-records.ts, the folder in history-location.ts.
@@ -82,14 +83,15 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   mirror.onDidChange(() => void updateStatus());
   /** Commits in progress, per document, so a conversion can wait for them. */
   const inflight = new Map<string, Promise<void>>();
-  const batcher = new CommitBatcher((key, kind) => {
-    const run = commitNow(key, kind);
+  /** Records a save, after any still being recorded for the same document (saves can come seconds apart). */
+  const record = (key: string, kind: SaveKind): Promise<void> => {
+    const run = (inflight.get(key) ?? Promise.resolve()).then(() => commitNow(key, kind));
     inflight.set(key, run);
     void run.finally(() => {
       if (inflight.get(key) === run) inflight.delete(key);
     });
     return run;
-  });
+  };
 
   async function commitNow(key: string, kind: SaveKind, note?: string): Promise<void> {
     try {
@@ -144,8 +146,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
   /** Before a conversion: the file's last save is in the history, and nothing is still being recorded. */
   async function settle(key: string): Promise<void> {
     if (!enabled()) return;
-    await inflight.get(key);
-    await batcher.saved(key, "save");
+    await record(key, "save");
     await history().idle();
   }
   /** Once ever: say that history is being kept, and where, with the ways to change that. */
@@ -243,7 +244,6 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
 
   context.subscriptions.push(
     status.item,
-    { dispose: () => batcher.dispose() },
     changedSaves,
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("highwater.historyFolder") || e.affectsConfiguration("highwater.writingHistory")) {
@@ -262,11 +262,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (!key || !enabled()) return;
       const reason = reasons.get(doc.uri.toString());
       reasons.delete(doc.uri.toString());
-      void batcher.saved(key, reason === vscode.TextDocumentSaveReason.Manual || reason === undefined ? "save" : "autosave");
-    }),
-    vscode.workspace.onDidCloseTextDocument((doc) => {
-      const key = keyOf(doc);
-      if (key && enabled()) void batcher.saved(key, "close");
+      void record(key, reason === vscode.TextDocumentSaveReason.Manual || reason === undefined ? "save" : "autosave");
     }),
     mirror,
   );

@@ -34,7 +34,7 @@ The print options (revision colours, paragraph numbers, synopses, notes, title p
 
 - One branch per work, holding the unpacked contents of the `.highland` file at each save.
 - A catalog of works on `main` (titles, file names, dates and text hashes, no text).
-- Autosaves are recorded at most every five minutes.
+- Every save is recorded, autosaves included.
 - Works are matched to files by an ID stored in the file, or by path for plain files.
 
 From the Writing History panel you can compare any save with the current text (VS Code's diff view), revert to it, or export one work's history as a git bundle. The repository can optionally be mirrored to any git remote, which keeps several computers in step. Concurrent saves from different computers are joined with merge commits, never force-pushed.

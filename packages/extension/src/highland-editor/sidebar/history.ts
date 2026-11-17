@@ -6,13 +6,14 @@ import { HISTORY_HELP } from "./help.ts";
 // ---------------------------------------------------------------------------------------------
 // Writing History (Highwater's, not Highland's): this document's saves, newest first, under a
 // heading for each day. A click selects a save, which shows Compare and Revert where its word change
-// was; Escape, a click beside the saves or leaving the panel lets go of it. The foot shows whether the history is recording and how the
-// mirror is doing, with the record (off or on for this document), export and gear (the rest) buttons.
+// was; Escape, a click beside the saves or leaving the panel lets go of it. Under the saves, a line
+// says when the document was last saved and when the mirror last synced; the foot has the Record
+// document history switch (this document only), Export and the gear (the rest).
 
 export class HistoryPanel {
   readonly #list = $("histlist");
   readonly #note = $("histnote");
-  readonly #record = $<HTMLButtonElement>("histrecord");
+  readonly #record = $<HTMLInputElement>("histrecord");
   #saves: HistorySave[] = [];
   #selected: string | null = null;
   /** The save being compared in the page, if any (outlined). */
@@ -21,7 +22,7 @@ export class HistoryPanel {
 
   constructor(private readonly deps: SidebarDeps) {
     const run = (command: string) => deps.post({ type: "historyCommand", command });
-    this.#record.onclick = () => run("highwater.toggleDocumentHistory");
+    this.#record.onchange = () => run("highwater.toggleDocumentHistory");
     $("histexport").onclick = () => run("highwater.exportHistory");
     const help = $("histhelp");
     help.onclick = () => openHelp(help, HISTORY_HELP);
@@ -141,41 +142,51 @@ export class HistoryPanel {
     this.deps.post({ type: "historyCompare", hash });
   }
 
-  /** The foot: whether this document's saves are being recorded, and the mirror's last outcome. */
+  /** The status line (last save, mirror) and the Record document history switch. */
   #foot(msg: HistoryMessage): void {
-    const last = msg.saves[0] ? new Date(msg.saves[0].at) : null;
-    $("histstate").textContent = !msg.document
+    const lastRecorded = msg.saves[0] ? msg.saves[0].at : null;
+    const paused = msg.state === "paused";
+    // A save made while recording was off is newer than the last recorded one (which is made just
+    // after its save, so a second's leeway).
+    const unrecorded = paused && msg.lastSaved !== null && (lastRecorded === null || msg.lastSaved > lastRecorded + 1000);
+    const lastSave = paused ? msg.lastSaved : (lastRecorded ?? msg.lastSaved);
+    const state = $("histstate");
+    state.classList.toggle("unrecorded", unrecorded);
+    state.textContent = !msg.document
       ? "Not saved yet"
       : msg.state === "off"
         ? "Writing history is off"
-        : msg.state === "paused"
-          ? "Paused for this document"
-          : last
-            ? `Recording · last save ${shortWhen(last)}`
-            : "Starts with the next save";
-    const rec = this.#record;
-    rec.hidden = !msg.document || msg.state === "off";
-    const paused = msg.state === "paused";
-    rec.classList.toggle("paused", paused);
-    const tip = paused ? "Turn Writing History On for This Document" : "Turn Writing History Off for This Document";
-    rec.dataset.tip = tip;
-    rec.setAttribute("aria-label", tip);
+        : lastSave !== null
+          ? `Last save ${shortWhen(new Date(lastSave))}`
+          : "Not saved yet";
+    if (unrecorded && msg.document && msg.state !== "off") {
+      const b = document.createElement("b");
+      b.textContent = "UNRECORDED";
+      b.dataset.tip = "Saved while recording was off for this document, so this save is not in the history.";
+      state.append(" ", b);
+    }
+    $("histrecordrow").hidden = !msg.document || msg.state === "off";
+    this.#record.checked = !paused;
+    this.#record.setAttribute("aria-checked", String(!paused));
     const mirror = $("histmirror");
-    mirror.hidden = !msg.mirror || msg.state === "off";
+    const shown = !!msg.mirror && msg.state !== "off";
+    mirror.hidden = !shown;
+    $("histsep").hidden = !shown || !state.textContent;
     mirror.classList.toggle("attention", !!msg.mirror?.signIn && !msg.mirror.busy);
     if (msg.mirror?.error) mirror.dataset.tip = msg.mirror.error;
+    else if (msg.mirror?.signIn) mirror.dataset.tip = "Click to sign in to the history mirror";
     else delete mirror.dataset.tip;
     mirror.classList.toggle("busy", !!msg.mirror?.busy);
     mirror.textContent = !msg.mirror
       ? ""
       : msg.mirror.busy
-        ? "Syncing with the mirror…"
+        ? "syncing with mirror…"
         : msg.mirror.signIn
-        ? "Mirror needs you to sign in"
-        : msg.mirror.error
-          ? "Not mirrored yet"
-          : msg.mirror.at
-            ? `Synced with the mirror ${shortWhen(new Date(msg.mirror.at))}`
-            : "Not synced with the mirror yet";
+          ? "mirror needs sign-in"
+          : msg.mirror.error
+            ? "not mirrored yet"
+            : msg.mirror.at
+              ? `synced with mirror ${shortWhen(new Date(msg.mirror.at))}`
+              : "not synced with mirror yet";
   }
 }
