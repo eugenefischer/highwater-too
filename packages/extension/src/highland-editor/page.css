@@ -313,6 +313,8 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 #setwin .st-select { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; color: var(--hl-panel-fg); background: color-mix(in srgb, var(--hl-panel-fg) 6%, transparent); border: 1px solid var(--hl-border); border-radius: 5px; }
 #setwin .st-path { flex: 1; min-width: 0; font: inherit; padding: 3px 8px; color: var(--hl-muted); background: color-mix(in srgb, var(--hl-panel-fg) 4%, transparent); border: 1px solid var(--hl-border); border-radius: 5px; text-overflow: ellipsis; }
 .st-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.st-pause { display: flex; align-items: center; gap: 6px; }
+#setwin .st-number { width: 4.5em; font: inherit; padding: 2px 6px; color: var(--hl-panel-fg); background: color-mix(in srgb, var(--hl-panel-fg) 6%, transparent); border: 1px solid var(--hl-border); border-radius: 5px; }
 .st-mirror-status { color: var(--hl-muted); font-size: 0.92em; }
 .st-mirror-status.st-attention { color: var(--hl-panel-fg); }
 .st-row[hidden] { display: none; }

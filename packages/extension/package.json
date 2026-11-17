@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.61",
+  "version": "0.6.62",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -850,9 +850,16 @@
         "highwater.autoSave": {
           "type": "string",
           "enum": ["off", "typing", "3", "5", "10", "15", "30", "60"],
-          "enumDescriptions": ["Only when you save (⌘S)", "A second after you stop typing", "Every 3 minutes while there are unsaved changes", "Every 5 minutes", "Every 10 minutes", "Every 15 minutes", "Every 30 minutes", "Every 60 minutes"],
+          "enumDescriptions": ["Only when you save (⌘S)", "When you stop typing (after `highwater.autoSavePause` seconds)", "Every 3 minutes while there are unsaved changes", "Every 5 minutes", "Every 10 minutes", "Every 15 minutes", "Every 30 minutes", "Every 60 minutes"],
           "default": "10",
           "markdownDescription": "How often screenplays and manuscripts save themselves. Every save is recorded in the writing history. Other files follow VS Code's own **Files: Auto Save**. Also in **Settings…** (Backup)."
+        },
+        "highwater.autoSavePause": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 300,
+          "markdownDescription": "With `highwater.autoSave` set to `typing`, how many seconds without a change before the document saves. Also in **Settings…** (Backup)."
         },
         "highwater.saveOnExport": {
           "type": "boolean",

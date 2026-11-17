@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.62
+
+- Settings → Backup: with Save Automatically set to **When I stop typing**, a field below it sets how many seconds without typing before the document saves (1 to 300; 1 by default).
+
 ## 0.6.61
 
 - **Settings → Backup**, Highland 2's Backup tab redone for the writing history:

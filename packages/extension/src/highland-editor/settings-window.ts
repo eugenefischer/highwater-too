@@ -1,7 +1,7 @@
 import { COLUMN_WIDTHS, EDITOR_FONTS, GENERAL_DEFAULTS, LINE_SPACINGS, SIDEBAR_TEXTS, type GeneralSettings } from "./general-settings.ts";
 import { DOCUMENT_DEFAULTS, type DocumentSettings } from "./document-settings.ts";
 import { INTERNATIONAL_DEFAULTS, type InternationalSettings } from "./international-settings.ts";
-import { AUTO_SAVES, AUTO_SAVE_LABELS, BACKUP_DEFAULTS, MIRROR_SYNCS, MIRROR_SYNC_LABELS, type BackupInfo, type BackupSettings } from "./backup-settings.ts";
+import { AUTO_SAVES, AUTO_SAVE_LABELS, AUTO_SAVE_PAUSE, BACKUP_DEFAULTS, MIRROR_SYNCS, MIRROR_SYNC_LABELS, type BackupInfo, type BackupSettings } from "./backup-settings.ts";
 import type { BackupAction, FromPage } from "./messages.ts";
 import { ThemeWindow } from "./theme-window.ts";
 
@@ -347,6 +347,7 @@ class BackupPane {
     const action = (name: BackupAction, label: string) => `<button class="st-action" data-action="${name}">${label}</button>`;
     root.innerHTML = `<div class="st-form st-backup">
   <div class="st-row"><span class="st-label">Save Automatically:</span>${select("autoSave", "Save Automatically", AUTO_SAVES, AUTO_SAVE_LABELS)}</div>
+  <div class="st-row st-pause-row"><span class="st-label"></span><label class="st-pause">after <input type="number" class="st-number" data-key="autoSavePause" min="${AUTO_SAVE_PAUSE.min}" max="${AUTO_SAVE_PAUSE.max}" step="1" aria-label="Seconds without typing"> seconds without typing</label></div>
   <div class="st-row"><span class="st-label"></span>${box("writingHistory", "Record writing history (every save)")}</div>
   <div class="st-row"><span class="st-label"></span>${box("saveOnExport", "Also record a save when exporting a PDF or Word file")}</div>
   <div class="st-row"><span class="st-label">History Folder:</span><input type="text" class="st-path" readonly aria-label="History folder">${action("setFolder", "Set…")}</div>
@@ -360,6 +361,16 @@ class BackupPane {
 </div>`;
     for (const sel of root.querySelectorAll<HTMLSelectElement>(".st-select")) sel.onchange = () => this.#set(sel.dataset.key as keyof BackupSettings, sel.value);
     for (const input of root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.onchange = () => this.#set(input.dataset.key as keyof BackupSettings, input.checked);
+    // The pause: a whole number of seconds; anything else goes back to the value it had.
+    const pause = root.querySelector<HTMLInputElement>(".st-number")!;
+    pause.onchange = () => {
+      const n = Math.round(Number(pause.value));
+      if (pause.value.trim() !== "" && Number.isFinite(n) && n >= AUTO_SAVE_PAUSE.min && n <= AUTO_SAVE_PAUSE.max) this.#set("autoSavePause", n);
+      else this.#fill();
+    };
+    pause.onkeydown = (e) => {
+      if (e.key === "Enter") pause.blur();
+    };
     for (const b of root.querySelectorAll<HTMLButtonElement>(".st-action")) b.onclick = () => this.post({ type: "backupAction", action: b.dataset.action as BackupAction });
     root.querySelector<HTMLButtonElement>(".st-restore")!.onclick = () => this.post({ type: "settingsRestore", tab: "backup" });
     this.#fill();
@@ -375,7 +386,7 @@ class BackupPane {
     this.#fill();
   }
 
-  #set(key: keyof BackupSettings, value: string | boolean): void {
+  #set(key: keyof BackupSettings, value: string | number | boolean): void {
     (this.#values as unknown as Record<string, unknown>)[key] = value;
     this.#fill();
     this.post({ type: "settingSet", key, value });
@@ -385,6 +396,10 @@ class BackupPane {
     const v = this.#values as unknown as Record<string, unknown>;
     for (const sel of this.root.querySelectorAll<HTMLSelectElement>(".st-select")) sel.value = String(v[sel.dataset.key!]);
     for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.checked = v[input.dataset.key!] === true;
+    // The pause shows only with "When I stop typing".
+    this.root.querySelector<HTMLElement>(".st-pause-row")!.hidden = this.#values.autoSave !== "typing";
+    const pause = this.root.querySelector<HTMLInputElement>(".st-number")!;
+    if (document.activeElement !== pause) pause.value = String(this.#values.autoSavePause);
     const info = this.#info;
     const folder = this.root.querySelector<HTMLInputElement>(".st-path")!;
     folder.value = info?.folder ?? "";

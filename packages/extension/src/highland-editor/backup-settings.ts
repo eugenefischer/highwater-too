@@ -6,6 +6,8 @@
 export interface BackupSettings {
   /** How often documents save themselves (each save is recorded in the writing history). */
   autoSave: AutoSave;
+  /** With "When I stop typing": how many seconds without a change before the document saves. */
+  autoSavePause: number;
   /** Record saves in the writing history (every document). */
   writingHistory: boolean;
   /** Save a document with unsaved changes when it is exported as a PDF or Word file (Highland's "On Print or Preview"). */
@@ -14,7 +16,10 @@ export interface BackupSettings {
   mirrorSync: MirrorSync;
 }
 
-/** off: only ⌘S; typing: a second after you stop typing; a number: every that many minutes while there are unsaved changes. */
+/** The pause "When I stop typing" waits for, in whole seconds. */
+export const AUTO_SAVE_PAUSE = { min: 1, max: 300 } as const;
+
+/** off: only ⌘S; typing: a pause after you stop typing (`autoSavePause` seconds); a number: every that many minutes while there are unsaved changes. */
 export const AUTO_SAVES = ["off", "typing", "3", "5", "10", "15", "30", "60"] as const;
 export type AutoSave = (typeof AUTO_SAVES)[number];
 export const AUTO_SAVE_LABELS: Record<AutoSave, string> = {
@@ -43,6 +48,7 @@ export const MIRROR_SYNC_LABELS: Record<MirrorSync, string> = {
 /** EJ: documents save themselves every ten minutes unless you choose otherwise (Highland's Backup Frequency default). */
 export const BACKUP_DEFAULTS: BackupSettings = {
   autoSave: "10",
+  autoSavePause: 1,
   writingHistory: true,
   saveOnExport: true,
   mirrorSync: "save",
@@ -58,8 +64,10 @@ export function backupSettings(read: (key: keyof BackupSettings) => unknown): Ba
     const v = read(key);
     return typeof v === "boolean" ? v : fallback;
   };
+  const pause = read("autoSavePause");
   return {
     autoSave: pick("autoSave", AUTO_SAVES, BACKUP_DEFAULTS.autoSave),
+    autoSavePause: typeof pause === "number" && Number.isFinite(pause) ? Math.min(AUTO_SAVE_PAUSE.max, Math.max(AUTO_SAVE_PAUSE.min, Math.round(pause))) : BACKUP_DEFAULTS.autoSavePause,
     writingHistory: bool("writingHistory", BACKUP_DEFAULTS.writingHistory),
     saveOnExport: bool("saveOnExport", BACKUP_DEFAULTS.saveOnExport),
     mirrorSync: pick("mirrorSync", MIRROR_SYNCS, BACKUP_DEFAULTS.mirrorSync),
@@ -67,9 +75,9 @@ export function backupSettings(read: (key: keyof BackupSettings) => unknown): Ba
 }
 
 /** Milliseconds between automatic saves while a document has unsaved changes; for "typing", the pause after the last change. Null: off. */
-export function autoSaveDelay(mode: AutoSave): number | null {
+export function autoSaveDelay(mode: AutoSave, pauseSeconds: number = BACKUP_DEFAULTS.autoSavePause): number | null {
   if (mode === "off") return null;
-  if (mode === "typing") return 1000;
+  if (mode === "typing") return pauseSeconds * 1000;
   return Number(mode) * 60_000;
 }
 

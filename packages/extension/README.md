@@ -91,7 +91,7 @@ Opening a Final Draft (`.fdx`) file converts it, as Highland 2 does: a new `.hig
 Every save is recorded in a git repository on your computer, as a record of how each work was written. It's on from the first save and needs nothing set up beyond git.
 
 - **What's recorded:** everything in the document at each save: text, Bin, Scratchpad, settings and images. Each save notes how many words it added or removed.
-- **When:** every save, whether ⌘S or an autosave. Documents save themselves every 10 minutes while they have unsaved changes; **Settings… → Backup** changes that (only ⌘S, when you stop typing, or every 3 to 60 minutes).
+- **When:** every save, whether ⌘S or an autosave. Documents save themselves every 10 minutes while they have unsaved changes; **Settings… → Backup** changes that (only ⌘S, when you stop typing for a number of seconds you choose, or every 3 to 60 minutes).
 - **Where:** one repository for all your writing, in your system's application-data folder, with one branch per work. **Settings… → Backup** moves it (History Folder → Set…). Avoid folders synced by Dropbox, iCloud and the like, which can damage git repositories.
 
 **In the Writing History panel**, select a save to see two buttons:
@@ -184,6 +184,7 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 | `highwater.docxFont` | Courier New | Font for Export Word Document: Courier New, or Courier Prime embedded. |
 | `highwater.templates.*` | Highland's | Each template's options, such as fonts. Easiest to change in the template window. |
 | `highwater.autoSave` | every 10 minutes | How often screenplays and manuscripts save themselves: only ⌘S, when you stop typing, or every 3–60 minutes. |
+| `highwater.autoSavePause` | 1 | With “when you stop typing”: the seconds without a change before saving. |
 | `highwater.writingHistory` | on | Record saves in the writing history. |
 | `highwater.saveOnExport` | on | Save a document with unsaved changes before exporting a PDF or Word file. |
 | `highwater.mirrorSync` | after every save | When the writing history syncs with its mirror: after every save, every 5–60 minutes, or only on Sync. |
