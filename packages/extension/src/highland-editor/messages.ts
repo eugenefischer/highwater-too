@@ -11,6 +11,7 @@ import type { CustomTheme } from "./themes.ts";
 import type { GeneralSettings } from "./general-settings.ts";
 import type { DocumentSettings } from "./document-settings.ts";
 import type { InternationalSettings } from "./international-settings.ts";
+import type { BackupInfo, BackupSettings } from "./backup-settings.ts";
 
 export const PANELS = ["navigator", "bin", "stats", "assets", "scratchpad", "history", "works"] as const;
 export type PanelName = (typeof PANELS)[number];
@@ -131,9 +132,11 @@ export type ToPage =
   /** Choose Theme… from the Command Palette: the theme menu drops down. */
   | { type: "showThemePane" }
   /** The General settings (Settings window, and how the page and sidebar look). */
-  | { type: "settings"; general: GeneralSettings; document: DocumentSettings; international: InternationalSettings }
+  | { type: "settings"; general: GeneralSettings; document: DocumentSettings; international: InternationalSettings; backup: BackupSettings }
+  /** Settings → Backup: where the history is kept, and the mirror (sent again when either changes). */
+  | { type: "backupInfo"; info: BackupInfo }
   /** Settings… from the Command Palette or the editor's menu: the Settings window opens at a tab. */
-  | { type: "showSettings"; tab: "general" | "document" | "international" | "themes" }
+  | { type: "showSettings"; tab: "general" | "document" | "international" | "themes" | "backup" }
   | { type: "fontSize"; px: number | null }
   | { type: "numbers"; on: boolean }
   /** Show Page Breaks: where each page starts, as [page offset, page number] pairs (none when off). */
@@ -188,7 +191,9 @@ export type FromPage =
   | { type: "darkPagesSet"; on: boolean }
   // The Settings window: a General setting changed, or a tab's Restore Defaults.
   | { type: "settingSet"; key: string; value: string | number | boolean | string[] }
-  | { type: "settingsRestore"; tab: "general" | "document" | "international" }
+  | { type: "settingsRestore"; tab: "general" | "document" | "international" | "backup" }
+  /** Settings → Backup's buttons: the history folder and the mirror. */
+  | { type: "backupAction"; action: BackupAction }
   | { type: "copyText"; text: string; note: string }
   | { type: "learnWord"; word: string }
   /** A comparison started or ended: the text can't be changed meanwhile. */
@@ -225,3 +230,5 @@ export type FromPage =
 export function postTo(panel: { webview: { postMessage(message: unknown): unknown } }, msg: ToPage): void {
   void panel.webview.postMessage(msg);
 }
+
+export type BackupAction = "setFolder" | "revealFolder" | "setUpMirror" | "signIn" | "forgetSignIn" | "syncNow";

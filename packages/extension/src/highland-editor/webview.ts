@@ -680,7 +680,8 @@ window.addEventListener("message", (event: MessageEvent) => {
     applyInternational(msg.international);
     applyDocument(msg.document);
     applyGeneral(msg.general);
-  }
+    settingsWindow.backup(msg.backup);
+  } else if (msg.type === "backupInfo") settingsWindow.backupInfo(msg.info);
   else if (msg.type === "showSettings") settingsWindow.open(msg.tab);
   else if (msg.type === "pageBreaks") view?.dispatch({ effects: setPageBreaks.of(msg.starts), annotations: remote.of(true) });
   else if (msg.type === "numbers") {

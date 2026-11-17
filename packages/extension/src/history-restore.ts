@@ -146,7 +146,7 @@ export function restoreCommands(core: RestoreCore) {
           return ["info.json"];
         });
       } else await extras.moveTo(own.id, id);
-      if (mirror.url) mirror.schedule();
+      if (mirror.url) mirror.afterSave();
       else await h.flushCatalog();
     } else {
       await h.claim({ id: w.id, branch: w.branch }, key);

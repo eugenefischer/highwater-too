@@ -91,15 +91,15 @@ Opening a Final Draft (`.fdx`) file converts it, as Highland 2 does: a new `.hig
 Every save is recorded in a git repository on your computer, as a record of how each work was written. It's on from the first save and needs nothing set up beyond git.
 
 - **What's recorded:** everything in the document at each save: text, Bin, Scratchpad, settings and images. Each save notes how many words it added or removed.
-- **When:** every save, whether ⌘S or an autosave. How often VS Code autosaves is up to you (its **Auto Save** setting).
-- **Where:** one repository for all your writing, in your system's application-data folder, with one branch per work. **Change Writing History Location…** moves it. Avoid folders synced by Dropbox, iCloud and the like, which can damage git repositories.
+- **When:** every save, whether ⌘S or an autosave. Documents save themselves every 10 minutes while they have unsaved changes; **Settings… → Backup** changes that (only ⌘S, when you stop typing, or every 3 to 60 minutes).
+- **Where:** one repository for all your writing, in your system's application-data folder, with one branch per work. **Settings… → Backup** moves it (History Folder → Set…). Avoid folders synced by Dropbox, iCloud and the like, which can damage git repositories.
 
 **In the Writing History panel**, select a save to see two buttons:
 
 - **Compare** marks what has changed since the save in your text: added text in green, removed text in red and struck through. ‹ and › at the top move between changes. The text can’t be changed while comparing: double-click a spot to stop and edit there, or press **Done** or Escape. **Revert** in the bar goes back to the save and stops comparing.
 - **Revert** puts that save's text, Bin and Scratchpad back and saves the document. The revert is recorded as a save, so nothing is removed from the history.
 
-The panel's foot shows when the document was last saved and when the mirror last synced, beside Export and the ⚙ menu with the rest: turning the history off or on for this document, connecting to another work, syncing. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.
+The panel's foot shows when the document was last saved and when the mirror last synced, beside Export and the ⚙ menu with the rest: syncing, connecting to another work, revealing the history folder, turning the history off or on for this document, and **Manage Writing History…**, which opens Settings → Backup. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.
 
 **In the Works panel**, every work is listed by where it is: on this computer, in the history only, or on the mirror only. Select a work to open or restore it and see its saves. Its **More** menu has two options:
 
@@ -108,7 +108,7 @@ The panel's foot shows when the document was last saved and when the mirror last
 
 Neither touches the file itself.
 
-**On more than one computer.** **Set Up History Mirror…** keeps the history in step with any git server: GitHub, GitLab, Gitea or Forgejo, an SSH server, or another disk. It can create the repository for you.
+**On more than one computer.** A history mirror, set up in **Settings… → Backup**, keeps the history in step with any git server: GitHub, GitLab, Gitea or Forgejo, an SSH server, or another disk. It can create the repository for you. **Sync with Mirror** chooses when: after every save, every 5 to 60 minutes, or only when you click Sync.
 
 - **What's shared:** each computer keeps only the works used on it. A work saved elsewhere comes over when you restore it, from the Works panel or with **Open Work from History…**.
 - **Saves on two computers:** they are joined; neither is overwritten.
@@ -146,7 +146,7 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 
 ## Settings
 
-**Settings…** (in the Highwater Editor's ⋯ menu, or the Command Palette) opens the Settings window, laid out as Highland 2's: General, Document, International and Themes tabs. Each setting there is also a VS Code setting, listed below.
+**Settings…** (in the Highwater Editor's ⋯ menu, or the Command Palette) opens the Settings window, laid out as Highland 2's: General, Document, International, Themes and Backup tabs. Backup is Highland's Backup redone for the writing history: **Save Automatically** (every 10 minutes unless you choose only ⌘S, when you stop typing, or another interval; every save is recorded), **Record writing history**, **Also record a save when exporting a PDF or Word file**, the history folder, and the history mirror. Each setting there is also a VS Code setting, listed below.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -183,7 +183,10 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 | `highwater.highlandShortcuts` | on | Highland 2's shortcuts instead of VS Code's. Off: Preview is ⌃⌥P. |
 | `highwater.docxFont` | Courier New | Font for Export Word Document: Courier New, or Courier Prime embedded. |
 | `highwater.templates.*` | Highland's | Each template's options, such as fonts. Easiest to change in the template window. |
+| `highwater.autoSave` | every 10 minutes | How often screenplays and manuscripts save themselves: only ⌘S, when you stop typing, or every 3–60 minutes. |
 | `highwater.writingHistory` | on | Record saves in the writing history. |
+| `highwater.saveOnExport` | on | Save a document with unsaved changes before exporting a PDF or Word file. |
+| `highwater.mirrorSync` | after every save | When the writing history syncs with its mirror: after every save, every 5–60 minutes, or only on Sync. |
 | `highwater.historyFolder` | system default | Where the writing history and backups are kept. |
 | `highwater.historyRemote` | none | The git remote that mirrors the writing history. |
 | `highwater.historyMatchMinWords` | 50 | The fewest words a file needs to be recognised by its text, so empty files and templates never match. |

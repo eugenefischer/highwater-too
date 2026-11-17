@@ -1,4 +1,6 @@
 import { basename } from "node:path";
+import { autoSaving } from "./auto-save.ts";
+import { mirrorSyncInterval } from "./highland-editor/backup-settings.ts";
 import { formOf, type CommitInfo, type SaveKind } from "@highwater/history";
 import * as vscode from "vscode";
 import { ask } from "./ask.ts";
@@ -107,7 +109,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (c) {
         lastCommit.set(key, c.date);
         // The catalog goes to main with the next push; with no mirror, now.
-        if (mirror.url) mirror.schedule();
+        if (mirror.url) mirror.afterSave();
         else await history().flushCatalog();
       }
       void showNotice();
@@ -132,7 +134,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const c = await history().commit(r.id, r.files, "save", new Date(), note, { form: formOf(key), file: basename(key) });
       if (c) {
         lastCommit.set(key, c.date);
-        if (mirror.url) mirror.schedule();
+        if (mirror.url) mirror.afterSave();
         else await history().flushCatalog();
       }
       view.refresh();
@@ -182,7 +184,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       .then(() => connector.offerLatest(key))
       .then(() => view.refresh());
     // Opening a document: bring in other computers' saves, at most once a minute.
-    if (mirror.url && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
+    if (mirror.url && mirror.mode !== "manual" && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());
   }
 
   // The saves changed (the Highwater Editor's Writing History panel listens).
@@ -262,7 +264,8 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (!key || !enabled()) return;
       const reason = reasons.get(doc.uri.toString());
       reasons.delete(doc.uri.toString());
-      void record(key, reason === vscode.TextDocumentSaveReason.Manual || reason === undefined ? "save" : "autosave");
+      const auto = autoSaving.has(doc.uri.toString()) || (reason !== undefined && reason !== vscode.TextDocumentSaveReason.Manual);
+      void record(key, auto ? "autosave" : "save");
     }),
     mirror,
   );
@@ -273,11 +276,26 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
 
   // On start-up: bring in other computers' saves, then push what could not be pushed last time
   // (offline, say); and every ten minutes, pull again.
+  // Settings → Backup's Sync with the mirror: after every save (other computers' saves are brought
+  // in every ten minutes), every few minutes (both ways), or only when the writer clicks Sync.
   setTimeout(() => {
-    if (enabled() && mirror.url) void pulled(mirror.sync());
+    if (enabled() && mirror.url && mirror.mode !== "manual") void pulled(mirror.sync());
   }, 15_000);
-  const timer = setInterval(() => {
-    if (enabled() && mirror.url) void pulled(mirror.pull());
-  }, 10 * 60_000);
-  context.subscriptions.push({ dispose: () => clearInterval(timer) });
+  let timer: NodeJS.Timeout | undefined;
+  const startTimer = () => {
+    clearInterval(timer);
+    const mode = mirror.mode;
+    if (mode === "manual") return;
+    const every = mirrorSyncInterval(mode);
+    timer = setInterval(() => {
+      if (enabled() && mirror.url) void pulled(every === null ? mirror.pull() : mirror.sync());
+    }, every ?? 10 * 60_000);
+  };
+  startTimer();
+  context.subscriptions.push(
+    { dispose: () => clearInterval(timer) },
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("highwater.mirrorSync")) startTimer();
+    }),
+  );
 }

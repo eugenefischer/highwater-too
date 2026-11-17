@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.60",
+  "version": "0.6.61",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -364,6 +364,11 @@
         "command": "highwater.openSettings",
         "title": "Settings…",
         "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.manageWritingHistory",
+        "title": "Manage Writing History…",
+        "category": "Highwater Too"
       }
     ],
     "customEditors": [
@@ -444,7 +449,7 @@
           "type": "boolean",
           "default": true,
           "scope": "application",
-          "markdownDescription": "Record each save in the writing history (a git repository in the history folder, one branch per document). Needs git (on a Mac, the Xcode command-line tools)."
+          "markdownDescription": "Record each save in the writing history (a git repository in the history folder, one branch per document). Needs git (on a Mac, the Xcode command-line tools). Also in **Settings…** (Backup)."
         },
         "highwater.historyRemote": {
           "type": "string",
@@ -841,6 +846,25 @@
           "maximum": 100,
           "default": 100,
           "markdownDescription": "How bright **Show Invisibles**' marks are, from 0 (faint) to 100. Also in **Settings…** (General)."
+        },
+        "highwater.autoSave": {
+          "type": "string",
+          "enum": ["off", "typing", "3", "5", "10", "15", "30", "60"],
+          "enumDescriptions": ["Only when you save (⌘S)", "A second after you stop typing", "Every 3 minutes while there are unsaved changes", "Every 5 minutes", "Every 10 minutes", "Every 15 minutes", "Every 30 minutes", "Every 60 minutes"],
+          "default": "10",
+          "markdownDescription": "How often screenplays and manuscripts save themselves. Every save is recorded in the writing history. Other files follow VS Code's own **Files: Auto Save**. Also in **Settings…** (Backup)."
+        },
+        "highwater.saveOnExport": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Exporting a PDF or Word file saves the document first if it has unsaved changes, so the version you sent out is in the writing history. Also in **Settings…** (Backup)."
+        },
+        "highwater.mirrorSync": {
+          "type": "string",
+          "enum": ["save", "5", "10", "30", "60", "manual"],
+          "enumDescriptions": ["After every save (other computers' saves are brought in every ten minutes)", "Every 5 minutes", "Every 10 minutes", "Every 30 minutes", "Every 60 minutes", "Only when you click Sync"],
+          "default": "save",
+          "markdownDescription": "When the writing history is synced with its mirror (`highwater.historyRemote`), both ways. Also in **Settings…** (Backup)."
         },
         "highwater.saveCursorPosition": {
           "type": "boolean",

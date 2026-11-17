@@ -10,7 +10,8 @@ import { parse, type Document } from "@highwater/parser";
 import { paragraphNumbers } from "./line-styles.ts";
 import { lineAndCharacter, offsetOf, pageForm } from "./offsets.ts";
 import { handleThemeMessage, registerThemes, themesMessage, themeVars } from "./theme-host.ts";
-import { affectsSettings, currentGeneral, handleSettingsMessage, registerSettings, settingsMessage } from "./settings-host.ts";
+import { affectsSettings, backupInfoMessage, currentGeneral, handleSettingsMessage, registerSettings, settingsMessage } from "./settings-host.ts";
+import { historyApi } from "../history.ts";
 import { editorFocused, registerSidebarNote } from "./sidebar-note.ts";
 import { sidebarHost } from "./sidebar-host.ts";
 import { pageHtml } from "./page-html.ts";
@@ -100,6 +101,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     const whenReady = (run: () => void) => (view.ready ? run() : waiting.push(run));
     /** Preview mode: the page shows the printed pages, laid out here. */
     let previewing = false;
+    /** Settings → Backup's folder and mirror, sent again when the history or the mirror changes. */
+    let backupWatch: vscode.Disposable | undefined;
     let layout = 0;
     const sendPages = async (at: number | null) => {
       const mine = ++layout;
@@ -185,6 +188,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           pageText = pageForm(document.getText());
           // The General settings first: the column width shapes the text's first layout.
           postTo(panel, settingsMessage());
+          postTo(panel, backupInfoMessage());
+          backupWatch ??= historyApi?.onDidChange(() => view.ready && postTo(panel, backupInfoMessage()));
           postTo(panel, { type: "init", text: pageText, mode: MODES.get(document.languageId) ?? "fountain" });
           view.ready = true;
           previewing = false;
@@ -262,6 +267,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && e.affectsConfiguration(SETTINGS_PREFIX)) sendTemplateValues();
         if (view.ready && e.affectsConfiguration("highwater.fontSize")) sendFontSize();
         if (view.ready && affectsSettings(e)) postTo(panel, settingsMessage());
+        if (view.ready && (e.affectsConfiguration("highwater.historyFolder") || e.affectsConfiguration("highwater.historyRemote"))) postTo(panel, backupInfoMessage());
         if (view.ready && e.affectsConfiguration("highwater.excludeNotesFromWordCount")) sendCounts();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
         if (view.ready && e.affectsConfiguration("highwater.pageBreaks")) sendPageBreaks();
@@ -300,6 +306,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     panel.onDidDispose(() => {
       log(`panel disposed ${document.uri.path.split("/").pop()}`);
       sendCounts.cancel();
+      backupWatch?.dispose();
       subscriptions.forEach((s) => s.dispose());
     });
   }

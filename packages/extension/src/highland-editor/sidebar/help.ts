@@ -33,15 +33,11 @@ export const HISTORY_HELP = `
 
 <h3>More actions</h3>
 <ul>
-<li><b>Disable History for This Document</b> (or <b>Enable</b>): stops or restarts recording this document’s saves. Existing saves are kept.</li>
+<li><b>Sync Writing History Now</b> (with a mirror): brings in saves from your other computers and sends this computer’s.</li>
 <li><b>Connect to a Work’s History</b>: if a copied or renamed file lost its history, joins it back up. You’ll be asked to confirm.</li>
-<li><b>Link Writing History to This File</b> (.fountain and .md files): adds a short line at the end of the file so its history, Bin and Scratchpad follow it if you move or rename it. .highland files don’t need this.</li>
-<li><b>Set Up History Mirror</b>: keeps a backup of all your history on a remote git server you choose, such as a private GitHub repository. Your other computers can then see and restore your work.</li>
-<li><b>Sync Writing History Now</b>: syncs your local writing history with the history mirror.</li>
-<li><b>Sign In to History Mirror</b>: signs in to your history mirror. Highwater Too saves your sign-in credentials so you only need to do this once.</li>
-<li><b>Forget History Mirror Sign-In</b>: forgets the saved history mirror sign-in credentials.</li>
 <li><b>Reveal Writing History Folder</b>: shows where writing histories are stored on this computer.</li>
-<li><b>Change Writing History Location</b>: lets you select where writing histories are stored on this computer.</li>
+<li><b>Disable History for This Document</b> (or <b>Enable</b>): stops or restarts recording this document’s saves. Existing saves are kept.</li>
+<li><b>Manage Writing History</b>: opens Settings → Backup, where you choose how often documents save themselves, where the history is kept, and the history mirror: setting it up, signing in, and how often it syncs.</li>
 </ul>
 `;
 

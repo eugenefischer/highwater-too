@@ -153,6 +153,11 @@ function defaultFolder(): string {
  * unless `target` is given (tests). Uses the editor's text, so unsaved edits are included, and the
  * document's own "Title Page" print option. Only ever writes a .pdf on disk (file: scheme).
  */
+/** Settings → Backup: Also record a save when exporting (a document with unsaved changes is saved first, so what went out is in the history). */
+async function saveBeforeExport(doc: vscode.TextDocument): Promise<void> {
+  if (doc.isDirty && !doc.isUntitled && vscode.workspace.getConfiguration("highwater").get<boolean>("saveOnExport", true)) await doc.save();
+}
+
 async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, resource?: vscode.Uri, target?: vscode.Uri): Promise<void> {
   const doc = (resource && vscode.workspace.textDocuments.find((d) => d.uri.toString() === resource.toString())) ?? activeDocument();
   if (!doc || !doc.languageId.startsWith("highland-")) {
@@ -177,6 +182,7 @@ async function exportPdf(context: vscode.ExtensionContext, store: BundleStore, r
     void vscode.window.showErrorMessage(`Not exporting: ${out.toString()} is not a .pdf file on disk.`);
     return;
   }
+  await saveBeforeExport(doc);
   await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Exporting ${basename(out.fsPath)}…` }, async () => {
     const result = (await renderDocument(context, store, doc, template))!;
     await vscode.workspace.fs.writeFile(out, result.pdf);
@@ -214,6 +220,7 @@ async function exportDocx(context: vscode.ExtensionContext, store: BundleStore, 
     void vscode.window.showErrorMessage(`Not exporting: ${out.toString()} is not a .docx file on disk.`);
     return;
   }
+  await saveBeforeExport(doc);
   await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Exporting ${basename(out.fsPath)}…` }, async () => {
     const result = await renderDocx(context, store, doc);
     await vscode.workspace.fs.writeFile(out, result.docx);

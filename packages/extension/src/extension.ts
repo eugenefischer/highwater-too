@@ -12,6 +12,7 @@ import { applyScriptTerms } from "./script-terms.ts";
 import { registerBinAndAssets } from "./bin-assets.ts";
 import { registerTemplateStatus, watchTemplateOptions } from "./render-document.ts";
 import { registerHistory } from "./history.ts";
+import { registerAutoSave } from "./auto-save.ts";
 import { currentHistory, historyRoot } from "./history-location.ts";
 import { startPlainExtras } from "./extras.ts";
 import { focusedDocument } from "./focus.ts";
@@ -103,6 +104,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ["template indicator", () => registerTemplateStatus(context, store)],
     ["template options", () => watchTemplateOptions(context)],
     ["writing history", () => registerHistory(context, store)],
+    ["auto save", () => registerAutoSave(context)],
   ];
   for (const [name, start] of features) {
     try {

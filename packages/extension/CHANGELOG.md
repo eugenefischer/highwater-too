@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.61
+
+- **Settings → Backup**, Highland 2's Backup tab redone for the writing history:
+  - **Save Automatically:** screenplays and manuscripts save themselves every 10 minutes while they have unsaved changes (the default), or when you stop typing, or every 3, 5, 15, 30 or 60 minutes, or only when you press ⌘S. Every one of these saves is recorded in the writing history as an Autosave.
+  - **Record writing history** (every document), and **Also record a save when exporting a PDF or Word file**: a document with unsaved changes is saved before it's exported, so the version you sent out is in the history.
+  - **History Folder**, with **Set…** to move it and **Show in Finder**.
+  - **History Mirror**: **Set Up…** (or **Change…**), the mirror's status, **Sync with Mirror** (after every save, every 5–60 minutes, or only when you click Sync), **Sync Now**, **Sign In…** and **Forget Sign-In**.
+  - **Restore Defaults** leaves the history folder and the mirror alone.
+- The Writing History panel's gear menu: **Sync Writing History Now**, **Connect to a Work's History…**, **Reveal Writing History Folder**, **Disable History for This Document** (or Enable), and **Manage Writing History…**, which opens Settings → Backup. Setting up the mirror, signing in and out, and moving the history folder are now in Settings → Backup (and the Command Palette).
+
 ## 0.6.60
 
 - Writing History panel: the **Record document history** switch is gone. Turning the history off or on for this document is now **Disable History for This Document** (or **Enable**) in the gear menu. While it's off, the foot says **History disabled for this document** in the theme's emphasis colour. The status line is back on the foot's single row, beside Export and the gear, so nothing can cover it in a narrow sidebar.

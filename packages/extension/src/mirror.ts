@@ -1,3 +1,4 @@
+import { backupSettings, type MirrorSync } from "./highland-editor/backup-settings.ts";
 import { basename } from "node:path";
 import { failureKind, git, History, Mirror, parseRemote, type Removed } from "@highwater/history";
 import * as vscode from "vscode";
@@ -46,6 +47,16 @@ export class HistoryMirror implements vscode.Disposable {
 
   get url(): string {
     return vscode.workspace.getConfiguration("highwater").get<string>("historyRemote", "").trim();
+  }
+
+  /** Settings → Backup's Sync with the mirror. */
+  get mode(): MirrorSync {
+    return backupSettings((k) => vscode.workspace.getConfiguration("highwater").get(k)).mirrorSync;
+  }
+
+  /** After a save is recorded: pushed soon when syncing after every save; otherwise at the next timed or manual sync. */
+  afterSave(): void {
+    if (this.mode === "save") this.schedule();
   }
 
   /** After a commit: push a few seconds later (several quick saves make one push). */
@@ -222,7 +233,7 @@ export class HistoryMirror implements vscode.Disposable {
       this.state = { at: this.state.at, error: result.message, signIn };
       // Offline or the server is down: try again in ten minutes (and on the next save). A refused
       // sign-in would only be refused again: wait for the writer.
-      if (!signIn) this.#retry = setTimeout(() => void this.push(), 10 * 60_000);
+      if (!signIn && this.mode !== "manual") this.#retry = setTimeout(() => void this.push(), 10 * 60_000);
     }
     this.#changed.fire();
   }

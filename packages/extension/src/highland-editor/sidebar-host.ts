@@ -34,6 +34,7 @@ const HISTORY_COMMANDS = new Set([
   "highwater.forgetHistoryMirrorSignIn",
   "highwater.openHistoryFolder",
   "highwater.changeHistoryLocation",
+  "highwater.manageWritingHistory",
 ]);
 
 
@@ -167,20 +168,13 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
             ? "The writing history is off for this document."
             : "No saves yet: the history starts with the next save.";
     const saves = commits.map((c) => ({ hash: c.hash, at: c.date.getTime(), ...parseSave(c.message) }));
+    // EJ (2026-11-18): the mirror's set-up and sign-in and the folder's location are in Settings → Backup.
     const menu: { label: string; command: string; sep?: boolean }[] = [
-      ...(k && !off ? [{ label: state === "paused" ? "Enable History for This Document" : "Disable History for This Document", command: "highwater.toggleDocumentHistory" }] : []),
-      ...(k ? [{ label: "Connect to a Work's History…", command: "highwater.connectToWork", sep: !off }] : []),
-      ...(plain() ? [{ label: "Link Writing History to This File", command: "highwater.linkHistoryToFile" }] : []),
-      { label: remote ? "Change History Mirror…" : "Set Up History Mirror…", command: "highwater.setUpHistoryMirror", sep: !!k },
-      ...(remote
-        ? [
-            { label: "Sync Writing History Now", command: "highwater.pushHistoryNow" },
-            { label: "Sign In to History Mirror…", command: "highwater.signInHistoryMirror" },
-            { label: "Forget History Mirror Sign-In", command: "highwater.forgetHistoryMirrorSignIn" },
-          ]
-        : []),
-      { label: "Reveal Writing History Folder", command: "highwater.openHistoryFolder", sep: true },
-      { label: "Change Writing History Location…", command: "highwater.changeHistoryLocation" },
+      ...(remote ? [{ label: "Sync Writing History Now", command: "highwater.pushHistoryNow" }] : []),
+      ...(k ? [{ label: "Connect to a Work's History…", command: "highwater.connectToWork" }] : []),
+      { label: "Reveal Writing History Folder", command: "highwater.openHistoryFolder" },
+      ...(k && !off ? [{ label: state === "paused" ? "Enable History for This Document" : "Disable History for This Document", command: "highwater.toggleDocumentHistory", sep: true }] : []),
+      { label: "Manage Writing History…", command: "highwater.manageWritingHistory", sep: !(k && !off) },
     ];
     post({
       type: "history",

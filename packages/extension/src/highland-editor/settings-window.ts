@@ -1,17 +1,18 @@
 import { COLUMN_WIDTHS, EDITOR_FONTS, GENERAL_DEFAULTS, LINE_SPACINGS, SIDEBAR_TEXTS, type GeneralSettings } from "./general-settings.ts";
 import { DOCUMENT_DEFAULTS, type DocumentSettings } from "./document-settings.ts";
 import { INTERNATIONAL_DEFAULTS, type InternationalSettings } from "./international-settings.ts";
-import type { FromPage } from "./messages.ts";
+import { AUTO_SAVES, AUTO_SAVE_LABELS, BACKUP_DEFAULTS, MIRROR_SYNCS, MIRROR_SYNC_LABELS, type BackupInfo, type BackupSettings } from "./backup-settings.ts";
+import type { BackupAction, FromPage } from "./messages.ts";
 import { ThemeWindow } from "./theme-window.ts";
 
-export const SETTINGS_TABS = ["general", "document", "international", "themes"] as const;
+export const SETTINGS_TABS = ["general", "document", "international", "themes", "backup"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
-const TAB_NAMES: Record<SettingsTab, string> = { general: "General", document: "Document", international: "International", themes: "Themes" };
+const TAB_NAMES: Record<SettingsTab, string> = { general: "General", document: "Document", international: "International", themes: "Themes", backup: "Backup" };
 
 /**
  * The Settings window, as Highland 2's: a tab for each group of settings (General, Document,
- * International and Themes; Highland's Backup is the writing history's job here). Settings are for every document and kept as VS Code
- * settings; each change is saved as it is made.
+ * International, Themes and Backup, which is the writing history's here). Settings are for every
+ * document and kept as VS Code settings; each change is saved as it is made.
  */
 export class SettingsWindow {
   readonly #root: HTMLElement;
@@ -21,6 +22,7 @@ export class SettingsWindow {
   readonly #general: GeneralPane;
   readonly #document: DocumentPane;
   readonly #international: InternationalPane;
+  readonly #backup: BackupPane;
   #tab: SettingsTab = "general";
 
   constructor(post: (msg: FromPage) => void) {
@@ -42,6 +44,7 @@ export class SettingsWindow {
     this.#document = new DocumentPane(post, this.#panes.get("document")!);
     this.#international = new InternationalPane(post, this.#panes.get("international")!);
     this.themes = new ThemeWindow(post, this.#panes.get("themes")!);
+    this.#backup = new BackupPane(post, this.#panes.get("backup")!);
     this.#root.querySelector<HTMLButtonElement>(".tw-done")!.onclick = () => this.close();
     this.#root.addEventListener("mousedown", (e) => e.target === this.#root && this.close());
     this.#root.addEventListener("keydown", (e) => {
@@ -82,6 +85,16 @@ export class SettingsWindow {
   /** The International settings' values, from the extension. */
   international(values: InternationalSettings): void {
     this.#international.update(values);
+  }
+
+  /** The Backup settings' values, from the extension. */
+  backup(values: BackupSettings): void {
+    this.#backup.update(values);
+  }
+
+  /** Where the history is and how the mirror is doing, from the extension. */
+  backupInfo(info: BackupInfo): void {
+    this.#backup.info(info);
   }
 
   #show(tab: SettingsTab): void {
@@ -312,6 +325,91 @@ class InternationalPane {
       input.disabled = !on;
       if (document.activeElement !== input) input.value = this.#values[input.dataset.key as "customMore" | "customContd"];
     }
+  }
+}
+
+/**
+ * The Backup tab: Highland's Backup redone for the writing history (claude/backup-settings-design.md).
+ * Saving and recording, then where the history is kept, then the mirror (its rows shown once one
+ * is set up).
+ */
+class BackupPane {
+  #values: BackupSettings = { ...BACKUP_DEFAULTS };
+  #info: BackupInfo | null = null;
+
+  constructor(
+    private readonly post: (msg: FromPage) => void,
+    private readonly root: HTMLElement,
+  ) {
+    const select = (key: "autoSave" | "mirrorSync", label: string, options: readonly string[], labels: Record<string, string>) =>
+      `<select class="st-select" data-key="${key}" aria-label="${label}">${options.map((o) => `<option value="${o}">${labels[o]}</option>`).join("")}</select>`;
+    const box = (key: keyof BackupSettings, label: string) => `<label class="st-check"><input type="checkbox" data-key="${key}"> ${label}</label>`;
+    const action = (name: BackupAction, label: string) => `<button class="st-action" data-action="${name}">${label}</button>`;
+    root.innerHTML = `<div class="st-form st-backup">
+  <div class="st-row"><span class="st-label">Save Automatically:</span>${select("autoSave", "Save Automatically", AUTO_SAVES, AUTO_SAVE_LABELS)}</div>
+  <div class="st-row"><span class="st-label"></span>${box("writingHistory", "Record writing history (every save)")}</div>
+  <div class="st-row"><span class="st-label"></span>${box("saveOnExport", "Also record a save when exporting a PDF or Word file")}</div>
+  <div class="st-row"><span class="st-label">History Folder:</span><input type="text" class="st-path" readonly aria-label="History folder">${action("setFolder", "Set…")}</div>
+  <div class="st-row"><span class="st-label"></span><span class="st-buttons"><button class="st-action st-reveal" data-action="revealFolder">Show in Finder</button></span></div>
+  <div class="st-rule"></div>
+  <div class="st-row"><span class="st-label">History Mirror:</span><input type="text" class="st-path st-mirror-url" readonly aria-label="History mirror"><button class="st-action st-mirror-setup" data-action="setUpMirror">Set Up…</button></div>
+  <div class="st-row st-mirror-only"><span class="st-label"></span><span class="st-mirror-status"></span></div>
+  <div class="st-row st-mirror-only"><span class="st-label">Sync with Mirror:</span>${select("mirrorSync", "Sync with Mirror", MIRROR_SYNCS, MIRROR_SYNC_LABELS)}${action("syncNow", "Sync Now")}</div>
+  <div class="st-row st-mirror-only"><span class="st-label"></span><span class="st-buttons">${action("signIn", "Sign In…")}${action("forgetSignIn", "Forget Sign-In")}</span></div>
+  <div class="st-foot"><button class="st-restore">Restore Defaults</button></div>
+</div>`;
+    for (const sel of root.querySelectorAll<HTMLSelectElement>(".st-select")) sel.onchange = () => this.#set(sel.dataset.key as keyof BackupSettings, sel.value);
+    for (const input of root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.onchange = () => this.#set(input.dataset.key as keyof BackupSettings, input.checked);
+    for (const b of root.querySelectorAll<HTMLButtonElement>(".st-action")) b.onclick = () => this.post({ type: "backupAction", action: b.dataset.action as BackupAction });
+    root.querySelector<HTMLButtonElement>(".st-restore")!.onclick = () => this.post({ type: "settingsRestore", tab: "backup" });
+    this.#fill();
+  }
+
+  update(values: BackupSettings): void {
+    this.#values = { ...values };
+    this.#fill();
+  }
+
+  info(info: BackupInfo): void {
+    this.#info = info;
+    this.#fill();
+  }
+
+  #set(key: keyof BackupSettings, value: string | boolean): void {
+    (this.#values as unknown as Record<string, unknown>)[key] = value;
+    this.#fill();
+    this.post({ type: "settingSet", key, value });
+  }
+
+  #fill(): void {
+    const v = this.#values as unknown as Record<string, unknown>;
+    for (const sel of this.root.querySelectorAll<HTMLSelectElement>(".st-select")) sel.value = String(v[sel.dataset.key!]);
+    for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.checked = v[input.dataset.key!] === true;
+    const info = this.#info;
+    const folder = this.root.querySelector<HTMLInputElement>(".st-path")!;
+    folder.value = info?.folder ?? "";
+    folder.title = info?.folder ?? "";
+    this.root.querySelector<HTMLElement>(".st-reveal")!.textContent = info?.reveal ?? "Show in Finder";
+    const m = info?.mirror ?? null;
+    const url = this.root.querySelector<HTMLInputElement>(".st-mirror-url")!;
+    url.value = m?.url ?? "";
+    url.placeholder = "None";
+    url.title = m?.url ?? "";
+    this.root.querySelector<HTMLElement>(".st-mirror-setup")!.textContent = m ? "Change…" : "Set Up…";
+    for (const row of this.root.querySelectorAll<HTMLElement>(".st-mirror-only")) row.hidden = !m;
+    const status = this.root.querySelector<HTMLElement>(".st-mirror-status")!;
+    status.classList.toggle("st-attention", !!m?.signIn || !!m?.error);
+    status.textContent = !m
+      ? ""
+      : m.busy
+        ? "Syncing with the mirror…"
+        : m.signIn
+          ? "The mirror needs you to sign in."
+          : m.error
+            ? `Not mirrored yet: ${m.error}`
+            : m.at
+              ? `Synced with the mirror ${new Date(m.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
+              : "Not synced with the mirror yet";
   }
 }
 
