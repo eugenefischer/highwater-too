@@ -37,9 +37,9 @@ Your script appears in a page-width column of Courier Prime, as in Highland 2. E
 - **Writing keys:** Highland's (see [Shortcuts](#keyboard-shortcuts)).
 - **Completion:** in a screenplay, start a line in capitals and the characters who already speak are offered, most frequent first. You're also offered scene-heading prefixes and transitions, the script's locations after `INT.` or `EXT.`, and times of day after ` - `.
 - **Markers:** ⌃M inserts one. ⌃⌥M jumps to the next.
-- **Check Spelling While Typing:** American English, off by default. Misspelled words get red dots underneath. Right-click for suggestions, **Ignore** or **Learn Spelling**. ⌘; goes to the next misspelling.
-- **Paragraph numbers, Go to Paragraph, Show Invisibles and Show Page Breaks:** as in Highland. Show Page Breaks marks where each printed page starts with a short line and the page number in the right margin; it catches up a second after you stop typing.
-- **Typewriter Scrolling** (the editor's ⋯ menu): the line you're typing stays one line below the middle of the editor, for every document. Typing, Return and deleting bring it back there; clicking, the arrow keys and scrolling don't.
+- **Spelling checks** (**Show Spelling Checks** in the editor's ⋯ menu): American English, off by default. Misspelled words get red dots underneath. Right-click for suggestions, **Ignore** or **Learn Spelling**. ⌘; goes to the next misspelling.
+- **Paragraph numbers, Go to Paragraph, Show Invisibles and Show Page Breaks:** as in Highland. The editor's ⋯ menu offers Show or Hide for each, whichever applies. Show Page Breaks marks where each printed page starts with a short line and the page number in the right margin; it catches up a second after you stop typing.
+- **Typewriter Scrolling** (**Enable Typewriter Scrolling** in the editor's ⋯ menu): the line you're typing stays one line below the middle of the editor, for every document. Typing, Return and deleting bring it back there; clicking, the arrow keys and scrolling don't.
 - **Text size:** ⌘+ and ⌘− change it. ⌥⌘0 resets it.
 
 To edit a document as plain text, for other extensions or multiple cursors, use VS Code's **Reopen Editor With… → Text Editor**. It keeps the highlighting, completion and writing keys, but not the sidebar, the pages or Compare.

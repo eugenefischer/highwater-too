@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.71
+
+- The editor's ⋯ menu shows whichever of each pair applies, instead of check marks (which VS Code doesn't draw for extensions' menu items): **Show / Hide Paragraph Numbers**, **Enable / Disable Typewriter Scrolling**, **Show / Hide Page Breaks**, **Show / Hide Spelling Checks**, and (new in the menu) **Show / Hide Invisibles**. The Command Palette offers the same pairs. ⇧⌘I still switches invisibles.
+
 ## 0.6.70
 
 - The editor's ⋯ menu names each on/off item for what it does, with a check mark while it's on: **Show Paragraph Numbers**, **Use Typewriter Scrolling**, **Check Spelling While Typing** and **Show Page Breaks** (were "Show or Hide…", "Turn … On or Off" and "(On or Off)").

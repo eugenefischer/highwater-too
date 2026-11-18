@@ -9,7 +9,7 @@ import { openHighland } from "./open.ts";
 import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { changeCase, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
-import { activeDocument, activeOffsets, editActive } from "./surface.ts";
+import { activeDocument, activeOffsets, editActive, onDidChangeActiveSurface } from "./surface.ts";
 
 const NEW: Record<string, { mode: DocumentMode; template: string; name: string }> = {
   screenplay: { mode: "fountain", template: "Screenplay", name: "Untitled Screenplay" },
@@ -30,7 +30,14 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     // ⌃U and ⌃⇧U: VS Code's own case commands in the text editor; these in the Highwater Editor.
     vscode.commands.registerCommand("highwater.upperCase", () => applyToSelections((t, s, e) => changeCase(t, s, e, true))),
     vscode.commands.registerCommand("highwater.lowerCase", () => applyToSelections((t, s, e) => changeCase(t, s, e, false))),
-    vscode.commands.registerCommand("highwater.toggleInvisibles", toggleInvisibles),
+    vscode.commands.registerCommand("highwater.toggleInvisibles", () => setInvisibles(null)),
+    // The editor's ⋯ menu shows Show Invisibles or Hide Invisibles, whichever applies (EJ).
+    vscode.commands.registerCommand("highwater.showInvisibles", () => setInvisibles(true)),
+    vscode.commands.registerCommand("highwater.hideInvisibles", () => setInvisibles(false)),
+    onDidChangeActiveSurface(() => noteInvisibles()),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("editor.renderWhitespace")) noteInvisibles();
+    }),
     vscode.commands.registerCommand("highwater.newScreenplay", () => newDocument("screenplay")),
     vscode.commands.registerCommand("highwater.newManuscript", () => newDocument("manuscript")),
     // The editor's title bar passes the open document's URI, which is not a kind: then it asks.
@@ -47,6 +54,9 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
       exportDocx(context, store, resource instanceof vscode.Uri ? resource : undefined, options?.target),
     ),
   );
+  // The menus show Show or Hide Invisibles for the document in front from the start.
+  noteInvisibles();
+
 }
 
 /** Applies a text toggle to every selection, in a text editor or the Highwater Editor. */
@@ -74,13 +84,22 @@ async function applyToSelections(toggle: (text: string, start: number, end: numb
   await editActive(doc, edits, selections);
 }
 
-async function toggleInvisibles(): Promise<void> {
-  // The setting for the document's language: the text editor and the Highwater Editor both follow it.
+/** Invisibles on, off, or (null) the other way: the setting for the document's language, which the text editor and the Highwater Editor both follow. */
+async function setInvisibles(on: boolean | null): Promise<void> {
   const doc = activeDocument();
   if (!doc) return;
   const config = vscode.workspace.getConfiguration("editor", doc);
-  const current = config.get<string>("renderWhitespace");
-  await config.update("renderWhitespace", current === "all" ? "none" : "all", vscode.ConfigurationTarget.Global, true);
+  const showing = config.get<string>("renderWhitespace") === "all";
+  const want = on ?? !showing;
+  await config.update("renderWhitespace", want ? "all" : "none", vscode.ConfigurationTarget.Global, true);
+  noteInvisibles();
+}
+
+/** The context key `highwater.invisibles`: whether the active document shows invisibles (for the menus). */
+function noteInvisibles(): void {
+  const doc = activeDocument();
+  const on = !!doc && vscode.workspace.getConfiguration("editor", doc).get<string>("renderWhitespace") === "all";
+  void vscode.commands.executeCommand("setContext", "highwater.invisibles", on);
 }
 
 async function newDocument(kind: "screenplay" | "manuscript", chosen?: vscode.Uri): Promise<void> {

@@ -596,6 +596,17 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       if (!answer) return;
       await revealOffset(doc, starts[+answer - 1]!, "center", true);
     }),
+    // The editor's ⋯ menu shows whichever of each pair applies (EJ): Show/Hide, Enable/Disable.
+    ...([
+      ["ParagraphNumbers", "paragraphNumbers", "show", "hide"],
+      ["TypewriterScrolling", "typewriterScrolling", "enable", "disable"],
+      ["PageBreaks", "pageBreaks", "show", "hide"],
+      ["SpellingChecks", "spellCheck", "show", "hide"],
+    ] as const).flatMap(([name, key, on, off]) =>
+      [true, false].map((value) =>
+        vscode.commands.registerCommand(`highwater.${value ? on : off}${name}`, () => vscode.workspace.getConfiguration("highwater").update(key, value, vscode.ConfigurationTarget.Global)),
+      ),
+    ),
     vscode.commands.registerCommand("highwater.toggleSpelling", async () => {
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("spellCheck", !config.get<boolean>("spellCheck", false), vscode.ConfigurationTarget.Global);

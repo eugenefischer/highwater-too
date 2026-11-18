@@ -677,6 +677,27 @@ const tests: [string, () => Promise<void>][] = [
       assert.ok(new TextDecoder("latin1").decode(bytes).includes("word/document.xml"));
     },
   ],
+  [
+    "the editor menu's Show/Hide and Enable/Disable pairs set their settings",
+    async () => {
+      const config = () => vscode.workspace.getConfiguration("highwater");
+      const pairs: [string, string, string][] = [
+        ["highwater.showParagraphNumbers", "highwater.hideParagraphNumbers", "paragraphNumbers"],
+        ["highwater.enableTypewriterScrolling", "highwater.disableTypewriterScrolling", "typewriterScrolling"],
+        ["highwater.showPageBreaks", "highwater.hidePageBreaks", "pageBreaks"],
+        ["highwater.showSpellingChecks", "highwater.hideSpellingChecks", "spellCheck"],
+      ];
+      for (const [on, off, key] of pairs) {
+        await vscode.commands.executeCommand(on);
+        assert.equal(config().get(key), true, `${on} turns ${key} on`);
+        await vscode.commands.executeCommand(on);
+        assert.equal(config().get(key), true, `${on} again leaves it on`);
+        await vscode.commands.executeCommand(off);
+        assert.equal(config().get(key), false, `${off} turns ${key} off`);
+        await config().update(key, undefined, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
 ];
 
 export async function run(): Promise<void> {

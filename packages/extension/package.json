@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.70",
+  "version": "0.6.71",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -158,7 +158,7 @@
       },
       {
         "command": "highwater.toggleInvisibles",
-        "title": "Show Invisibles",
+        "title": "Show or Hide Invisibles",
         "category": "Highwater Too"
       },
       {
@@ -309,26 +309,72 @@
       },
       {
         "command": "highwater.toggleParagraphNumbers",
-        "title": "Show Paragraph Numbers",
-        "toggled": "config.highwater.paragraphNumbers",
+        "title": "Show or Hide Paragraph Numbers",
         "category": "Highwater Too"
       },
       {
         "command": "highwater.toggleTypewriterScrolling",
-        "title": "Use Typewriter Scrolling",
-        "toggled": "config.highwater.typewriterScrolling",
+        "title": "Turn Typewriter Scrolling On or Off",
         "category": "Highwater Too"
       },
       {
         "command": "highwater.togglePageBreaks",
-        "title": "Show Page Breaks",
-        "toggled": "config.highwater.pageBreaks",
+        "title": "Show or Hide Page Breaks",
         "category": "Highwater Too"
       },
       {
         "command": "highwater.toggleSpelling",
-        "title": "Check Spelling While Typing",
-        "toggled": "config.highwater.spellCheck",
+        "title": "Turn Spelling Checks On or Off",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.showParagraphNumbers",
+        "title": "Show Paragraph Numbers",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.hideParagraphNumbers",
+        "title": "Hide Paragraph Numbers",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.enableTypewriterScrolling",
+        "title": "Enable Typewriter Scrolling",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.disableTypewriterScrolling",
+        "title": "Disable Typewriter Scrolling",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.showPageBreaks",
+        "title": "Show Page Breaks",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.hidePageBreaks",
+        "title": "Hide Page Breaks",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.showSpellingChecks",
+        "title": "Show Spelling Checks",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.hideSpellingChecks",
+        "title": "Hide Spelling Checks",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.showInvisibles",
+        "title": "Show Invisibles",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.hideInvisibles",
+        "title": "Hide Invisibles",
         "category": "Highwater Too"
       },
       {
@@ -595,7 +641,7 @@
         "highwater.typewriterScrolling": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Typewriter Scrolling in the Highwater Editor, for every document: the line you're typing stays one line below the middle of the editor. Typing, Return and deleting bring it back there; clicking and the arrow keys don't. **Use Typewriter Scrolling** in the editor's ⋯ menu turns it on and off."
+          "markdownDescription": "Typewriter Scrolling in the Highwater Editor, for every document: the line you're typing stays one line below the middle of the editor. Typing, Return and deleting bring it back there; clicking and the arrow keys don't. **Enable Typewriter Scrolling** / **Disable Typewriter Scrolling** in the editor's ⋯ menu turn it on and off."
         },
         "highwater.pageBreaks": {
           "type": "boolean",
@@ -1616,7 +1662,7 @@
         },
         {
           "command": "highwater.toggleInvisibles",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "false"
         },
         {
           "command": "highwater.exportPdf",
@@ -1685,6 +1731,62 @@
         {
           "command": "highwater.toggleEditorSidebar",
           "when": "activeCustomEditorId == 'highwater.highlandEditor'"
+        },
+        {
+          "command": "highwater.toggleParagraphNumbers",
+          "when": "false"
+        },
+        {
+          "command": "highwater.toggleTypewriterScrolling",
+          "when": "false"
+        },
+        {
+          "command": "highwater.toggleSpelling",
+          "when": "false"
+        },
+        {
+          "command": "highwater.togglePageBreaks",
+          "when": "false"
+        },
+        {
+          "command": "highwater.showParagraphNumbers",
+          "when": "highwater.docLang =~ /^highland-/ && !config.highwater.paragraphNumbers"
+        },
+        {
+          "command": "highwater.hideParagraphNumbers",
+          "when": "highwater.docLang =~ /^highland-/ && config.highwater.paragraphNumbers"
+        },
+        {
+          "command": "highwater.enableTypewriterScrolling",
+          "when": "highwater.docLang =~ /^highland-/ && !config.highwater.typewriterScrolling"
+        },
+        {
+          "command": "highwater.disableTypewriterScrolling",
+          "when": "highwater.docLang =~ /^highland-/ && config.highwater.typewriterScrolling"
+        },
+        {
+          "command": "highwater.showPageBreaks",
+          "when": "highwater.docLang =~ /^highland-/ && !config.highwater.pageBreaks"
+        },
+        {
+          "command": "highwater.hidePageBreaks",
+          "when": "highwater.docLang =~ /^highland-/ && config.highwater.pageBreaks"
+        },
+        {
+          "command": "highwater.showSpellingChecks",
+          "when": "highwater.docLang =~ /^highland-/ && !config.highwater.spellCheck"
+        },
+        {
+          "command": "highwater.hideSpellingChecks",
+          "when": "highwater.docLang =~ /^highland-/ && config.highwater.spellCheck"
+        },
+        {
+          "command": "highwater.showInvisibles",
+          "when": "highwater.docLang =~ /^highland-/ && !highwater.invisibles"
+        },
+        {
+          "command": "highwater.hideInvisibles",
+          "when": "highwater.docLang =~ /^highland-/ && highwater.invisibles"
         }
       ],
       "explorer/context": [
@@ -1763,23 +1865,53 @@
           "group": "1_highwater@1"
         },
         {
-          "command": "highwater.toggleParagraphNumbers",
-          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "command": "highwater.showParagraphNumbers",
+          "when": "activeCustomEditorId == highwater.highlandEditor && !config.highwater.paragraphNumbers",
           "group": "1_highwater@2"
         },
         {
-          "command": "highwater.toggleTypewriterScrolling",
-          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "command": "highwater.hideParagraphNumbers",
+          "when": "activeCustomEditorId == highwater.highlandEditor && config.highwater.paragraphNumbers",
           "group": "1_highwater@2"
         },
         {
-          "command": "highwater.toggleSpelling",
-          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "command": "highwater.enableTypewriterScrolling",
+          "when": "activeCustomEditorId == highwater.highlandEditor && !config.highwater.typewriterScrolling",
+          "group": "1_highwater@2"
+        },
+        {
+          "command": "highwater.disableTypewriterScrolling",
+          "when": "activeCustomEditorId == highwater.highlandEditor && config.highwater.typewriterScrolling",
+          "group": "1_highwater@2"
+        },
+        {
+          "command": "highwater.showSpellingChecks",
+          "when": "activeCustomEditorId == highwater.highlandEditor && !config.highwater.spellCheck",
           "group": "1_highwater@4"
         },
         {
-          "command": "highwater.togglePageBreaks",
-          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "command": "highwater.hideSpellingChecks",
+          "when": "activeCustomEditorId == highwater.highlandEditor && config.highwater.spellCheck",
+          "group": "1_highwater@4"
+        },
+        {
+          "command": "highwater.showPageBreaks",
+          "when": "activeCustomEditorId == highwater.highlandEditor && !config.highwater.pageBreaks",
+          "group": "1_highwater@3"
+        },
+        {
+          "command": "highwater.hidePageBreaks",
+          "when": "activeCustomEditorId == highwater.highlandEditor && config.highwater.pageBreaks",
+          "group": "1_highwater@3"
+        },
+        {
+          "command": "highwater.showInvisibles",
+          "when": "activeCustomEditorId == highwater.highlandEditor && !highwater.invisibles",
+          "group": "1_highwater@3"
+        },
+        {
+          "command": "highwater.hideInvisibles",
+          "when": "activeCustomEditorId == highwater.highlandEditor && highwater.invisibles",
           "group": "1_highwater@3"
         },
         {
