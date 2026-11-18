@@ -103,7 +103,7 @@ The panel's foot shows when the document was last saved and when the mirror last
 
 **In the Works panel**, every work is listed by where it is: on this computer, in the history only, or on the mirror only. Select a work to open or restore it and see its saves. Each work has a title, taken at its first save from its title page, its first heading (manuscripts) or its file name, as chosen in **Settings… → Backup**. Its **More** menu has these options:
 
-- **Rename…** gives the work a new title, typed on the card, and offers to rename its file too (the two can differ). The rename is recorded in its history, and your other computers offer to rename their copy of the file. Only works whose history is on this computer can be renamed.
+- **Rename…** gives the work a new title and, if you tick **Also change file name?**, its file a new name (the two can differ). The rename is recorded in its history, and your other computers offer to rename their copy of the file. Only works whose history is on this computer can be renamed.
 - **Remove from This Computer…** takes its history off this computer and leaves it on the mirror.
 - **Delete Writing History…** deletes it for good, everywhere or only here.
 

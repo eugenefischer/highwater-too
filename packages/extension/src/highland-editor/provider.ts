@@ -628,6 +628,12 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
         swapSoon(opened.input.uri);
       }
     }),
+    // For the end-to-end tests' log: when a script's text editor gets its cursor (a Search result's
+    // line arrives a moment after the editor itself; CI's Ubuntu run, 0.6.63).
+    vscode.window.onDidChangeTextEditorSelection((e) => {
+      if (!e.textEditor.document.languageId.startsWith("highland-")) return;
+      log(`selection ${e.textEditor.document.uri.path.split("/").pop()}: ${e.textEditor.document.offsetAt(e.selections[0]!.active)} (${e.kind === undefined ? "api" : vscode.TextEditorSelectionChangeKind[e.kind]})`);
+    }),
     // Also when a script's text tab comes to the front: the tab events don't always say it is active.
     vscode.window.onDidChangeActiveTextEditor((e) => {
       if (e && editorDefaults.highwater) swapSoon(e.document.uri);

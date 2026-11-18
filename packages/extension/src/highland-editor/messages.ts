@@ -171,7 +171,8 @@ export type ToPage =
   | { type: "assets"; items: AssetCard[]; available: boolean }
   | HistoryMessage
   | { type: "works"; items: WorkRow[]; mirror: MirrorStatus | null; computer: string }
-  | { type: "workSaves"; i: number; saves: WorkSaveRow[] };
+  | { type: "workSaves"; i: number; saves: WorkSaveRow[] }
+  | { type: "workRenamed"; i: number; error?: string };
 
 /** From the page to the extension. */
 export type FromPage =
@@ -224,7 +225,7 @@ export type FromPage =
   | { type: "historyRevert"; hash: string }
   | { type: "worksRefresh" }
   | { type: "workAction"; i: number; action: string }
-  | { type: "workRename"; i: number; title: string }
+  | { type: "workRename"; i: number; title: string; file?: string }
   | { type: "workSaves"; i: number };
 
 /** Sends a message to a Highwater Editor page (as `void panel.webview.postMessage(msg)`, typed). */

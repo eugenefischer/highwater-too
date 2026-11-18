@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import * as vscode from "vscode";
-import { ask, askText } from "./ask.ts";
+import { ask } from "./ask.ts";
 import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { splitBundlePath } from "./store.ts";
@@ -14,35 +14,32 @@ import type { WorksHost } from "./works.ts";
  * rename its file as well, when it next opens it.
  */
 
-/** Rename…: the title the writer typed on the Works card, then the file's name if they want. */
-export async function renameWork(host: WorksHost, work: { id: string | null; title: string; local: boolean }, here: string | undefined, typed: string): Promise<boolean> {
+/**
+ * Rename…: the title from the Rename window and, when the writer ticked "Also change file name?",
+ * the file's new name. Returns why it couldn't be done, or null once renamed.
+ */
+export async function renameWork(host: WorksHost, work: { id: string | null; title: string; local: boolean }, here: string | undefined, typed: string, newFile?: string): Promise<string | null> {
   const title = typed.replace(/\s+/g, " ").trim();
-  if (!work.id || !work.local || !title || title === work.title) return false;
+  if (!work.id || !work.local) return "Only a work whose history is on this computer can be renamed.";
+  if (!title) return "Type a title.";
   let file: string | undefined;
-  if (here) {
-    const name = basename(here);
-    const choice = await ask(
-      "info",
-      `Rename the file too?`,
-      { modal: true, detail: `“${title}” is kept in ${name}. A file's name doesn't have to match its work's title.` },
-      "Rename File…",
-      "Keep File Name",
-    );
-    if (!choice) return false;
-    if (choice === "Rename File…") {
-      const chosen = await askFileName(here, title);
-      if (chosen === undefined) return false;
-      if (chosen !== name) file = chosen;
-    }
+  if (here && newFile !== undefined) {
+    const ext = extname(here);
+    file = withExtension(newFile.trim(), ext);
+    if (!file.slice(0, file.length - ext.length).trim()) return "Type a file name.";
+    if (/[/\\:]/.test(file)) return "A file name can’t contain / \\ or :.";
+    if (file === basename(here)) file = undefined;
+    else if (existsSync(join(dirname(here), file))) return `${file} is already in that folder.`;
   }
+  if (title === work.title && !file) return null;
   const h = host.history();
   if (here && file) {
     const moved = await renameWorkFile(host, here, file, work.id);
-    if (!moved) return false;
+    if (!moved) return `${basename(here)} could not be renamed.`;
   }
   await h.rename(work.id, title, file ? { file } : {});
   await recorded(host);
-  return true;
+  return null;
 }
 
 /**
@@ -70,29 +67,6 @@ export async function offerFileRename(host: WorksHost, key: string, id: string):
     await renameWorkFile(host, key, offer.file, id);
     host.changed();
   }
-}
-
-/** The file's new name, in the same folder and with the same extension; undefined if cancelled. */
-async function askFileName(path: string, title: string): Promise<string | undefined> {
-  const ext = extname(path);
-  const suggested = `${title.replace(/[/\\:*?"<>|]+/g, "-").replace(/^\.+/, "").trim() || "Untitled"}${ext}`;
-  const answer = await askText({
-    title: "Rename the File",
-    prompt: `The new name for ${basename(path)} (in the same folder)`,
-    value: suggested,
-    valueSelection: [0, suggested.length - ext.length],
-    validateInput: (value) => {
-      const name = withExtension(value.trim(), ext);
-      if (!value.trim() || name === ext) return "Type a name.";
-      if (/[/\\:]/.test(name)) return "A file name can't contain / \\ or :.";
-      if (name !== basename(path) && existsSync(join(dirname(path), name))) return `${name} is already in this folder.`;
-      return null;
-    },
-  });
-  if (answer === undefined) return undefined;
-  const name = withExtension(answer.trim(), ext);
-  if (!answer.trim() || /[/\\:]/.test(name) || (name !== basename(path) && existsSync(join(dirname(path), name)))) return undefined;
-  return name;
 }
 
 const withExtension = (name: string, ext: string) => (name.toLowerCase().endsWith(ext.toLowerCase()) ? name : `${name}${ext}`);

@@ -21,11 +21,8 @@ export class WorksPanel {
   #rows: WorkRow[] = [];
   #selected: number | null = null;
   #saves: WorkSaveRow[] | null = null;
-  /** The work whose title is being edited (Rename…), and what has been typed so far. */
-  #renaming: number | null = null;
-  #renameText = "";
-  /** Set while the list is rebuilt: the title box leaving the page then is not the writer clicking away. */
-  #rebuilding = false;
+  /** The open Rename window, while it waits for the extension to say how renaming went. */
+  #rename: RenameWindow | null = null;
 
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
@@ -64,7 +61,6 @@ export class WorksPanel {
     this.#rows = rows;
     const again = was ? rows.find((w) => w.title === was.title && w.kind === was.kind) : undefined;
     this.#selected = again?.i ?? null;
-    if (this.#renaming !== null) this.#renaming = again ? again.i : null;
     this.#saves = null;
     if (again && again.kind !== "remote") this.deps.post({ type: "workSaves", i: again.i });
     const note = $("worknote");
@@ -106,7 +102,6 @@ export class WorksPanel {
   deselect(): void {
     if (this.#selected === null) return;
     this.#selected = null;
-    this.#renaming = null;
     this.#saves = null;
     this.#render();
   }
@@ -139,12 +134,7 @@ export class WorksPanel {
       out.push(h);
       for (const w of works) out.push(this.#card(w));
     }
-    this.#rebuilding = true;
-    try {
-      this.#list.replaceChildren(...out);
-    } finally {
-      this.#rebuilding = false;
-    }
+    this.#list.replaceChildren(...out);
   }
 
   #card(w: WorkRow): HTMLElement {
@@ -155,13 +145,10 @@ export class WorksPanel {
     card.setAttribute("aria-selected", String(selected));
     const main = document.createElement("div");
     main.className = "sb-row-main";
-    if (w.i === this.#renaming) main.append(this.#titleEditor(w));
-    else {
-      const title = document.createElement("span");
-      title.className = "sb-row-title";
-      title.textContent = w.title;
-      main.append(title);
-    }
+    const title = document.createElement("span");
+    title.className = "sb-row-title";
+    title.textContent = w.title;
+    main.append(title);
     card.append(main);
     // The file's name, then when it was last saved and how long it is.
     for (const line of [w.file, [w.at ? `Saved ${shortWhen(new Date(w.at))}` : "", w.words ? `${w.words} words` : ""].filter(Boolean).join(" · ")]) {
@@ -182,65 +169,28 @@ export class WorksPanel {
       ...(w.kind !== "remote" ? [{ label: "Rename…", command: "rename" }, { label: "Remove from This Computer…", command: "remove" }] : []),
       { label: "Delete Writing History…", command: "delete", danger: true },
     ];
-    const more = button("More", MORE_ICON, () => openMenu(more, menu, (name) => (name === "rename" ? this.#startRename(w) : action(name))));
+    const more = button("More", MORE_ICON, () => openMenu(more, menu, (name) => (name === "rename" ? this.#openRename(w) : action(name))));
     tools.append(more);
     card.append(tools);
     if (selected) card.append(this.#savesOf(w));
     card.addEventListener("mousedown", (e) => {
-      if ((e.target as HTMLElement).closest("button, input, .work-saves")) return;
+      if ((e.target as HTMLElement).closest("button, .work-saves")) return;
       this.#select(w.i, false);
     });
     return card;
   }
 
-  /** Rename…: the title becomes a text box on the card. Enter keeps the new title; Escape or clicking away doesn't. */
-  #startRename(w: WorkRow): void {
-    this.#renaming = w.i;
-    this.#renameText = w.title;
-    if (this.#selected !== w.i) this.#select(w.i, false);
-    else this.#render();
-    const input = this.#list.querySelector<HTMLInputElement>(".work-title-edit");
-    input?.focus();
-    input?.select();
+  /** Rename…: a window with the title, and the file's name when the writer ticks the box. */
+  #openRename(w: WorkRow): void {
+    this.#rename?.close();
+    this.#rename = new RenameWindow(w, (title, file) => this.deps.post({ type: "workRename", i: w.i, title, ...(file !== undefined ? { file } : {}) }), () => (this.#rename = null));
   }
 
-  #titleEditor(w: WorkRow): HTMLInputElement {
-    const input = document.createElement("input");
-    input.type = "text";
-    input.className = "work-title-edit";
-    input.value = this.#renameText;
-    input.setAttribute("aria-label", "Title");
-    input.spellcheck = false;
-    const stop = () => {
-      this.#renaming = null;
-      this.#render();
-      this.#list.focus();
-    };
-    input.addEventListener("input", () => (this.#renameText = input.value));
-    input.addEventListener("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const title = input.value.trim();
-        // The card shows the new title until the works come back with it.
-        if (title && title !== w.title) {
-          w.title = title;
-          this.deps.post({ type: "workRename", i: w.i, title });
-        }
-        stop();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        stop();
-      }
-    });
-    input.addEventListener("blur", () => {
-      if (this.#renaming === w.i && !this.#rebuilding) stop();
-    });
-    // Rebuilt (the works refreshed) while editing: carry on where the writer was.
-    queueMicrotask(() => {
-      if (this.#renaming === w.i && document.activeElement !== input && input.isConnected) input.focus();
-    });
-    return input;
+  /** The extension renamed the work (the window closes), or says why it couldn't (the window stays). */
+  renamed(i: number, error?: string): void {
+    if (!this.#rename || this.#rename.work.i !== i) return;
+    if (error) this.#rename.failed(error);
+    else this.#rename.close();
   }
 
   /** A selected work's saves, newest first: a record to read, not clickable. */
@@ -274,5 +224,125 @@ export class WorksPanel {
       box.append(row);
     }
     return box;
+  }
+}
+
+/**
+ * The Rename window (EJ, 0.6.65): the work's title, and "Also change file name?", which makes the
+ * file's name editable. Rename does both; Cancel or Escape does nothing.
+ */
+class RenameWindow {
+  readonly #root = document.createElement("div");
+  readonly #title: HTMLInputElement;
+  readonly #change: HTMLInputElement | null;
+  readonly #file: HTMLInputElement | null;
+  readonly #error: HTMLElement;
+  readonly #ok: HTMLButtonElement;
+  readonly #ext: string;
+
+  constructor(
+    readonly work: WorkRow,
+    private readonly submit: (title: string, file: string | undefined) => void,
+    private readonly closed: () => void,
+  ) {
+    // Only a work whose file is here has a file name to change.
+    const hasFile = work.kind === "here" && !!work.file;
+    this.#ext = /\.[^.]+$/.exec(work.file)?.[0] ?? "";
+    this.#root.id = "renamewin";
+    this.#root.setAttribute("role", "dialog");
+    this.#root.setAttribute("aria-label", "Rename Work");
+    this.#root.innerHTML = `<div class="tw-sheet rn-sheet">
+  <div class="tw-head"><h1>Rename Work</h1></div>
+  <div class="rn-body">
+    <label class="rn-row"><span>Title:</span><input type="text" class="rn-title" spellcheck="false"></label>
+    ${hasFile ? `<label class="rn-check"><input type="checkbox" class="rn-change"> Also change file name?</label>
+    <label class="rn-row"><span>File name:</span><input type="text" class="rn-file" spellcheck="false" disabled></label>` : ""}
+    <div class="rn-error" role="alert" hidden></div>
+  </div>
+  <div class="rn-foot"><button class="rn-cancel">Cancel</button><button class="rn-ok">Rename</button></div>
+</div>`;
+    const q = <T extends HTMLElement>(sel: string) => this.#root.querySelector<T>(sel);
+    this.#title = q<HTMLInputElement>(".rn-title")!;
+    this.#change = q<HTMLInputElement>(".rn-change");
+    this.#file = q<HTMLInputElement>(".rn-file");
+    this.#error = q<HTMLElement>(".rn-error")!;
+    this.#ok = q<HTMLButtonElement>(".rn-ok")!;
+    this.#title.value = work.title;
+    if (this.#file) this.#file.value = work.file;
+    this.#change?.addEventListener("change", () => {
+      this.#file!.disabled = !this.#change!.checked;
+      if (this.#change!.checked) {
+        this.#file!.focus();
+        this.#file!.setSelectionRange(0, Math.max(0, this.#file!.value.length - this.#ext.length));
+      }
+      this.#check();
+    });
+    for (const input of [this.#title, this.#file]) input?.addEventListener("input", () => this.#check());
+    q<HTMLButtonElement>(".rn-cancel")!.onclick = () => this.close();
+    this.#ok.onclick = () => this.#go();
+    this.#root.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.close();
+      } else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement)) {
+        e.preventDefault();
+        this.#go();
+      }
+    });
+    // A click outside the sheet does nothing (as with the Settings window): Cancel or Escape closes it.
+    document.body.append(this.#root);
+    this.#check();
+    this.#title.focus();
+    this.#title.select();
+  }
+
+  /** What would be done, or why not: the Rename button follows it. */
+  #problem(): string | null {
+    const title = this.#title.value.trim();
+    if (!title) return "Type a title.";
+    const file = this.#fileName();
+    if (file !== undefined) {
+      if (!file.slice(0, file.length - this.#ext.length).trim()) return "Type a file name.";
+      if (/[/\\:]/.test(file)) return "A file name can’t contain / \\ or :.";
+    }
+    return null;
+  }
+
+  /** The new file name (with the work's extension), when the box is ticked and it differs. */
+  #fileName(): string | undefined {
+    if (!this.#change?.checked || !this.#file) return undefined;
+    let name = this.#file.value.trim();
+    if (this.#ext && !name.toLowerCase().endsWith(this.#ext.toLowerCase())) name += this.#ext;
+    return name === this.work.file ? undefined : name;
+  }
+
+  #check(): void {
+    const problem = this.#problem();
+    const unchanged = this.#title.value.trim() === this.work.title && this.#fileName() === undefined;
+    this.#ok.disabled = problem !== null || unchanged;
+    this.#error.hidden = true;
+  }
+
+  #go(): void {
+    if (this.#ok.disabled) return;
+    const problem = this.#problem();
+    if (problem) return this.failed(problem);
+    this.#ok.disabled = true;
+    this.#ok.textContent = "Renaming…";
+    this.submit(this.#title.value.trim(), this.#fileName());
+  }
+
+  failed(message: string): void {
+    this.#ok.textContent = "Rename";
+    this.#check();
+    this.#error.textContent = message;
+    this.#error.hidden = false;
+  }
+
+  close(): void {
+    if (!this.#root.isConnected) return;
+    this.#root.remove();
+    this.closed();
   }
 }

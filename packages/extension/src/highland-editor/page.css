@@ -158,7 +158,6 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .work-card.selected .sb-row-main { padding-right: 52px; }
 .work-card .sb-row-tools { position: absolute; top: 2px; right: 3px; display: none; }
 .work-card.selected .sb-row-tools { display: flex; }
-#sidebar .work-title-edit { width: 100%; box-sizing: border-box; font: inherit; font-weight: 600; padding: 1px 4px; margin: -2px 0 -2px -5px; color: var(--nav-fg); background: var(--nav-bg, transparent); border: 1px solid var(--hl-accent); border-radius: 4px; outline: none; user-select: text; }
 .work-card.work-local .sb-row-title, .work-card.work-remote .sb-row-title { font-weight: 500; color: color-mix(in srgb, var(--nav-fg) 75%, var(--nav-muted)); }
 .work-saves { margin: 4px -4px 0; padding-top: 4px; border-top: 1px solid color-mix(in srgb, var(--nav-muted) 25%, transparent); max-height: 230px; overflow-y: auto; }
 .work-save { display: flex; gap: 6px; align-items: baseline; padding: 3px 4px; }
@@ -168,7 +167,7 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 .work-saves .sb-row-detail { padding: 3px 4px; white-space: normal; }
 #workrefresh.busy svg { animation: sb-spin 0.9s linear infinite; }
 #sbmenu button.danger { color: var(--vscode-errorForeground, #f48771); }
-#sbmenu button.danger:hover, #sbmenu button.danger:focus { background: var(--vscode-errorForeground, #f48771); color: var(--hl-bg); }
+#sbmenu button.danger:hover, #sbmenu button.danger:focus-visible { background: var(--vscode-errorForeground, #f48771); color: var(--hl-bg); }
 /* Highland's eye popover for the Navigator: what it lists, above the eye button. */
 #navpop { position: fixed; z-index: 45; padding: 10px 12px 10px; background: var(--hl-bg); color: var(--nav-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); font-family: var(--vscode-font-family); font-size: 13px; }
 #navpop[hidden] { display: none; }
@@ -183,7 +182,8 @@ section.dropping .sb-scroll { outline: 2px dashed color-mix(in srgb, var(--nav-a
 #sbmenu { position: fixed; z-index: 45; min-width: 200px; max-width: calc(var(--sb-width) + 120px); padding: 4px; background: var(--hl-bg); color: var(--nav-fg); border: 1px solid color-mix(in srgb, var(--nav-muted) 45%, transparent); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); font-family: var(--vscode-font-family); font-size: 13px; }
 #sbmenu[hidden] { display: none; }
 #sbmenu button { display: block; width: 100%; text-align: left; padding: 4px 10px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; cursor: default; white-space: nowrap; }
-#sbmenu button:hover, #sbmenu button:focus { background: var(--nav-accent); color: var(--hl-bg); outline: none; }
+#sbmenu:focus { outline: none; }
+#sbmenu button:hover, #sbmenu button:focus-visible { background: var(--nav-accent); color: var(--hl-bg); outline: none; }
 #sbmenu hr { border: 0; border-top: 1px solid color-mix(in srgb, var(--nav-muted) 35%, transparent); margin: 4px 6px; }
 .sb-head { padding: 4px 14px 2px; color: var(--nav-muted); font-size: 0.85em; letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-rows { display: flex; flex-direction: column; gap: 2px; }
@@ -272,6 +272,24 @@ body:not(.previewing) #tbtext::after, body.previewing #tbpages::after { content:
 /* The theme window (Manage Themes…): your own themes, made, imported, edited. */
 #setwin { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; background: rgba(0, 0, 0, 0.35); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
 #setwin[hidden] { display: none; }
+/* The Works panel's Rename window. */
+#renamewin { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px; background: rgba(0, 0, 0, 0.35); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
+.rn-sheet { width: min(460px, 100%); }
+.rn-body { display: flex; flex-direction: column; gap: 10px; padding: 4px 20px 12px; }
+.rn-row { display: flex; align-items: center; gap: 10px; }
+.rn-row span { flex: 0 0 6.5em; text-align: right; }
+.rn-check { display: flex; align-items: center; gap: 6px; margin-left: calc(6.5em + 10px); }
+.rn-check input { accent-color: var(--hl-accent); }
+#renamewin input[type="text"] { flex: 1; min-width: 0; font: inherit; padding: 4px 8px; color: var(--hl-panel-fg); background: color-mix(in srgb, var(--hl-panel-fg) 6%, var(--hl-panel-bg)); border: 1px solid var(--hl-border); border-radius: 5px; outline: none; }
+#renamewin input[type="text"]:focus { border-color: var(--hl-accent); }
+#renamewin input[type="text"]:disabled { color: var(--hl-muted); opacity: 0.6; }
+#renamewin input::selection { background: color-mix(in srgb, var(--hl-accent) 30%, var(--hl-panel-bg)); color: var(--hl-panel-fg); }
+.rn-error { margin-left: calc(6.5em + 10px); color: var(--vscode-errorForeground, #f48771); font-size: 0.92em; }
+.rn-error[hidden] { display: none; }
+.rn-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 20px 16px; }
+#renamewin .rn-foot button { font: inherit; padding: 4px 14px; border: 1px solid var(--hl-border); border-radius: 5px; background: color-mix(in srgb, var(--hl-panel-fg) 8%, transparent); color: inherit; cursor: pointer; }
+#renamewin .rn-foot .rn-ok { border-color: transparent; background: var(--hl-accent); color: var(--hl-accent-fg); }
+#renamewin .rn-foot .rn-ok:disabled { opacity: 0.5; cursor: default; }
 /* The Settings window: tabs under the title, then the tab's pane. */
 .st-sheet { width: min(860px, 100%); }
 .st-tabs { display: flex; justify-content: center; gap: 4px; padding: 0 16px 10px; border-bottom: 1px solid var(--hl-border); }

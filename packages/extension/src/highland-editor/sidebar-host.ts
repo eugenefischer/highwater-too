@@ -341,9 +341,10 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
       else if (msg.type === "workRename" && typeof msg.i === "number" && typeof msg.title === "string") {
         const node = workNodes[msg.i];
-        if (node && historyApi) void historyApi.works.rename(node, msg.title).then((done) => !done && void sendWorks());
-      }
-      else return false;
+        const i = msg.i;
+        const file = typeof msg.file === "string" ? msg.file : undefined;
+        if (node && historyApi) void historyApi.works.rename(node, msg.title, file).then((error) => post({ type: "workRenamed", i, ...(error ? { error } : {}) }));
+      } else return false;
       return true;
     },
     ready() {

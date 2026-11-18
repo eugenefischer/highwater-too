@@ -72,13 +72,12 @@ export class Works {
     this.#host.changed();
   }
 
-  /** Rename…: a new title (an entry in the work's history), and the file's name too if the writer wants. True if renamed. */
-  async rename(node: Node, title: string): Promise<boolean> {
+  /** Rename…: a new title (an entry in the work's history), and the file's new name if given. Why it couldn't, or null. */
+  async rename(node: Node, title: string, file?: string): Promise<string | null> {
     try {
-      return await renameWork(this.#host, node.work, node.here, title);
+      return await renameWork(this.#host, node.work, node.here, title, file);
     } catch (error) {
-      void vscode.window.showErrorMessage(`${node.work.title} could not be renamed: ${(error as Error).message}`);
-      return false;
+      return (error as Error).message;
     } finally {
       this.#host.changed();
     }

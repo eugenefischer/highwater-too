@@ -103,6 +103,7 @@ export class Sidebar {
     else if (msg.type === "history") this.#history.show(msg);
     else if (msg.type === "works") this.#works.show(msg.items, msg.mirror ?? null, typeof msg.computer === "string" ? msg.computer : "");
     else if (msg.type === "workSaves") this.#works.saves(msg.i, msg.saves);
+    else if (msg.type === "workRenamed") this.#works.renamed(msg.i, msg.error);
     else if (msg.type === "showPanel" && PANELS.includes(msg.panel)) this.show(msg.panel);
     else if (msg.type === "toggleSidebar") this.toggle();
     else return false;

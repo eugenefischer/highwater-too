@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.64
+
+- **Rename…** opens a Rename window instead of editing the title on the card: the title, and **Also change file name?**, which makes the file's name editable. **Rename** does both; Cancel or Escape does nothing. If the file can't be renamed (a file of that name is already there, say), the window says why and stays open.
+- The sidebar's menus (a Works card's More, the Writing History gear) open with no item highlighted. The pointer, or ↓ and ↑, picks one.
+
 ## 0.6.63
 
 - **Work titles.** Each work in the writing history has a title of its own, apart from its file's name.

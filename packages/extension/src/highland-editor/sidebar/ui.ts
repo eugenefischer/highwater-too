@@ -139,7 +139,10 @@ export function openMenu(anchor: HTMLElement, items: MenuItem[], pick: (command:
   const h = menu.offsetHeight;
   menu.style.left = `${Math.round(Math.max(4, Math.min(window.innerWidth - w - 4, r.right - w)))}px`;
   menu.style.top = `${Math.round(r.top - h - 6 >= 4 ? r.top - h - 6 : r.bottom + 6)}px`;
-  menu.querySelector<HTMLElement>("button")?.focus();
+  // Nothing is chosen until the pointer or an arrow key picks an item (EJ); the menu itself takes
+  // the keys meanwhile.
+  menu.tabIndex = -1;
+  menu.focus({ preventScroll: true });
   const away = (e: MouseEvent) => {
     if (!menu.contains(e.target as Node) && e.target !== anchor && !anchor.contains(e.target as Node)) closeMenu();
   };
@@ -152,7 +155,8 @@ export function openMenu(anchor: HTMLElement, items: MenuItem[], pick: (command:
       anchor.focus();
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      buttons[(i + (e.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+      const next = i < 0 ? (e.key === "ArrowDown" ? 0 : buttons.length - 1) : (i + (e.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length;
+      buttons[next]?.focus();
     }
   };
   document.addEventListener("mousedown", away, true);
