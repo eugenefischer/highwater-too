@@ -339,6 +339,10 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       } else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");
       else if (msg.type === "workAction" && typeof msg.i === "number" && typeof msg.action === "string") void workAction(msg.i, msg.action);
       else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
+      else if (msg.type === "workRename" && typeof msg.i === "number" && typeof msg.title === "string") {
+        const node = workNodes[msg.i];
+        if (node && historyApi) void historyApi.works.rename(node, msg.title).then((done) => !done && void sendWorks());
+      }
       else return false;
       return true;
     },

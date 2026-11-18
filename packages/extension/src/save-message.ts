@@ -11,5 +11,7 @@ export function parseSave(message: string): { kind: string; note: string; delta:
   const m = /(?:^|, )([+−-])([\d,]+) words \(([\d,]+)\)$/.exec(rest);
   if (!m) return { kind, note: rest, delta: "", words: "" };
   rest = rest.slice(0, m.index);
+  // A rename changes no words: its note says what it did.
+  if (kind === "Rename") return { kind, note: rest, delta: "", words: m[3]! };
   return { kind, note: rest, delta: `${m[1] === "+" ? "+" : "−"}${m[2]}`, words: m[3]! };
 }

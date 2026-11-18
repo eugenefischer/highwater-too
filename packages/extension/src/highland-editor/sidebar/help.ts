@@ -53,7 +53,7 @@ export const WORKS_HELP = `
 <li><b>Local history only</b>: the history is on this computer, but the file isn’t where it was last saved. It may have been moved, renamed or deleted.</li>
 <li><b>Mirror only</b>: the work was saved on another computer, and its history is on the mirror.</li>
 </ul>
-<p>Each shows its file name, when it was last saved, and its word count.</p>
+<p>Each shows its title, its file name, when it was last saved, and its word count. A new work takes its title at its first save, from its title page or file name (Settings → Backup).</p>
 
 <h3>A work</h3>
 <p>Click a work to see its saves, then:</p>
@@ -63,6 +63,7 @@ export const WORKS_HELP = `
 <li>Its saves are listed to show its history. To compare with one or revert to it, open the work, then use its Writing History.</li>
 <li>${icon(MORE_ICON)} <b>More</b>:
 <ul>
+<li><b>Rename</b>: gives the work a new title. Type it on the card and press Return (Escape cancels). You can rename its file too, with a name of its own. The rename is listed among the work’s saves, and your other computers offer to rename their copy of the file the next time it’s opened. Only works whose history is on this computer can be renamed.</li>
 <li><b>Remove from This Computer</b>: removes the work’s history from this computer. It stays on the mirror, so you can restore it later. You need a mirror to do this.</li>
 <li><b>Delete Writing History</b>: deletes the work’s history for good. With a mirror, you choose whether to delete it everywhere or only on this computer. The file itself is never deleted.</li>
 </ul></li>

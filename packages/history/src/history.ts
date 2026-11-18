@@ -4,7 +4,7 @@ import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/pro
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { git, gitBytes } from "./git.ts";
-import { addDeletion, addSave, mergeMain, readCatalog, type CatalogEntry, type MainFiles } from "./catalog.ts";
+import { addDeletion, addSave, mergeMain, readCatalog, withTitle, type CatalogEntry, type MainFiles } from "./catalog.ts";
 
 /**
  * The writing history (M7): one git repository in the history folder, with one branch per
@@ -41,6 +41,11 @@ export interface SaveMeta {
   form: Form;
   /** The file's name (not its path, which differs from computer to computer). */
   file: string;
+  /**
+   * The work's title, used at its first save only (afterwards only Rename changes it). Missing or
+   * empty: the file's name without its extension.
+   */
+  title?: string;
 }
 
 /** A work in the history: indexed on this computer, or pulled from another one. */
@@ -97,6 +102,8 @@ export interface IndexEntry {
   paths: string[];
   /** History turned off for this document. */
   paused?: boolean;
+  /** The latest rename with a new file name already answered here (renamed, or kept the name). */
+  renameAnswered?: string;
 }
 
 interface Index {
@@ -127,12 +134,22 @@ export interface CopyCandidate {
 /**
  * "convert": the work moved to another kind of file; "revert": an older save was brought back;
  * "restore": the work was written out on a computer that did not have it; "connect": the writer
- * connected a file to the work by hand (Connect to a Work's History). These four are recorded even
- * when no file changed.
+ * connected a file to the work by hand (Connect to a Work's History); "rename": the work was
+ * given a new title (made by `rename`, never by a save). These are recorded even when no file
+ * changed.
  */
-export type SaveKind = "save" | "autosave" | "close" | "convert" | "revert" | "restore" | "connect";
+export type SaveKind = "save" | "autosave" | "close" | "convert" | "revert" | "restore" | "connect" | "rename";
 
-const ALWAYS_RECORDED: SaveKind[] = ["convert", "revert", "restore", "connect"];
+const ALWAYS_RECORDED: SaveKind[] = ["convert", "revert", "restore", "connect", "rename"];
+
+/** A rename that came from another computer with a new file name, not yet answered here. */
+export interface FileRename {
+  hash: string;
+  date: Date;
+  title: string;
+  /** The new file name. */
+  file: string;
+}
 
 export interface CommitInfo {
   hash: string;
@@ -167,9 +184,10 @@ commits are only added.
 
 ## Where the works are
 
-This \`main\` branch holds only this README. **Each work has its own branch** under \`works/\`, named after the file it
-was first saved as, followed by part of the work's ID (the name never changes, even if the file is renamed). To see a
-work, switch to its branch (in a web interface, use the branch menu).
+This \`main\` branch holds this README and a catalog of the works (\`works/\`, \`deleted/\`). **Each work has its own
+branch** under \`works/\`, named after the file it was first saved as, followed by part of the work's ID (the name never
+changes, even if the work or its file is renamed). The table gives each work's title, which Highwater Too's *Rename…*
+changes. To see a work, switch to its branch (in a web interface, use the branch menu).
 
 | Work | Branch |
 |---|---|
@@ -183,7 +201,8 @@ others.
 One commit is one save. Its message says when, and how the word count changed, e.g.
 \`Save 2026-10-11 14:03, +120 words (4,567)\`. \`Autosave\` and \`Close\` mark automatic saves; \`Convert\` marks a work
 moving between a \`.highland\` file and a plain \`.fountain\`, \`.md\` or \`.txt\` file; \`Revert\` marks an older save
-brought back; \`Restore\` marks the work written out on a computer that did not have it.
+brought back; \`Restore\` marks the work written out on a computer that did not have it; \`Rename\` marks a new title
+(its files are the save before it, unchanged).
 
 A commit's files are exactly what is inside the \`.highland\` file, unpacked (zipped, they are that file):
 
@@ -201,7 +220,9 @@ Scratchpad (kept by Highwater Too, not in the file), an \`info.json\` for its se
 beside it.
 
 Each commit message ends with lines naming the work's ID (\`Highwater-Document:\`), the kind of file it was kept in
-(\`Highwater-Form:\` \`highland\`, \`fountain\`, \`md\` or \`txt\`) and the file's name (\`Highwater-File:\`). They are how
+(\`Highwater-Form:\` \`highland\`, \`fountain\`, \`md\` or \`txt\`) and the file's name (\`Highwater-File:\`). A work's
+first save and its renames also name its title (\`Highwater-Title:\`), and a rename that gave the file a new name says
+so (\`Highwater-Renamed-File:\`). They are how
 Highwater Too on another computer knows which document a branch belongs to. A commit titled *Join the history saved on another computer*
 joins saves made on two computers; its text is the later computer's.
 
@@ -302,17 +323,85 @@ export class History {
       if (parent && !ALWAYS_RECORDED.includes(kind) && (await this.#revParse(`${parent}^{tree}`)) === tree) return null;
       const before = parent ? await this.#read(parent, files.scriptName) : "";
       const message = commitMessage(kind, date, before, files.script, note);
+      // The work's title is set by its first save (afterwards only by a rename).
+      const title = parent ? null : oneLine(meta?.title ?? "") || entry.title;
       // The document's ID, form and file name ride along as trailers, so another computer can tell
       // which document a branch belongs to and what kind of file it is kept in.
-      const trailers = [`${ID_TRAILER}: ${id}`, ...(meta ? [`${FORM_TRAILER}: ${meta.form}`, `${FILE_TRAILER}: ${meta.file}`] : [])];
+      const trailers = [`${ID_TRAILER}: ${id}`, ...(meta ? [`${FORM_TRAILER}: ${meta.form}`, `${FILE_TRAILER}: ${meta.file}`] : []), ...(title ? [`${TITLE_TRAILER}: ${title}`] : [])];
       const hash = await this.#commitTree(tree, parent, `${message}\n\n${trailers.join("\n")}`, date);
       // Compare-and-swap: fails rather than losing a commit if the branch moved meanwhile.
       await git(this.repo, ["update-ref", ref, hash, parent ?? "0".repeat(40)]);
       if (meta) {
         const text = textHash(files.script);
-        await this.#pend({ id, branch: entry.branch, title: branchTitle(entry.branch), form: meta.form, file: meta.file, lastSave: date.toISOString(), latestText: text }, text);
+        const info = { id, branch: entry.branch, title: title ?? branchTitle(entry.branch), form: meta.form, file: meta.file, lastSave: date.toISOString(), latestText: text };
+        await this.#pend(title ? { ...info, titleAt: date.toISOString() } : info, text);
       }
       return { hash, date, message, ...(meta ?? {}) };
+    });
+  }
+
+  /**
+   * Gives a work a new title: a commit with the same files as its latest save (a rename changes no
+   * text), whose message and trailers carry the title and, when the writer renamed the file too,
+   * its new name. The catalog takes the title, and the latest rename wins on every computer.
+   */
+  rename(id: string, title: string, options: { file?: string; date?: Date } = {}): Promise<CommitInfo> {
+    return this.#serial(async () => {
+      await this.#init();
+      const index = await this.#load();
+      const entry = index.documents[id];
+      if (!entry) throw new Error(`No history for document ${id}`);
+      const name = oneLine(title);
+      if (!name) throw new Error("A work's title can't be empty.");
+      const ref = `refs/heads/${entry.branch}`;
+      const parent = await this.#revParse(ref);
+      if (!parent) throw new Error("This work has no saves yet.");
+      const date = options.date ?? new Date();
+      const last = (await this.#branchLog(entry.branch, 1))[0];
+      const text = await this.scriptAt(parent);
+      const form = last?.form ?? null;
+      const file = options.file ?? last?.file ?? null;
+      const renamedFile = options.file !== undefined && options.file !== last?.file;
+      const note = `to “${name}”${renamedFile ? `, file renamed to ${options.file}` : ""}`;
+      const message = commitMessage("rename", date, text, text, note);
+      const trailers = [`${ID_TRAILER}: ${id}`, ...(form ? [`${FORM_TRAILER}: ${form}`] : []), ...(file ? [`${FILE_TRAILER}: ${file}`] : []), `${TITLE_TRAILER}: ${name}`, ...(renamedFile ? [`${RENAMED_FILE_TRAILER}: ${options.file}`] : [])];
+      const tree = (await git(this.repo, ["rev-parse", `${parent}^{tree}`])).trim();
+      const hash = await this.#commitTree(tree, parent, `${message}\n\n${trailers.join("\n")}`, date);
+      await git(this.repo, ["update-ref", ref, hash, parent]);
+      // This computer has its answer to its own rename.
+      if (renamedFile) {
+        entry.renameAnswered = hash;
+        await this.#save(index);
+      }
+      const hashOfText = textHash(text);
+      await this.#pend({ id, branch: entry.branch, title: name, titleAt: date.toISOString(), form: form && isForm(form) ? form : null, file, lastSave: date.toISOString(), latestText: hashOfText }, hashOfText);
+      return { hash, date, message, ...(form ? { form } : {}), ...(file ? { file } : {}) };
+    });
+  }
+
+  /**
+   * The work's latest rename that gave its file a new name, when the file here (`fileName`) has
+   * another name and this computer has not answered it yet: a rename made on another computer, to
+   * offer here. Null otherwise.
+   */
+  async fileRename(id: string, fileName: string): Promise<FileRename | null> {
+    const entry = existsSync(this.repo) ? (await this.#load()).documents[id] : undefined;
+    if (!entry) return null;
+    const format = `%H%x00%aI%x00%(trailers:key=${TITLE_TRAILER},valueonly,separator=)%x00%(trailers:key=${RENAMED_FILE_TRAILER},valueonly,separator=)`;
+    const out = await git(this.repo, ["log", "-1", "-E", `--grep=^${RENAMED_FILE_TRAILER}: `, `--format=${format}`, `refs/heads/${entry.branch}`, "--"]).catch(() => "");
+    const [hash, date, title, file] = out.trim().split("\0").map((x) => x?.trim() ?? "");
+    if (!hash || !file || file === fileName || hash === entry.renameAnswered) return null;
+    return { hash, date: new Date(date!), title: title || branchTitle(entry.branch), file };
+  }
+
+  /** The writer answered a rename from another computer (renamed the file, or kept its name). */
+  answerFileRename(id: string, hash: string): Promise<void> {
+    return this.#serial(async () => {
+      const index = await this.#load();
+      const entry = index.documents[id];
+      if (!entry) return;
+      entry.renameAnswered = hash;
+      await this.#save(index);
     });
   }
 
@@ -374,7 +463,7 @@ export class History {
         if (seen.has(branch)) return;
         seen.add(branch);
         const c = catalog.get(branch);
-        out.push({ id: id ?? c?.id ?? null, branch, title: branchTitle(branch), latest: null, lastSave: c?.lastSave ? new Date(c.lastSave) : null, form: c?.form ?? null, file: c?.file ?? null, local: false, paths });
+        out.push({ id: id ?? c?.id ?? null, branch, title: c?.title || branchTitle(branch), latest: null, lastSave: c?.lastSave ? new Date(c.lastSave) : null, form: c?.form ?? null, file: c?.file ?? null, local: false, paths });
       };
       for (const [id, e] of Object.entries(index.documents)) add(id, e.branch, e.paths);
       for (const o of await this.#unindexed(index)) add(o.id, o.branch, []);
@@ -903,7 +992,7 @@ export class History {
   async #pend(info: Omit<CatalogEntry, "texts">, text: string): Promise<void> {
     const pending = await this.#pending();
     const old = pending[info.branch];
-    pending[info.branch] = { info, texts: [...new Set([...(old?.texts ?? []), text])] };
+    pending[info.branch] = { info: old ? withTitle(info, old.info, info) : info, texts: [...new Set([...(old?.texts ?? []), text])] };
     await writeFile(join(this.folder, PENDING), JSON.stringify(pending));
   }
 
@@ -1021,6 +1110,15 @@ export const ID_TRAILER = "Highwater-Document";
 /** The commit trailers naming the kind of file the work was kept in, and its name, at that save. */
 export const FORM_TRAILER = "Highwater-Form";
 export const FILE_TRAILER = "Highwater-File";
+/** The work's title, on its first save and on every rename. */
+export const TITLE_TRAILER = "Highwater-Title";
+/** A rename's new file name, when the writer renamed the file too. */
+export const RENAMED_FILE_TRAILER = "Highwater-Renamed-File";
+
+/** A title as one line, its spaces collapsed. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
 
 const FORMS: Form[] = ["highland", "fountain", "md", "txt"];
 export function isForm(value: string): value is Form {
@@ -1115,7 +1213,7 @@ export function commitMessage(kind: SaveKind, date: Date, before: string, after:
   const when = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   const words = wordCount(after);
   const delta = words - wordCount(before);
-  const label = { save: "Save", autosave: "Autosave", close: "Close", convert: "Convert", revert: "Revert", restore: "Restore", connect: "Connect" }[kind];
+  const label = { save: "Save", autosave: "Autosave", close: "Close", convert: "Convert", revert: "Revert", restore: "Restore", connect: "Connect", rename: "Rename" }[kind];
   return `${label} ${when}, ${note ? `${note}, ` : ""}${delta >= 0 ? "+" : "−"}${Math.abs(delta).toLocaleString("en-US")} words (${words.toLocaleString("en-US")})`;
 }
 

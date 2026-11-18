@@ -224,6 +224,7 @@ export type FromPage =
   | { type: "historyRevert"; hash: string }
   | { type: "worksRefresh" }
   | { type: "workAction"; i: number; action: string }
+  | { type: "workRename"; i: number; title: string }
   | { type: "workSaves"; i: number };
 
 /** Sends a message to a Highwater Editor page (as `void panel.webview.postMessage(msg)`, typed). */

@@ -4,7 +4,7 @@
  */
 export const PACKAGE_NAME = "@highwater/history";
 export { git, gitBytes, GitError } from "./git.ts";
-export { commitMessage, computerName, FILE_TRAILER, FORM_TRAILER, formOf, History, ID_TRAILER, isForm, textHash, readme, moveHistory, REPO_NAME, wordCount, type CommitInfo, type DocumentFiles, type Form, type SaveMeta, type IndexEntry, type SaveKind, type CopyCandidate, type HistoryOptions, type Recognition, type WorkInfo } from "./history.ts";
-export { addDeletion, addSave, mergeMain, readCatalog, slugOf, type CatalogEntry, type CatalogInfo, type DeletedEntry, type MainFiles } from "./catalog.ts";
+export { commitMessage, computerName, FILE_TRAILER, FORM_TRAILER, RENAMED_FILE_TRAILER, TITLE_TRAILER, formOf, History, ID_TRAILER, isForm, textHash, readme, moveHistory, REPO_NAME, wordCount, type CommitInfo, type DocumentFiles, type FileRename, type Form, type SaveMeta, type IndexEntry, type SaveKind, type CopyCandidate, type HistoryOptions, type Recognition, type WorkInfo } from "./history.ts";
+export { addDeletion, addSave, mergeMain, readCatalog, slugOf, withTitle, type CatalogEntry, type CatalogInfo, type DeletedEntry, type MainFiles } from "./catalog.ts";
 export { defaultHistoryFolder, syncedFolder } from "./location.ts";
 export { failureKind, Mirror, parseRemote, type FailureKind, type PullResult, type PushResult, type RemoteInfo, type Removed } from "./mirror.ts";

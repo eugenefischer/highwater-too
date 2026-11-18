@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.63
+
+- **Work titles.** Each work in the writing history has a title of its own, apart from its file's name.
+  - A new work takes its title at its first save: from its title page's **Title** (in a manuscript without one, its `CC` line), else (manuscripts only) its first top-level `#` heading, else its file's name. Choose which in **Settings → Backup** (Title New Works With). Works saved before this keep their old titles (their first file names).
+  - **Rename…** in a Works card's More menu: type the new title on the card and press Return (Escape or clicking away cancels). You're asked whether to rename the file too, with a name of its own. Only works whose history is on this computer can be renamed.
+  - A rename is an entry in the work's history (**Rename**, with the new title and any new file name), with Compare and Revert like any other row. It changes no text.
+  - On your other computers the new title arrives with the next sync. If the file was renamed too, opening the work there asks whether to rename that computer's file as well (once).
+  - A plain file's images folder keeps its name when the file is renamed, so the text's image links still work.
+
 ## 0.6.62
 
 - Settings → Backup: with Save Automatically set to **When I stop typing**, a field below it sets how many seconds without typing before the document saves (1 to 300; 1 by default).

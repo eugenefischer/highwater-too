@@ -144,7 +144,7 @@ class GeneralPane {
 </div>`;
     for (const seg of root.querySelectorAll<HTMLElement>(".st-seg"))
       for (const b of seg.querySelectorAll<HTMLButtonElement>("button")) b.onclick = () => this.#set(seg.dataset.key as keyof GeneralSettings, b.dataset.value!);
-    for (const input of root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.onchange = () => this.#set(input.dataset.key as keyof GeneralSettings, input.checked);
+    for (const input of root.querySelectorAll<HTMLInputElement>("input[type=checkbox][data-key]")) input.onchange = () => this.#set(input.dataset.key as keyof GeneralSettings, input.checked);
     const range = root.querySelector<HTMLInputElement>(".st-range")!;
     range.oninput = () => this.#set("invisiblesBrightness", Number(range.value));
     root.querySelector<HTMLButtonElement>(".st-restore")!.onclick = () => this.post({ type: "settingsRestore", tab: "general" });
@@ -172,7 +172,7 @@ class GeneralPane {
         b.classList.toggle("st-on", on);
         b.setAttribute("aria-checked", String(on));
       }
-    for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.checked = v[input.dataset.key!] === true;
+    for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox][data-key]")) input.checked = v[input.dataset.key!] === true;
     const range = this.root.querySelector<HTMLInputElement>(".st-range")!;
     if (document.activeElement !== range) range.value = String(v.invisiblesBrightness);
   }
@@ -350,6 +350,10 @@ class BackupPane {
   <div class="st-row st-pause-row"><span class="st-label"></span><label class="st-pause">after <input type="number" class="st-number" data-key="autoSavePause" min="${AUTO_SAVE_PAUSE.min}" max="${AUTO_SAVE_PAUSE.max}" step="1" aria-label="Seconds without typing"> seconds without typing</label></div>
   <div class="st-row"><span class="st-label"></span>${box("writingHistory", "Record writing history (every save)")}</div>
   <div class="st-row"><span class="st-label"></span>${box("saveOnExport", "Also record a save when exporting a PDF or Word file")}</div>
+  <div class="st-row"><span class="st-label">Title New Works With:</span>${box("titleFromTitlePage", "The title page’s Title")}</div>
+  <div class="st-row"><span class="st-label"></span>${box("titleFromHeading", "The first top-level heading (manuscripts only)")}</div>
+  <div class="st-row"><span class="st-label"></span><label class="st-check st-fixed"><input type="checkbox" checked disabled> The file name, when neither of those is there</label></div>
+  <div class="st-row"><span class="st-label"></span><span class="st-hint">A work takes its title at its first save. Rename… in Works changes it.</span></div>
   <div class="st-row"><span class="st-label">History Folder:</span><input type="text" class="st-path" readonly aria-label="History folder">${action("setFolder", "Set…")}</div>
   <div class="st-row"><span class="st-label"></span><span class="st-buttons"><button class="st-action st-reveal" data-action="revealFolder">Show in Finder</button></span></div>
   <div class="st-rule"></div>
@@ -360,7 +364,7 @@ class BackupPane {
   <div class="st-foot"><button class="st-restore">Restore Defaults</button></div>
 </div>`;
     for (const sel of root.querySelectorAll<HTMLSelectElement>(".st-select")) sel.onchange = () => this.#set(sel.dataset.key as keyof BackupSettings, sel.value);
-    for (const input of root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.onchange = () => this.#set(input.dataset.key as keyof BackupSettings, input.checked);
+    for (const input of root.querySelectorAll<HTMLInputElement>("input[type=checkbox][data-key]")) input.onchange = () => this.#set(input.dataset.key as keyof BackupSettings, input.checked);
     // The pause: a whole number of seconds; anything else goes back to the value it had.
     const pause = root.querySelector<HTMLInputElement>(".st-number")!;
     pause.onchange = () => {
@@ -395,7 +399,7 @@ class BackupPane {
   #fill(): void {
     const v = this.#values as unknown as Record<string, unknown>;
     for (const sel of this.root.querySelectorAll<HTMLSelectElement>(".st-select")) sel.value = String(v[sel.dataset.key!]);
-    for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) input.checked = v[input.dataset.key!] === true;
+    for (const input of this.root.querySelectorAll<HTMLInputElement>("input[type=checkbox][data-key]")) input.checked = v[input.dataset.key!] === true;
     // The pause shows only with "When I stop typing".
     this.root.querySelector<HTMLElement>(".st-pause-row")!.hidden = this.#values.autoSave !== "typing";
     const pause = this.root.querySelector<HTMLInputElement>(".st-number")!;

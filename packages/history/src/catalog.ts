@@ -5,7 +5,7 @@ import type { Form } from "./history.ts";
  * writing. One folder per work, so two computers changing it at once rarely touch the same files,
  * and fixed rules for when they do, so merging never needs a person:
  *
- *   works/<name>-<id8>/info.json   ID, branch, title, form, file name, last save, latest text hash
+ *   works/<name>-<id8>/info.json   ID, branch, title (and when it was set), form, file name, last save, latest text hash
  *   works/<name>-<id8>/texts       the text hash of every save, one per line, sorted (union on merge)
  *   deleted/<name>-<id8>.json      a deletion record (union on merge; removes the work's folder)
  *   README.md                      written from the catalog, never merged as text
@@ -14,6 +14,13 @@ export interface CatalogInfo {
   id: string;
   branch: string;
   title: string;
+  /**
+   * ISO time the title was set: the work's first save, or its latest rename. The title with the
+   * later time wins whatever the other fields do (an ordinary save made on a computer that has not
+   * heard of a rename yet keeps the rename's title). Absent on works recorded before titles were
+   * kept (their title is the branch's name).
+   */
+  titleAt?: string;
   form: Form | null;
   file: string | null;
   /** ISO time of the latest save. */
@@ -58,12 +65,26 @@ export function readCatalog(files: MainFiles): { works: CatalogEntry[]; deleted:
   return { works: works.filter((w) => !gone.has(w.branch)), deleted };
 }
 
+/**
+ * `base` with the title of whichever of `a` and `b` was set later (`a`'s when neither says, or
+ * both say the same time).
+ */
+export function withTitle<T extends CatalogInfo>(base: T, a: CatalogInfo, b: CatalogInfo): T {
+  const from = (b.titleAt ?? "") > (a.titleAt ?? "") ? b : a;
+  const out: T = { ...base, title: from.title };
+  if (from.titleAt) out.titleAt = from.titleAt;
+  else delete out.titleAt;
+  return out;
+}
+
 /** Adds a save to a work's entry (or creates it). */
 export function addSave(files: MainFiles, info: CatalogInfo, textHash: string): void {
   const slug = slugOf(info.branch);
   const old = parse<CatalogInfo>(files.get(`works/${slug}/info.json`) ?? "");
   const newer = !old?.lastSave || !info.lastSave || info.lastSave >= old.lastSave;
-  files.set(`works/${slug}/info.json`, stringify(newer ? info : old!));
+  const chosen = newer ? info : old!;
+  // An ordinary save carries no title time: the title already recorded stays.
+  files.set(`works/${slug}/info.json`, stringify(old ? withTitle(chosen, old, info) : chosen));
   files.set(`works/${slug}/texts`, joinLines([...lines(files.get(`works/${slug}/texts`) ?? ""), textHash]));
 }
 
@@ -85,7 +106,15 @@ export function mergeMain(mine: MainFiles, theirs: MainFiles): MainFiles {
     else if (/^works\/[^/]+\/info\.json$/.test(path)) {
       const a = parse<CatalogInfo>(here);
       const b = parse<CatalogInfo>(text);
-      if (!a || (b && (b.lastSave ?? "") > (a.lastSave ?? ""))) out.set(path, text);
+      if (!a) out.set(path, text);
+      else if (b) {
+        const theirsNewer = (b.lastSave ?? "") > (a.lastSave ?? "");
+        const winner = theirsNewer ? b : a;
+        const titled = withTitle(winner, a, b);
+        // The newer entry as written, unless the other one's title is the later one.
+        if (titled.title === winner.title && titled.titleAt === winner.titleAt) out.set(path, theirsNewer ? text : here);
+        else out.set(path, stringify(titled));
+      }
     }
     // deleted/ records are kept as either computer wrote them; anything else stays this computer's.
   }

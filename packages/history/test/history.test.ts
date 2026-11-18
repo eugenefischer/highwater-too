@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { commitMessage, formOf, History, mergeMain, moveHistory, textHash, wordCount } from "../src/index.ts";
+import { commitMessage, formOf, History, mergeMain, moveHistory, readCatalog, textHash, wordCount } from "../src/index.ts";
 
 const folder = () => mkdtemp(join(tmpdir(), "highwater-history-"));
 const script = "INT. HOUSE - DAY\n\nShe enters.\n\nBOB\nHello there.\n";
@@ -187,7 +187,7 @@ describe("plain files", () => {
     const back = await h.filesAt(c!.hash);
     expect(back.others?.map((o) => o.path)).toEqual(["assets/a.png", "info.json"]);
     expect(back.others?.find((o) => o.path === "info.json")?.data).toEqual(info);
-    expect(gitIn(h.repo, "log", "-1", "--format=%B", branch)).toBe(`Save 2026-10-12 09:00, +8 words (8)\n\nHighwater-Document: ${id}\nHighwater-Form: fountain\nHighwater-File: Script.fountain`);
+    expect(gitIn(h.repo, "log", "-1", "--format=%B", branch)).toBe(`Save 2026-10-12 09:00, +8 words (8)\n\nHighwater-Document: ${id}\nHighwater-Form: fountain\nHighwater-File: Script.fountain\nHighwater-Title: Script`);
     const [latest] = await h.log(id, 1);
     expect(latest).toMatchObject({ form: "fountain", file: "Script.fountain" });
     // An unchanged save is not recorded; a Restore (like Convert and Revert) always is.
@@ -352,5 +352,71 @@ describe("copies and moves", () => {
     const { rm } = await import("node:fs/promises");
     await rm(original);
     expect(await h.recognise({ id: null, path: copy, text: long })).toMatchObject([{ by: "hash", local: true, copyOf: null }]);
+  });
+});
+
+describe("titles and renames", () => {
+  const long = Array.from({ length: 60 }, (_, i) => `Line ${i} of the story.`).join("\n") + "\n";
+  const meta = (file: string, title?: string) => ({ form: formOf(file), file, ...(title !== undefined ? { title } : {}) });
+
+  it("takes a work's title at its first save only, from the host or else the file name", async () => {
+    const h = new History(await folder());
+    const a = await h.resolve({ id: null, path: "/w/story_draft.md", text: long });
+    await h.commit(a.id, { scriptName: "text.md", script: long }, "save", new Date(2026, 10, 1), undefined, meta("story_draft.md", "  The   Story\n"));
+    await h.commit(a.id, { scriptName: "text.md", script: `${long}More.\n` }, "save", new Date(2026, 10, 2), undefined, meta("story_draft.md", "Something Else"));
+    const b = await h.resolve({ id: null, path: "/w/Plain Name.fountain", text: long });
+    await h.commit(b.id, { scriptName: "text.fountain", script: long }, "save", new Date(2026, 10, 3), undefined, meta("Plain Name.fountain", ""));
+    const titles = Object.fromEntries((await h.works()).map((w) => [w.branch, w.title]));
+    expect(titles[a.branch]).toBe("The Story");
+    expect(titles[b.branch]).toBe("Plain Name");
+    // The branch keeps the file's name; the first commit names the title.
+    expect(a.branch).toMatch(/^works\/story-draft-/);
+    expect(gitIn(h.repo, "log", "--format=%(trailers:key=Highwater-Title,valueonly)", a.branch).split("\n").filter(Boolean)).toEqual(["The Story"]);
+  });
+
+  it("records a rename as a commit with unchanged files, and the catalog and README follow it", async () => {
+    const h = new History(await folder());
+    const doc = await h.resolve({ id: null, path: "/w/Astounding.highland", text: long });
+    await h.commit(doc.id, { scriptName: "text.fountain", script: long, bin: ["x"] }, "save", new Date(2026, 10, 1, 9, 0), undefined, meta("Astounding.highland"));
+    const r = await h.rename(doc.id, "Story Title", { file: "Story_Title.highland", date: new Date(2026, 10, 1, 9, 30) });
+    expect(r.message).toBe("Rename 2026-11-01 09:30, to “Story Title”, file renamed to Story_Title.highland, +0 words (60)".replace("(60)", `(${wordCount(long)})`));
+    expect(gitIn(h.repo, "rev-parse", `${r.hash}^{tree}`)).toBe(gitIn(h.repo, "rev-parse", `${r.hash}~1^{tree}`));
+    const log = await h.log(doc.id);
+    expect(log.map((c) => c.message.split(" ")[0])).toEqual(["Rename", "Save"]);
+    expect(log[0]).toMatchObject({ form: "highland", file: "Story_Title.highland" });
+    // An ordinary save afterwards keeps the title; nothing is "unchanged" about a rename.
+    await h.commit(doc.id, { scriptName: "text.fountain", script: `${long}More.\n`, bin: ["x"] }, "save", new Date(2026, 10, 1, 10, 0), undefined, meta("Story_Title.highland"));
+    expect((await h.works())[0]!.title).toBe("Story Title");
+    await h.flushCatalog();
+    expect(gitIn(h.repo, "show", "main:README.md")).toContain(`| Story Title | \`${doc.branch}\` |`);
+    // This computer renamed its own file: nothing to offer here.
+    expect(await h.fileRename(doc.id, "Story_Title.highland")).toBeNull();
+    expect(await h.fileRename(doc.id, "Astounding.highland")).toBeNull();
+    await expect(h.rename(doc.id, "  ")).rejects.toThrow();
+  });
+
+  it("offers another computer's file rename once, until it is answered", async () => {
+    const h = new History(await folder());
+    const doc = await h.resolve({ id: null, path: "/w/Astounding.highland", text: long });
+    await h.commit(doc.id, { scriptName: "text.fountain", script: long }, "save", new Date(2026, 10, 1), undefined, meta("Astounding.highland"));
+    await h.rename(doc.id, "Only the Title");
+    expect(await h.fileRename(doc.id, "Astounding.highland")).toBeNull();
+    const r = await h.rename(doc.id, "Story Title", { file: "Story_Title.highland" });
+    // As if made elsewhere: forget that this computer answered it.
+    await h.answerFileRename(doc.id, "none");
+    expect(await h.fileRename(doc.id, "Astounding.highland")).toMatchObject({ hash: r.hash, title: "Story Title", file: "Story_Title.highland" });
+    await h.answerFileRename(doc.id, r.hash);
+    expect(await h.fileRename(doc.id, "Astounding.highland")).toBeNull();
+  });
+
+  it("keeps the later title when computers' catalogs meet, whichever saved last", () => {
+    const info = (lastSave: string, title: string, titleAt?: string) => JSON.stringify({ id: "x", branch: "works/A-x", title, ...(titleAt ? { titleAt } : {}), form: "md", file: "A.md", lastSave, latestText: lastSave });
+    // Here: renamed at 10:00. There: saved at 11:00, not yet knowing of the rename.
+    const mine = new Map([["works/A-x/info.json", info("2026-11-01T10:00:00Z", "New", "2026-11-01T10:00:00Z")]]);
+    const theirs = new Map([["works/A-x/info.json", info("2026-11-01T11:00:00Z", "Old", "2026-11-01T08:00:00Z")]]);
+    for (const merged of [mergeMain(mine, theirs), mergeMain(theirs, mine)]) {
+      const [w] = readCatalog(merged).works;
+      expect(w).toMatchObject({ title: "New", titleAt: "2026-11-01T10:00:00Z", lastSave: "2026-11-01T11:00:00Z" });
+    }
   });
 });

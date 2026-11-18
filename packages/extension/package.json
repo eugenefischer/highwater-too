@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.62",
+  "version": "0.6.63",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -865,6 +865,16 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Exporting a PDF or Word file saves the document first if it has unsaved changes, so the version you sent out is in the writing history. Also in **Settings…** (Backup)."
+        },
+        "highwater.titleFromTitlePage": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "A new work's title (in Works and the writing history) is its title page's Title, taken at its first save. In a manuscript without a Title, its `CC` line. Otherwise the next choice, or the file's name. Also in **Settings…** (Backup)."
+        },
+        "highwater.titleFromHeading": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "A new manuscript with no title page Title takes its first top-level `#` heading as its title, at its first save (screenplays never do: their first `#` is usually an act). Also in **Settings…** (Backup)."
         },
         "highwater.mirrorSync": {
           "type": "string",

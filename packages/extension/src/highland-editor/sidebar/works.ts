@@ -21,6 +21,11 @@ export class WorksPanel {
   #rows: WorkRow[] = [];
   #selected: number | null = null;
   #saves: WorkSaveRow[] | null = null;
+  /** The work whose title is being edited (Rename…), and what has been typed so far. */
+  #renaming: number | null = null;
+  #renameText = "";
+  /** Set while the list is rebuilt: the title box leaving the page then is not the writer clicking away. */
+  #rebuilding = false;
 
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
@@ -59,6 +64,7 @@ export class WorksPanel {
     this.#rows = rows;
     const again = was ? rows.find((w) => w.title === was.title && w.kind === was.kind) : undefined;
     this.#selected = again?.i ?? null;
+    if (this.#renaming !== null) this.#renaming = again ? again.i : null;
     this.#saves = null;
     if (again && again.kind !== "remote") this.deps.post({ type: "workSaves", i: again.i });
     const note = $("worknote");
@@ -100,6 +106,7 @@ export class WorksPanel {
   deselect(): void {
     if (this.#selected === null) return;
     this.#selected = null;
+    this.#renaming = null;
     this.#saves = null;
     this.#render();
   }
@@ -132,7 +139,12 @@ export class WorksPanel {
       out.push(h);
       for (const w of works) out.push(this.#card(w));
     }
-    this.#list.replaceChildren(...out);
+    this.#rebuilding = true;
+    try {
+      this.#list.replaceChildren(...out);
+    } finally {
+      this.#rebuilding = false;
+    }
   }
 
   #card(w: WorkRow): HTMLElement {
@@ -143,10 +155,13 @@ export class WorksPanel {
     card.setAttribute("aria-selected", String(selected));
     const main = document.createElement("div");
     main.className = "sb-row-main";
-    const title = document.createElement("span");
-    title.className = "sb-row-title";
-    title.textContent = w.title;
-    main.append(title);
+    if (w.i === this.#renaming) main.append(this.#titleEditor(w));
+    else {
+      const title = document.createElement("span");
+      title.className = "sb-row-title";
+      title.textContent = w.title;
+      main.append(title);
+    }
     card.append(main);
     // The file's name, then when it was last saved and how long it is.
     for (const line of [w.file, [w.at ? `Saved ${shortWhen(new Date(w.at))}` : "", w.words ? `${w.words} words` : ""].filter(Boolean).join(" · ")]) {
@@ -162,19 +177,70 @@ export class WorksPanel {
     tools.append(
       w.kind === "here" ? button("Open", OPEN_ICON, () => action("open")) : button("Restore…", RESTORE_ICON, () => action("restore")),
     );
+    // Only a work whose history is on this computer can be renamed (EJ): a rename is one of its saves.
     const menu: MenuItem[] = [
-      ...(w.kind !== "remote" ? [{ label: "Remove from This Computer…", command: "remove" }] : []),
+      ...(w.kind !== "remote" ? [{ label: "Rename…", command: "rename" }, { label: "Remove from This Computer…", command: "remove" }] : []),
       { label: "Delete Writing History…", command: "delete", danger: true },
     ];
-    const more = button("More", MORE_ICON, () => openMenu(more, menu, action));
+    const more = button("More", MORE_ICON, () => openMenu(more, menu, (name) => (name === "rename" ? this.#startRename(w) : action(name))));
     tools.append(more);
     card.append(tools);
     if (selected) card.append(this.#savesOf(w));
     card.addEventListener("mousedown", (e) => {
-      if ((e.target as HTMLElement).closest("button, .work-saves")) return;
+      if ((e.target as HTMLElement).closest("button, input, .work-saves")) return;
       this.#select(w.i, false);
     });
     return card;
+  }
+
+  /** Rename…: the title becomes a text box on the card. Enter keeps the new title; Escape or clicking away doesn't. */
+  #startRename(w: WorkRow): void {
+    this.#renaming = w.i;
+    this.#renameText = w.title;
+    if (this.#selected !== w.i) this.#select(w.i, false);
+    else this.#render();
+    const input = this.#list.querySelector<HTMLInputElement>(".work-title-edit");
+    input?.focus();
+    input?.select();
+  }
+
+  #titleEditor(w: WorkRow): HTMLInputElement {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "work-title-edit";
+    input.value = this.#renameText;
+    input.setAttribute("aria-label", "Title");
+    input.spellcheck = false;
+    const stop = () => {
+      this.#renaming = null;
+      this.#render();
+      this.#list.focus();
+    };
+    input.addEventListener("input", () => (this.#renameText = input.value));
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const title = input.value.trim();
+        // The card shows the new title until the works come back with it.
+        if (title && title !== w.title) {
+          w.title = title;
+          this.deps.post({ type: "workRename", i: w.i, title });
+        }
+        stop();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        stop();
+      }
+    });
+    input.addEventListener("blur", () => {
+      if (this.#renaming === w.i && !this.#rebuilding) stop();
+    });
+    // Rebuilt (the works refreshed) while editing: carry on where the writer was.
+    queueMicrotask(() => {
+      if (this.#renaming === w.i && document.activeElement !== input && input.isConnected) input.focus();
+    });
+    return input;
   }
 
   /** A selected work's saves, newest first: a record to read, not clickable. */

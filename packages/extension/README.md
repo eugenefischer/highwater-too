@@ -101,8 +101,9 @@ Every save is recorded in a git repository on your computer, as a record of how 
 
 The panel's foot shows when the document was last saved and when the mirror last synced, beside Export and the ⚙ menu with the rest: syncing, connecting to another work, revealing the history folder, turning the history off or on for this document, and **Manage Writing History…**, which opens Settings → Backup. **Export Writing History…** writes one work's history as a file anyone can open with `git clone`.
 
-**In the Works panel**, every work is listed by where it is: on this computer, in the history only, or on the mirror only. Select a work to open or restore it and see its saves. Its **More** menu has two options:
+**In the Works panel**, every work is listed by where it is: on this computer, in the history only, or on the mirror only. Select a work to open or restore it and see its saves. Each work has a title, taken at its first save from its title page, its first heading (manuscripts) or its file name, as chosen in **Settings… → Backup**. Its **More** menu has these options:
 
+- **Rename…** gives the work a new title, typed on the card, and offers to rename its file too (the two can differ). The rename is recorded in its history, and your other computers offer to rename their copy of the file. Only works whose history is on this computer can be renamed.
 - **Remove from This Computer…** takes its history off this computer and leaves it on the mirror.
 - **Delete Writing History…** deletes it for good, everywhere or only here.
 
@@ -187,6 +188,8 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 | `highwater.autoSavePause` | 1 | With “when you stop typing”: the seconds without a change before saving. |
 | `highwater.writingHistory` | on | Record saves in the writing history. |
 | `highwater.saveOnExport` | on | Save a document with unsaved changes before exporting a PDF or Word file. |
+| `highwater.titleFromTitlePage` | on | A new work's title is its title page's Title (a manuscript's `CC` line without one). |
+| `highwater.titleFromHeading` | on | Else, for a manuscript, its first top-level heading; otherwise the file name. |
 | `highwater.mirrorSync` | after every save | When the writing history syncs with its mirror: after every save, every 5–60 minutes, or only on Sync. |
 | `highwater.historyFolder` | system default | Where the writing history and backups are kept. |
 | `highwater.historyRemote` | none | The git remote that mirrors the writing history. |

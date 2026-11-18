@@ -1,7 +1,8 @@
 import { basename } from "node:path";
 import { autoSaving } from "./auto-save.ts";
-import { mirrorSyncInterval } from "./highland-editor/backup-settings.ts";
-import { formOf, type CommitInfo, type SaveKind } from "@highwater/history";
+import { BACKUP_DEFAULTS, mirrorSyncInterval } from "./highland-editor/backup-settings.ts";
+import { workTitle } from "./work-title.ts";
+import { formOf, type CommitInfo, type SaveKind, type SaveMeta } from "@highwater/history";
 import * as vscode from "vscode";
 import { ask } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
@@ -13,6 +14,7 @@ import { focusedDocument } from "./focus.ts";
 import { deletedElsewhere, revertTo, Works, type WorksHost } from "./works.ts";
 import { highwaterOpener } from "./surface.ts";
 import { restoreCommands } from "./history-restore.ts";
+import { offerFileRename } from "./work-rename.ts";
 import { historyAt, historyRoot } from "./history-location.ts";
 import { historyRecords, type Instead } from "./history-records.ts";
 import { historyStatus } from "./history-status.ts";
@@ -95,6 +97,15 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     return run;
   };
 
+  /** The kind of file and its name; for a work's first save, its title too (Settings → Backup). */
+  async function metaOf(key: string, r: { id: string; files: { scriptName: string; script: string } }): Promise<SaveMeta> {
+    const meta: SaveMeta = { form: formOf(key), file: basename(key) };
+    if ((await history().log(r.id, 1)).length) return meta;
+    const c = vscode.workspace.getConfiguration("highwater");
+    const sources = { titlePage: c.get<boolean>("titleFromTitlePage", BACKUP_DEFAULTS.titleFromTitlePage), heading: c.get<boolean>("titleFromHeading", BACKUP_DEFAULTS.titleFromHeading) };
+    return { ...meta, title: workTitle(r.files.script, r.files.scriptName, basename(key), sources) };
+  }
+
   async function commitNow(key: string, kind: SaveKind, note?: string): Promise<void> {
     try {
       // A file this computer has no history for may belong to a work in the catalog: ask first.
@@ -103,7 +114,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       const next = kind === "save" || kind === "autosave" || kind === "close" ? connector.takeNext(key) : undefined;
       const r = await resolve(key);
       if (r.paused) return;
-      const c = await history().commit(r.id, r.files, next?.kind ?? kind, new Date(), next?.note ?? note, { form: formOf(key), file: basename(key) });
+      const c = await history().commit(r.id, r.files, next?.kind ?? kind, new Date(), next?.note ?? note, await metaOf(key, r));
       if (!key.toLowerCase().endsWith(".highland")) await extras.recorded(key, c?.hash ?? null);
       failures.delete(key);
       if (c) {
@@ -131,7 +142,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     try {
       const r = await resolve(key, instead);
       if (r.paused) return false;
-      const c = await history().commit(r.id, r.files, "save", new Date(), note, { form: formOf(key), file: basename(key) });
+      const c = await history().commit(r.id, r.files, "save", new Date(), note, await metaOf(key, r));
       if (c) {
         lastCommit.set(key, c.date);
         if (mirror.url) mirror.afterSave();
@@ -182,6 +193,12 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     void connector
       .check(key)
       .then(() => connector.offerLatest(key))
+      .then(async () => {
+        // A rename on another computer that gave the file a new name: offered here once.
+        const found = await lookup(key).catch(() => null);
+        if (found && !found.paused && !found.copyOf) await offerFileRename(worksHost, key, found.id);
+      })
+      .catch(() => {})
       .then(() => view.refresh());
     // Opening a document: bring in other computers' saves, at most once a minute.
     if (mirror.url && mirror.mode !== "manual" && Date.now() - mirror.lastPull > 60_000) void pulled(mirror.pull());

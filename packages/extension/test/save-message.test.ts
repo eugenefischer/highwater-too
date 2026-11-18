@@ -14,4 +14,7 @@ describe("parseSave", () => {
   it("keeps a join's message as its note", () => {
     expect(parseSave("Connect 2026-11-13 15:42, the history of Draft.highland joined\n\nHighwater-Document: x")).toEqual({ kind: "Connect", note: "the history of Draft.highland joined", delta: "", words: "" });
   });
+  it("reads a rename's note, with no change in words", () => {
+    expect(parseSave(commitMessage("rename", date, "a b c", "a b c", "to “Story Title”, file renamed to Story_Title.highland"))).toEqual({ kind: "Rename", note: "to “Story Title”, file renamed to Story_Title.highland", delta: "", words: "3" });
+  });
 });

@@ -14,6 +14,10 @@ export interface BackupSettings {
   saveOnExport: boolean;
   /** When the writing history is synced with its mirror. */
   mirrorSync: MirrorSync;
+  /** A new work takes its title from the title page's Title (at its first save). */
+  titleFromTitlePage: boolean;
+  /** Else, in a manuscript, from its first top-level heading; else the file's name. */
+  titleFromHeading: boolean;
 }
 
 /** The pause "When I stop typing" waits for, in whole seconds. */
@@ -52,6 +56,8 @@ export const BACKUP_DEFAULTS: BackupSettings = {
   writingHistory: true,
   saveOnExport: true,
   mirrorSync: "save",
+  titleFromTitlePage: true,
+  titleFromHeading: true,
 };
 
 /** Stored values made sound: unknown or missing values fall back to the defaults. */
@@ -71,6 +77,8 @@ export function backupSettings(read: (key: keyof BackupSettings) => unknown): Ba
     writingHistory: bool("writingHistory", BACKUP_DEFAULTS.writingHistory),
     saveOnExport: bool("saveOnExport", BACKUP_DEFAULTS.saveOnExport),
     mirrorSync: pick("mirrorSync", MIRROR_SYNCS, BACKUP_DEFAULTS.mirrorSync),
+    titleFromTitlePage: bool("titleFromTitlePage", BACKUP_DEFAULTS.titleFromTitlePage),
+    titleFromHeading: bool("titleFromHeading", BACKUP_DEFAULTS.titleFromHeading),
   };
 }
 

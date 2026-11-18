@@ -8,6 +8,7 @@ import type { Connector } from "./connect.ts";
 import { plainExtras } from "./extras.ts";
 import type { HistoryMirror } from "./mirror.ts";
 import type { BundleStore } from "./store.ts";
+import { renameWork } from "./work-rename.ts";
 
 export interface WorksHost {
   history(): History;
@@ -69,6 +70,18 @@ export class Works {
   async restore(node: Node): Promise<void> {
     await this.#host.restoreWork(node.work);
     this.#host.changed();
+  }
+
+  /** Rename…: a new title (an entry in the work's history), and the file's name too if the writer wants. True if renamed. */
+  async rename(node: Node, title: string): Promise<boolean> {
+    try {
+      return await renameWork(this.#host, node.work, node.here, title);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`${node.work.title} could not be renamed: ${(error as Error).message}`);
+      return false;
+    } finally {
+      this.#host.changed();
+    }
   }
 
   /** Remove from This Computer: the history goes from here (sent to the mirror first), and stays there. */
