@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.70
+
+- The editor's ⋯ menu names each on/off item for what it does, with a check mark while it's on: **Show Paragraph Numbers**, **Use Typewriter Scrolling**, **Check Spelling While Typing** and **Show Page Breaks** (were "Show or Hide…", "Turn … On or Off" and "(On or Off)").
+
 ## 0.6.69
 
 - **Typewriter Scrolling** (Highland's; **Turn Typewriter Scrolling On or Off** in the editor's ⋯ menu and the Command Palette; for every document): the line you're typing stays one line below the middle of the editor. Typing, Return, deleting and undo bring the cursor's line back there; clicking, the arrow keys, the Navigator and scrolling don't. Space above and below the text lets the first and last lines reach that height, so an empty or short document starts there.

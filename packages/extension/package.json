@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.69",
+  "version": "0.6.70",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -309,22 +309,26 @@
       },
       {
         "command": "highwater.toggleParagraphNumbers",
-        "title": "Show or Hide Paragraph Numbers",
+        "title": "Show Paragraph Numbers",
+        "toggled": "config.highwater.paragraphNumbers",
         "category": "Highwater Too"
       },
       {
         "command": "highwater.toggleTypewriterScrolling",
-        "title": "Turn Typewriter Scrolling On or Off",
+        "title": "Use Typewriter Scrolling",
+        "toggled": "config.highwater.typewriterScrolling",
         "category": "Highwater Too"
       },
       {
         "command": "highwater.togglePageBreaks",
-        "title": "Show or Hide Page Breaks",
+        "title": "Show Page Breaks",
+        "toggled": "config.highwater.pageBreaks",
         "category": "Highwater Too"
       },
       {
         "command": "highwater.toggleSpelling",
-        "title": "Check Spelling While Typing (On or Off)",
+        "title": "Check Spelling While Typing",
+        "toggled": "config.highwater.spellCheck",
         "category": "Highwater Too"
       },
       {
@@ -591,7 +595,7 @@
         "highwater.typewriterScrolling": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Typewriter Scrolling in the Highwater Editor, for every document: the line you're typing stays one line below the middle of the editor. Typing, Return and deleting bring it back there; clicking and the arrow keys don't. **Turn Typewriter Scrolling On or Off** is in the editor's ⋯ menu."
+          "markdownDescription": "Typewriter Scrolling in the Highwater Editor, for every document: the line you're typing stays one line below the middle of the editor. Typing, Return and deleting bring it back there; clicking and the arrow keys don't. **Use Typewriter Scrolling** in the editor's ⋯ menu turns it on and off."
         },
         "highwater.pageBreaks": {
           "type": "boolean",
