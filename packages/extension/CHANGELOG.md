@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.72
+
+- The editor's ⋯ menu's spelling pair reads **Check Spelling While Typing** / **Stop Checking Spelling** (was Show / Hide Spelling Checks).
+
 ## 0.6.71
 
 - The editor's ⋯ menu shows whichever of each pair applies, instead of check marks (which VS Code doesn't draw for extensions' menu items): **Show / Hide Paragraph Numbers**, **Enable / Disable Typewriter Scrolling**, **Show / Hide Page Breaks**, **Show / Hide Spelling Checks**, and (new in the menu) **Show / Hide Invisibles**. The Command Palette offers the same pairs. ⇧⌘I still switches invisibles.

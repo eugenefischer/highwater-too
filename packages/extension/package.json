@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.71",
+  "version": "0.6.72",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -359,12 +359,12 @@
       },
       {
         "command": "highwater.showSpellingChecks",
-        "title": "Show Spelling Checks",
+        "title": "Check Spelling While Typing",
         "category": "Highwater Too"
       },
       {
         "command": "highwater.hideSpellingChecks",
-        "title": "Hide Spelling Checks",
+        "title": "Stop Checking Spelling",
         "category": "Highwater Too"
       },
       {
