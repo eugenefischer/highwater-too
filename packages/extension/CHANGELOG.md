@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.66
+
+- Settings → Backup: the note under Title New Works With is gone.
+
 ## 0.6.65
 
 - **Link .fountain and .md files to their history** (Settings → Backup; off by default). Saving a plain file adds a line at its end naming its writing history, so its history, Bin and Scratchpad follow it when it's moved or renamed: `[[highwater: …]]` in a `.fountain` file, `<!-- highwater: … -->` in a `.md` file. A new file gets it at its second save (its history starts with the first).

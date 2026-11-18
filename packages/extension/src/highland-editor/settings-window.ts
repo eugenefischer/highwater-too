@@ -355,7 +355,6 @@ class BackupPane {
   <div class="st-row"><span class="st-label">Title New Works With:</span>${box("titleFromTitlePage", "The title page’s Title")}</div>
   <div class="st-row"><span class="st-label"></span>${box("titleFromHeading", "The first top-level heading (manuscripts only)")}</div>
   <div class="st-row"><span class="st-label"></span><label class="st-check st-fixed"><input type="checkbox" checked disabled> The file name, when neither of those is there</label></div>
-  <div class="st-row"><span class="st-label"></span><span class="st-hint">A work takes its title at its first save. Rename… in Works changes it.</span></div>
   <div class="st-row"><span class="st-label">History Folder:</span><input type="text" class="st-path" readonly aria-label="History folder">${action("setFolder", "Set…")}</div>
   <div class="st-row"><span class="st-label"></span><span class="st-buttons"><button class="st-action st-reveal" data-action="revealFolder">Show in Finder</button></span></div>
   <div class="st-rule"></div>
