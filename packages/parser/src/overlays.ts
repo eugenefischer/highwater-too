@@ -10,7 +10,7 @@ const REVISION_CLOSE = /\{\{\s*\/\s*REVISION\s*\}\}/iy;
  * With `htmlComments` (Markdown), an HTML comment `<!-- … -->` is a boneyard too (EJ, 2026-11-18):
  * never printed, as Markdown apps (Typora, Obsidian, pandoc) don't show it either.
  */
-export function findOverlays(source: string, options: { htmlComments?: boolean } = {}): { overlays: Overlays; diagnostics: Diagnostic[] } {
+export function findOverlays(source: string, options: { htmlComments?: boolean; frontMatter?: boolean } = {}): { overlays: Overlays; diagnostics: Diagnostic[] } {
   const html = options.htmlComments === true;
   const boneyard: BoneyardRange[] = [];
   const revisions: RevisionRange[] = [];
@@ -18,6 +18,12 @@ export function findOverlays(source: string, options: { htmlComments?: boolean }
   let open: { color: string; tag: Span } | null = null;
   let i = 0;
   const n = source.length;
+  // A Markdown file's YAML front matter (Typora, Obsidian, pandoc): hidden like a boneyard.
+  const front = options.frontMatter ? frontMatterAt(source) : null;
+  if (front) {
+    boneyard.push({ span: front.span, inner: front.inner, frontMatter: true });
+    i = front.span.end;
+  }
   while (i < n) {
     const c = source.charCodeAt(i);
     if (c === 47 /* / */ && source.charCodeAt(i + 1) === 42 /* * */) {
@@ -145,4 +151,40 @@ export function logicalText(source: string, span: Span, hidden: Span[]): Logical
   text += source.slice(runStart, span.end);
   offsets.push(span.end);
   return { text, base: span.start, offsets };
+}
+
+/**
+ * YAML front matter at the very top of a Markdown file (EJ, 2026-11-18; for files also edited in
+ * Typora or Obsidian): a `---` line, YAML, and a closing `---` (or `...`) line. As in pandoc, the
+ * line after the opening one isn't blank. Every line inside must look like YAML (`key: value`, an
+ * indented line, a `- ` list item, a `#` comment or a blank line), so a manuscript that starts with
+ * a `---` scene break and has another later is not taken for it. The span ends with the closing
+ * line's text (its line break stays outside).
+ */
+export function frontMatterAt(source: string): { span: Span; inner: Span } | null {
+  const start = source.charCodeAt(0) === 0xfeff ? 1 : 0;
+  // (Sticky, from `start`: `^` would only match at 0, before a byte-order mark.)
+  const first = /---[ \t]*(?:\r?\n|$)/y;
+  first.lastIndex = start;
+  const open = first.exec(source);
+  if (!open || !open[0].endsWith("\n")) return null;
+  let at = start + open[0].length;
+  const innerStart = at;
+  let lines = 0;
+  while (at < source.length) {
+    const nl = source.indexOf("\n", at);
+    const lineEnd = nl < 0 ? source.length : nl;
+    const line = source.slice(at, lineEnd).replace(/\r$/, "");
+    if (/^(?:---|\.\.\.)[ \t]*$/.test(line)) {
+      if (lines === 0) return null;
+      // (From 0: a byte-order mark before it goes with it.)
+      return { span: { start: 0, end: at + line.length }, inner: { start: innerStart, end: at } };
+    }
+    if (lines === 0 && line.trim() === "") return null;
+    if (!(line.trim() === "" || /^[^\s:#-][^:]*:(?:[ \t]|$)/.test(line) || /^[ \t]+\S/.test(line) || /^-(?:[ \t]|$)/.test(line) || /^#/.test(line))) return null;
+    lines++;
+    if (nl < 0) break;
+    at = nl + 1;
+  }
+  return null;
 }

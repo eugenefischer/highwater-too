@@ -23,7 +23,9 @@ export function modeFromFileName(name: string): Mode {
  * or plain text), inline content and directives.
  */
 export function parse(source: string, options: ParseOptions): Document {
-  const { overlays, diagnostics } = findOverlays(source, { htmlComments: options.mode === "markdown" });
+  const markdown = options.mode === "markdown";
+  const { overlays, diagnostics } = findOverlays(source, { htmlComments: markdown, frontMatter: markdown });
+  const front = overlays.boneyard[0]?.frontMatter ? overlays.boneyard[0] : null;
   const lines = splitLines(source);
   const nodes: TopNode[] = [];
 
@@ -46,7 +48,12 @@ export function parse(source: string, options: ParseOptions): Document {
   const isBlankLine = (k: number): boolean => blank[k]! && !inBone[k]!;
 
   let i = 0;
-  // Leading blank lines, then an optional title page.
+  // YAML front matter (Markdown), then leading blank lines, then an optional title page.
+  if (front) {
+    const end = takeWhile(lines, 0, insideBoneyard);
+    if (end > 0) nodes.push(group("boneyard", lines, 0, end));
+    i = end;
+  }
   const leading = takeWhile(lines, i, isBlankLine);
   if (leading > i) {
     nodes.push(group("blank", lines, i, leading));
@@ -96,7 +103,7 @@ export function parse(source: string, options: ParseOptions): Document {
     if (d.directive.kind === "include" && d.directive.path === "") warn("INCLUDE needs a file path");
   }
 
-  return { mode: options.mode, source, nodes, titlePage, overlays, elements, directives, diagnostics };
+  return { mode: options.mode, source, nodes, titlePage, frontMatter: front ? front.span : null, overlays, elements, directives, diagnostics };
 }
 
 function takeWhile(lines: Line[], from: number, test: (index: number) => boolean): number {

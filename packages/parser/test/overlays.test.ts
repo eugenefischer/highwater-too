@@ -56,6 +56,34 @@ describe("HTML comments in Markdown", () => {
   });
 });
 
+describe("YAML front matter in Markdown", () => {
+  const yaml = "---\ntitle: The Story\ntags:\n  - draft\n- second\n# a comment\n\nauthor: \"E. F.\"\n---\n\n# Chapter One\n\nShe walked.\n\n---\n\nLater.\n";
+
+  it("is hidden like a boneyard, at the very top of a Markdown file only", () => {
+    const doc = parse(yaml, { mode: "markdown" });
+    const end = yaml.indexOf("---\n\n# Chapter") + 3;
+    expect(doc.frontMatter).toEqual({ start: 0, end });
+    expect(doc.overlays.boneyard[0]).toMatchObject({ span: { start: 0, end }, frontMatter: true });
+    expect(doc.nodes[0]).toMatchObject({ kind: "boneyard", span: { start: 0, end: end + 1 } });
+    // The text after it is as usual, including a later --- (a page break or rule).
+    expect(doc.elements.map((e) => e.kind)).toContain("heading");
+    expect(doc.elements.filter((e) => e.kind === "paragraph").map((e) => (e as { text: string }).text)).toEqual(["She walked.", "---", "Later."]);
+    expectTiling(doc);
+    expect(parse(yaml, { mode: "fountain" }).frontMatter).toBeNull();
+  });
+
+  it("ends at --- or ..., and allows a byte-order mark first", () => {
+    expect(parse("---\ntitle: A\n...\nText.\n", { mode: "markdown" }).frontMatter).toEqual({ start: 0, end: 16 });
+    expect(parse("\ufeff---\ntitle: A\n---\n", { mode: "markdown" }).frontMatter).toEqual({ start: 0, end: 17 });
+  });
+
+  it("is not taken for scene breaks, a blank line after the first ---, or an unclosed block", () => {
+    for (const src of ["---\nShe walked to the pier.\n---\n", "---\n\ntitle: A\n---\n", "---\ntitle: A\n\nMore\n", "Text\n---\ntitle: A\n---\n", "---\n---\n"]) {
+      expect(parse(src, { mode: "markdown" }).frontMatter, src).toBeNull();
+    }
+  });
+});
+
 describe("revision tags", () => {
   // From the MaximalScreenplay sample: a revision crosses a paragraph break, and a second starts right after it.
   const src =

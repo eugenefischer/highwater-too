@@ -5,7 +5,7 @@
 export const PACKAGE_NAME = "@highwater/parser";
 export type * from "./ast.ts";
 export { isBlank, lineText, splitLines } from "./lines.ts";
-export { findOverlays, hiddenRanges, logicalText, offsetAt, type LogicalText } from "./overlays.ts";
+export { findOverlays, frontMatterAt, hiddenRanges, logicalText, offsetAt, type LogicalText } from "./overlays.ts";
 export { modeFromFileName, parse, type ParseOptions } from "./parse.ts";
 export { TITLE_PAGE_KEYS, fieldText, normalizeKey, readTitlePage } from "./title-page.ts";
 export { classifyFountain } from "./fountain.ts";

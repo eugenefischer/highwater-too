@@ -126,6 +126,19 @@ describe("manuscript layout", () => {
 /** Drops Highland's object-replacement character for images (we draw the image only). */
 const noPlaceholders = (pages: PdfPage[]) => pages.map((p) => ({ ...p, lines: p.lines.filter((l) => l.text !== "￼") }));
 
+describe("YAML front matter and HTML comments", () => {
+  it("never print", () => {
+    const text = "---\ntitle: The Story\ntags:\n  - draft\n---\n\n# Chapter One\n\nShe walked. <!-- cut --> She stopped.\n\n<!--\nA cut paragraph.\n-->\n\nThe end.\n";
+    const printed = items(layout(text)).map((it) => it[3]).join("\n");
+    expect(printed).not.toMatch(/title:|draft|cut|---/);
+    expect(printed).toContain("She walked.");
+    expect(printed).toContain("The end.");
+    // The same text without them lays out the same pages.
+    const plain = items(layout("# Chapter One\n\nShe walked.  She stopped.\n\nThe end.\n")).map((it) => it[3]).join("\n");
+    expect(printed.replace(/\s+/g, " ")).toBe(plain.replace(/\s+/g, " "));
+  });
+});
+
 describe("rendered manuscript PDFs match Highland's", () => {
   // Highland's quirks reproduced: quotes into the margin, "%pp" counting its blank last page.
   it("ManuscriptEdgeCases: matches line for line with Highland's quirks, but for its blank last page", async () => {

@@ -68,6 +68,8 @@ export interface BoneyardRange {
   span: Span;
   /** Between the delimiters. */
   inner: Span;
+  /** A Markdown file's YAML front matter, kept out of the text like a boneyard. */
+  frontMatter?: true;
 }
 
 /** `{{REVISION: #rrggbb}} … {{/REVISION}}`; may cross line and block boundaries. */
@@ -97,6 +99,8 @@ export interface Document {
   source: string;
   nodes: TopNode[];
   titlePage: TitlePageNode | null;
+  /** A Markdown file's YAML front matter (`---` … `---` at the very top), from its first `---` to the end of its last line; null if none. */
+  frontMatter: Span | null;
   overlays: Overlays;
   /** Classified content in reading order. */
   elements: Element[];

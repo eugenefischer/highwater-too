@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.68
+
+- **Markdown: YAML front matter.** A `---` … `---` (or `...`) block of YAML at the very top of a `.md` manuscript, as Typora, Obsidian and pandoc write it, is dimmed in the editor, left out of the word count and the Navigator, and never printed. Its `---` lines are no longer taken for scene breaks. A `---` later in the text is unchanged, and a manuscript that merely starts with a `---` scene break isn't mistaken for front matter (every line inside must look like YAML).
+
 ## 0.6.67
 
 - The Writing History panel's menu button shows ⋯, like the More buttons everywhere else, instead of a gear.
