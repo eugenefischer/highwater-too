@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.69
+
+- **Typewriter Scrolling** (Highland's; **Turn Typewriter Scrolling On or Off** in the editor's ⋯ menu and the Command Palette; for every document): the line you're typing stays one line below the middle of the editor. Typing, Return, deleting and undo bring the cursor's line back there; clicking, the arrow keys, the Navigator and scrolling don't. Space above and below the text lets the first and last lines reach that height, so an empty or short document starts there.
+
 ## 0.6.68
 
 - **Markdown: YAML front matter.** A `---` … `---` (or `...`) block of YAML at the very top of a `.md` manuscript, as Typora, Obsidian and pandoc write it, is dimmed in the editor, left out of the word count and the Navigator, and never printed. Its `---` lines are no longer taken for scene breaks. A `---` later in the text is unchanged, and a manuscript that merely starts with a `---` scene break isn't mistaken for front matter (every line inside must look like YAML).

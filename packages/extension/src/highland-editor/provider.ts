@@ -125,6 +125,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Highland's paragraph numbers in the margin (highwater.paragraphNumbers).
     const sendNumbers = () => postTo(panel, { type: "numbers", on: vscode.workspace.getConfiguration("highwater").get<boolean>("paragraphNumbers", false) });
+    // Typewriter Scrolling (highwater.typewriterScrolling): on or off for every document.
+    const sendTypewriter = () => postTo(panel, { type: "typewriter", on: vscode.workspace.getConfiguration("highwater").get<boolean>("typewriterScrolling", false) });
     // Show Page Breaks (highwater.pageBreaks): where each page starts, from the page count's layout.
     const sendPageBreaks = () => {
       const on = vscode.workspace.getConfiguration("highwater").get<boolean>("pageBreaks", false);
@@ -197,6 +199,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           sendTheme();
           sendFontSize();
           sendNumbers();
+          sendTypewriter();
           sendPageBreaks();
           sendSpelling();
           void sendTemplate();
@@ -270,6 +273,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         if (view.ready && (e.affectsConfiguration("highwater.historyFolder") || e.affectsConfiguration("highwater.historyRemote"))) postTo(panel, backupInfoMessage());
         if (view.ready && e.affectsConfiguration("highwater.excludeNotesFromWordCount")) sendCounts();
         if (view.ready && e.affectsConfiguration("highwater.paragraphNumbers")) sendNumbers();
+        if (view.ready && e.affectsConfiguration("highwater.typewriterScrolling")) sendTypewriter();
         if (view.ready && e.affectsConfiguration("highwater.pageBreaks")) sendPageBreaks();
         if (view.ready && (e.affectsConfiguration("highwater.spellCheck") || e.affectsConfiguration("highwater.spellingWords"))) sendSpelling();
       }),
@@ -604,6 +608,10 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
     vscode.commands.registerCommand("highwater.togglePageBreaks", async () => {
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("pageBreaks", !config.get<boolean>("pageBreaks", false), vscode.ConfigurationTarget.Global);
+    }),
+    vscode.commands.registerCommand("highwater.toggleTypewriterScrolling", async () => {
+      const config = vscode.workspace.getConfiguration("highwater");
+      await config.update("typewriterScrolling", !config.get<boolean>("typewriterScrolling", false), vscode.ConfigurationTarget.Global);
     }),
     vscode.commands.registerCommand("highwater.toggleParagraphNumbers", async () => {
       const config = vscode.workspace.getConfiguration("highwater");

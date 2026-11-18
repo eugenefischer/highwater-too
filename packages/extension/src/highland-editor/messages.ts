@@ -139,6 +139,8 @@ export type ToPage =
   | { type: "showSettings"; tab: "general" | "document" | "international" | "themes" | "backup" }
   | { type: "fontSize"; px: number | null }
   | { type: "numbers"; on: boolean }
+  /** Typewriter Scrolling (highwater.typewriterScrolling). */
+  | { type: "typewriter"; on: boolean }
   /** Show Page Breaks: where each page starts, as [page offset, page number] pairs (none when off). */
   | { type: "pageBreaks"; starts: number[] }
   | { type: "invisibles"; on: boolean }

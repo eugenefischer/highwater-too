@@ -519,3 +519,6 @@ body.comparing #main::after { content: ""; position: absolute; inset: 0; border:
 .cm-editor .cm-content .cm-changedText { background: var(--hl-add-text, color-mix(in srgb, #2ea043 32%, transparent)) !important; text-decoration: none !important; border-radius: 2px; }
 .cm-editor .cm-content .cm-deletedChunk { background: var(--hl-del-line, color-mix(in srgb, #e5534b 14%, transparent)) !important; padding: 0 !important; }
 .cm-editor .cm-content .cm-deletedChunk del, .cm-editor .cm-content .cm-deletedText { background: var(--hl-del-text, color-mix(in srgb, #e5534b 32%, transparent)) !important; text-decoration: line-through; text-decoration-color: var(--hl-del, #e5534b); border-radius: 2px; }
+
+/* Typewriter Scrolling: room above and below the text for its first and last lines to reach the typing height (typewriter.ts). */
+.hl-typewriter .cm-content { padding-top: var(--tw-top, 0) !important; padding-bottom: var(--tw-bottom, 0) !important; }

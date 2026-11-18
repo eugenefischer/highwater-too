@@ -33,6 +33,7 @@ const binHistory = invertedEffects.of((tr) => tr.effects.filter((e) => e.is(binE
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 import { idLineGuard, onlyAddsIdLine } from "./id-line.ts";
+import { typewriter } from "./typewriter.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: FromPage): void };
 const vscode = acquireVsCodeApi();
@@ -248,6 +249,9 @@ const lineEnds = ViewPlugin.fromClass(
 const idLine = new Compartment();
 let hideIdLine = false;
 const idLineExtension = (on: boolean) => (on ? idLineGuard((tr) => !!tr.annotation(remote)) : []);
+/** Typewriter Scrolling (typewriter.ts), on or off for every document. */
+const typewriterMode = new Compartment();
+let typewriterOn = false;
 const invisibles = new Compartment();
 let showInvisibles = false;
 const invisibleMarks = (on: boolean) => (on ? [highlightWhitespace(), lineEnds] : []);
@@ -373,6 +377,7 @@ function start(text: string): void {
         compare.extension,
         invisibles.of(invisibleMarks(showInvisibles)),
         idLine.of(idLineExtension(hideIdLine)),
+        typewriterMode.of(typewriter(typewriterOn)),
         screenplayCompletion(
           () => (mode === "fountain" ? parsed : null),
           () => ({ locations: documentSettings.autoCompleteLocations, characters: documentSettings.autoCompleteCharacterNames, terms: completionTerms }),
@@ -699,6 +704,12 @@ window.addEventListener("message", (event: MessageEvent) => {
   } else if (msg.type === "backupInfo") settingsWindow.backupInfo(msg.info);
   else if (msg.type === "showSettings") settingsWindow.open(msg.tab);
   else if (msg.type === "pageBreaks") view?.dispatch({ effects: setPageBreaks.of(msg.starts), annotations: remote.of(true) });
+  else if (msg.type === "typewriter") {
+    if (!!msg.on !== typewriterOn) {
+      typewriterOn = !!msg.on;
+      view?.dispatch({ effects: typewriterMode.reconfigure(typewriter(typewriterOn)) });
+    }
+  }
   else if (msg.type === "numbers") {
     document.documentElement.classList.toggle("hl-numbers", !!msg.on);
     view?.requestMeasure();

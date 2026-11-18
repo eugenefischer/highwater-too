@@ -39,6 +39,7 @@ Your script appears in a page-width column of Courier Prime, as in Highland 2. E
 - **Markers:** ⌃M inserts one. ⌃⌥M jumps to the next.
 - **Check Spelling While Typing:** American English, off by default. Misspelled words get red dots underneath. Right-click for suggestions, **Ignore** or **Learn Spelling**. ⌘; goes to the next misspelling.
 - **Paragraph numbers, Go to Paragraph, Show Invisibles and Show Page Breaks:** as in Highland. Show Page Breaks marks where each printed page starts with a short line and the page number in the right margin; it catches up a second after you stop typing.
+- **Typewriter Scrolling** (the editor's ⋯ menu): the line you're typing stays one line below the middle of the editor, for every document. Typing, Return and deleting bring it back there; clicking, the arrow keys and scrolling don't.
 - **Text size:** ⌘+ and ⌘− change it. ⌥⌘0 resets it.
 
 To edit a document as plain text, for other extensions or multiple cursors, use VS Code's **Reopen Editor With… → Text Editor**. It keeps the highlighting, completion and writing keys, but not the sidebar, the pages or Compare.
@@ -180,6 +181,7 @@ Highland 2's shortcuts are on by default (`highwater.highlandShortcuts`). On Win
 | `highwater.darkPages` | off | With a dark theme, show the printed pages dark too. Saved PDFs are unchanged. |
 | `highwater.fontSize` | 0 | Text size in the Highwater Editor, in pixels. 0 follows VS Code's font size, scaled to about Highland's. |
 | `highwater.paragraphNumbers` | off | Paragraph numbers in the margin. |
+| `highwater.typewriterScrolling` | off | The line being typed stays one line below the middle of the editor. |
 | `highwater.pageBreaks` | off | Show Page Breaks: where each printed page starts, in the right margin. |
 | `highwater.spellCheck` | off | Check spelling while typing (American English). |
 | `highwater.spellingWords` | none | Words added with Learn Spelling. |

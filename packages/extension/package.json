@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.68",
+  "version": "0.6.69",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -313,6 +313,11 @@
         "category": "Highwater Too"
       },
       {
+        "command": "highwater.toggleTypewriterScrolling",
+        "title": "Turn Typewriter Scrolling On or Off",
+        "category": "Highwater Too"
+      },
+      {
         "command": "highwater.togglePageBreaks",
         "title": "Show or Hide Page Breaks",
         "category": "Highwater Too"
@@ -582,6 +587,11 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Show paragraph numbers in the Highwater Editor's margin: every line with text is numbered, except the title page, notes and omitted text on lines of their own, and directives such as `{{HEADER}}` and markers. **Go to Paragraph…** (⌃G) goes to a number."
+        },
+        "highwater.typewriterScrolling": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Typewriter Scrolling in the Highwater Editor, for every document: the line you're typing stays one line below the middle of the editor. Typing, Return and deleting bring it back there; clicking and the arrow keys don't. **Turn Typewriter Scrolling On or Off** is in the editor's ⋯ menu."
         },
         "highwater.pageBreaks": {
           "type": "boolean",
@@ -1750,6 +1760,11 @@
         },
         {
           "command": "highwater.toggleParagraphNumbers",
+          "when": "activeCustomEditorId == highwater.highlandEditor",
+          "group": "1_highwater@2"
+        },
+        {
+          "command": "highwater.toggleTypewriterScrolling",
           "when": "activeCustomEditorId == highwater.highlandEditor",
           "group": "1_highwater@2"
         },
