@@ -350,6 +350,8 @@ class BackupPane {
   <div class="st-row st-pause-row"><span class="st-label"></span><label class="st-pause">after <input type="number" class="st-number" data-key="autoSavePause" min="${AUTO_SAVE_PAUSE.min}" max="${AUTO_SAVE_PAUSE.max}" step="1" aria-label="Seconds without typing"> seconds without typing</label></div>
   <div class="st-row"><span class="st-label"></span>${box("writingHistory", "Record writing history (every save)")}</div>
   <div class="st-row"><span class="st-label"></span>${box("saveOnExport", "Also record a save when exporting a PDF or Word file")}</div>
+  <div class="st-row"><span class="st-label"></span>${box("linkPlainFiles", "Link .fountain and .md files to their history")}</div>
+  <div class="st-row"><span class="st-label"></span><span class="st-hint">Adds a line at the end of each file, hidden in the Highwater Editor, so its history follows it when it’s moved or renamed. It never prints.</span></div>
   <div class="st-row"><span class="st-label">Title New Works With:</span>${box("titleFromTitlePage", "The title page’s Title")}</div>
   <div class="st-row"><span class="st-label"></span>${box("titleFromHeading", "The first top-level heading (manuscripts only)")}</div>
   <div class="st-row"><span class="st-label"></span><label class="st-check st-fixed"><input type="checkbox" checked disabled> The file name, when neither of those is there</label></div>

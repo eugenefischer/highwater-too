@@ -25,7 +25,7 @@ export interface BlankNode {
   lines: Line[];
 }
 
-/** Lines that lie entirely inside a boneyard (`/* … *\/`). Omitted from output. */
+/** Lines that lie entirely inside a boneyard (`/* … *\/`, or in Markdown `<!-- … -->`). Omitted from output. */
 export interface BoneyardNode {
   kind: "boneyard";
   span: Span;

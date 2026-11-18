@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { extname } from "node:path";
 import type { CommitInfo, DocumentFiles, History } from "@highwater/history";
 import type { PlainExtras } from "./extras.ts";
-import { ID_NOTE, idNote, noteId } from "./extras-folder.ts";
+import { ID_NOTE, idForm, idNote, noteId } from "./extras-folder.ts";
 import type { BundleStore } from "./store.ts";
 import { withoutSavedText } from "./to-bundle.ts";
 import { INFO_KEY } from "./history-location.ts";
@@ -60,10 +60,10 @@ export function historyRecords(deps: { store: BundleStore; extras: PlainExtras; 
     // A plain file's ID note naming another work (a copy kept separate) names its own work now.
     if (!key.toLowerCase().endsWith(".highland") && id && resolved.id !== id && !resolved.copyOf) {
       const text = await readFile(key, "utf8");
-      const now = text.replace(ID_NOTE, idNote(resolved.id));
+      const now = text.replace(ID_NOTE, idNote(resolved.id, idForm(key)));
       if (now !== text) {
         await writeFile(key, now);
-        files.script = files.script.replace(ID_NOTE, idNote(resolved.id));
+        files.script = files.script.replace(ID_NOTE, idNote(resolved.id, idForm(key)));
       }
     }
     return { ...resolved, files };

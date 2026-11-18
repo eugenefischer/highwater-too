@@ -23,6 +23,8 @@ export class WorksPanel {
   #saves: WorkSaveRow[] | null = null;
   /** The open Rename window, while it waits for the extension to say how renaming went. */
   #rename: RenameWindow | null = null;
+  /** "Reveal in Finder", or what the system calls it. */
+  #reveal = "Reveal in Finder";
 
   constructor(private readonly deps: SidebarDeps) {
     this.#filter.addEventListener("input", () => this.#render());
@@ -51,7 +53,8 @@ export class WorksPanel {
     });
   }
 
-  show(rows: WorkRow[], mirror: MirrorStatus | null, computer: string): void {
+  show(rows: WorkRow[], mirror: MirrorStatus | null, computer: string, reveal = "Reveal in Finder"): void {
+    this.#reveal = reveal;
     // This computer's name: what saves made here are called on other computers ("on …").
     const name = $("workcomputer");
     name.textContent = computer;
@@ -166,6 +169,8 @@ export class WorksPanel {
     );
     // Only a work whose history is on this computer can be renamed (EJ): a rename is one of its saves.
     const menu: MenuItem[] = [
+      // A local work's file, shown in a Finder window.
+      ...(w.kind === "here" ? [{ label: this.#reveal, command: "reveal" }] : []),
       ...(w.kind !== "remote" ? [{ label: "Rename…", command: "rename" }, { label: "Remove from This Computer…", command: "remove" }] : []),
       { label: "Delete Writing History…", command: "delete", danger: true },
     ];

@@ -170,7 +170,7 @@ export type ToPage =
   | { type: "binRefused" }
   | { type: "assets"; items: AssetCard[]; available: boolean }
   | HistoryMessage
-  | { type: "works"; items: WorkRow[]; mirror: MirrorStatus | null; computer: string }
+  | { type: "works"; items: WorkRow[]; mirror: MirrorStatus | null; computer: string; reveal: string }
   | { type: "workSaves"; i: number; saves: WorkSaveRow[] }
   | { type: "workRenamed"; i: number; error?: string };
 

@@ -188,12 +188,14 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     });
   };
   // Works: every work in the writing history; a work here opens, others can be restored.
+  /** What the Works panel's More menu calls showing a work's file, as VS Code names it on each system. */
+  const REVEAL_LABEL = process.platform === "darwin" ? "Reveal in Finder" : process.platform === "win32" ? "Reveal in File Explorer" : "Reveal in File Manager";
   let workNodes: WorkNode[] = [];
   const sendWorks = async () => {
     const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote", "").trim();
     const m = historyApi?.mirror();
     const mirror = remote && m ? { busy: m.busy, at: m.at?.getTime() ?? null, error: m.error, signIn: m.signIn } : null;
-    if (!historyApi) return post({ type: "works", items: [], mirror, computer: computerName() });
+    if (!historyApi) return post({ type: "works", items: [], mirror, computer: computerName(), reveal: REVEAL_LABEL });
     workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
     const items = workNodes.map((n, i): WorkRow => {
       const w = n.work;
@@ -207,7 +209,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         kind: n.here ? "here" : w.local ? "local" : "remote",
       };
     });
-    post({ type: "works", items, mirror, computer: computerName() });
+    post({ type: "works", items, mirror, computer: computerName(), reveal: REVEAL_LABEL });
   };
   const sendWorkSaves = async (i: number) => {
     const node = workNodes[i];
@@ -238,6 +240,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
     else if (action === "restore") await w.restore(node);
     else if (action === "remove") await w.remove(node);
     else if (action === "delete") await w.delete(node);
+    else if (action === "reveal" && node.here) await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(node.here));
   };
   const historyChanged = debounce(200, () => {
     void sendHistory();

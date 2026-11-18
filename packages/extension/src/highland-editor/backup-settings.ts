@@ -18,6 +18,8 @@ export interface BackupSettings {
   titleFromTitlePage: boolean;
   /** Else, in a manuscript, from its first top-level heading; else the file's name. */
   titleFromHeading: boolean;
+  /** Each .fountain and .md file's save adds a hidden line at its end naming its writing history. */
+  linkPlainFiles: boolean;
 }
 
 /** The pause "When I stop typing" waits for, in whole seconds. */
@@ -58,6 +60,7 @@ export const BACKUP_DEFAULTS: BackupSettings = {
   mirrorSync: "save",
   titleFromTitlePage: true,
   titleFromHeading: true,
+  linkPlainFiles: false,
 };
 
 /** Stored values made sound: unknown or missing values fall back to the defaults. */
@@ -79,6 +82,7 @@ export function backupSettings(read: (key: keyof BackupSettings) => unknown): Ba
     mirrorSync: pick("mirrorSync", MIRROR_SYNCS, BACKUP_DEFAULTS.mirrorSync),
     titleFromTitlePage: bool("titleFromTitlePage", BACKUP_DEFAULTS.titleFromTitlePage),
     titleFromHeading: bool("titleFromHeading", BACKUP_DEFAULTS.titleFromHeading),
+    linkPlainFiles: bool("linkPlainFiles", BACKUP_DEFAULTS.linkPlainFiles),
   };
 }
 

@@ -116,7 +116,7 @@ Neither touches the file itself.
 - **An older save:** if a file you open is an older save than the mirror's latest, you're asked whether to update it or carry on from this version.
 - **Signing in:** github.com uses VS Code's GitHub sign-in. Other HTTPS servers ask once for a username and access token, kept in VS Code's secure storage. SSH uses your SSH key.
 
-**Finding a document's history.** A `.highland` file carries an ID that links it to its history. A plain file is found by its path, or anywhere if you run **Link Writing History to This File**.
+**Finding a document's history.** A `.highland` file carries an ID that links it to its history. A plain file is found by its path, or anywhere once it's linked: turn on **Link .fountain and .md files to their history** in **Settings… → Backup** (or run **Link Writing History to This File** for one file). A linked file ends with a line naming its history, `[[highwater: …]]` in a `.fountain` file or `<!-- highwater: …-->` in a `.md` file, which other Fountain and Markdown apps don't show either. The Highwater Editor hides it and keeps it safe from edits, and it never prints.
 
 - **A file the history doesn't know:** it's looked up by ID, exact text or file name, and you're always asked before it's connected.
 - **A copy of a work's file:** you're asked whether it's a separate work or the work's file now.

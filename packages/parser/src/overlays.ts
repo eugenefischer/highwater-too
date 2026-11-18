@@ -7,8 +7,11 @@ const REVISION_CLOSE = /\{\{\s*\/\s*REVISION\s*\}\}/iy;
 /**
  * Pass 1: finds boneyard ranges and revision tags anywhere in the source.
  * Boneyards do not nest (the first `*\/` closes). Revision tags inside a boneyard are ignored.
+ * With `htmlComments` (Markdown), an HTML comment `<!-- … -->` is a boneyard too (EJ, 2026-11-18):
+ * never printed, as Markdown apps (Typora, Obsidian, pandoc) don't show it either.
  */
-export function findOverlays(source: string): { overlays: Overlays; diagnostics: Diagnostic[] } {
+export function findOverlays(source: string, options: { htmlComments?: boolean } = {}): { overlays: Overlays; diagnostics: Diagnostic[] } {
+  const html = options.htmlComments === true;
   const boneyard: BoneyardRange[] = [];
   const revisions: RevisionRange[] = [];
   const diagnostics: Diagnostic[] = [];
@@ -26,6 +29,17 @@ export function findOverlays(source: string): { overlays: Overlays; diagnostics:
       }
       boneyard.push({ span: { start: i, end: close + 2 }, inner: { start: i + 2, end: close } });
       i = close + 2;
+      continue;
+    }
+    if (html && c === 60 /* < */ && source.startsWith("<!--", i)) {
+      const close = source.indexOf("-->", i + 4);
+      if (close < 0) {
+        diagnostics.push({ severity: "warning", message: "HTML comment <!-- is never closed; treated as text", span: { start: i, end: i + 4 } });
+        i += 4;
+        continue;
+      }
+      boneyard.push({ span: { start: i, end: close + 3 }, inner: { start: i + 4, end: close } });
+      i = close + 3;
       continue;
     }
     if (c === 123 /* { */ && source.charCodeAt(i + 1) === 123) {

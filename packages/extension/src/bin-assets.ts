@@ -7,7 +7,7 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 import { documentExtras, type AssetItem, type DocumentExtras, type Owner } from "./document-extras.ts";
 import { binLabel, byteSize, imageSize, move } from "./syntax/workspace.ts";
-import { idNote, noteId } from "./extras-folder.ts";
+import { idForm, idLineAddition, noteId } from "./extras-folder.ts";
 import { focusedDocument, type FocusedDocument } from "./focus.ts";
 import { activeDocument, activeSelections, activeView } from "./surface.ts";
 import { postTo } from "./highland-editor/messages.ts";
@@ -77,13 +77,11 @@ export function registerBinAndAssets(context: vscode.ExtensionContext, store: Bu
       return;
     }
     const text = doc.getText();
-    const end = doc.positionAt(text.length);
-    const sep = text === "" ? "" : text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
     const edit = new vscode.WorkspaceEdit();
-    edit.insert(doc.uri, end, `${sep}${idNote(id)}\n`);
+    edit.insert(doc.uri, doc.positionAt(text.length), idLineAddition(text, id, idForm(doc.uri.fsPath)));
     await vscode.workspace.applyEdit(edit);
     void vscode.window.showInformationMessage(
-      "Added a note at the end of the file naming its writing history, so its history, Bin and Scratchpad stay with it if it is moved or renamed. Notes never print.",
+      "Added a line at the end of the file naming its writing history, so its history, Bin and Scratchpad stay with it if it is moved or renamed. It never prints. To link every .fountain and .md file, turn on Link plain files in Settings → Backup.",
     );
   }
 }

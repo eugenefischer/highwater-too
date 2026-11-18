@@ -101,7 +101,7 @@ export class Sidebar {
     else if (msg.type === "bin") this.#bin.show(msg.items, !!msg.available);
     else if (msg.type === "assets") this.#assets.show(msg.items, !!msg.available);
     else if (msg.type === "history") this.#history.show(msg);
-    else if (msg.type === "works") this.#works.show(msg.items, msg.mirror ?? null, typeof msg.computer === "string" ? msg.computer : "");
+    else if (msg.type === "works") this.#works.show(msg.items, msg.mirror ?? null, typeof msg.computer === "string" ? msg.computer : "", typeof msg.reveal === "string" ? msg.reveal : "Reveal in Finder");
     else if (msg.type === "workSaves") this.#works.saves(msg.i, msg.saves);
     else if (msg.type === "workRenamed") this.#works.renamed(msg.i, msg.error);
     else if (msg.type === "showPanel" && PANELS.includes(msg.panel)) this.show(msg.panel);

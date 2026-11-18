@@ -23,7 +23,7 @@ export function modeFromFileName(name: string): Mode {
  * or plain text), inline content and directives.
  */
 export function parse(source: string, options: ParseOptions): Document {
-  const { overlays, diagnostics } = findOverlays(source);
+  const { overlays, diagnostics } = findOverlays(source, { htmlComments: options.mode === "markdown" });
   const lines = splitLines(source);
   const nodes: TopNode[] = [];
 

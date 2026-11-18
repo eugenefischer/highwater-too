@@ -63,6 +63,7 @@ export const WORKS_HELP = `
 <li>Its saves are listed to show its history. To compare with one or revert to it, open the work, then use its Writing History.</li>
 <li>${icon(MORE_ICON)} <b>More</b>:
 <ul>
+<li><b>Reveal in Finder</b> (local works): opens a Finder window with the work’s file selected.</li>
 <li><b>Rename</b>: gives the work a new title. To rename its file too, tick <b>Also change file name?</b> and type the file’s new name (it doesn’t have to match the title). The rename is listed among the work’s saves, and your other computers offer to rename their copy of the file the next time it’s opened. Only works whose history is on this computer can be renamed.</li>
 <li><b>Remove from This Computer</b>: removes the work’s history from this computer. It stays on the mirror, so you can restore it later. You need a mirror to do this.</li>
 <li><b>Delete Writing History</b>: deletes the work’s history for good. With a mirror, you choose whether to delete it everywhere or only on this computer. The file itself is never deleted.</li>

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.65
+
+- **Link .fountain and .md files to their history** (Settings → Backup; off by default). Saving a plain file adds a line at its end naming its writing history, so its history, Bin and Scratchpad follow it when it's moved or renamed: `[[highwater: …]]` in a `.fountain` file, `<!-- highwater: … -->` in a `.md` file. A new file gets it at its second save (its history starts with the first).
+  - In the Highwater Editor the line and the blank line before it are hidden, and no edit can touch it: Select All and Delete, Replace All, and typing at the very end change only your text. Adding it isn't an undo step. It's left out of word counts and never prints, even with notes printed.
+  - With the setting off, an existing line shows as written and can be edited; it isn't removed.
+  - **Link Writing History to This File** writes the same line for one file. A `.md` file linked before uses the note form, which still works.
+- **Markdown: HTML comments are boneyards.** `<!-- … -->` is never printed, is dimmed in the editor, and is left out of counts, as Typora, Obsidian and pandoc leave it out too. (Screenplays are unchanged.)
+- **Reveal in Finder** in a local work's More menu (Works panel) opens a Finder window with its file selected.
+
 ## 0.6.64
 
 - **Rename…** opens a Rename window instead of editing the title on the card: the title, and **Also change file name?**, which makes the file's name editable. **Rename** does both; Cancel or Escape does nothing. If the file can't be renamed (a file of that name is already there, say), the window says why and stays open.

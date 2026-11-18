@@ -54,7 +54,8 @@ function notesOf(e: Element): string[] {
   const out: string[] = [];
   const walk = (nodes: Inline[]) => {
     for (const n of nodes) {
-      if (n.kind === "note") out.push(n.text);
+      // The note tying a plain file to its writing history is not the writer's words.
+      if (n.kind === "note" && !/^\s*highwater:\s*[0-9A-Za-z-]{8,}\s*$/.test(n.text)) out.push(n.text);
       else if (n.kind === "styled" || n.kind === "link") walk(n.children);
     }
   };

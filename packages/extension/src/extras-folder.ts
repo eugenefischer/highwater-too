@@ -237,15 +237,42 @@ export function relinkAssets(text: string, from: string, to: string): string {
   return text.replace(re, (_m, open: string) => `${open}${encodePathPart(to)}/`);
 }
 
-/** The optional line tying a plain file to its writing history: a note, which never prints. */
-export const ID_NOTE = /\[\[highwater:\s*([0-9A-Za-z-]{8,})\s*\]\]/;
+/**
+ * The optional line tying a plain file to its writing history, which never prints: a Fountain note
+ * `[[highwater: <ID>]]`, or in a Markdown file an HTML comment `<!-- highwater: <ID> -->`, which
+ * Markdown apps hide too (EJ, 2026-11-18). Either is read in either kind of file (.md files linked
+ * before 0.6.65 have the note).
+ */
+export const ID_NOTE = /\[\[highwater:\s*([0-9A-Za-z-]{8,})\s*\]\]|<!--\s*highwater:\s*([0-9A-Za-z-]{8,})\s*-->/;
 
-export function idNote(id: string): string {
-  return `[[highwater: ${id}]]`;
+/** The ID line for a file of this kind: an HTML comment in Markdown, a note otherwise. */
+export function idNote(id: string, form: "markdown" | "fountain" = "fountain"): string {
+  return form === "markdown" ? `<!-- highwater: ${id} -->` : `[[highwater: ${id}]]`;
+}
+
+/** The kind of ID line a plain file takes, by its name. */
+export function idForm(path: string): "markdown" | "fountain" {
+  return /\.(md|markdown)$/i.test(path) ? "markdown" : "fountain";
 }
 
 export function noteId(text: string): string | null {
-  return ID_NOTE.exec(text)?.[1] ?? null;
+  const m = ID_NOTE.exec(text);
+  return m ? (m[1] ?? m[2] ?? null) : null;
+}
+
+/** What to add at the end of `text` for the ID line: on a line of its own, after a blank line. */
+export function idLineAddition(text: string, id: string, form: "markdown" | "fountain"): string {
+  const sep = text === "" ? "" : text.endsWith("\n\n") ? "" : text.endsWith("\n") ? "\n" : "\n\n";
+  return `${sep}${idNote(id, form)}\n`;
+}
+
+/**
+ * The text without its ID line when that line is the last thing in it (as it is added), so nothing
+ * before it moves: for printing and counting. Otherwise the text as it is.
+ */
+export function withoutTrailingIdNote(text: string): string {
+  const m = /\n?[ \t]*(?:\[\[highwater:\s*[0-9A-Za-z-]{8,}\s*\]\]|<!--\s*highwater:\s*[0-9A-Za-z-]{8,}\s*-->)[ \t]*\s*$/.exec(text);
+  return m ? text.slice(0, m.index).replace(/\s+$/, "\n") : text;
 }
 
 /**

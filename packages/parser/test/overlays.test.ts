@@ -35,6 +35,27 @@ describe("boneyard", () => {
   });
 });
 
+describe("HTML comments in Markdown", () => {
+  it("are boneyards in Markdown only: whole lines, inline, and left out of the logical text", () => {
+    const src = "# Heading\n\n<!--\nA cut paragraph.\n-->\n\nShe stops. <!-- cut this --> She goes.\n\n<!-- highwater: 1a2b3c4d -->\n";
+    const doc = parse(src, { mode: "markdown" });
+    expect(doc.overlays.boneyard.map((b) => slice(src, b.span))).toEqual(["<!--\nA cut paragraph.\n-->", "<!-- cut this -->", "<!-- highwater: 1a2b3c4d -->"]);
+    expect(slice(src, doc.overlays.boneyard[1]!.inner)).toBe(" cut this ");
+    expect(doc.nodes.filter((n) => n.kind === "boneyard").map((n) => slice(src, n.span))).toEqual(["<!--\nA cut paragraph.\n-->\n", "<!-- highwater: 1a2b3c4d -->\n"]);
+    const paragraphs = doc.elements.filter((e) => e.kind === "paragraph").map((e) => (e as { text: string }).text);
+    expect(paragraphs).toEqual(["She stops.  She goes."]);
+    expectTiling(doc);
+    // A screenplay's <!-- is just text.
+    expect(parse(src, { mode: "fountain" }).overlays.boneyard).toEqual([]);
+  });
+
+  it("warns about an unclosed comment and treats it as text", () => {
+    const doc = parse("Start <!-- never closed\n\nMore", { mode: "markdown" });
+    expect(doc.overlays.boneyard).toHaveLength(0);
+    expect(doc.diagnostics[0]!.message).toMatch(/never closed/);
+  });
+});
+
 describe("revision tags", () => {
   // From the MaximalScreenplay sample: a revision crosses a paragraph break, and a second starts right after it.
   const src =

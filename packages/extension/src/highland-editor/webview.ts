@@ -32,6 +32,7 @@ const opposite = (op: BinOp): BinOp => (op.kind === "move" ? { kind: "move", fro
 const binHistory = invertedEffects.of((tr) => tr.effects.filter((e) => e.is(binEffect)).map((e) => binEffect.of(opposite(e.value as BinOp))));
 import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, type InlineMark } from "./line-styles.ts";
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
+import { idLineGuard, onlyAddsIdLine } from "./id-line.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: FromPage): void };
 const vscode = acquireVsCodeApi();
@@ -243,6 +244,10 @@ const lineEnds = ViewPlugin.fromClass(
   },
   { decorations: (p) => p.decorations },
 );
+/** Settings → Backup's Link plain files: the ID line at the end is hidden and guarded (id-line.ts). */
+const idLine = new Compartment();
+let hideIdLine = false;
+const idLineExtension = (on: boolean) => (on ? idLineGuard((tr) => !!tr.annotation(remote)) : []);
 const invisibles = new Compartment();
 let showInvisibles = false;
 const invisibleMarks = (on: boolean) => (on ? [highlightWhitespace(), lineEnds] : []);
@@ -367,6 +372,7 @@ function start(text: string): void {
         spellingMarks,
         compare.extension,
         invisibles.of(invisibleMarks(showInvisibles)),
+        idLine.of(idLineExtension(hideIdLine)),
         screenplayCompletion(
           () => (mode === "fountain" ? parsed : null),
           () => ({ locations: documentSettings.autoCompleteLocations, characters: documentSettings.autoCompleteCharacterNames, terms: completionTerms }),
@@ -645,7 +651,11 @@ function replace(text: string): void {
   while (a < old.length && a < text.length && old[a] === text[a]) a++;
   let b = 0;
   while (b < old.length - a && b < text.length - a && old[old.length - 1 - b] === text[text.length - 1 - b]) b++;
-  view.dispatch({ changes: { from: a, to: old.length - b, insert: text.slice(a, text.length - b) }, annotations: remote.of(true) });
+  const removed = old.slice(a, old.length - b);
+  const inserted = text.slice(a, text.length - b);
+  // The ID line added at a save is not an edit of the writer's: undo passes it by.
+  const annotations = onlyAddsIdLine(removed, inserted) ? [remote.of(true), Transaction.addToHistory.of(false)] : remote.of(true);
+  view.dispatch({ changes: { from: a, to: old.length - b, insert: inserted }, annotations });
 }
 
 window.addEventListener("message", (event: MessageEvent) => {
@@ -681,6 +691,11 @@ window.addEventListener("message", (event: MessageEvent) => {
     applyDocument(msg.document);
     applyGeneral(msg.general);
     settingsWindow.backup(msg.backup);
+    const hide = msg.backup?.linkPlainFiles === true;
+    if (hide !== hideIdLine) {
+      hideIdLine = hide;
+      view?.dispatch({ effects: idLine.reconfigure(idLineExtension(hide)) });
+    }
   } else if (msg.type === "backupInfo") settingsWindow.backupInfo(msg.info);
   else if (msg.type === "showSettings") settingsWindow.open(msg.tab);
   else if (msg.type === "pageBreaks") view?.dispatch({ effects: setPageBreaks.of(msg.starts), annotations: remote.of(true) });

@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import { autoSaving } from "./auto-save.ts";
 import { BACKUP_DEFAULTS, mirrorSyncInterval } from "./highland-editor/backup-settings.ts";
 import { workTitle } from "./work-title.ts";
+import { idForm, idLineAddition, noteId } from "./extras-folder.ts";
 import { formOf, type CommitInfo, type SaveKind, type SaveMeta } from "@highwater/history";
 import * as vscode from "vscode";
 import { ask } from "./ask.ts";
@@ -96,6 +97,23 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     });
     return run;
   };
+
+  const linkPlainFiles = () => vscode.workspace.getConfiguration("highwater").get<boolean>("linkPlainFiles", BACKUP_DEFAULTS.linkPlainFiles);
+  /**
+   * The ID line for a plain file whose history already exists (a file's first save starts its
+   * history, so its line comes with the next save). Read without waiting behind a mirror's sync:
+   * VS Code gives a save only a moment.
+   */
+  async function idLineEdits(doc: vscode.TextDocument, key: string): Promise<vscode.TextEdit[]> {
+    try {
+      const text = doc.getText();
+      const found = await history().find({ id: noteId(text), path: key, text }, { wait: false });
+      if (!found || found.paused || found.copyOf || connector.undecided(key)) return [];
+      return [vscode.TextEdit.insert(doc.positionAt(text.length), idLineAddition(text, found.id, idForm(key)))];
+    } catch {
+      return [];
+    }
+  }
 
   /** The kind of file and its name; for a work's first save, its title too (Settings → Backup). */
   async function metaOf(key: string, r: { id: string; files: { scriptName: string; script: string } }): Promise<SaveMeta> {
@@ -274,7 +292,11 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
     }),
     focus.onDidChange(() => focused()),
     vscode.workspace.onWillSaveTextDocument((e) => {
-      if (keyOf(e.document)) reasons.set(e.document.uri.toString(), e.reason);
+      const key = keyOf(e.document);
+      if (!key) return;
+      reasons.set(e.document.uri.toString(), e.reason);
+      // Settings → Backup's Link plain files: the save puts the ID line at the end if it's missing.
+      if (enabled() && linkPlainFiles() && e.document.uri.scheme === "file" && /\.(fountain|spmd|md|markdown)$/i.test(key) && !noteId(e.document.getText())) e.waitUntil(idLineEdits(e.document, key));
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
       const key = keyOf(doc);
