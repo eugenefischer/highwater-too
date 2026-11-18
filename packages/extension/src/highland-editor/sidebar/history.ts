@@ -7,7 +7,7 @@ import { HISTORY_HELP } from "./help.ts";
 // Writing History (Highwater's, not Highland's): this document's saves, newest first, under a
 // heading for each day. A click selects a save, which shows Compare and Revert where its word change
 // was; Escape, a click beside the saves or leaving the panel lets go of it. The foot says when the
-// document was last saved and when the mirror last synced, beside Export and the gear (the rest,
+// document was last saved and when the mirror last synced, beside Export and the More (⋯) menu (the rest,
 // including turning the history off or on for this document).
 
 export class HistoryPanel {

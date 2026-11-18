@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.67
+
+- The Writing History panel's menu button shows ⋯, like the More buttons everywhere else, instead of a gear.
+
 ## 0.6.66
 
 - Settings → Backup: the note under Title New Works With is gone.
