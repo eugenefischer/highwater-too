@@ -171,6 +171,14 @@ describe("rendered manuscript PDFs match Highland's", () => {
     expect(r.diffs, formatReport(r)).toEqual([]);
   });
 
+  // Five-line list items pushed towards the foot of a page (generated 2026-11-20, exported by EJ):
+  // a list's first item moves on whole; later items split anywhere, their first line taking the extra line.
+  it("ListBreakProbe matches line for line", async () => {
+    const r = comparePages(await extractPages(join(generated, "ListBreakProbe.pdf")), await renderManuscript(join(generated, "ListBreakProbe.highland")));
+    expect(r.diffs, formatReport(r)).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
   it("draws an image centred at 1 pt per pixel", () => {
     const bundle = HighlandBundle.fromZip(new Uint8Array(readFileSync(join(generated, "ManuscriptEdgeCases.highland"))));
     const l = layoutManuscript(parse(bundle.text, { mode: "markdown" }), { highlandQuirks: true, image: (src) => bundle.get(src) ?? null });

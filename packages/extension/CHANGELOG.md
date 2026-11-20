@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.75
+
+- Manuscript PDFs: a list item at the foot of a page now breaks as Highland 2's does (measured from a new probe, ListBreakProbe): a list's first item moves to the next page whole, and later items split across the page break wherever they fall. Before, every item was kept whole.
+
 ## 0.6.74
 
 - The question after a sync when a work on this computer began as a copy of a work saved on another computer is worded like the others: "… began as a copy of “…”, saved on another computer.", with **Add to “…”** (was Join Them) or **Make This the Work's File**, and **Keep as a Separate Work** (was Keep Separate / Keep as a Separate Copy).

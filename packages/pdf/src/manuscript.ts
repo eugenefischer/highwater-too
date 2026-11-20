@@ -446,16 +446,18 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         break;
       }
       case "list":
-        for (const item of e.items) {
+        // ListBreakProbe (Highland 2, 2026-11-20): a list's first item moves to the next page whole;
+        // later items split anywhere, their first line opening (it may take the page's extra line).
+        e.items.forEach((item, index) => {
           const textX = item.level === 0 ? M.list.textX : M.list.nestedX + item.level * M.list.level;
           const marker = item.ordered ? item.marker : item.marker === "-" || item.marker === "+" ? item.marker : "•";
           const lines = wrapRuns(toRuns(item.inline, ctx), (M.list.right - textX) / CHAR);
           lines.forEach((r, k) => {
             const items: Line["items"] = [{ x: textX, runs: r }];
             if (k === 0) items.unshift({ x: textX - runsWidth([{ text: `${marker} `, style: {} }]), runs: [{ text: marker, style: {} }] });
-            push(text(items, k === 0 ? { together: lines.length } : {}));
+            push(text(items, k === 0 ? (index === 0 ? { together: lines.length } : { opens: true }) : {}));
           });
-        }
+        });
         printed = true;
         afterParagraph = false;
         break;
