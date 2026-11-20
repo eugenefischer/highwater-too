@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { pick } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
 import { LANGUAGES } from "./language.ts";
-import { exportManuscript, exportManuscriptDocx, exportPlainText, exportProse, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
+import { exportManuscript, exportManuscriptDocx, exportPlainText, exportRtf, exportProse, exportScreenplay, loadImages, type ExportResult } from "./pdf-export.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { plainExtras } from "./extras.ts";
 import { activeDocument, onDidChangeActiveSurface } from "./surface.ts";
@@ -170,6 +170,18 @@ export async function renderDocx(context: vscode.ExtensionContext, store: Bundle
   const { base, read } = await sources(context, store, doc);
   const font = vscode.workspace.getConfiguration("highwater").get<string>("docxFont") === "Courier Prime" ? "Courier Prime" : "Courier New";
   return exportManuscriptDocx({ ...base, image: await loadImages(base.text, read), font });
+}
+
+/** The script or manuscript as Rich Text, following its print options (and a script's template and scene heading settings). */
+export async function renderRtf(context: vscode.ExtensionContext, store: BundleStore, doc: vscode.TextDocument): Promise<{ rtf: string; problems: string[] }> {
+  const { base, read } = await sources(context, store, doc);
+  if (doc.languageId === LANGUAGES.fountain) {
+    const c = vscode.workspace.getConfiguration("highwater");
+    const d = documentSettings((key) => c.get(key));
+    const template = (await templateOf(context, store, doc)) ?? "Screenplay";
+    return exportRtf({ ...base, mode: "fountain", template, document: { sceneHeadingBold: d.sceneHeadingBold, sceneHeadingUnderline: d.sceneHeadingUnderline, sceneHeadingDoubleSpaced: d.sceneHeadingDoubleSpaced, synopsesItalic: d.synopsesItalic } });
+  }
+  return exportRtf({ ...base, mode: "markdown", image: await loadImages(base.text, read) });
 }
 
 /** The text, its path, the title-page setting and an image reader, shared by the exports. */

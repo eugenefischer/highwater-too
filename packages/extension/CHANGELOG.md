@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.76
+
+- **Export Text** can save a screenplay or a manuscript as Rich Text (`.rtf`, the Rich Text choice in the save dialog's format menu). It keeps the look of Highland 2's RTF export (Courier Prime 12, the template's indents and line spacing) and fixes what that export got wrong or left out:
+  - dual dialogue is side by side, with each cue at its own indent;
+  - every scene heading keeps its indent (Highland's lost it after a heading with no number and after a page break);
+  - tables are tables and term lists line up on tabs (Highland wrote their raw text);
+  - links keep their addresses;
+  - block quotes stay inside the right margin;
+  - list items have hanging markers and no blank line between them;
+  - the title page, the header and the footer are included.
+- Notes, synopses and revision colours in the RTF follow the print options, as in the PDF. A screenplay uses its print template's layout and the Document settings for scene headings and synopses.
 ## 0.6.75
 
 - Manuscript PDFs: a list item at the foot of a page now breaks as Highland 2's does (measured from a new probe, ListBreakProbe): a list's first item moves to the next page whole, and later items split across the page break wherever they fall. Before, every item was kept whole.

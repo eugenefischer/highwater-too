@@ -13,6 +13,7 @@ import { LANGUAGES } from "./language.ts";
 import { currentDocument } from "./highland-editor/settings-host.ts";
 import { openHighland } from "./open.ts";
 import { exportScreenplayFdx } from "./pdf-export.ts";
+import { renderRtf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags } from "./syntax/edits.ts";
 import { toBundle, toPlain, toTextBundle } from "./to-bundle.ts";
@@ -35,7 +36,7 @@ export function registerConversions(context: vscode.ExtensionContext, store: Bun
     vscode.commands.registerCommand("highwater.convertToFountain", toPlainFile),
     vscode.commands.registerCommand("highwater.convertToMarkdown", toPlainFile),
     vscode.commands.registerCommand("highwater.convertToText", toPlainFile),
-    vscode.commands.registerCommand("highwater.export", () => exportText(store)),
+    vscode.commands.registerCommand("highwater.export", () => exportText(context, store)),
   );
 }
 
@@ -182,11 +183,12 @@ async function writeTextBundle(store: BundleStore, target: vscode.Uri, text: str
 }
 
 /**
- * Export Text: the script as .fountain, .md or .txt without revision marks, as a TextBundle, or
- * (a screenplay) as a Final Draft file. An export is a new file outside the writing history: if it
+ * Export Text: the script as .fountain, .md or .txt without revision marks, as a TextBundle, as
+ * Rich Text (a screenplay or manuscript, following the print options), or (a screenplay) as a
+ * Final Draft file. An export is a new file outside the writing history: if it
  * is edited and saved, it starts a history of its own.
  */
-async function exportText(store: BundleStore): Promise<void> {
+async function exportText(context: vscode.ExtensionContext, store: BundleStore): Promise<void> {
   const doc = activeDocument();
   const parts = doc?.uri.scheme === SCHEME ? splitBundlePath(doc.uri.fsPath) : null;
   const plain = doc && plainExtras().isPlain(doc) ? doc.uri.fsPath : null;
@@ -203,8 +205,8 @@ async function exportText(store: BundleStore): Promise<void> {
       ext === "txt"
         ? { "Plain Text": ["txt"], TextBundle: ["textbundle"] }
         : ext === "fountain"
-          ? { Fountain: ["fountain"], "Plain Text": ["txt"], TextBundle: ["textbundle"], "Final Draft": ["fdx"] }
-          : { Markdown: ["md"], "Plain Text": ["txt"], TextBundle: ["textbundle"] },
+          ? { Fountain: ["fountain"], "Plain Text": ["txt"], TextBundle: ["textbundle"], "Rich Text": ["rtf"], "Final Draft": ["fdx"] }
+          : { Markdown: ["md"], "Plain Text": ["txt"], TextBundle: ["textbundle"], "Rich Text": ["rtf"] },
     title: "Export Text",
   });
   if (!target) return;
@@ -219,6 +221,11 @@ async function exportText(store: BundleStore): Promise<void> {
     // Final Draft keeps revisions (as revision sets) and notes, so it starts from the text as written.
     const { fdx, problems } = await exportScreenplayFdx({ text: withoutIdNote(doc.getText()), path: from, document: currentDocument() });
     await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(fdx));
+    for (const p of problems) void vscode.window.showWarningMessage(p);
+  } else if (ext !== "txt" && target.fsPath.toLowerCase().endsWith(".rtf")) {
+    // Rich Text follows the print options (notes, synopses, revision colours), so it starts from the text as written.
+    const { rtf, problems } = await renderRtf(context, store, doc);
+    await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(rtf));
     for (const p of problems) void vscode.window.showWarningMessage(p);
   } else if (target.fsPath.toLowerCase().endsWith(".textbundle")) await writeTextBundle(store, target, text, ext === "fountain" ? "fountain" : ext === "md" ? "markdown" : "plain", plain, parts?.bundle ?? null);
   else await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(text));

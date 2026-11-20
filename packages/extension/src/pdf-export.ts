@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse, resolveIncludes, type IncludeFile, type IncludeLoader } from "@highwater/parser";
-import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, renderPdf, screenplayFdx, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type PrintMarks, type ScriptDocumentOptions, type SourceRange } from "@highwater/pdf";
+import { layoutManuscript, layoutPlainText, layoutProse, layoutScreenplay, PROSE_TEMPLATES, manuscriptDocx, manuscriptRtf, renderPdf, screenplayFdx, screenplayRtf, SCREENPLAY, SCRIPT_TEMPLATES, type DocxFont, type Layout, type PrintMarks, type ScriptDocumentOptions, type SourceRange } from "@highwater/pdf";
 import type { Document, Element, MergedElement } from "@highwater/parser";
 import { paragraphNumbers } from "./highland-editor/line-styles.ts";
 
@@ -185,6 +185,43 @@ export async function exportScreenplayFdx(options: { text: string; path: string;
     ...(options.document ? { sceneHeadingBold: options.document.sceneHeadingBold, sceneHeadingUnderline: options.document.sceneHeadingUnderline } : {}),
   });
   return { fdx, problems: merged.problems.map((p) => p.message) };
+}
+
+/**
+ * A screenplay or manuscript as Rich Text (M13), with {{INCLUDE}} files merged in (their revisions
+ * not kept). Notes, synopses and revision colours follow the print options.
+ */
+export async function exportRtf(options: {
+  text: string;
+  path: string;
+  mode: "fountain" | "markdown";
+  date?: Date;
+  titlePage?: boolean;
+  print?: PrintFlags;
+  template?: string;
+  document?: { sceneHeadingBold: boolean; sceneHeadingUnderline: boolean; sceneHeadingDoubleSpaced: boolean; synopsesItalic: boolean };
+  image?: (src: string) => Uint8Array | null;
+}): Promise<{ rtf: string; problems: string[] }> {
+  const root: IncludeFile = { id: options.path, name: options.path, source: options.text };
+  const merged = await resolveIncludes(root, options.mode, includeLoader);
+  const doc = parse(options.text, { mode: options.mode });
+  const own = (m: MergedElement) => m.file === root || m.file.id === root.id;
+  const p = options.print;
+  const common = {
+    elements: merged.elements.map((m) => ({ element: m.element, source: own(m) ? doc.source : m.file.source, own: own(m) })),
+    print: { ...(p?.notes ? { notes: true } : {}), ...(p?.synopses ? { synopses: true } : {}), ...(p?.revisionColor ? { revisionColor: true } : {}) },
+    ...(options.date ? { date: options.date } : {}),
+    ...(options.titlePage === false ? { titlePage: false } : {}),
+  };
+  const rtf =
+    options.mode === "fountain"
+      ? screenplayRtf(doc, {
+          ...common,
+          template: SCRIPT_TEMPLATES[options.template ?? "Screenplay"] ?? SCREENPLAY,
+          ...(options.document ?? {}),
+        })
+      : manuscriptRtf(doc, { ...common, ...(options.image ? { image: options.image } : {}) });
+  return { rtf, problems: merged.problems.map((m) => m.message) };
 }
 
 /** Reads every image a manuscript names, so layout (which is synchronous) can look them up. */
