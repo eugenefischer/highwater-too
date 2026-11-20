@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.74
+
+- The question after a sync when a work on this computer began as a copy of a work saved on another computer is worded like the others: "… began as a copy of “…”, saved on another computer.", with **Add to “…”** (was Join Them) or **Make This the Work's File**, and **Keep as a Separate Work** (was Keep Separate / Keep as a Separate Copy).
+
 ## 0.6.73
 
 - The questions asked when a file belongs to a work in your writing history are reworded (EJ): each choice says what happens to the file, every one ends "Until you choose, your saves aren't recorded.", and the choices have the same names throughout: **Add to “…”** (was Connect It / Fetch Its History), **Keep as a Separate Work** (was Keep as a Separate Copy), **Make This the Work's File**, **Update to the Latest**, **Compare with the Latest**, **Keep This Version** (also replacing Join, Continuing from This Text). Dates read "Nov 18, 2026, 9:10 AM".

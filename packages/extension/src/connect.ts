@@ -46,8 +46,8 @@ export interface ConnectorHost {
  * writer chooses, the file's saves are not recorded.
  */
 /** The questions' shared choices and closing line (EJ approved the wording, 2026-11-20). */
-const SEPARATE = "Keep as a Separate Work";
-const MAKE_WORKS_FILE = "Make This the Work's File";
+export const SEPARATE = "Keep as a Separate Work";
+export const MAKE_WORKS_FILE = "Make This the Work's File";
 const UNTIL = "Until you choose, your saves aren't recorded.";
 
 export class Connector {

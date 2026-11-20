@@ -4,7 +4,7 @@ import { basename } from "node:path";
 import { formOf, type CommitInfo, type History, type WorkInfo } from "@highwater/history";
 import * as vscode from "vscode";
 import { ask } from "./ask.ts";
-import type { Connector } from "./connect.ts";
+import { MAKE_WORKS_FILE, SEPARATE, type Connector } from "./connect.ts";
 import { plainExtras } from "./extras.ts";
 import type { HistoryMirror } from "./mirror.ts";
 import type { BundleStore } from "./store.ts";
@@ -192,16 +192,19 @@ export async function afterPull(host: WorksHost, asked: Set<string>): Promise<vo
     if (!path) continue;
     const name = basename(path);
     const sameForm = !c.other.form || c.other.form === formOf(path);
-    const join = sameForm ? "Join Them" : "Make This File the Work's File";
-    const separate = sameForm ? "Keep Separate" : "Keep as a Separate Copy";
+    const title = c.other.title;
+    // Worded as the recognition questions are (EJ, 2026-11-20): what happens to the file.
+    const join = sameForm ? `Add to “${title}”` : MAKE_WORKS_FILE;
+    const separate = SEPARATE;
+    const kind = (form: string) => (form === "highland" ? "a .highland file" : `a .${form} file`);
     const choice = await ask(
       "warning",
-      `The history of ${name} on this computer started from a save of “${c.other.title}” made on another computer.`,
+      `${name} began as a copy of “${title}”, saved on another computer.`,
       {
         modal: true,
         detail: sameForm
-          ? `Join them: fetch that work's history and continue it with ${name}, keeping both histories (nothing is lost). Or keep them as separate works.`
-          : `“${c.other.title}” is kept as ${c.other.form === "highland" ? "a .highland file" : `a .${c.other.form} file`}, and ${name} is a different kind of file. Make this file the work's file: the histories are joined and continue with ${name}, recorded as a conversion. Or keep it as a separate copy.`,
+          ? `${join}: this file joins that work, and its saves on this computer are added to the work's history. Nothing is lost.\n\n${SEPARATE}: this file keeps a writing history of its own.`
+          : `“${title}” is kept as ${kind(c.other.form!)}, and ${name} is ${kind(formOf(path))}.\n\n${MAKE_WORKS_FILE}: “${title}” carries on in ${name} from now on, with this file's saves added to its history. Nothing is lost.\n\n${SEPARATE}: this file keeps a writing history of its own.`,
       },
       join,
       separate,
