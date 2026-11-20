@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.73
+
+- The questions asked when a file belongs to a work in your writing history are reworded (EJ): each choice says what happens to the file, every one ends "Until you choose, your saves aren't recorded.", and the choices have the same names throughout: **Add to “…”** (was Connect It / Fetch Its History), **Keep as a Separate Work** (was Keep as a Separate Copy), **Make This the Work's File**, **Update to the Latest**, **Compare with the Latest**, **Keep This Version** (also replacing Join, Continuing from This Text). Dates read "Nov 18, 2026, 9:10 AM".
+
 ## 0.6.72
 
 - The editor's ⋯ menu's spelling pair reads **Check Spelling While Typing** / **Stop Checking Spelling** (was Show / Hide Spelling Checks).

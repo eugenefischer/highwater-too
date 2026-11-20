@@ -45,6 +45,11 @@ export interface ConnectorHost {
  * file that is not the work's latest save asks how it continues; there is no default. Until the
  * writer chooses, the file's saves are not recorded.
  */
+/** The questions' shared choices and closing line (EJ approved the wording, 2026-11-20). */
+const SEPARATE = "Keep as a Separate Work";
+const MAKE_WORKS_FILE = "Make This the Work's File";
+const UNTIL = "Until you choose, your saves aren't recorded.";
+
 export class Connector {
   readonly #host: ConnectorHost;
   /** Files looked at this session (asked once each, unless still undecided). */
@@ -184,20 +189,24 @@ export class Connector {
     if (p.stage === "copy") return this.#askCopy(key, p);
     const title = p.r.entry.title;
     if (p.stage === "connect") {
-      const where = p.r.local ? "" : " Its history is on the mirror, not on this computer.";
       const why =
         p.r.by === "id"
-          ? `${name} belongs to “${title}” in your writing history.`
+          ? `${name} belongs to “${title}”, a work in your writing history.`
           : p.r.by === "hash"
-            ? `${name} has exactly the text of a save of “${title}” in your writing history.`
-            : `${name} has the same name as “${title}” in your writing history, and may be a copy of it.`;
-      const go = p.r.local ? "Connect It" : "Fetch Its History";
+            ? `${name} has the same text as a save of “${title}”, a work in your writing history.`
+            : `${name} has the same name as “${title}”, a work in your writing history. It may be a copy.`;
+      const go = `Add to “${title}”`;
       const choice = await ask(
         "warning",
         why,
-        { modal: true, detail: `${where} ${p.r.local ? "Connect" : "Fetch that history to this computer and connect"} this file to it, so its saves continue the same history? Or keep it as a separate copy, with a history of its own.`.trim() },
+        {
+          modal: true,
+          detail:
+            `${go}: this file's saves join that work's history, after its earlier saves.${p.r.local ? "" : " That history is on your mirror, so it's brought to this computer first."}\n\n` +
+            `${SEPARATE}: this file gets a writing history of its own.\n\n${UNTIL}`,
+        },
         go,
-        "Keep as a Separate Copy",
+        SEPARATE,
       );
       if (!choice) return this.#wait(key, p);
       if (choice !== go) return this.#separate(key);
@@ -212,19 +221,22 @@ export class Connector {
       await h.claim({ id: entry.id, branch: entry.branch }, key);
       const form = head.form ?? entry.form;
       if (form && form !== formOf(key)) {
-        const kept = form === "highland" ? "a .highland file" : `a plain .${form} file`;
+        const kept = form === "highland" ? "a .highland file" : `a .${form} file`;
+        const other = basename(head.file ?? entry.file ?? "") || "the work's other file";
         const choice = await ask(
           "warning",
-          `“${title}” is kept as ${kept}, and ${name} is a different kind of file.`,
+          `“${title}” is kept as ${kept}, and ${name} is ${formOf(key) === "highland" ? "a .highland file" : `a .${formOf(key)} file`}.`,
           {
             modal: true,
-            detail: `Make this file the work's file: the history continues with ${name} from now on, recorded as a conversion, and the work's other file is no longer tracked. Or keep this file as a separate copy, with a history of its own.`,
+            detail:
+              `${MAKE_WORKS_FILE}: “${title}” carries on in ${name} from now on. ${other} is left as it is, and changes to it aren't recorded.\n\n` +
+              `${SEPARATE}: this file gets a writing history of its own.\n\n${UNTIL}`,
           },
-          "Make This File the Work's File",
-          "Keep as a Separate Copy",
+          MAKE_WORKS_FILE,
+          SEPARATE,
         );
         if (!choice) return this.#wait(key, p);
-        if (choice !== "Make This File the Work's File") return this.#separate(key);
+        if (choice !== MAKE_WORKS_FILE) return this.#separate(key);
         this.#done(key);
         await this.#host.commit(key, "convert", `to ${name}`);
         return;
@@ -234,23 +246,28 @@ export class Connector {
     // stage "text": how this file's text relates to the work's saves.
     if (p.r.match === "latest") return this.#done(key);
     const save = p.r.text ? await h.saveWithText(entry.branch, p.r.text) : null;
-    const when = save ? save.date.toLocaleString() : "an earlier date";
-    const latest = head.date.toLocaleString();
+    const day = { dateStyle: "medium", timeStyle: "short" } as const;
+    const when = save ? save.date.toLocaleString([], day) : "an earlier date";
+    const latest = head.date.toLocaleString([], day);
+    const separate = `${SEPARATE}: this file gets a writing history of its own.\n\n${UNTIL}`;
     if (p.r.match === "older") {
       const choice = await ask(
         "warning",
-        `${name} is an older version of “${title}”: the save of ${when}. The latest save is from ${latest}.`,
+        `${name} is an older version of “${title}”.`,
         {
           modal: true,
           detail:
-            "Update to the latest: this file is replaced with the latest save (nothing is lost: this version is itself a save in the history).\n\nKeep this version: your next save goes back to it, recorded as a revert.\n\nKeep as a separate copy: this file gets a history of its own.",
+            `It's the version saved on ${when}. The newest version was saved on ${latest}.\n\n` +
+            "Update to the Latest: replace this file (with its Bin and Scratchpad) with the newest version. This version stays in the history.\n\n" +
+            "Keep This Version: carry on with this file as it is. When you next save, it becomes the newest version.\n\n" +
+            separate,
         },
         "Update to the Latest",
         "Keep This Version",
-        "Keep as a Separate Copy",
+        SEPARATE,
       );
       if (!choice) return this.#wait(key, p);
-      if (choice === "Keep as a Separate Copy") return this.#separate(key);
+      if (choice === SEPARATE) return this.#separate(key);
       if (choice === "Keep This Version") {
         this.#next.set(key, { kind: "revert", note: `to the save of ${when}` });
         return this.#done(key);
@@ -261,19 +278,21 @@ export class Connector {
     if (p.r.match === "edited") {
       const choice = await ask(
         "warning",
-        `${name} was edited since the save of ${when} of “${title}”, and the work has been saved since, most recently on ${latest}.`,
+        `${name} is an edited older version of “${title}”.`,
         {
           modal: true,
           detail:
-            "Compare with the latest: what this file has that the latest save doesn't is marked in green, and what it lacks in red. Then choose.\n\nKeep this version: your next save continues from this file, recorded as going back to the save of " +
-            `${when} with edits.\n\nKeep as a separate copy: this file gets a history of its own.`,
+            `It began as the version saved on ${when}, and has been edited since. The newest version was saved on ${latest}.\n\n` +
+            "Compare with the Latest: see what this file has that the newest version doesn't (in green) and what it lacks (in red), then choose. Nothing is replaced.\n\n" +
+            "Keep This Version: carry on with this file, edits included. When you next save, it becomes the newest version.\n\n" +
+            separate,
         },
         "Compare with the Latest",
         "Keep This Version",
-        "Keep as a Separate Copy",
+        SEPARATE,
       );
       if (!choice) return this.#wait(key, p);
-      if (choice === "Keep as a Separate Copy") return this.#separate(key);
+      if (choice === SEPARATE) return this.#separate(key);
       if (choice === "Keep This Version") {
         this.#next.set(key, { kind: "revert", note: `to the save of ${when}, edited since` });
         return this.#done(key);
@@ -283,16 +302,19 @@ export class Connector {
     }
     const choice = await ask(
       "warning",
-      `${name}'s text matches no save of “${title}”.`,
+      `${name}'s text doesn't match any save of “${title}”.`,
       {
         modal: true,
-        detail: `It may have been edited somewhere without the writing history. The work was last saved on ${latest}.\n\nJoin, continuing from this text: your next save continues the work with this file's text.\n\nKeep as a separate copy: this file gets a history of its own.`,
+        detail:
+          `It may have been edited somewhere its history wasn't kept, such as another app. The newest version was saved on ${latest}.\n\n` +
+          `Keep This Version: carry on with this file as it is, as part of “${title}”. When you next save, it becomes the newest version.\n\n` +
+          separate,
       },
-      "Join, Continuing from This Text",
-      "Keep as a Separate Copy",
+      "Keep This Version",
+      SEPARATE,
     );
     if (!choice) return this.#wait(key, p);
-    if (choice !== "Join, Continuing from This Text") return this.#separate(key);
+    if (choice !== "Keep This Version") return this.#separate(key);
     this.#next.set(key, { kind: "save", note: "continuing with text edited elsewhere" });
     return this.#done(key);
   }
@@ -313,7 +335,7 @@ export class Connector {
         detail:
           `The work's file is still at ${p.original}.\n\n` +
           `Keep as a Separate Work: ${name} gets a writing history of its own from its next save. ${basename(p.original)} keeps “${p.title}”'s history.\n\n` +
-          `Make This the Work's File: “${p.title}”'s history carries on with ${name} from its next save. ${basename(p.original)} is no longer tracked; if you open it again, you'll be asked about it.\n\n` +
+          `Make This the Work's File: “${p.title}”'s history carries on with ${name} from its next save. ${basename(p.original)} is left as it is, and changes to it aren't recorded. If you open it again, you'll be asked about it.\n\n` +
           "Until you choose, your saves aren't recorded.",
       },
       "Keep as a Separate Work",
