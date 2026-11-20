@@ -1,8 +1,8 @@
-import { inlineText, seriesCounter, type Directive, type Document, type Element, type Inline, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
-import { imageSize, manuscriptHeadingPages, MANUSCRIPT } from "./manuscript.ts";
-import { SCREENPLAY, styledValue, type ScriptTemplate } from "./screenplay.ts";
-import { onlyNotes, plain, printContext, SYNOPSIS_COLOR, toRuns, type InlineContext, type PrintContext } from "./text.ts";
-import { CHAR, type PrintMarks, type Run, type TextStyle } from "./types.ts";
+import { inlineText, seriesCounter, type Directive, type Document, type Element, type Inline, type PageTextPart, type PageTextSlots } from "@highwater/parser";
+import { imageSize, layoutManuscript, manuscriptHeadingPages, MANUSCRIPT } from "./manuscript.ts";
+import { layoutScreenplay, SCREENPLAY, type ScriptTemplate } from "./screenplay.ts";
+import { onlyNotes, plain, printContext, runsWidth, SYNOPSIS_COLOR, toRuns, type InlineContext, type PrintContext } from "./text.ts";
+import { CHAR, type Page, type PrintMarks, type Run, type TextStyle } from "./types.ts";
 
 /**
  * Rich Text (.rtf) exports (M13; EJ, 2026-11-20): Highland 2's RTF export (claude/rtf-findings.md)
@@ -140,13 +140,27 @@ function pard(o: { li?: number; ri?: number; fi?: number; sb?: number; sl?: numb
 }
 
 /** A header or footer from {{HEADER}}/{{FOOTER}}: left, centre and right on tabs; %p the page, %pp the count, %# the chapter. */
-function slotsRtf(rtf: Rtf, d: PageTextSlots, width: number, base: string): string {
+function slotsRtf(d: PageTextSlots, base: string, at: PageTextPlace): string {
   const fill = (parts: PageTextPart[] | null) =>
     (parts ?? [])
       .map((t) => (t.kind === "text" ? Rtf.text(t.text) : t.kind === "page" ? "{\\field{\\*\\fldinst PAGE}{\\fldrslt 1}}" : t.kind === "pageCount" ? "{\\field{\\*\\fldinst NUMPAGES}{\\fldrslt 1}}" : `{\\field{\\*\\fldinst STYLEREF "heading 1"}{\\fldrslt }}`))
       .join("");
-  void rtf;
-  return `${base}\\tqc\\tx${tw(width / 2)}\\tqr\\tx${tw(width)} ${fill(d.left)}\\tab ${fill(d.center)}\\tab ${fill(d.right)}\\par`;
+  return `${base}${at.indents}\\tqc\\tx${tw(at.centre)}\\tqr\\tx${tw(at.right)} ${fill(d.left)}\\tab ${fill(d.center)}\\tab ${fill(d.right)}\\par`;
+}
+
+/**
+ * Where the PDF puts headers and footers (left edge, centre, right edge, in points from the paper's
+ * left edge), as indents and tab stops from the page margins. Tab stops count from the left margin.
+ */
+interface PageTextPlace {
+  indents: string;
+  centre: number;
+  right: number;
+}
+function pageTextPlace(pos: { left: number; centre: number; right: number }, margins: { l: number; r: number }): PageTextPlace {
+  const li = pos.left - margins.l;
+  const ri = PAGE.width - margins.r - pos.right;
+  return { indents: (li ? `\\li${tw(li)}` : "") + (ri ? `\\ri${tw(ri)}` : ""), centre: pos.centre - margins.l, right: pos.right - margins.l };
 }
 
 type PageTextDirective = Extract<Directive, { slots: PageTextSlots }>;
@@ -165,12 +179,15 @@ function pageTexts(elements: RtfElement[]): { header: PageTextDirective | null; 
 }
 
 /** The body's section: page numbering from 1, the header and footer (none on its first page without a {{HEADER}}, as Highland prints). */
-function bodySection(rtf: Rtf, texts: ReturnType<typeof pageTexts>, o: { margins: { l: number; r: number; t: number; b: number }; width: number; headerY: number; footerY: number; defaultHeader: string; first: boolean }): string {
+function bodySection(texts: ReturnType<typeof pageTexts>, o: { margins: { l: number; r: number; t: number; b: number }; header: { y: number; left: number; centre: number; right: number }; footer: { y: number; left: number; centre: number; right: number }; defaultHeader: string; first: boolean }): string {
   const m = o.margins;
-  let s = `\\sectd\\pgnrestart\\pgnstarts1\\margl${tw(m.l)}\\margr${tw(m.r)}\\margt${tw(m.t)}\\margb${tw(m.b)}\\headery${tw(o.headerY)}\\footery${tw(PAGE.height - o.footerY)}`;
+  // Header and footer heights put their baselines where the PDF's are (measured in LibreOffice).
+  let s = `\\sectd\\pgnrestart\\pgnstarts1\\margl${tw(m.l)}\\margr${tw(m.r)}\\margt${tw(m.t)}\\margb${tw(m.b)}\\headery${tw(o.header.y - 7.8)}\\footery${tw(PAGE.height - o.footer.y - 4.3)}`;
   const base = "\\pard\\plain\\f0\\fs24";
-  const header = texts.header ? (texts.header.off ? `${base}\\par` : slotsRtf(rtf, texts.header.slots, o.width, base)) : `${base}\\qr ${o.defaultHeader}\\par`;
-  const footer = texts.footer && !texts.footer.off ? slotsRtf(rtf, texts.footer.slots, o.width, base) : "";
+  const at = pageTextPlace(o.header, m);
+  const below = pageTextPlace(o.footer, m);
+  const header = texts.header ? (texts.header.off ? `${base}\\par` : slotsRtf(texts.header.slots, base, at)) : `${base}${at.indents}\\qr ${o.defaultHeader}\\par`;
+  const footer = texts.footer && !texts.footer.off ? slotsRtf(texts.footer.slots, base, below) : "";
   if (!texts.header && o.first) s += "\\titlepg";
   s += `{\\header ${header}}`;
   if (!texts.header && o.first) s += `{\\headerf ${base}\\par}`;
@@ -205,7 +222,9 @@ export function screenplayRtf(doc: Document, options: RtfOptions = {}): string {
   let pageBreak = false;
   /** A paragraph; the first of an element gets a blank line before it (none at the top of a page). */
   const para = (o: Parameters<typeof pard>[0], content: string, opens = true) => {
-    out.push(`${pard({ sl: lines, ...o, ...(opens && !first && !pageBreak ? { sb: o?.sb ?? lines } : {}), ...(pageBreak ? { pagebb: true } : {}) })}${content}\\par\n`);
+    // Space before only between elements: none at the top of the script or of a page.
+    const { sb, ...rest } = o ?? {};
+    out.push(`${pard({ sl: lines, ...rest, ...(opens && !first && !pageBreak ? { sb: sb ?? lines } : {}), ...(pageBreak ? { pagebb: true } : {}) })}${content}\\par\n`);
     first = false;
     pageBreak = false;
   };
@@ -283,10 +302,11 @@ export function screenplayRtf(doc: Document, options: RtfOptions = {}): string {
   if (empty) out.push(`${pard()}\\par\n`);
 
   const texts = pageTexts(elements);
-  const width = right - margins.l;
   const hasTitle = doc.titlePage !== null && options.titlePage !== false;
-  const title = hasTitle ? screenplayTitlePage(rtf, doc.titlePage!.fields, ctx, T, margins.l, right) : "";
-  const body = bodySection(rtf, texts, { margins, width, headerY: T.header.y - 9, footerY: T.footer.y, defaultHeader: "{\\field{\\*\\fldinst PAGE}{\\fldrslt 2}}.", first: true });
+  // The title page as the PDF lays it out, line for line.
+  const titleLayout = hasTitle ? layoutScreenplay(doc, { template: T, date: ctx.date }).pages[0] : undefined;
+  const title = titleLayout?.number === null ? titlePageRtf(rtf, titleLayout, { margins: { l: margins.l, t: 72 }, centre: T.title.centre, right: T.title.right, ascent: 11 }) : "";
+  const body = bodySection(texts, { margins, header: T.header, footer: T.footer, defaultHeader: "{\\field{\\*\\fldinst PAGE}{\\fldrslt 2}}.", first: true });
   // A title page and nothing else: just the title page.
   if (title && empty) return rtf.document(`\\sectd\\margl${tw(margins.l)}\\margr${tw(margins.r)}\\margt${tw(72)}\\margb${tw(72)}\n${title}`);
   return rtf.document((title ? `\\sectd\\margl${tw(margins.l)}\\margr${tw(margins.r)}\\margt${tw(72)}\\margb${tw(72)}\n${title}\\sect` : "") + body + out.join(""));
@@ -319,36 +339,38 @@ function dualRow(rtf: Rtf, T: ScriptTemplate, left: number, [a, b]: [Extract<Ele
 }
 
 /**
- * The title page as Highland prints it: the title block centred about a third of the way down,
- * contact details at the foot on the left, the draft date on the right; 14.4 pt lines.
+ * A title page from the PDF's layout of it: each printed line becomes a paragraph at the same
+ * height (exact line spacing, the gap above as space before), each part on a tab stop where the
+ * PDF puts it (left at its x, centred lines on the centre, right-aligned ones on the right edge).
  */
-function screenplayTitlePage(rtf: Rtf, fields: TitleField[], ctx: InlineContext, T: ScriptTemplate, left: number, right: number): string {
-  const lines = (names: string[]) =>
-    fields
-      .filter((f) => names.includes(f.name))
-      .flatMap((f) => {
-        const vs = f.values.map((v) => v.text);
-        if (vs[0]?.trim() === "") vs.shift();
-        return vs;
-      })
-      .map((text) => styledValue(text.trim(), ctx));
-  const pitch = T.title.pitch;
-  const p = (runs: Run[], align: "c" | "l" | "r", sb = 0) => `${pard({ sl: pitch, sb, ...(align !== "l" ? { align } : {}), ri: 0 })}${rtf.runs(runs)}\\par\n`;
+function titlePageRtf(rtf: Rtf, page: Page, o: { margins: { l: number; t: number }; centre: number; right: number; ascent: number }): string {
+  const rows: { y: number; items: Page["items"] }[] = [];
+  for (const item of [...page.items].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const row = rows.at(-1);
+    if (row && Math.abs(row.y - item.y) < 0.5) row.items.push(item);
+    else rows.push({ y: item.y, items: [item] });
+  }
   let out = "";
-  let y = 72;
-  const blocks = [lines(["title"]), lines(["credit"]), lines(["author", "authors"]), lines(["source"])].filter((b) => b.length);
-  blocks.forEach((b, k) => {
-    const sb = k === 0 ? Math.max(0, T.title.firstY - 11 - y) : pitch;
-    b.forEach((r, j) => (out += p(r, "c", j === 0 ? sb : 0)));
-    y += sb + b.length * pitch;
-  });
-  const leftLines = lines(["contact", "contact info", "notes", "copyright"]);
-  const rightLines = lines(["draft date", "date", "revision"]);
-  const n = Math.max(leftLines.length, rightLines.length);
-  if (n) {
-    const sb = Math.max(0, T.title.bottomY - 11 - (n - 1) * pitch - y - 4);
-    // Left and right on the same lines: the right part on a right tab.
-    for (let k = 0; k < n; k++) out += `${pard({ sl: pitch, ...(k === 0 ? { sb } : {}), extra: `\\tqr\\tx${tw(right - left)}` })}${rtf.runs(leftLines[k] ?? [])}\\tab ${rtf.runs(rightLines[k] ?? [])}\\par\n`;
+  let top = o.margins.t;
+  for (const row of rows) {
+    const height = 14.4;
+    const sb = Math.max(0, row.y - o.ascent - top);
+    let tabs = "";
+    let text = "";
+    for (const item of row.items) {
+      const len = runsWidth(item.runs);
+      const x = item.x - o.margins.l;
+      if (Math.abs(item.x + len / 2 - o.centre) < 1) tabs += `\\tqc\\tx${tw(o.centre - o.margins.l)}`;
+      else if (Math.abs(item.x + len - o.right) < 1) tabs += `\\tqr\\tx${tw(o.right - o.margins.l)}`;
+      else if (x < 0.5 && text === "") {
+        // At the margin, first on its line: no tab needed.
+        text += rtf.runs(item.runs);
+        continue;
+      } else tabs += `\\tx${tw(x)}`;
+      text += `\\tab ${rtf.runs(item.runs)}`;
+    }
+    out += `${pard({ sl: height, ...(sb > 0.05 ? { sb } : {}), extra: tabs })}${text}\\par\n`;
+    top += sb + height;
   }
   return out || `${pard()}\\par\n`;
 }
@@ -373,7 +395,9 @@ export function manuscriptRtf(doc: Document, options: RtfOptions = {}): string {
   const linkDefinitions = new Map<string, string>();
   for (const { element: e } of elements) if (e.kind === "linkDefinition") linkDefinitions.set(e.label.toLowerCase(), e.url);
   const ctx: InlineContext = { series: seriesCounter(), date: options.date ?? new Date(), links: true, linkDefinitions };
-  const margins = { l: M.left, r: PAGE.width - M.right, t: 72, b: 72 };
+  // The text box is the PDF's (one inch all round), raised 4 pt: with exact 28.32 pt lines the
+  // first baseline then lands on the PDF's (y 90; measured in LibreOffice).
+  const margins = { l: M.left, r: PAGE.width - M.right, t: 68, b: 76 };
   const width = M.right - M.left;
   const hasTitle = doc.titlePage !== null && options.titlePage !== false;
   const out: string[] = [];
@@ -515,8 +539,9 @@ export function manuscriptRtf(doc: Document, options: RtfOptions = {}): string {
   if (empty) out.push(`${pard()}\\par\n`);
 
   const texts = pageTexts(elements);
-  const title = hasTitle ? manuscriptTitlePage(rtf, doc.titlePage!.fields, ctx, width) : "";
-  const body = bodySection(rtf, texts, { margins, width, headerY: M.header.y - 9, footerY: M.footer.y, defaultHeader: "{\\field{\\*\\fldinst PAGE}{\\fldrslt 2}}", first: true });
+  const titleLayout = hasTitle ? layoutManuscript(doc, { date: ctx.date, ...(options.image ? { image: options.image } : {}) }).pages[0] : undefined;
+  const title = titleLayout?.number === null ? titlePageRtf(rtf, titleLayout, { margins: { l: margins.l, t: margins.t }, centre: M.title.centre, right: M.title.right, ascent: 11 }) : "";
+  const body = bodySection(texts, { margins, header: M.header, footer: M.footer, defaultHeader: "{\\field{\\*\\fldinst PAGE}{\\fldrslt 2}}", first: true });
   const titleSection = `\\sectd\\margl${tw(margins.l)}\\margr${tw(margins.r)}\\margt${tw(margins.t)}\\margb${tw(margins.b)}\n${title}`;
   if (title && empty) return rtf.document(titleSection);
   return rtf.document((title ? `${titleSection}\\sect` : "") + body + out.join(""));
@@ -546,50 +571,6 @@ function pictRtf(data: Uint8Array, wpt: number, hpt: number): string {
   const size = imageSize(data);
   const hex = Buffer.from(data).toString("hex").replace(/(.{128})/g, "$1\n");
   return `{\\pict${png ? "\\pngblip" : "\\jpegblip"}\\picw${size?.width ?? 1}\\pich${size?.height ?? 1}\\picwgoal${tw(wpt)}\\pichgoal${tw(hpt)}\n${hex}}`;
-}
-
-/** The manuscript title page as printed: TL and TR at the top, CC centred a third of the way down, BL and BR at the foot; 14.4 pt lines. */
-function manuscriptTitlePage(rtf: Rtf, fields: TitleField[], ctx: InlineContext, width: number): string {
-  const T = MANUSCRIPT.title;
-  const get = (name: string) => fields.find((f) => f.name === name);
-  const lines = (f: TitleField | undefined): Run[][] => (f ? f.values.map((v) => (v.text.trim() === "" ? [] : styledValue(v.text, ctx))) : []);
-  const trim = (ls: Run[][]) => {
-    let a = 0;
-    let b = ls.length;
-    while (a < b && ls[a]!.length === 0) a++;
-    while (b > a && ls[b - 1]!.length === 0) b--;
-    return ls.slice(a, b);
-  };
-  const any = (...names: string[]) => names.flatMap((n) => trim(lines(get(n))));
-  const pitch = T.pitch;
-  const pair = (l: Run[][], r: Run[][], sb: number) => {
-    let s = "";
-    for (let k = 0; k < Math.max(l.length, r.length); k++) s += `${pard({ sl: pitch, ...(k === 0 && sb ? { sb } : {}), extra: `\\tqr\\tx${tw(width)}` })}${rtf.runs(l[k] ?? [])}\\tab ${rtf.runs(r[k] ?? [])}\\par\n`;
-    return s;
-  };
-  let out = "";
-  let y = 72;
-  const tl = any("tl", "contact", "contact info");
-  const tr = any("tr");
-  out += pair(tl, tr, 0);
-  y += Math.max(tl.length, tr.length) * pitch;
-  const blocks: Run[][][] = [];
-  const cc = trim(lines(get("cc")));
-  if (cc.length) blocks.push(cc);
-  else for (const name of ["title", "credit", "author", "authors", "source"]) {
-    const ls = trim(lines(get(name)));
-    if (ls.length) blocks.push(ls);
-  }
-  blocks.forEach((ls, k) => {
-    const sb = k === 0 ? Math.max(0, T.centreY - 11.5 - y) : 2 * pitch;
-    ls.forEach((r, j) => (out += `${pard({ sl: pitch, align: "c", ...(j === 0 && sb ? { sb } : {}) })}${rtf.runs(r)}\\par\n`));
-    y += sb + ls.length * pitch;
-  });
-  const bl = any("bl", "notes", "copyright");
-  const br = any("br", "draft date", "date", "revision");
-  const n = Math.max(bl.length, br.length);
-  if (n) out += pair(bl, br, Math.max(0, T.bottomY - 11.5 - (n - 1) * pitch - y - 4));
-  return out || `${pard()}\\par\n`;
 }
 
 /** The text of inline content, for tests. */

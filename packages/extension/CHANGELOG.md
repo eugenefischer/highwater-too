@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.77
+
+- Rich Text export now puts everything where the PDF does:
+  - a screenplay's header, footer and title page were placed against the half-inch page margin; they now sit at the PDF's positions (1 inch from the left edge, page numbers and right-hand parts ending 1 inch from the right);
+  - both title pages are taken line for line from the PDF's layout (the gaps between title-page fields, and the lower block's lines, were wrong before);
+  - the first scene heading on a page no longer has space above it;
+  - manuscript lines start at the PDF's height on each page.
 ## 0.6.76
 
 - **Export Text** can save a screenplay or a manuscript as Rich Text (`.rtf`, the Rich Text choice in the save dialog's format menu). It keeps the look of Highland 2's RTF export (Courier Prime 12, the template's indents and line spacing) and fixes what that export got wrong or left out:

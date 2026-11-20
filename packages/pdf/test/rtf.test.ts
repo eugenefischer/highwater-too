@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { HighlandBundle } from "@highwater/bundle";
 import { parse } from "@highwater/parser";
 import { describe, expect, it } from "vitest";
-import { layoutManuscript, layoutScreenplay, manuscriptRtf, screenplayRtf, type RtfOptions } from "../src/index.ts";
+import { layoutManuscript, layoutScreenplay, MANUSCRIPT, manuscriptRtf, screenplayRtf, type RtfOptions } from "../src/index.ts";
 
 const generated = fileURLToPath(new URL("../../../fixtures/generated/", import.meta.url));
 const date = new Date(2026, 10, 20);
@@ -62,6 +62,9 @@ describe("Rich Text export: screenplays", () => {
     expect(paragraph(rtf, "FORCED SCENE HEADING")).toContain("\\li1440");
     expect(paragraph(rtf, "INT. HALL")).toContain("\\li1440");
     expect(paragraph(rtf, "INT. HALL")).toContain("\\pagebb");
+    // No space above the first line of the script or of a page.
+    expect(paragraph(rtf, "INT. KITCHEN")).not.toContain("\\sb");
+    expect(paragraph(rtf, "INT. HALL")).not.toContain("\\sb");
   });
 
   it("sets dual dialogue side by side, each cue at its column's indent", () => {
@@ -82,6 +85,15 @@ describe("Rich Text export: screenplays", () => {
     expect(rtf).toMatch(/\{\\header [^}]*RTF Probe/);
     expect(rtf).toMatch(/\{\\footer [^}]*Left footer/);
     expect(screenplay({ titlePage: false })).not.toContain("RTF Export Probe");
+  });
+
+  it("puts the header, footer and title page where the PDF does, not at the half-inch margin", () => {
+    const rtf = screenplay();
+    // Left at 1 in and right at 7.5 in from the paper's edge: indents from the 0.5 in margins.
+    expect(rtf).toMatch(/\{\\header \\pard\\plain\\f0\\fs24\\li720\\ri480\\tqc\\tx5400\\tqr\\tx10080 /);
+    expect(rtf).toMatch(/\{\\footer \\pard\\plain\\f0\\fs24\\li720\\ri480\\tqc\\tx5400\\tqr\\tx10080 /);
+    expect(paragraph(rtf, "RTF Export Probe")).toContain("\\tqc\\tx5400");
+    expect(paragraph(rtf, "probe@example.com")).toMatch(/\\tx720\\tqr\\tx10080 \\tab probe@example\.com\\tab 2026-11-20/);
   });
 
   it("leaves out notes, synopses and revision colours unless the print options ask for them", () => {
@@ -108,8 +120,8 @@ describe("Rich Text export: screenplays", () => {
   });
 
   it("follows the Document settings for scene heading spacing and synopses", () => {
-    expect(paragraph(screenplay(), "INT. KITCHEN")).toContain("\\sb480");
-    expect(paragraph(screenplay({ sceneHeadingDoubleSpaced: false }), "INT. KITCHEN")).toContain("\\sb240");
+    expect(paragraph(screenplay(), "EXT. GARDEN")).toContain("\\sb480");
+    expect(paragraph(screenplay({ sceneHeadingDoubleSpaced: false }), "EXT. GARDEN")).toContain("\\sb240");
     expect(screenplay({ print: { synopses: true }, synopsesItalic: true })).toMatch(/\{\\i\\cf\d+ Synopsis of Act One\.\}/);
   });
 
@@ -191,7 +203,7 @@ describe("Rich Text export: manuscripts", () => {
     const rtf = manuscript();
     expect(rtf.indexOf("About 500 words")).toBeLessThan(rtf.indexOf("\\sect\\sectd"));
     expect(rtf).toContain("Claude\\tab About 500 words");
-    expect(paragraph(rtf, "RTF Export Probe")).toContain("\\qc");
+    expect(paragraph(rtf, "RTF Export Probe")).toContain("\\tqc\\tx4680");
     expect(manuscript({ titlePage: false })).not.toContain("About 500 words");
   });
 
@@ -240,5 +252,44 @@ describe("Rich Text export: manuscripts", () => {
       const ours = (md ? layoutManuscript(doc, { date, image }) : layoutScreenplay(doc, { date })).pages.length;
       expect(Math.abs(pages - ours), `${file}: ${pages} pages in LibreOffice, ${ours} in our PDF`).toBeLessThanOrEqual(Math.ceil(ours * 0.06));
     }
+  }, 240_000);
+
+  const pdftotext = (() => {
+    try {
+      execFileSync("pdftotext", ["-v"], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  it.skipIf(!soffice || !pdftotext)("lands the header, footer, title page and first lines where the PDF puts them, in LibreOffice", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rtf-"));
+    /** Each word's left edge, right edge and baseline (bottom less Courier Prime's 2.9 pt descent). */
+    const words = (name: string, rtf: string, page: number) => {
+      writeFileSync(join(dir, `${name}.rtf`), rtf);
+      execFileSync("soffice", [`-env:UserInstallation=file://${dir}/lo`, "--headless", "--convert-to", "pdf", "--outdir", dir, join(dir, `${name}.rtf`)], { stdio: "ignore", timeout: 120_000 });
+      const out = execFileSync("pdftotext", ["-bbox", "-f", String(page), "-l", String(page), join(dir, `${name}.pdf`), "-"], { encoding: "utf8" });
+      return [...out.matchAll(/xMin="([\d.]+)" yMin="[\d.]+" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)</g)].map((m) => ({ left: +m[1]!, right: +m[2]!, y: +m[3]! - 2.9, text: m[4]! }));
+    };
+    const near = (a: number, b: number) => expect(Math.abs(a - b), `${a} vs ${b}`).toBeLessThan(1.5);
+    const find = (ws: ReturnType<typeof words>, text: string) => ws.find((w) => w.text === text)!;
+    const title = words("title", screenplay(), 1);
+    near(find(title, "probe@example.com").left, 72);
+    near(find(title, "probe@example.com").y, 716.6);
+    near(find(title, "2026-11-20").right, 540);
+    near((find(title, "RTF").left + find(title, "Probe").right) / 2, 306);
+    near(find(title, "RTF").y, 241.4);
+    near(find(title, "written").y, 313.4);
+    const body = words("body", sp("{{HEADER: Head | %p}}\n{{FOOTER: Foot | | Right}}\n\nINT. ROOM - DAY\n\nAction."), 1);
+    near(find(body, "Head").left, 72);
+    near(find(body, "Head").y, 51);
+    near(find(body, "1").right, 540);
+    near(find(body, "Foot").y, 747);
+    near(find(body, "Right").right, 540);
+    near(find(body, "INT.").left, 108);
+    near(find(body, "INT.").y, 81);
+    const m = words("ms", ms("# One\n\nText.", { titlePage: false }), 1);
+    near(find(m, "One").y, 90 + MANUSCRIPT.dropHeading);
+    near(find(m, "Text.").left, 72);
   }, 240_000);
 });
