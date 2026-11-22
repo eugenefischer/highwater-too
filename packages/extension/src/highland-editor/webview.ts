@@ -695,6 +695,23 @@ function apply(id: number, changes: { from: number; to: number; insert: string }
   vscode.postMessage({ type: "applied", id, ok: true });
 }
 
+/** The end-to-end tests: types a letter at a time, as key presses do (one undo step), and says what happened. */
+async function testType(text: string): Promise<void> {
+  let typed = 0;
+  try {
+    for (const ch of text) {
+      if (!view) throw new Error("no editor");
+      const at = view.state.selection.main;
+      view.dispatch({ changes: { from: at.from, to: at.to, insert: ch }, selection: { anchor: at.from + ch.length }, userEvent: "input.type" });
+      typed++;
+      await new Promise((r) => setTimeout(r, 15));
+    }
+    vscode.postMessage({ type: "testTyped", typed, text: view?.state.doc.toString() ?? "" });
+  } catch (e) {
+    vscode.postMessage({ type: "testTyped", typed, text: view?.state.doc.toString() ?? "", error: String((e as Error)?.stack ?? e) });
+  }
+}
+
 /** VS Code's Edit ▸ Undo or Redo: the page's own step (as ⌘Z or ⇧⌘Z), then says whether the text changed. */
 function historyStep(dir: "undo" | "redo"): void {
   if (!view) return vscode.postMessage({ type: "historyStepDone", dir, changed: false });
@@ -729,9 +746,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   } else if (msg.type === "update") replace(msg.text ?? "");
   else if (msg.type === "apply") apply(msg.id, msg.changes, msg.selections);
   else if (msg.type === "historyStep") historyStep(msg.dir);
-  else if (msg.type === "testType" && view) {
-    for (const ch of msg.text) view.dispatch(view.state.replaceSelection(ch), { userEvent: "input.type" });
-  }
+  else if (msg.type === "testType") void testType(msg.text);
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "togglePreview") togglePreview();
   else if (msg.type === "compare") {

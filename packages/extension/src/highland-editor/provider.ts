@@ -138,6 +138,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     /** When a step last brought no change in time: one that still arrives is the stepping's, not an Edit ▸ Undo. */
     let stepTimedOut = 0;
     const walk = async (dir: "undo" | "redo", target: string) => {
+      log(`walk ${dir} to ${JSON.stringify(target.slice(-40))}`);
       walking = true;
       try {
         for (let i = 0; i < WALK_LIMIT && pageForm(document.getText()) !== target; i++) {
@@ -326,6 +327,8 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           applying.delete(msg.id);
           // Its edit came first, as an "edit" message: answer once that is in the document.
           if (resolve) queue = queue.then(() => resolve(msg.ok));
+        } else if (msg.type === "testTyped") {
+          log(`testTyped ${msg.typed} letters${msg.error ? `, error: ${msg.error}` : ""}; page text ${JSON.stringify(msg.text.slice(-60))}; document ${JSON.stringify(pageForm(document.getText()).slice(-60))}`);
         } else if (msg.type === "historyStepDone") {
           // The page's step didn't change its text (nothing to undo, a Bin-only step, comparing):
           // VS Code's own step is taken back.
@@ -339,6 +342,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           queue = queue.then(() => walk(history, target));
         } else if (msg.type === "edit" && msg.changes) {
           const changes = msg.changes;
+          log(`edit from the page: ${changes.map((c) => `${c.from}-${c.to}+${JSON.stringify(c.insert)}`).join(" ")}`);
           // Where each change goes, by line and character in the text before it (the document's
           // line breaks don't matter then; VS Code gives inserted "\n" the document's own).
           const before = pageText;
@@ -392,6 +396,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document.uri.toString() !== document.uri.toString() || e.contentChanges.length === 0) return;
         if (e.document !== document) document = e.document;
+        log(`document changed (${e.reason === undefined ? "edit" : vscode.TextDocumentChangeReason[e.reason]}${walking ? ", stepping" : ""}${panel.active ? "" : ", panel not active"})`);
         if (walking) {
           // VS Code's own undo being stepped to the page's text: the page has it already.
         } else if ((e.reason === vscode.TextDocumentChangeReason.Undo || e.reason === vscode.TextDocumentChangeReason.Redo) && panel.active && view.ready && Date.now() - stepTimedOut > 1000) {

@@ -190,6 +190,8 @@ export type FromPage =
   | { type: "edit"; changes: TextChange[]; history?: "undo" | "redo" }
   /** The page's answer to "historyStep": whether its undo or redo changed the text. */
   | { type: "historyStepDone"; dir: "undo" | "redo"; changed: boolean }
+  /** The end-to-end tests: what "testType" did (for the test's log). */
+  | { type: "testTyped"; typed: number; text: string; error?: string }
   /** The page made (ok) or refused (comparing) an "apply" change. */
   | { type: "applied"; id: number; ok: boolean }
   | { type: "selection"; ranges: SelectionRange[] }

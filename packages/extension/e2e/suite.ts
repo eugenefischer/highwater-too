@@ -670,8 +670,15 @@ const tests: [string, () => Promise<void>][] = [
       const text = () => documentAt(uri).getText();
       await selectInView(start.indexOf("Start.") + "Start.".length);
       // A burst of typing: one step for the page, an edit (and a VS Code undo step) per letter.
+      await vscode.commands.executeCommand("highwater.test.swapLog"); // from here on
       await vscode.commands.executeCommand("highwater.test.typeInView", " One two");
-      await until("the typing in the document", async () => text() === typed);
+      try {
+        await until("the typing in the document", async () => text() === typed);
+      } catch (e) {
+        // What the page did (it says, after typing) and what the extension saw: a failure on CI's macOS run, 0.6.85.
+        const seen = ((await vscode.commands.executeCommand<string[]>("highwater.test.swapLog")) ?? []).join("\n");
+        throw new Error(`${(e as Error).message}\ndocument: ${JSON.stringify(text())}\nlog:\n${seen}`);
+      }
       assert.ok(documentAt(uri).isDirty, "unsaved after typing");
       // ⌘Z: the whole burst goes, and VS Code is back at the saved text, so no unsaved dot.
       await vscode.commands.executeCommand("highwater.test.pageStep", "undo");
