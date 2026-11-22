@@ -32,7 +32,8 @@ async function openBuilder(context: vscode.ExtensionContext, cache: ParseCache):
     async (msg: { type: "insert"; values: BuilderValues } | { type: "cancel" }) => {
       if (msg.type === "insert") {
         // Re-read the document as it is now: the writer may have typed meanwhile.
-        const edit = titlePageEdit(cache.get(document), msg.values);
+        // A plain .md manuscript gets a new title page as YAML front matter; a .highland one keeps Highland's form (EJ, 2026-11-23).
+        const edit = titlePageEdit(cache.get(document), msg.values, document.uri.scheme === "file");
         const shown = viewOf(document);
         // In the Highwater Editor, the page makes the change (one step for its undo).
         if (shown) await shown.apply([edit]);

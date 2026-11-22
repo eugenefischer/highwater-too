@@ -209,6 +209,18 @@ describe("the cursor at a wrapped line", () => {
   }
 });
 
+describe("a title page in YAML front matter", () => {
+  it("shows the front matter as the title page, and lines like Highland's after it as text", async () => {
+    const text = "---\ntitle: A Story\nauthor: Someone\n---\n\nTitle: Not a title page\n\nText.\n";
+    const e = await openEditor(text, "markdown");
+    const classes = await e.page.evaluate(() => [...document.querySelectorAll(".cm-line")].map((l) => [l.textContent, l.className]));
+    const of = (t: string) => (classes.find(([c]) => c === t)?.[1] ?? "") as string;
+    expect(of("title: A Story")).toContain("hl-title");
+    expect(of("Title: Not a title page")).not.toContain("hl-title");
+    await e.close();
+  });
+});
+
 describe("completion", () => {
   it("offers the script's character names for a cue being typed", async () => {
     const text = "INT. KITCHEN - DAY\n\nBOBBY\nHi.\n\n";

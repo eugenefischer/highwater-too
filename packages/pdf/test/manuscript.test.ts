@@ -128,9 +128,10 @@ const noPlaceholders = (pages: PdfPage[]) => pages.map((p) => ({ ...p, lines: p.
 
 describe("YAML front matter and HTML comments", () => {
   it("never print", () => {
-    const text = "---\ntitle: The Story\ntags:\n  - draft\n---\n\n# Chapter One\n\nShe walked. <!-- cut --> She stopped.\n\n<!--\nA cut paragraph.\n-->\n\nThe end.\n";
+    // (Keys that are title-page fields make a title page since 0.6.87: tested below.)
+    const text = "---\nlang: en\ntags:\n  - draft\n---\n\n# Chapter One\n\nShe walked. <!-- cut --> She stopped.\n\n<!--\nA cut paragraph.\n-->\n\nThe end.\n";
     const printed = items(layout(text)).map((it) => it[3]).join("\n");
-    expect(printed).not.toMatch(/title:|draft|cut|---/);
+    expect(printed).not.toMatch(/lang|draft|cut|---/);
     expect(printed).toContain("She walked.");
     expect(printed).toContain("The end.");
     // The same text without them lays out the same pages.
@@ -268,5 +269,16 @@ describe("the page's text box", () => {
     // box's bottom (720), so nothing sits lower than 738.
     const lowest = Math.max(...l.pages.slice(1).flatMap((p) => p.items.filter((it) => it.x > 60).map((it) => it.y)));
     expect(lowest).toBeLessThan(738);
+  });
+});
+
+describe("a title page in YAML front matter (0.6.87)", () => {
+  const highland = "Title: The Enrichment and Decay of Ionia\nAuthor: Eugene Fischer\nContact:\n\tEugene Fischer\n\tyou@example.com\nTR: About 12,000 words\nDraft date: 2026-11-23\n\n# Chapter\n\nText.\n";
+  const yaml = '---\ntitle: The Enrichment and Decay of Ionia\nauthor: Eugene Fischer\ncontact: |\n  Eugene Fischer\n  you@example.com\ntr: About 12,000 words\ndraft_date: "2026-11-23"\ntags: [sf]\n---\n\n# Chapter\n\nText.\n';
+  const pages = (text: string) => layoutManuscript(parse(text, { mode: "markdown" }), { date: new Date(2026, 10, 23) }).pages.map((p) => ({ number: p.number, items: p.items.map((i) => [i.x, i.y, i.runs.map((r) => r.text).join("")]) }));
+
+  it("prints exactly as the same fields in Highland's form", () => {
+    expect(pages(yaml)).toEqual(pages(highland));
+    expect(pages(yaml)[0]!.number).toBeNull();
   });
 });

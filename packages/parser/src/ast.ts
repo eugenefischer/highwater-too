@@ -41,8 +41,11 @@ export interface TextNode {
 
 export interface TitlePageNode {
   kind: "titlePage";
+  /** Highland's form: its lines. From YAML front matter (Markdown): the whole front matter block. */
   span: Span;
   fields: TitleField[];
+  /** Read from YAML front matter rather than Highland's `Key: value` lines. */
+  yaml?: true;
 }
 
 export interface TitleField {

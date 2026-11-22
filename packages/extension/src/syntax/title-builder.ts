@@ -1,4 +1,5 @@
 import type { Document, TitleField } from "@highwater/parser";
+import { fieldLines, yamlField, yamlHead, yamlKeyFor } from "./title-form.ts";
 
 /** The Title Page Builder's fields, as in Highland's dialog, with the keys each one reads. */
 export const BUILDER_FIELDS = [
@@ -34,11 +35,22 @@ export function readBuilderValues(doc: Document): BuilderValues {
 /**
  * The edit that writes the builder's values: the builder's fields in Highland's order, then any
  * other fields the title page already had (TL, Notes, Copyright…) exactly as written. Removes the
- * title page when nothing is left.
+ * title page when nothing is left. A YAML title page is written as YAML (title, credit, author,
+ * source, contact, draft_date, revision), as is a new one in a plain .md manuscript (`preferYaml`).
  */
-export function titlePageEdit(doc: Document, values: BuilderValues): { start: number; end: number; text: string } {
+export function titlePageEdit(doc: Document, values: BuilderValues, preferYaml = false): { start: number; end: number; text: string } {
   const src = doc.source;
   const known = new Set<string>(BUILDER_FIELDS.flatMap((b) => [...b.names]));
+  // A title page in YAML front matter stays YAML; a manuscript without one gets YAML when preferred (a plain .md file).
+  if (doc.titlePage?.yaml || (!doc.titlePage && preferYaml && doc.mode === "markdown")) {
+    const lines: string[] = [];
+    for (const b of BUILDER_FIELDS) {
+      const v = values[b.label].replace(/\r\n?/g, "\n").replace(/^\n+|\n+$/g, "");
+      if (v.trim() !== "") lines.push(...yamlField(yamlKeyFor(b.names[0]), v.split("\n").map((p) => p.trim())));
+    }
+    const others = (doc.titlePage?.fields ?? []).filter((f) => !known.has(f.name)).flatMap((f) => yamlField(f.key, fieldLines(f)));
+    return yamlHead(doc, [...lines, ...others]);
+  }
   const lines: string[] = [];
   for (const b of BUILDER_FIELDS) {
     const v = values[b.label].replace(/\r\n?/g, "\n").replace(/^\n+|\n+$/g, "");

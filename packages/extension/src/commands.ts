@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { createDocument, writeBundle, type DocumentMode } from "@highwater/bundle";
+import { parse } from "@highwater/parser";
 import * as vscode from "vscode";
 import { ask, pick } from "./ask.ts";
 import { SCHEME } from "./fs-provider.ts";
@@ -9,6 +10,7 @@ import { openHighland } from "./open.ts";
 import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { changeCase, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
+import { toHighlandTitlePage, toYamlTitlePage } from "./syntax/title-form.ts";
 import { activeDocument, activeOffsets, editActive, HIGHLAND_EDITOR, onDidChangeActiveSurface, showDocument } from "./surface.ts";
 
 const NEW: Record<string, { mode: DocumentMode; template: string; name: string }> = {
@@ -45,6 +47,8 @@ export function registerCommands(context: vscode.ExtensionContext, store: Bundle
     vscode.commands.registerCommand("highwater.newDocument", (kind?: unknown, target?: unknown) =>
       typeof kind === "string" ? newAnyDocument(kind as NewKind, target instanceof vscode.Uri ? target : undefined) : newAnyDocument(),
     ),
+    vscode.commands.registerCommand("highwater.titlePageToYaml", () => convertTitlePage("yaml")),
+    vscode.commands.registerCommand("highwater.titlePageToHighland", () => convertTitlePage("highland")),
     vscode.commands.registerCommand("highwater.useForMarkdown", useForMarkdown),
     vscode.commands.registerCommand("highwater.stopUsingForMarkdown", stopUsingForMarkdown),
     // Menus (the editor title button) pass the document's URI; only an explicit option sets where to save.
@@ -327,4 +331,22 @@ async function keepMarkdownEditorAssociations(): Promise<void> {
   ] as const) {
     if (value && MD_PATTERNS.some((p) => value[p] === LANGUAGES.markdown)) await setEditorAssociations(target, true).catch(() => undefined);
   }
+}
+
+/**
+ * Converts a manuscript's title page between Highland's `Key: value` lines and YAML front matter,
+ * field for field, as one undoable edit in the Highwater Editor (syntax/title-form.ts).
+ */
+async function convertTitlePage(to: "yaml" | "highland"): Promise<void> {
+  const active = activeOffsets();
+  if (!active) return void vscode.window.showInformationMessage("Open a manuscript in the Highwater Editor to convert its title page.");
+  const doc = active.document;
+  if (doc.languageId !== LANGUAGES.markdown) return void vscode.window.showInformationMessage("Only a manuscript's title page can be in YAML front matter.");
+  const parsed = parse(doc.getText(), { mode: "markdown" });
+  if (!parsed.titlePage) return void vscode.window.showInformationMessage("This manuscript has no title page.");
+  if (!!parsed.titlePage.yaml === (to === "yaml")) return void vscode.window.showInformationMessage(to === "yaml" ? "The title page is in YAML front matter already." : "The title page is in Highland style already.");
+  const edit = to === "yaml" ? toYamlTitlePage(parsed) : toHighlandTitlePage(parsed);
+  if (!edit || !(await editActive(doc, [edit]))) return;
+  if (to === "yaml" && doc.uri.scheme === SCHEME)
+    void vscode.window.showInformationMessage("Converted. Highland 2 doesn't read YAML front matter: opened there, this document would show it as text and print no title page.");
 }

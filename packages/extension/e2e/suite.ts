@@ -708,6 +708,24 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "converts a manuscript's title page to YAML front matter and back",
+    async () => {
+      const path = join(dir, "TitleForms.md");
+      const highland = "Title: A Story\nAuthor: Someone\nContact:\n\tLine one\n\tLine two\n\nText.\n";
+      await writeFile(path, highland);
+      const uri = vscode.Uri.file(path);
+      // A .md file is Highwater Markdown when the writer chooses: give this one the language directly.
+      await vscode.languages.setTextDocumentLanguage(await vscode.workspace.openTextDocument(uri), "highland-markdown");
+      await openInEditor(uri, "highland-markdown");
+      await vscode.commands.executeCommand("highwater.titlePageToYaml");
+      await until("the title page in YAML", async () => documentAt(uri).getText() === "---\ntitle: A Story\nauthor: Someone\ncontact: |\n  Line one\n  Line two\n---\n\nText.\n");
+      await vscode.commands.executeCommand("highwater.titlePageToHighland");
+      await until("the title page in Highland style again", async () => documentAt(uri).getText() === highland);
+      await vscode.commands.executeCommand("workbench.action.files.revert");
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    },
+  ],
+  [
     "⌘E in the Highwater Editor lays out the pages in place",
     async () => {
       const path = await copyOf("PreviewInPlace");

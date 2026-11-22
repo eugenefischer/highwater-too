@@ -67,7 +67,22 @@ The sidebar on the left of the page (⌘0 shows or hides it) has Highland's pane
 - **Export Word Document** (manuscripts only): a `.docx` built from ordinary Word styles, with a real header, page numbers, lists and tables, so it can be edited and sent out. Word works out its own page breaks, so the page count can differ a little from the PDF. The `highwater.docxFont` setting chooses between Courier New and Courier Prime (embedded in the file).
 - **Export Text:** the text as `.fountain`, `.md` or `.txt`, or as a `.textbundle` (the text with its images, for apps that read TextBundles), without revision marks. A screenplay can also go out as a Final Draft `.fdx` file, which keeps revisions (a revision set for each colour) and notes; sections are left out. A screenplay or manuscript can also go out as Rich Text (`.rtf`), laid out like its PDF (title page, header and footer included) and following the print options for notes, synopses and revision colours. Exports are always new files, separate from the writing history.
 
-**Markdown files from other apps.** A `.md` manuscript can start with YAML front matter (the `---` … `---` block Typora and Obsidian use) and contain HTML comments (`<!-- … -->`). Both are dimmed in the editor, left out of the word count and the Navigator, and never printed, as those apps leave them out too.
+**Markdown files from other apps.** A `.md` manuscript can start with YAML front matter (the `---` … `---` block Typora and Obsidian use) and contain HTML comments (`<!-- … -->`). Both are dimmed in the editor, left out of the word count and the Navigator, and never printed as text, as those apps leave them out too.
+
+**A manuscript's title page in YAML.** A manuscript's title page can be Highland 2's `Title:` … lines, or YAML front matter with the same fields in lower case: `title`, `credit`, `author`, `source`, `contact`, `notes`, `copyright`, `draft_date`, `date`, `revision`, and `tl`, `tr`, `cc`, `bl`, `br` for the corners. A field of several lines is a `|` block:
+
+```yaml
+---
+title: The Story
+author: A. Writer
+contact: |
+  A. Writer
+  writer@example.com
+tr: About 5,000 words
+---
+```
+
+It prints exactly as the same fields in Highland's form. Other keys (tags, lang…) stay out of the title page. With a YAML title page, `Title:` lines after it are ordinary text. **Convert Title Page to YAML Front Matter** and **Convert Title Page to Highland Style** (Command Palette) convert one form to the other, field for field, as one ⌘Z step. The Title Page Builder keeps whichever form a manuscript has, and gives a plain `.md` manuscript without a title page YAML; a `.highland` manuscript gets Highland's form, which Highland 2 can read (it shows YAML front matter as text).
 
 **Templates.** These six print line for line with Highland 2's own PDFs: Screenplay, Multi-Cam, Stage Play, Graphic Novel, Manuscript and Plain Text. The eight prose templates (Novel, Treatment, Modern Standard, Article, Bulletin, Speech, MLA Report, Wiki) also match line for line when Highland's fonts are available, and closely otherwise (see [Known limitations](#known-limitations)). The chosen template is saved in the document, as Highland saves it.
 

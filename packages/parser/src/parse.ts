@@ -1,10 +1,10 @@
-import type { BlankNode, BoneyardNode, Document, Element, Line, Mode, TextNode, TopNode } from "./ast.ts";
+import type { BlankNode, BoneyardNode, Document, Element, Line, Mode, TextNode, TitlePageNode, TopNode } from "./ast.ts";
 import { collectDirectives } from "./directives.ts";
 import { isBlank, lineText, splitLines } from "./lines.ts";
 import { classifyFountain } from "./fountain.ts";
 import { classifyMarkdown, classifyPlain } from "./markdown.ts";
 import { findOverlays, hiddenRanges } from "./overlays.ts";
-import { readTitlePage } from "./title-page.ts";
+import { readTitlePage, yamlTitlePage } from "./title-page.ts";
 
 export interface ParseOptions {
   mode: Mode;
@@ -59,8 +59,9 @@ export function parse(source: string, options: ParseOptions): Document {
     nodes.push(group("blank", lines, i, leading));
     i = leading;
   }
-  let titlePage = null;
-  const title = readTitlePage(source, lines, i);
+  // A Markdown title page in YAML front matter: then lines like Highland's are ordinary text.
+  let titlePage: TitlePageNode | null = front ? yamlTitlePage(source, front) : null;
+  const title = titlePage ? null : readTitlePage(source, lines, i);
   if (title) {
     titlePage = title.node;
     nodes.push(title.node);

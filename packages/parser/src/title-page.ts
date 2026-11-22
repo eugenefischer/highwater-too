@@ -1,5 +1,6 @@
-import type { Line, TitleField, TitlePageNode } from "./ast.ts";
+import type { Line, Span, TitleField, TitlePageNode } from "./ast.ts";
 import { lineText } from "./lines.ts";
+import { yamlEntries } from "./yaml.ts";
 
 /** Keys that may open a title page (case-insensitive). Later fields may use any key. */
 export const TITLE_PAGE_KEYS = new Set([
@@ -84,4 +85,21 @@ export function fieldText(field: TitleField): string {
   const values = field.values.map((v) => v.text);
   if (values[0] === "") values.shift();
   return values.join("\n");
+}
+
+/** A YAML key as a title-page field name: "draft_date" and "Draft-Date" read as "draft date". */
+export function yamlKeyName(key: string): string {
+  return normalizeKey(key.replace(/[_-]+/g, " "));
+}
+
+/**
+ * A title page in a Markdown document's YAML front matter: its keys that are title-page fields
+ * (title, author, contact, tl…; see TITLE_PAGE_KEYS), each value line a line of the field. Other
+ * keys (tags, lang…) are not part of the title page. Null when it has none.
+ */
+export function yamlTitlePage(source: string, front: { span: Span; inner: Span }): TitlePageNode | null {
+  const fields: TitleField[] = yamlEntries(source, front.inner)
+    .map((e) => ({ key: e.key, name: yamlKeyName(e.key), keySpan: e.keySpan, values: e.values, span: e.span }))
+    .filter((f) => TITLE_PAGE_KEYS.has(f.name));
+  return fields.length ? { kind: "titlePage", span: { ...front.span }, fields, yaml: true } : null;
 }

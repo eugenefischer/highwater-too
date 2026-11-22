@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.87
+
+- **A manuscript's title page can be YAML front matter** (EJ): Highland's fields in lower case (`title`, `credit`, `author`, `source`, `contact`, `notes`, `copyright`, `draft_date`, `date`, `revision`, and `tl`, `tr`, `cc`, `bl`, `br`), a `|` block for a field of several lines. It prints exactly as the same fields in Highland's form, in the pages, PDF, Word and RTF, and gives a new work its title. Other front matter keys are left out of the title page; `Title:` lines after a YAML title page are ordinary text.
+- **Convert Title Page to YAML Front Matter** and **Convert Title Page to Highland Style** (Command Palette, manuscripts in the Highwater Editor): field for field, nothing lost, other front matter kept, one ⌘Z step. Converting a `.highland` manuscript to YAML says that Highland 2 would show the YAML as text.
+- The Title Page Builder keeps a manuscript's form; a new title page is YAML in a plain `.md` manuscript and Highland's form in a `.highland` one (EJ: for now).
 ## 0.6.86
 
 - Fast typing (or a held-down key) in the Highwater Editor could briefly take back letters just typed, put them back, and split the typing into several ⌘Z steps; in the worst case, a letter typed in that moment could land in the wrong place. The extension took the document, still a few letters behind the editor, for a change made elsewhere and sent it to the editor. It now waits until the editor's edits are all in the document before comparing. Found by 0.6.85's new end-to-end test, which types quickly.

@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.86",
+  "version": "0.6.87",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -424,6 +424,16 @@
       {
         "command": "highwater.manageWritingHistory",
         "title": "Manage Writing History…",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.titlePageToYaml",
+        "title": "Convert Title Page to YAML Front Matter",
+        "category": "Highwater Too"
+      },
+      {
+        "command": "highwater.titlePageToHighland",
+        "title": "Convert Title Page to Highland Style",
         "category": "Highwater Too"
       }
     ],
@@ -1811,6 +1821,14 @@
         {
           "command": "highwater.hideInvisibles",
           "when": "highwater.docLang =~ /^highland-/ && highwater.invisibles"
+        },
+        {
+          "command": "highwater.titlePageToYaml",
+          "when": "activeCustomEditorId == 'highwater.highlandEditor' && highwater.docLang == highland-markdown"
+        },
+        {
+          "command": "highwater.titlePageToHighland",
+          "when": "activeCustomEditorId == 'highwater.highlandEditor' && highwater.docLang == highland-markdown"
         }
       ],
       "explorer/context": [
