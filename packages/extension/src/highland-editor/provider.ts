@@ -64,6 +64,10 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     /** The text the page holds ("\n" line breaks), to tell its own edits from changes made elsewhere. */
     let pageText = pageForm(document.getText());
     let queue: Promise<unknown> = Promise.resolve();
+    /** Runs after what is queued; a failure is logged and doesn't stop what comes after. */
+    const enqueue = (run: () => unknown) => {
+      queue = queue.then(run).catch((e: unknown) => log(`queued step failed: ${(e as Error)?.message ?? e}`));
+    };
     const changedElsewhere = () => pageForm(document.getText()) !== pageText;
     // Offsets in the page's text and in the document differ in a file with "\r\n" line breaks.
     const crlf = () => document.eol === vscode.EndOfLine.CRLF;
@@ -135,6 +139,12 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
      * text (a change from elsewhere in between), the document is simply set to it.
      */
     let walking = false;
+    /**
+     * The page's edits received and not yet in the document. Until they are, the document is behind
+     * the page, which is not a change made elsewhere: sending it to the page then took back letters
+     * typed quickly (key repeat, say) and split their undo step (CI's runs of 0.6.85's undo test).
+     */
+    let inFlight = 0;
     /** When a step last brought no change in time: one that still arrives is the stepping's, not an Edit ▸ Undo. */
     let stepTimedOut = 0;
     const walk = async (dir: "undo" | "redo", target: string) => {
@@ -243,6 +253,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       storeCursor();
     };
     const send = () => {
+      log("the document's text sent to the page (changed elsewhere)");
       pageText = pageForm(document.getText());
       postTo(panel, { type: "update", text: pageText });
     };
@@ -326,20 +337,20 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           const resolve = applying.get(msg.id);
           applying.delete(msg.id);
           // Its edit came first, as an "edit" message: answer once that is in the document.
-          if (resolve) queue = queue.then(() => resolve(msg.ok));
+          if (resolve) enqueue(() => resolve(msg.ok));
         } else if (msg.type === "testTyped") {
           log(`testTyped ${msg.typed} letters${msg.error ? `, error: ${msg.error}` : ""}; page text ${JSON.stringify(msg.text.slice(-60))}; document ${JSON.stringify(pageForm(document.getText()).slice(-60))}`);
         } else if (msg.type === "historyStepDone") {
           // The page's step didn't change its text (nothing to undo, a Bin-only step, comparing):
           // VS Code's own step is taken back.
           const opposite = msg.dir === "undo" ? "redo" : "undo";
-          queue = queue.then(() => (pageForm(document.getText()) !== pageText ? walk(msg.changed ? msg.dir : opposite, pageText) : undefined));
+          enqueue(() => (pageForm(document.getText()) !== pageText ? walk(msg.changed ? msg.dir : opposite, pageText) : undefined));
         } else if (msg.type === "edit" && msg.changes && msg.history) {
           // The page's undo or redo: VS Code's own steps bring the document to the same text.
           const history = msg.history;
           for (const c of [...msg.changes].reverse()) pageText = pageText.slice(0, c.from) + c.insert + pageText.slice(c.to);
           const target = pageText;
-          queue = queue.then(() => walk(history, target));
+          enqueue(() => walk(history, target));
         } else if (msg.type === "edit" && msg.changes) {
           const changes = msg.changes;
           log(`edit from the page: ${changes.map((c) => `${c.from}-${c.to}+${JSON.stringify(c.insert)}`).join(" ")}`);
@@ -349,11 +360,17 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           const ranges = changes.map((c) => new vscode.Range(positionIn(before, c.from), positionIn(before, c.to)));
           // The page's text after its edit; the document should match once the edit is applied.
           for (const c of [...changes].reverse()) pageText = pageText.slice(0, c.from) + c.insert + pageText.slice(c.to);
-          queue = queue.then(async () => {
-            const edit = new vscode.WorkspaceEdit();
-            changes.forEach((c, i) => edit.replace(document.uri, ranges[i]!, c.insert));
-            await vscode.workspace.applyEdit(edit);
-            if (changedElsewhere()) send();
+          inFlight++;
+          enqueue(async () => {
+            try {
+              const edit = new vscode.WorkspaceEdit();
+              changes.forEach((c, i) => edit.replace(document.uri, ranges[i]!, c.insert));
+              await vscode.workspace.applyEdit(edit);
+            } finally {
+              inFlight--;
+            }
+            // Only once the page's edits are all in: before, the document is behind the page, not changed elsewhere.
+            if (inFlight === 0 && changedElsewhere()) send();
           });
         }
       }),
@@ -402,7 +419,7 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         } else if ((e.reason === vscode.TextDocumentChangeReason.Undo || e.reason === vscode.TextDocumentChangeReason.Redo) && panel.active && view.ready && Date.now() - stepTimedOut > 1000) {
           // VS Code's Edit ▸ Undo or Redo in this editor: the page takes its own step (see walk).
           postTo(panel, { type: "historyStep", dir: e.reason === vscode.TextDocumentChangeReason.Undo ? "undo" : "redo" });
-        } else if (changedElsewhere()) send();
+        } else if (inFlight === 0 && changedElsewhere()) send();
         if (view.ready) sendCounts();
       }),
     ];

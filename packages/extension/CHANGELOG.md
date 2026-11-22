@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.86
+
+- Fast typing (or a held-down key) in the Highwater Editor could briefly take back letters just typed, put them back, and split the typing into several ⌘Z steps; in the worst case, a letter typed in that moment could land in the wrong place. The extension took the document, still a few letters behind the editor, for a change made elsewhere and sent it to the editor. It now waits until the editor's edits are all in the document before comparing. Found by 0.6.85's new end-to-end test, which types quickly.
+- A failed step in sending the editor's edits to the document no longer stops the ones after it.
 ## 0.6.85
 
 - VS Code's Edit ▸ Undo and Edit ▸ Redo now do what ⌘Z and ⇧⌘Z do in the Highwater Editor, in the same steps (a burst of typing, a ⌘B, a Bin drag), instead of one letter at a time. Redo works after either, and the unsaved dot goes away when you undo back to the saved text (EJ).
