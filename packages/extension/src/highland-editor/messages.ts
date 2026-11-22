@@ -124,8 +124,9 @@ export type ToPage =
   // The text and how to show it.
   | { type: "init"; text: string; mode: Mode }
   | { type: "update"; text: string }
+  /** A change one of Highwater's commands makes (⌘B, a marker, an insert): the page makes it as its own edit. */
+  | { type: "apply"; id: number; changes: { from: number; to: number; insert: string }[]; selections?: { anchor: number; head: number }[] }
   | { type: "reveal"; offset: number; how: "top" | "center"; select: boolean }
-  | { type: "select"; ranges: SelectionRange[] }
   | { type: "theme"; vars: Record<string, string> | null }
   /** The theme in use (highwater.theme) and your own themes, for the theme menu and window. */
   | { type: "themes"; current: string; customs: CustomTheme[]; darkPagesSetting: boolean; darkPages: { background: string; text: string } | null }
@@ -182,6 +183,8 @@ export type FromPage =
   | { type: "ready" }
   | { type: "pageFocus" }
   | { type: "edit"; changes: TextChange[] }
+  /** The page made (ok) or refused (comparing) an "apply" change. */
+  | { type: "applied"; id: number; ok: boolean }
   | { type: "selection"; ranges: SelectionRange[] }
   | { type: "scroll"; top: number }
   // The theme menu: opened (remember the theme there was), a theme tried, closed keeping it or not.

@@ -27,6 +27,15 @@ export { HIGHLAND_EDITOR };
  * The Highwater Editor: a custom text editor over the same document as
  * VS Code's editor, so saving, the writing history and the panes work as before. Opened with
  * Reopen Editor With… or Open in Highwater Editor; the text editor stays one click away.
+ *
+ * Who owns the text (architecture review, 2026-11-22): the page does all editing. Typing, undo
+ * and redo happen in the page, and so do Highwater's commands (⌘B, markers, inserts, the Title
+ * Page Builder): the extension works out the change and sends it with "apply" (HighlandView.apply);
+ * the page makes it as its own edit, so its rules and its undo history cover it. Every edit the
+ * page makes comes back as "edit" and is applied to the document, which is the copy VS Code saves
+ * and the writing history records. A change that replaces the text from elsewhere (Revert, VS
+ * Code's Edit ▸ Undo, the file changed on disk, another editor) reaches the page as "update",
+ * marked as coming from outside.
  */
 export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
   constructor(
@@ -81,21 +90,45 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       pagesSent: 0,
       comparing: false,
       togglePreview: () => postTo(panel, { type: "togglePreview" }),
-      select: (ranges) => {
-        // The page must hold the edited text before it can select in it.
-        if (changedElsewhere()) send();
-        if (view.ready) postTo(panel, { type: "select", ranges: ranges.map((r) => ({ anchor: toPage(r.anchor), head: toPage(r.head) })) });
-      },
       reveal: (offset, how, select) => {
         const msg: ToPage = { type: "reveal", offset: toPage(offset), how, select };
         // The page drops messages sent before its script has started: hold the latest until it has.
         if (view.ready) postTo(panel, msg);
         else pendingReveal = msg;
       },
+      apply: async (edits, selections) => {
+        if (!view.ready) return false;
+        // The page must hold the document's text (and the edits it already sent must be in the
+        // document) before offsets in the document mean the same place in the page.
+        await queue;
+        if (changedElsewhere()) send();
+        const before = document.getText();
+        const changes = edits.map((e) => ({ from: toPage(e.start), to: toPage(e.end), insert: pageForm(e.text) }));
+        // Selections are offsets in the edited document: in a "\r\n" file, find the same line and character in the edited page text.
+        let after = before;
+        for (const e of [...edits].sort((a, b) => b.start - a.start)) after = after.slice(0, e.start) + e.text + after.slice(e.end);
+        const afterPage = pageForm(after);
+        const inPage = (o: number) => {
+          if (!crlf()) return o;
+          const p = lineAndCharacter(after, o);
+          return offsetOf(afterPage, p.line, p.character);
+        };
+        const id = ++applyId;
+        const done = new Promise<boolean>((resolve) => {
+          applying.set(id, resolve);
+          // A page that never answers (closed meanwhile) doesn't leave the command waiting.
+          setTimeout(() => applying.delete(id) && resolve(false), 5000);
+        });
+        postTo(panel, { type: "apply", id, changes, ...(selections ? { selections: selections.map((r) => ({ anchor: inPage(r.anchor), head: inPage(r.head) })) } : {}) });
+        return done;
+      },
       showPanel: (name) => whenReady(() => postTo(panel, { type: "showPanel", panel: name })),
       compareWith: (hash, at) => whenReady(() => sidebar.compare(hash, at)),
     };
     let pendingReveal: ToPage | undefined;
+    /** Changes sent to the page to make ("apply"), waiting for its answer. */
+    let applyId = 0;
+    const applying = new Map<number, (ok: boolean) => void>();
     /** What waits for the page's script to start (it drops messages sent before). */
     const waiting: (() => void)[] = [];
     const whenReady = (run: () => void) => (view.ready ? run() : waiting.push(run));
@@ -248,6 +281,11 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
         } else if (msg.type === "scroll" && typeof msg.top === "number") {
           view.top = toDocument(msg.top);
           highlandViews.scrolled(view);
+        } else if (msg.type === "applied") {
+          const resolve = applying.get(msg.id);
+          applying.delete(msg.id);
+          // Its edit came first, as an "edit" message: answer once that is in the document.
+          if (resolve) queue = queue.then(() => resolve(msg.ok));
         } else if (msg.type === "edit" && msg.changes) {
           const changes = msg.changes;
           // Where each change goes, by line and character in the text before it (the document's

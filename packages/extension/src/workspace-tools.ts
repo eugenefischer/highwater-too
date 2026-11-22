@@ -33,9 +33,14 @@ async function openBuilder(context: vscode.ExtensionContext, cache: ParseCache):
       if (msg.type === "insert") {
         // Re-read the document as it is now: the writer may have typed meanwhile.
         const edit = titlePageEdit(cache.get(document), msg.values);
-        const we = new vscode.WorkspaceEdit();
-        we.replace(document.uri, new vscode.Range(document.positionAt(edit.start), document.positionAt(edit.end)), edit.text);
-        await vscode.workspace.applyEdit(we);
+        const shown = viewOf(document);
+        // In the Highwater Editor, the page makes the change (one step for its undo).
+        if (shown) await shown.apply([edit]);
+        else {
+          const we = new vscode.WorkspaceEdit();
+          we.replace(document.uri, new vscode.Range(document.positionAt(edit.start), document.positionAt(edit.end)), edit.text);
+          await vscode.workspace.applyEdit(we);
+        }
       }
       panel.dispose();
       // Back to the editor the writer came from (the Highwater Editor if that was it).

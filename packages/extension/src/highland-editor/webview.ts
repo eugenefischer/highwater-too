@@ -665,13 +665,32 @@ function toBin(cut: boolean): void {
   });
 }
 
-/** Sets the selections after one of Highwater's writing keys (bold, centre, case…) changed the text. */
-function select(ranges: { anchor: number; head: number }[]): void {
-  if (!view || !ranges.length) return;
+/**
+ * A change one of Highwater's commands makes (⌘B, a marker, an insert, the Title Page Builder),
+ * made here as the page's own edit: one step for undo, the page's rules apply (the hidden history
+ * line, no changes while comparing), and it goes to the document like typing. Changes from
+ * elsewhere (Revert, VS Code's Edit ▸ Undo, the file changed on disk) come as "update" instead.
+ */
+function apply(id: number, changes: { from: number; to: number; insert: string }[], selections?: { anchor: number; head: number }[]): void {
+  if (!view) return vscode.postMessage({ type: "applied", id, ok: false });
+  if (compare.active) {
+    compare.refused();
+    return vscode.postMessage({ type: "applied", id, ok: false });
+  }
   const len = view.state.doc.length;
   const clamp = (n: number) => Math.min(Math.max(0, n), len);
-  view.dispatch({ selection: EditorSelection.create(ranges.map((r) => EditorSelection.range(clamp(r.anchor), clamp(r.head)))), annotations: remote.of(true), scrollIntoView: true });
+  // In the text before the change, in order (the extension may list them last first).
+  const set = view.state.changes(changes.map((c) => ({ from: clamp(c.from), to: clamp(c.to), insert: c.insert })).sort((a, b) => a.from - b.from));
+  const fit = (n: number) => Math.min(Math.max(0, n), set.newLength);
+  view.dispatch({
+    changes: set,
+    ...(selections?.length ? { selection: EditorSelection.create(selections.map((r) => EditorSelection.range(fit(r.anchor), fit(r.head)))) } : {}),
+    userEvent: "highwater.command",
+    scrollIntoView: true,
+    annotations: isolateHistory.of("full"),
+  });
   view.focus();
+  vscode.postMessage({ type: "applied", id, ok: true });
 }
 
 /** Replaces the text with the document's, changing only what differs, so the cursor stays put. */
@@ -698,8 +717,8 @@ window.addEventListener("message", (event: MessageEvent) => {
     document.body.dataset.mode = mode;
     start(msg.text ?? "");
   } else if (msg.type === "update") replace(msg.text ?? "");
+  else if (msg.type === "apply") apply(msg.id, msg.changes, msg.selections);
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
-  else if (msg.type === "select" && msg.ranges) select(msg.ranges);
   else if (msg.type === "togglePreview") togglePreview();
   else if (msg.type === "compare") {
     if (pages.shown) pages.hide();

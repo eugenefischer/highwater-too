@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { postTo } from "./highland-editor/messages.ts";
 
 /**
  * Where the writer is writing: a VS Code text editor or a Highwater Editor. The panes,
@@ -38,8 +37,13 @@ export interface HighlandView {
   pagesSent: number;
   /** Flips between the text and the printed pages (⌘E). */
   togglePreview(): void;
-  /** Sets the selections (offsets in the document as it is now). */
-  select(ranges: readonly { anchor: number; head: number }[]): void;
+  /**
+   * Makes a change as an edit in the page, as typing is made: the page's rules apply to it (a
+   * history line stays hidden, nothing changes while comparing), it is one step for undo, and the
+   * page sends it on to the document. Edits are offsets in the document as it is now; selections,
+   * offsets in the edited document. False if the page refused it (comparing) or wasn't there.
+   */
+  apply(edits: readonly OffsetEdit[], selections?: readonly { anchor: number; head: number }[]): Promise<boolean>;
   /** Scrolls to an offset (at the top, or centred if out of view); with `select`, puts the cursor there and focuses the editor. */
   reveal(offset: number, how: "top" | "center", select: boolean): void;
   /** Opens a sidebar panel (held until the page has started). */
@@ -209,12 +213,10 @@ export async function revealOffset(doc: vscode.TextDocument, offset: number, how
 /** Replaces the selection in whichever editor shows the document (a text editor is opened if none is). */
 export async function insertAtSelection(doc: vscode.TextDocument, text: string): Promise<void> {
   const view = viewOf(doc);
-  if (view?.comparing) return void postTo(view.panel, { type: "compareRefused" });
   if (view) {
     const s = view.selections[0] ?? { anchor: 0, head: 0 };
-    const edit = new vscode.WorkspaceEdit();
-    edit.replace(doc.uri, new vscode.Range(doc.positionAt(Math.min(s.anchor, s.head)), doc.positionAt(Math.max(s.anchor, s.head))), text);
-    await vscode.workspace.applyEdit(edit);
+    const start = Math.min(s.anchor, s.head);
+    await view.apply([{ start, end: Math.max(s.anchor, s.head), text }], [{ anchor: start + text.length, head: start + text.length }]);
     view.panel.reveal(view.panel.viewColumn, false);
     return;
   }
@@ -236,17 +238,7 @@ export interface OffsetEdit {
  */
 export async function editActive(doc: vscode.TextDocument, edits: readonly OffsetEdit[], selections?: readonly { anchor: number; head: number }[]): Promise<boolean> {
   const view = activeView();
-  if (view && view.document === doc) {
-    if (view.comparing) {
-      postTo(view.panel, { type: "compareRefused" });
-      return false;
-    }
-    const edit = new vscode.WorkspaceEdit();
-    for (const e of edits) edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
-    if (!(await vscode.workspace.applyEdit(edit))) return false;
-    if (selections) view.select(selections);
-    return true;
-  }
+  if (view && view.document === doc) return view.apply(edits, selections);
   const editor = vscode.window.activeTextEditor;
   if (!editor || editor.document !== doc) return false;
   const ok = await editor.edit((b) => {

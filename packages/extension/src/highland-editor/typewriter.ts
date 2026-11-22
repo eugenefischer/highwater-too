@@ -46,10 +46,10 @@ const spacing = ViewPlugin.fromClass(
   },
 );
 
-/** Typing and deleting (and undo, which types for you) scroll the cursor's line to the height. */
+/** Typing and deleting (and undo, which types for you, and Highwater's commands, ⌘B and the rest) scroll the cursor's line to the height. */
 const follow = EditorState.transactionExtender.of((tr) => {
   if (!tr.docChanged || !target) return null;
-  if (!(tr.isUserEvent("input") || tr.isUserEvent("delete") || tr.isUserEvent("undo") || tr.isUserEvent("redo"))) return null;
+  if (!(tr.isUserEvent("input") || tr.isUserEvent("delete") || tr.isUserEvent("undo") || tr.isUserEvent("redo") || tr.isUserEvent("highwater.command"))) return null;
   // The cursor's line box at the target: its top half a line above it.
   return { effects: EditorView.scrollIntoView(tr.newSelection.main.head, { y: "start", yMargin: Math.max(0, target - lineHeight / 2) }) };
 });

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.82
+
+- Highwater's commands in the editor (⌘B and the other writing keys, case changes, markers, Insert from the Bin, the Title Page Builder) now make their change in the page itself, as typing does, instead of changing the document and having the page copy the result. Each is one step for ⌘Z (before, the page worked the step out by comparing texts), keeps the hidden history line out of reach, is refused while comparing with a save, and keeps the typing line in place with Typewriter Scrolling. Changes from elsewhere (Revert, Edit ▸ Undo, the file changed on disk) still come in as before.
 ## 0.6.81
 
 - No change in use. The keys the editor page leaves to VS Code (⌘B, ⌃M, ⌘E and the rest of Highwater's keybindings) are now read from the extension's keybindings when it is built, instead of a list kept by hand beside them, which had drifted (it held keys with no keybinding off a Mac, and missed ⌘⇧= and ⌃⌥P). A unit test checks every keybinding converts, and the page tests check the keys reach VS Code and do nothing in the page.

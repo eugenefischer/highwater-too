@@ -37,6 +37,51 @@ describe("the text and the extension", () => {
   });
 });
 
+describe("Highwater's commands (⌘B, markers, inserts)", () => {
+  const apply = (id: number, changes: { from: number; to: number; insert: string }[], selections?: { anchor: number; head: number }[]) =>
+    ({ type: "apply", id, changes, ...(selections ? { selections } : {}) }) as const;
+
+  it("makes a command's change as the page's own edit: sent on, selected, one undo step", async () => {
+    const e = await openEditor("Some words here.\n", "markdown");
+    await e.select(16);
+    await e.page.keyboard.type(" More", { delay: 20 });
+    // ⌘B on "words": the extension works out the change and the selection inside the stars.
+    await e.post(apply(1, [{ from: 5, to: 5, insert: "**" }, { from: 10, to: 10, insert: "**" }], [{ anchor: 7, head: 12 }]));
+    await e.page.waitForFunction(() => (window as unknown as { highwaterTest: { posted: { type: string }[] } }).highwaterTest.posted.some((m) => m.type === "applied"));
+    expect(await e.text()).toBe("Some **words** here. More\n");
+    expect(await e.selection()).toMatchObject({ anchor: 7, head: 12 });
+    const posted = await e.posted();
+    expect(posted.find((m) => m.type === "applied")).toEqual({ type: "applied", id: 1, ok: true });
+    const edits = posted.filter((m) => m.type === "edit");
+    expect(edits.at(-1)).toEqual({ type: "edit", changes: [{ from: 5, to: 5, insert: "**" }, { from: 10, to: 10, insert: "**" }] });
+    // Undo takes back the command alone, not the typing before it.
+    await e.page.keyboard.press(`${mod}+z`);
+    expect(await e.text()).toBe("Some words here. More\n");
+    await e.close();
+  });
+
+  it("refuses a command's change while comparing, and says so", async () => {
+    const e = await openEditor("The text now.\n", "markdown");
+    await e.post({ type: "compare", base: "The text then.\n", hash: "0", at: 0 });
+    await e.page.waitForTimeout(100);
+    await e.post(apply(2, [{ from: 0, to: 0, insert: "X" }]));
+    await e.page.waitForFunction(() => (window as unknown as { highwaterTest: { posted: { type: string }[] } }).highwaterTest.posted.some((m) => m.type === "applied"));
+    expect(await e.text()).toBe("The text now.\n");
+    expect((await e.posted()).find((m) => m.type === "applied")).toEqual({ type: "applied", id: 2, ok: false });
+    await e.close();
+  });
+
+  it("keeps the hidden history line out of a command's reach", async () => {
+    const id = "<!-- highwater: 0123456789abcdef -->";
+    const text = `Text.\n\n${id}\n`;
+    const e = await openEditor(text, "markdown", { settings: { backup: { linkPlainFiles: true } } });
+    await e.post(apply(3, [{ from: 0, to: text.length, insert: "Replaced.\n" }]));
+    await e.page.waitForTimeout(100);
+    expect((await e.text()).endsWith(`${id}\n`)).toBe(true);
+    await e.close();
+  });
+});
+
 describe("undo and redo", () => {
   it("undoes typing over a selection in one step, and keeps the keys from VS Code", async () => {
     const start = "# Chapter\n\nThe first line.\n\nThe second line, to replace.\n";
