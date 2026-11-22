@@ -404,7 +404,9 @@ function start(text: string): void {
           const changes: { from: number; to: number; insert: string }[] = [];
           // Offsets in the document as it was before this update, applied in order by the extension.
           u.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => changes.push({ from: fromA, to: toA, insert: inserted.toString() }));
-          vscode.postMessage({ type: "edit", changes });
+          // The page's undo and redo are marked: the extension steps VS Code's own undo to the same text.
+          const history = u.transactions.some((t) => t.isUserEvent("undo")) ? "undo" : u.transactions.some((t) => t.isUserEvent("redo")) ? "redo" : undefined;
+          vscode.postMessage({ type: "edit", changes, ...(history ? { history } : {}) });
         }),
         // After the edit, so the extension reads the offsets against the edited document.
         EditorView.updateListener.of((u) => {
@@ -693,6 +695,14 @@ function apply(id: number, changes: { from: number; to: number; insert: string }
   vscode.postMessage({ type: "applied", id, ok: true });
 }
 
+/** VS Code's Edit ▸ Undo or Redo: the page's own step (as ⌘Z or ⇧⌘Z), then says whether the text changed. */
+function historyStep(dir: "undo" | "redo"): void {
+  if (!view) return vscode.postMessage({ type: "historyStepDone", dir, changed: false });
+  const before = view.state.doc;
+  (dir === "undo" ? undo : redo)(view);
+  vscode.postMessage({ type: "historyStepDone", dir, changed: !view.state.doc.eq(before) });
+}
+
 /** Replaces the text with the document's, changing only what differs, so the cursor stays put. */
 function replace(text: string): void {
   if (!view) return start(text);
@@ -718,6 +728,10 @@ window.addEventListener("message", (event: MessageEvent) => {
     start(msg.text ?? "");
   } else if (msg.type === "update") replace(msg.text ?? "");
   else if (msg.type === "apply") apply(msg.id, msg.changes, msg.selections);
+  else if (msg.type === "historyStep") historyStep(msg.dir);
+  else if (msg.type === "testType" && view) {
+    for (const ch of msg.text) view.dispatch(view.state.replaceSelection(ch), { userEvent: "input.type" });
+  }
   else if (msg.type === "reveal") reveal(msg.offset ?? 0, msg.how ?? "center", msg.select ?? false);
   else if (msg.type === "togglePreview") togglePreview();
   else if (msg.type === "compare") {

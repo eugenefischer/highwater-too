@@ -125,6 +125,47 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       compareWith: (hash, at) => whenReady(() => sidebar.compare(hash, at)),
     };
     let pendingReveal: ToPage | undefined;
+    /**
+     * Undo and redo belong to the page (its steps: a burst of typing, a ⌘B), but VS Code keeps its
+     * own list, a step per edit, which Edit ▸ Undo, Redo and the unsaved dot go by. So when the page
+     * undoes or redoes, VS Code's own undo or redo is stepped until the document matches; when
+     * VS Code's Edit ▸ Undo or Redo moves the document, the page takes its step and VS Code is
+     * stepped the rest of the way. Nothing new is added to VS Code's list, so its Redo still works
+     * and the dot goes when the text is back to the saved one. If the steps can't reach the page's
+     * text (a change from elsewhere in between), the document is simply set to it.
+     */
+    let walking = false;
+    /** When a step last brought no change in time: one that still arrives is the stepping's, not an Edit ▸ Undo. */
+    let stepTimedOut = 0;
+    const walk = async (dir: "undo" | "redo", target: string) => {
+      walking = true;
+      try {
+        for (let i = 0; i < WALK_LIMIT && pageForm(document.getText()) !== target; i++) {
+          // VS Code's Undo and Redo act on the active editor: only while this one is it.
+          if (!panel.active) break;
+          const version = document.version;
+          await vscode.commands.executeCommand(dir);
+          // The change reaches the extension host as an event of its own: give it a moment.
+          for (let waited = 0; document.version === version && waited < 200; waited += 10) await new Promise((r) => setTimeout(r, 10));
+          if (document.version === version) {
+            stepTimedOut = Date.now(); // nothing left to step (or a change slower than this)
+            break;
+          }
+        }
+      } finally {
+        walking = false;
+      }
+      const now = pageForm(document.getText());
+      if (now === target) return;
+      log(`walk ${dir}: VS Code's steps didn't reach the page's text; setting it`);
+      let a = 0;
+      while (a < now.length && a < target.length && now[a] === target[a]) a++;
+      let b = 0;
+      while (b < now.length - a && b < target.length - a && now[now.length - 1 - b] === target[target.length - 1 - b]) b++;
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(document.uri, new vscode.Range(positionIn(now, a), positionIn(now, now.length - b)), target.slice(a, target.length - b));
+      await vscode.workspace.applyEdit(edit);
+    };
     /** Changes sent to the page to make ("apply"), waiting for its answer. */
     let applyId = 0;
     const applying = new Map<number, (ok: boolean) => void>();
@@ -285,6 +326,17 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
           applying.delete(msg.id);
           // Its edit came first, as an "edit" message: answer once that is in the document.
           if (resolve) queue = queue.then(() => resolve(msg.ok));
+        } else if (msg.type === "historyStepDone") {
+          // The page's step didn't change its text (nothing to undo, a Bin-only step, comparing):
+          // VS Code's own step is taken back.
+          const opposite = msg.dir === "undo" ? "redo" : "undo";
+          queue = queue.then(() => (pageForm(document.getText()) !== pageText ? walk(msg.changed ? msg.dir : opposite, pageText) : undefined));
+        } else if (msg.type === "edit" && msg.changes && msg.history) {
+          // The page's undo or redo: VS Code's own steps bring the document to the same text.
+          const history = msg.history;
+          for (const c of [...msg.changes].reverse()) pageText = pageText.slice(0, c.from) + c.insert + pageText.slice(c.to);
+          const target = pageText;
+          queue = queue.then(() => walk(history, target));
         } else if (msg.type === "edit" && msg.changes) {
           const changes = msg.changes;
           // Where each change goes, by line and character in the text before it (the document's
@@ -340,7 +392,12 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document.uri.toString() !== document.uri.toString() || e.contentChanges.length === 0) return;
         if (e.document !== document) document = e.document;
-        if (changedElsewhere()) send();
+        if (walking) {
+          // VS Code's own undo being stepped to the page's text: the page has it already.
+        } else if ((e.reason === vscode.TextDocumentChangeReason.Undo || e.reason === vscode.TextDocumentChangeReason.Redo) && panel.active && view.ready && Date.now() - stepTimedOut > 1000) {
+          // VS Code's Edit ▸ Undo or Redo in this editor: the page takes its own step (see walk).
+          postTo(panel, { type: "historyStep", dir: e.reason === vscode.TextDocumentChangeReason.Undo ? "undo" : "redo" });
+        } else if (changedElsewhere()) send();
         if (view.ready) sendCounts();
       }),
     ];
@@ -369,6 +426,9 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     });
   }
 }
+
+/** VS Code steps taken at most to match one undo or redo of the page's (a burst of typing is a step per letter). */
+const WALK_LIMIT = 400;
 
 /** Notes for the end-to-end tests' log (highwater.test.swapLog): which editor opened what, and the cursor's moves. */
 export const swapLog: string[] = [];

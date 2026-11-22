@@ -126,6 +126,10 @@ export type ToPage =
   | { type: "update"; text: string }
   /** A change one of Highwater's commands makes (⌘B, a marker, an insert): the page makes it as its own edit. */
   | { type: "apply"; id: number; changes: { from: number; to: number; insert: string }[]; selections?: { anchor: number; head: number }[] }
+  /** VS Code's Edit ▸ Undo or Redo (or the tests): the page takes its own undo or redo step. */
+  | { type: "historyStep"; dir: "undo" | "redo" }
+  /** The end-to-end tests: types text as key presses would (one undo step, an edit per letter). */
+  | { type: "testType"; text: string }
   | { type: "reveal"; offset: number; how: "top" | "center"; select: boolean }
   | { type: "theme"; vars: Record<string, string> | null }
   /** The theme in use (highwater.theme) and your own themes, for the theme menu and window. */
@@ -182,7 +186,10 @@ export type FromPage =
   // The text.
   | { type: "ready" }
   | { type: "pageFocus" }
-  | { type: "edit"; changes: TextChange[] }
+  /** An edit the page made; `history` when it was the page's undo or redo (VS Code's own undo is stepped to match). */
+  | { type: "edit"; changes: TextChange[]; history?: "undo" | "redo" }
+  /** The page's answer to "historyStep": whether its undo or redo changed the text. */
+  | { type: "historyStepDone"; dir: "undo" | "redo"; changed: boolean }
   /** The page made (ok) or refused (comparing) an "apply" change. */
   | { type: "applied"; id: number; ok: boolean }
   | { type: "selection"; ranges: SelectionRange[] }

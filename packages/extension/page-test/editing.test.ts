@@ -100,6 +100,38 @@ describe("undo and redo", () => {
     await e.close();
   });
 
+  it("marks its undo and redo edits, so VS Code's own undo can be stepped to match", async () => {
+    const e = await openEditor("Start.\n", "markdown");
+    await e.select(6);
+    await e.page.keyboard.type(" More", { delay: 20 });
+    await e.page.keyboard.press(`${mod}+z`);
+    await e.page.keyboard.press(`${mod}+Shift+z`);
+    const edits = (await e.posted()).filter((m) => m.type === "edit");
+    expect(edits.slice(-2).map((m) => (m as { history?: string }).history)).toEqual(["undo", "redo"]);
+    expect(edits.slice(0, -2).every((m) => !(m as { history?: string }).history)).toBe(true);
+    await e.close();
+  });
+
+  it("takes its own step for VS Code's Edit ▸ Undo and Redo, and says whether the text changed", async () => {
+    const e = await openEditor("Start.\n", "markdown");
+    await e.select(6);
+    await e.page.keyboard.type(" More", { delay: 20 });
+    await e.post({ type: "historyStep", dir: "undo" });
+    await e.page.waitForTimeout(50);
+    expect(await e.text()).toBe("Start.\n");
+    await e.post({ type: "historyStep", dir: "undo" });
+    await e.post({ type: "historyStep", dir: "redo" });
+    await e.page.waitForTimeout(50);
+    expect(await e.text()).toBe("Start. More\n");
+    const done = (await e.posted()).filter((m) => m.type === "historyStepDone");
+    expect(done).toEqual([
+      { type: "historyStepDone", dir: "undo", changed: true },
+      { type: "historyStepDone", dir: "undo", changed: false },
+      { type: "historyStepDone", dir: "redo", changed: true },
+    ]);
+    await e.close();
+  });
+
   it("leaves undo in a text box to the box, and still keeps the key from VS Code", async () => {
     const e = await openEditor("Text.\n", "markdown");
     await e.page.evaluate(() => {

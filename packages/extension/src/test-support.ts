@@ -5,6 +5,7 @@
  * answers itself, since they work through its questions.
  */
 import * as vscode from "vscode";
+import { postTo } from "./highland-editor/messages.ts";
 import { focusedDocument } from "./focus.ts";
 import { swapLog } from "./highland-editor/provider.ts";
 import { pageCountOf } from "./page-count.ts";
@@ -21,6 +22,15 @@ export function registerTestCommands(context: vscode.ExtensionContext): void {
       }),
       vscode.commands.registerCommand("highwater.test.revealInView", (offset: number) => activeView()?.reveal(offset, "center", true)),
       // Selects in the active Highwater Editor (offsets in the document), as the writer would; resolves once the page has.
+      // Types in the active Highwater Editor as key presses would, and takes the page's own undo or redo step (as ⌘Z, ⇧⌘Z).
+      vscode.commands.registerCommand("highwater.test.typeInView", (text: string) => {
+        const view = activeView();
+        if (view) postTo(view.panel, { type: "testType", text });
+      }),
+      vscode.commands.registerCommand("highwater.test.pageStep", (dir: "undo" | "redo") => {
+        const view = activeView();
+        if (view) postTo(view.panel, { type: "historyStep", dir });
+      }),
       vscode.commands.registerCommand("highwater.test.selectInView", (anchor: number, head: number) => activeView()?.apply([], [{ anchor, head }]) ?? false),
       vscode.commands.registerCommand("highwater.test.swapLog", () => swapLog.splice(0)),
       // Scripts open in VS Code's text editor while this is false (the Highwater Editor otherwise).

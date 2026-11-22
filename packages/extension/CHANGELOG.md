@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.85
+
+- VS Code's Edit ▸ Undo and Edit ▸ Redo now do what ⌘Z and ⇧⌘Z do in the Highwater Editor, in the same steps (a burst of typing, a ⌘B, a Bin drag), instead of one letter at a time. Redo works after either, and the unsaved dot goes away when you undo back to the saved text (EJ).
+- How: undo stays the editor's own, and VS Code's list of steps is moved to match it (its own Undo and Redo, a letter at a time, until the text is the same) instead of being given new changes. If that can't reach the text (after a change from elsewhere, say), the text is simply set, and for that once Redo and the dot behave as in 0.6.84.
 ## 0.6.84
 
 - VS Code's text editor is now a plain view of a document: it keeps the highlighting and the outline, and you can still edit there, but Highwater's writing keys (⌘B and the rest), completion, markers, Cut and Copy to Bin and the Title Page Builder work only in the Highwater Editor. The commands' second way of working, for the text editor, is gone, and with it the 15 keybindings that only applied there.

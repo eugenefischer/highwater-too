@@ -660,6 +660,42 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "undo and redo: the page's steps, VS Code's Edit ▸ Undo and Redo, and the unsaved dot agree",
+    async () => {
+      const path = join(dir, "UndoSteps.fountain");
+      await writeFile(path, "INT. HALL - DAY\n\nStart.\n");
+      const uri = vscode.Uri.file(path);
+      const start = (await openInEditor(uri)).getText();
+      const typed = start.replace("Start.", "Start. One two");
+      const text = () => documentAt(uri).getText();
+      await selectInView(start.indexOf("Start.") + "Start.".length);
+      // A burst of typing: one step for the page, an edit (and a VS Code undo step) per letter.
+      await vscode.commands.executeCommand("highwater.test.typeInView", " One two");
+      await until("the typing in the document", async () => text() === typed);
+      assert.ok(documentAt(uri).isDirty, "unsaved after typing");
+      // ⌘Z: the whole burst goes, and VS Code is back at the saved text, so no unsaved dot.
+      await vscode.commands.executeCommand("highwater.test.pageStep", "undo");
+      await until("the page's undo in the document", async () => text() === start);
+      await until("no unsaved dot after undoing to the saved text", async () => !documentAt(uri).isDirty);
+      // VS Code's Edit ▸ Redo still works after ⌘Z, and takes the page's whole step.
+      await vscode.commands.executeCommand("redo");
+      await until("Edit ▸ Redo: the whole burst back", async () => text() === typed);
+      // VS Code's Edit ▸ Undo: the page's step too, not one letter.
+      await vscode.commands.executeCommand("undo");
+      await until("Edit ▸ Undo: the whole burst gone", async () => text() === start);
+      assert.ok(!documentAt(uri).isDirty, "no unsaved dot after Edit ▸ Undo to the saved text");
+      // ⇧⌘Z after Edit ▸ Undo.
+      await vscode.commands.executeCommand("highwater.test.pageStep", "redo");
+      await until("the page's redo in the document", async () => text() === typed);
+      // Nothing left to redo: Edit ▸ Redo leaves the text as it is.
+      await vscode.commands.executeCommand("redo");
+      await new Promise((r) => setTimeout(r, 500));
+      assert.equal(text(), typed, "Edit ▸ Redo with nothing to redo");
+      await vscode.commands.executeCommand("workbench.action.files.revert");
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    },
+  ],
+  [
     "⌘E in the Highwater Editor lays out the pages in place",
     async () => {
       const path = await copyOf("PreviewInPlace");
