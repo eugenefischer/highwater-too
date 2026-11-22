@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.80
+
+- No change in use. The Highwater Editor's page now has automated tests in Chromium (`npm run test:page -w highwater-too`, run by CI on Ubuntu and macOS, so both the Ctrl and ⌘ key paths are tested): typing and the edits sent to the extension, changes made elsewhere, undo and redo (one step for typing over a selection; the keys kept from VS Code; text boxes' own undo), Highwater's keys passed on to VS Code, the cursor at wrapped lines, capitals in scene headings, the hidden history line, and read-only Compare. They fail on 0.6.77's page, which had the arrow-key and undo bugs.
 ## 0.6.79
 
 - ⌘Z after replacing a selection by typing undid one letter at a time, with a flash of the old text each time. The page's own undo ran, and VS Code also undid the document's last edit (one key press), whose text then replaced the page's. Undo and redo keys now stay in the page: one ⌘Z brings back what was replaced, as in Highland (EJ). In the Scratchpad, a card being edited or Find, ⌘Z is that box's own undo and no longer also undoes the document.

@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.79",
+  "version": "0.6.80",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -40,7 +40,8 @@
     "build": "node scripts/build.mjs",
     "package": "npm run build && node -e \"require('fs').copyFileSync('../../LICENSE','LICENSE')\" && vsce package --no-dependencies --out ../../highwater-too.vsix",
     "build:e2e": "node scripts/build.mjs --e2e",
-    "test:e2e": "npm run build:e2e && node --experimental-strip-types --no-warnings e2e/run.ts"
+    "test:e2e": "npm run build:e2e && node --experimental-strip-types --no-warnings e2e/run.ts",
+    "test:page": "npm run build && vitest run --config page-test/vitest.config.ts"
   },
   "contributes": {
     "commands": [
@@ -909,8 +910,26 @@
         },
         "highwater.autoSave": {
           "type": "string",
-          "enum": ["off", "typing", "3", "5", "10", "15", "30", "60"],
-          "enumDescriptions": ["Only when you save (⌘S)", "When you stop typing (after `highwater.autoSavePause` seconds)", "Every 3 minutes while there are unsaved changes", "Every 5 minutes", "Every 10 minutes", "Every 15 minutes", "Every 30 minutes", "Every 60 minutes"],
+          "enum": [
+            "off",
+            "typing",
+            "3",
+            "5",
+            "10",
+            "15",
+            "30",
+            "60"
+          ],
+          "enumDescriptions": [
+            "Only when you save (⌘S)",
+            "When you stop typing (after `highwater.autoSavePause` seconds)",
+            "Every 3 minutes while there are unsaved changes",
+            "Every 5 minutes",
+            "Every 10 minutes",
+            "Every 15 minutes",
+            "Every 30 minutes",
+            "Every 60 minutes"
+          ],
           "default": "10",
           "markdownDescription": "How often screenplays and manuscripts save themselves. Every save is recorded in the writing history. Other files follow VS Code's own **Files: Auto Save**. Also in **Settings…** (Backup)."
         },
@@ -943,8 +962,22 @@
         },
         "highwater.mirrorSync": {
           "type": "string",
-          "enum": ["save", "5", "10", "30", "60", "manual"],
-          "enumDescriptions": ["After every save (other computers' saves are brought in every ten minutes)", "Every 5 minutes", "Every 10 minutes", "Every 30 minutes", "Every 60 minutes", "Only when you click Sync"],
+          "enum": [
+            "save",
+            "5",
+            "10",
+            "30",
+            "60",
+            "manual"
+          ],
+          "enumDescriptions": [
+            "After every save (other computers' saves are brought in every ten minutes)",
+            "Every 5 minutes",
+            "Every 10 minutes",
+            "Every 30 minutes",
+            "Every 60 minutes",
+            "Only when you click Sync"
+          ],
           "default": "save",
           "markdownDescription": "When the writing history is synced with its mirror (`highwater.historyRemote`), both ways. Also in **Settings…** (Backup)."
         },
@@ -2294,7 +2327,8 @@
     "@vscode/vsce": "^4.0.0",
     "dictionary-en": "^4.0.0",
     "nspell": "^2.1.5",
-    "pdfjs-dist": "^6.4.299"
+    "pdfjs-dist": "^6.4.299",
+    "playwright": "^1.63.0"
   },
   "dependencies": {
     "@codemirror/merge": "^6.12.3",

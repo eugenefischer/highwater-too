@@ -402,6 +402,9 @@ function start(text: string): void {
       ],
     }),
   });
+  // The page tests (page-test/) reach the editor through this; nothing else sets the flag.
+  const test = window as { highwaterTest?: { view: EditorView | null } };
+  if (test.highwaterTest) test.highwaterTest.view = view;
   view.scrollDOM.addEventListener("scroll", reportScroll);
   spellingMenu(view, spelling, spellingMarks);
   view.focus();

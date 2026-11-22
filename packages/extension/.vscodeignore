@@ -1,7 +1,9 @@
 src/**
 test/**
 e2e/**
+page-test/**
 dist/e2e/**
+page-test/**
 **/*.map
 .vscode-test/**
 tsconfig*.json

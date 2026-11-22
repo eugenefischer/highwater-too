@@ -33,6 +33,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Page tests in Chromium
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then npx playwright install --with-deps chromium; else npx playwright install chromium; fi
+          npm run test:page -w highwater-too
       - name: End-to-end tests in VS Code
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then xvfb-run -a npm run test:e2e -w highwater-too; else npm run test:e2e -w highwater-too; fi
