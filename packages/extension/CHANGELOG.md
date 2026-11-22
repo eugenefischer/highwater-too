@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.84
+
+- VS Code's text editor is now a plain view of a document: it keeps the highlighting and the outline, and you can still edit there, but Highwater's writing keys (⌘B and the rest), completion, markers, Cut and Copy to Bin and the Title Page Builder work only in the Highwater Editor. The commands' second way of working, for the text editor, is gone, and with it the 15 keybindings that only applied there.
+- Converting a document (to .highland, .fountain, .md or .txt) now closes its Highwater Editor tab too, not only a text tab.
 ## 0.6.83
 
 - VS Code now opens .fountain files and .highland files straight in the Highwater Editor (it is their default editor), and .md files too once you choose Highwater Too for them (the choice now also sets VS Code's editor association; a choice made before is brought up to date). Before, they opened as text and the extension switched them over, which took about 250 lines of tab-watching code: the source of the brief flash of text on opening and of several flaky tests. That code is gone.

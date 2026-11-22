@@ -251,7 +251,8 @@ async function freeFolderName(dir: string, name: string): Promise<string> {
 }
 
 async function closeTabs(match: (uri: vscode.Uri) => boolean): Promise<void> {
-  const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.input instanceof vscode.TabInputText && match(t.input.uri));
+  // Text tabs and Highwater Editor tabs alike (scripts open in the Highwater Editor).
+  const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && match(t.input.uri));
   if (tabs.length) await vscode.window.tabGroups.close(tabs);
 }
 

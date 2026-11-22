@@ -9,7 +9,7 @@ import { documentExtras, type AssetItem, type DocumentExtras, type Owner } from 
 import { binLabel, byteSize, imageSize, move } from "./syntax/workspace.ts";
 import { idForm, idLineAddition, noteId } from "./extras-folder.ts";
 import { focusedDocument, type FocusedDocument } from "./focus.ts";
-import { activeDocument, activeSelections, activeView } from "./surface.ts";
+import { activeDocument, activeView } from "./surface.ts";
 import { postTo } from "./highland-editor/messages.ts";
 
 /**
@@ -35,29 +35,11 @@ export function registerBinAndAssets(context: vscode.ExtensionContext, store: Bu
     vscode.commands.registerCommand("highwater.linkHistoryToFile", () => linkHistoryToFile()),
   );
 
-  async function toBin(cut: boolean): Promise<void> {
-    // In the Highwater Editor the page does it, so ⌘Z there puts the text back and takes the item out.
+  /** Cut and Copy to Bin are the page's (in the Highwater Editor), so ⌘Z there puts the text back and takes the item out. */
+  function toBin(cut: boolean): void {
     const view = activeView();
-    if (view) {
-      postTo(view.panel, { type: "toBin", cut });
-      return;
-    }
-    const active = activeSelections();
-    const document = active?.document;
-    const bundle = document && document.uri.scheme === SCHEME ? splitBundlePath(document.uri.fsPath)?.bundle : undefined;
-    const plain = document && extras.isPlain(document) ? document.uri.fsPath : undefined;
-    if (!active || !document || (!bundle && !plain)) {
-      void vscode.window.showInformationMessage("Open a document to use the Bin.");
-      return;
-    }
-    const ranges = active.ranges.filter((s) => !s.isEmpty);
-    if (!ranges.length) return;
-    const text = ranges.map((r) => document.getText(r)).join("\n\n");
-    if (!(await bin.add(text, bundle ? { bundle } : { plain: plain! }))) return;
-    if (!cut) return;
-    const edit = new vscode.WorkspaceEdit();
-    for (const r of ranges) edit.delete(document.uri, r);
-    await vscode.workspace.applyEdit(edit);
+    if (view) postTo(view.panel, { type: "toBin", cut });
+    else void vscode.window.showInformationMessage("Open the document in the Highwater Editor to use the Bin.");
   }
 
   /** Writes the ID note into a plain file, so its history and extras follow it if it moves. */

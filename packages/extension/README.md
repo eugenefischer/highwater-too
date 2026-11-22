@@ -42,7 +42,7 @@ Your script appears in a page-width column of Courier Prime, as in Highland 2. E
 - **Typewriter Scrolling** (**Enable Typewriter Scrolling** in the editor's ⋯ menu): the line you're typing stays one line below the middle of the editor, for every document. Typing, Return and deleting bring it back there; clicking, the arrow keys and scrolling don't.
 - **Text size:** ⌘+ and ⌘− change it. ⌥⌘0 resets it.
 
-VS Code opens .fountain files and .highland files in the Highwater Editor (and .md files, once you choose Highwater Too for them). A result from VS Code's Search across files opens its document at the top, not at the result: VS Code doesn't pass the line to a custom editor. Use ⌘F in the document to find it. To edit a document as plain text, for other extensions or multiple cursors, use VS Code's **Reopen Editor With… → Text Editor**. It keeps the highlighting, completion and writing keys, but not the sidebar, the pages or Compare.
+VS Code opens .fountain files and .highland files in the Highwater Editor (and .md files, once you choose Highwater Too for them). A result from VS Code's Search across files opens its document at the top, not at the result: VS Code doesn't pass the line to a custom editor. Use ⌘F in the document to find it. To see a document as plain text, for other extensions or multiple cursors, use VS Code's **Reopen Editor With… → Text Editor**. It is a plain view: it keeps the highlighting and the outline, and you can edit there, but Highwater's writing keys, completion, Bin commands and the rest work only in the Highwater Editor.
 
 ## The sidebar
 

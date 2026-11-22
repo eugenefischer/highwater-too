@@ -100,7 +100,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ["conversions and exports", () => registerConversions(context, store)],
     ["Bin and Assets", () => registerBinAndAssets(context, store, fs)],
     ["Title Page Builder", () => registerWorkspaceTools(context, cache)],
-    ["completion, markers and cheat sheet", () => registerWritingTools(context, cache)],
+    ["markers and cheat sheet", () => registerWritingTools(context)],
     ["template indicator", () => registerTemplateStatus(context, store)],
     ["template options", () => watchTemplateOptions(context)],
     ["writing history", () => registerHistory(context, store)],

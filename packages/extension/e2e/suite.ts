@@ -34,6 +34,39 @@ async function openScript(path: string, language = "highland-fountain"): Promise
   return vscode.window.showTextDocument(doc);
 }
 
+type Surface = { document?: string; view: boolean; ready?: boolean; selection?: { anchor: number; head: number }; focused?: string; focusedText?: string };
+const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
+
+async function until(what: string, ok: () => Promise<boolean>, ms = 10_000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!(await ok())) {
+    if (Date.now() > end) throw new Error(`Timed out waiting for: ${what} (${JSON.stringify({ ...(await surface()), focusedText: undefined })})`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
+/** The open document at a URI (a script gets a new TextDocument when it is given its language). */
+const documentAt = (uri: vscode.Uri) => vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString())!;
+
+/**
+ * Opens a document in the Highwater Editor and waits until its page is ready and the document has
+ * its language. Highwater's editing commands work there only (VS Code's text editor is a plain view).
+ */
+async function openInEditor(uri: vscode.Uri, language = "highland-fountain"): Promise<vscode.TextDocument> {
+  await vscode.commands.executeCommand("vscode.openWith", uri, "highwater.highlandEditor");
+  await until("the Highwater Editor", async () => {
+    const s = await surface();
+    return s.view && s.ready === true && s.document === uri.toString();
+  });
+  await waitFor(`${language} on ${uri.path}`, () => documentAt(uri)?.languageId === language);
+  return documentAt(uri);
+}
+
+/** Selects in the active Highwater Editor (offsets in the document). */
+async function selectInView(anchor: number, head = anchor): Promise<void> {
+  assert.ok(await vscode.commands.executeCommand<boolean>("highwater.test.selectInView", anchor, head), "the page selected");
+}
+
 const tests: [string, () => Promise<void>][] = [
   [
     "treats a whole name as one word (completion, double-click and word moves depend on it)",
@@ -93,19 +126,16 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "completes character names and jumps between markers in a screenplay",
+    "jumps between markers in a screenplay",
     async () => {
       const path = join(dir, "Complete.fountain");
-      // Line 5 is "BO", after an empty line: the cue being typed.
       await writeFile(path, "INT. KITCHEN - DAY\n\nBOB\nHi. {{%m: here}}\n\nBO");
-      const doc = await vscode.workspace.openTextDocument(path);
-      const editor = await vscode.window.showTextDocument(doc);
-      await waitFor("Fountain", () => editor.document.languageId === "highland-fountain");
-      const list = await vscode.commands.executeCommand<vscode.CompletionList>("vscode.executeCompletionItemProvider", doc.uri, new vscode.Position(5, 2));
-      assert.ok(list.items.some((i) => (typeof i.label === "string" ? i.label : i.label.label) === "BOB"), "BOB is offered");
-      editor.selection = new vscode.Selection(0, 0, 0, 0);
+      const doc = await openInEditor(vscode.Uri.file(path));
+      await selectInView(0);
       await vscode.commands.executeCommand("highwater.nextMarker");
-      assert.equal(doc.offsetAt(editor.selection.active), doc.getText().indexOf("{{%m"));
+      const want = doc.getText().indexOf("{{%m");
+      await until("the cursor at the marker", async () => (await surface()).selection?.head === want);
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     },
   ],
   [
@@ -158,17 +188,22 @@ const tests: [string, () => Promise<void>][] = [
     "formats the selection with Highland's commands",
     async () => {
       const path = await copyOf("Format");
-      const editor = await openScript(path);
-      const line = editor.document.lineAt(editor.document.lineCount - 1);
-      await editor.edit((e) => e.insert(line.range.end, "\n\nShe runs home."));
-      const last = editor.document.lineAt(editor.document.lineCount - 1);
-      const at = last.text.indexOf("runs");
-      editor.selection = new vscode.Selection(last.lineNumber, at, last.lineNumber, at + 4);
+      const uri = highland(path);
+      let doc = await openInEditor(uri);
+      // A line added from elsewhere (as another editor would), which the page takes in.
+      const edit = new vscode.WorkspaceEdit();
+      edit.insert(uri, doc.positionAt(doc.getText().length), "\n\nShe runs home.");
+      assert.ok(await vscode.workspace.applyEdit(edit), "the edit applies");
+      doc = documentAt(uri);
+      const at = doc.getText().lastIndexOf("runs");
+      await selectInView(at, at + 4);
+      const last = () => documentAt(uri).lineAt(documentAt(uri).lineCount - 1).text;
       await vscode.commands.executeCommand("highwater.bold");
-      assert.equal(editor.document.lineAt(last.lineNumber).text, "She **runs** home.");
+      assert.equal(last(), "She **runs** home.");
       await vscode.commands.executeCommand("highwater.bold");
-      assert.equal(editor.document.lineAt(last.lineNumber).text, "She runs home.");
+      assert.equal(last(), "She runs home.");
       await vscode.commands.executeCommand("workbench.action.files.revert");
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     },
   ],
   [
@@ -190,27 +225,28 @@ const tests: [string, () => Promise<void>][] = [
     "copies a selection to the Bin and opens the Scratchpad",
     async () => {
       const path = await copyOf("Panels");
-      const editor = await openScript(path);
-      let n = editor.document.lineCount - 1;
-      while (n > 0 && editor.document.lineAt(n).isEmptyOrWhitespace) n--;
-      const line = editor.document.lineAt(n);
-      editor.selection = new vscode.Selection(line.range.start, line.range.end);
+      const doc = await openInEditor(highland(path));
+      let n = doc.lineCount - 1;
+      while (n > 0 && doc.lineAt(n).isEmptyOrWhitespace) n--;
+      const line = doc.lineAt(n);
+      await selectInView(doc.offsetAt(line.range.start), doc.offsetAt(line.range.end));
       await vscode.commands.executeCommand("highwater.copyToBin");
-      const bundle = (await readBundle(path)).bundle;
-      assert.deepEqual(bundle.binItems, [line.text]);
-      assert.equal(bundle.text, editor.document.getText(), "the script is untouched");
+      await until("the Bin item in the file", async () => JSON.stringify((await readBundle(path)).bundle.binItems) === JSON.stringify([line.text]));
+      assert.equal((await readBundle(path)).bundle.text, documentAt(highland(path)).getText(), "the script is untouched");
       await vscode.commands.executeCommand("highwater.openScratchpad");
       await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.path.endsWith("/scratchpad.txt") === true);
       assert.equal((await readBundle(path)).bundle.scratchpad, "");
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     },
   ],
   [
     "opens the Title Page Builder",
     async () => {
       const path = await copyOf("Tools");
-      await openScript(path);
+      await openInEditor(highland(path));
       await vscode.commands.executeCommand("highwater.titlePageBuilder");
       await waitFor("title page panel", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.label === "Title Page")));
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     },
   ],
   [
@@ -318,19 +354,28 @@ const tests: [string, () => Promise<void>][] = [
         // Not "Plain.fountain": an earlier test leaves that file open, with other text.
         const path = join(dir, "Kettle.fountain");
         await writeFile(path, "INT. KITCHEN - NIGHT\n\nA kettle boils.\n");
-        const doc = await vscode.workspace.openTextDocument(path);
-        await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
-        const editor = await vscode.window.showTextDocument(doc);
-        const line = editor.document.lineAt(2);
-        editor.selection = new vscode.Selection(line.range.start, line.range.end);
+        const doc = await openInEditor(vscode.Uri.file(path));
+        const line = doc.lineAt(2);
+        await selectInView(doc.offsetAt(line.range.start), doc.offsetAt(line.range.end));
         // The first Bin item of a plain file says, once, where it is kept.
         await vscode.commands.executeCommand("highwater.test.answer", "Continue");
         await vscode.commands.executeCommand("highwater.copyToBin");
-        const asked = await vscode.commands.executeCommand<{ message: string; choices: string[] }[]>("highwater.test.asked");
-        assert.ok(asked.some((q) => q.message.includes("can’t hold a Bin or Scratchpad") && q.choices.includes("Continue")), "the once-only notice about plain files is asked");
+        const asked: { message: string; choices: string[] }[] = [];
+        await until("the once-only notice about plain files", async () => {
+          asked.push(...((await vscode.commands.executeCommand<{ message: string; choices: string[] }[]>("highwater.test.asked")) ?? []));
+          return asked.some((q) => q.message.includes("can’t hold a Bin or Scratchpad") && q.choices.includes("Continue"));
+        });
         const index = () => JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { branch: string; paths: string[] }> };
-        const [id, entry] = Object.entries(index().documents).find(([, e]) => e.paths.includes(path))!;
-        assert.equal(await readFile(join(historyDir, "extras", id, "bin", "0.txt"), "utf8"), "A kettle boils.");
+        const binFile = () => {
+          try {
+            const found = Object.entries(index().documents).find(([, e]) => e.paths.includes(path));
+            return found ? readFileSync(join(historyDir, "extras", found[0], "bin", "0.txt"), "utf8") : null;
+          } catch {
+            return null;
+          }
+        };
+        await until("the Bin item kept with the history", async () => binFile() === "A kettle boils.");
+        const [, entry] = Object.entries(index().documents).find(([, e]) => e.paths.includes(path))!;
         assert.equal(await readFile(path, "utf8"), "INT. KITCHEN - NIGHT\n\nA kettle boils.\n", "the file is untouched");
         await vscode.commands.executeCommand("highwater.openScratchpad");
         await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.scheme === "highwater-extras");
@@ -363,11 +408,19 @@ const tests: [string, () => Promise<void>][] = [
         const path = join(dir, "Round.fountain");
         const original = "INT. HALL - DAY\n\nThe clock strikes.\n";
         await writeFile(path, original);
-        const doc = await vscode.workspace.openTextDocument(path);
-        await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
-        const editor = await vscode.window.showTextDocument(doc);
-        editor.selection = new vscode.Selection(editor.document.lineAt(2).range.start, editor.document.lineAt(2).range.end);
+        const doc = await openInEditor(vscode.Uri.file(path));
+        await selectInView(doc.offsetAt(doc.lineAt(2).range.start), doc.offsetAt(doc.lineAt(2).range.end));
         await vscode.commands.executeCommand("highwater.copyToBin");
+        // The page's Bin change reaches the history's extras folder a moment later.
+        await until("the Bin item kept with the history", async () => {
+          try {
+            const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { paths: string[] }> };
+            const found = Object.entries(index.documents).find(([, e]) => e.paths.includes(path));
+            return !!found && readFileSync(join(historyDir, "extras", found[0], "bin", "0.txt"), "utf8") === "The clock strikes.";
+          } catch {
+            return false;
+          }
+        });
         const highland = join(dir, "Round.highland");
         // Each conversion offers to move the old file to the Trash: keep it.
         await vscode.commands.executeCommand("highwater.test.answer", "Keep", "Keep");

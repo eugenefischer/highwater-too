@@ -191,39 +191,22 @@ export function visibleTop(doc: vscode.TextDocument): number | undefined {
   return viewOf(doc)?.top;
 }
 
-/**
- * Shows an offset of a document: in its Highwater Editor if one is visible, else in a visible
- * text editor. With `select`, puts the cursor there and focuses that editor (opening a text editor if
- * none shows the document).
- */
+/** Shows an offset of a document in its Highwater Editor (opened if needed); with `select`, puts the cursor there and focuses it. */
 export async function revealOffset(doc: vscode.TextDocument, offset: number, how: "top" | "center", select: boolean): Promise<void> {
-  const view = viewOf(doc);
-  if (view) {
-    if (select) view.panel.reveal(view.panel.viewColumn, false);
-    view.reveal(offset, how, select);
-    return;
-  }
-  let editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
-  if (select) editor = await vscode.window.showTextDocument(doc, { ...(editor?.viewColumn ? { viewColumn: editor.viewColumn } : {}), preserveFocus: false });
-  if (!editor) return; // only scrolling, and nothing shows the document
-  const pos = doc.positionAt(offset);
-  if (select) editor.selection = new vscode.Selection(pos, pos);
-  editor.revealRange(new vscode.Range(pos, pos), how === "top" ? vscode.TextEditorRevealType.AtTop : vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  const view = viewOf(doc) ?? (select ? await highwaterOpener.open(doc) : undefined);
+  if (!view) return; // only scrolling, and nothing shows the document
+  if (select) view.panel.reveal(view.panel.viewColumn, false);
+  view.reveal(offset, how, select);
 }
 
-/** Replaces the selection in whichever editor shows the document (a text editor is opened if none is). */
+/** Replaces the selection in the document's Highwater Editor (opened if needed), as the page's own edit. */
 export async function insertAtSelection(doc: vscode.TextDocument, text: string): Promise<void> {
-  const view = viewOf(doc);
-  if (view) {
-    const s = view.selections[0] ?? { anchor: 0, head: 0 };
-    const start = Math.min(s.anchor, s.head);
-    await view.apply([{ start, end: Math.max(s.anchor, s.head), text }], [{ anchor: start + text.length, head: start + text.length }]);
-    view.panel.reveal(view.panel.viewColumn, false);
-    return;
-  }
-  const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc) ?? (await vscode.window.showTextDocument(doc));
-  await editor.edit((e) => e.replace(editor.selection, text));
-  await vscode.window.showTextDocument(editor.document, editor.viewColumn);
+  const view = viewOf(doc) ?? (await highwaterOpener.open(doc));
+  if (!view) return;
+  const s = view.selections[0] ?? { anchor: 0, head: 0 };
+  const start = Math.min(s.anchor, s.head);
+  await view.apply([{ start, end: Math.max(s.anchor, s.head), text }], [{ anchor: start + text.length, head: start + text.length }]);
+  view.panel.reveal(view.panel.viewColumn, false);
 }
 
 /** A replacement in a document, by offsets. */
@@ -234,27 +217,17 @@ export interface OffsetEdit {
 }
 
 /**
- * Applies non-overlapping edits to the document in the active editor (text or Highwater Editor),
- * then sets its selections, given as offsets in the edited text.
+ * Makes a command's change (non-overlapping edits, then selections as offsets in the edited text)
+ * in the active Highwater Editor, as the page's own edit. VS Code's text editor is a plain view:
+ * Highwater's editing commands work only in the Highwater Editor.
  */
 export async function editActive(doc: vscode.TextDocument, edits: readonly OffsetEdit[], selections?: readonly { anchor: number; head: number }[]): Promise<boolean> {
   const view = activeView();
-  if (view && view.document === doc) return view.apply(edits, selections);
-  const editor = vscode.window.activeTextEditor;
-  if (!editor || editor.document !== doc) return false;
-  const ok = await editor.edit((b) => {
-    for (const e of edits) b.replace(new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
-  });
-  if (ok && selections) editor.selections = selections.map((r) => new vscode.Selection(doc.positionAt(r.anchor), doc.positionAt(r.head)));
-  return ok;
+  return view && view.document === doc ? view.apply(edits, selections) : false;
 }
 
-/** The active editor's selections as offsets, with the document. */
+/** The active Highwater Editor's selections as offsets, with the document. */
 export function activeOffsets(): { document: vscode.TextDocument; selections: { anchor: number; head: number }[] } | undefined {
   const view = activeView();
-  if (view) return { document: view.document, selections: [...view.selections] };
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) return undefined;
-  const doc = editor.document;
-  return { document: doc, selections: editor.selections.map((s) => ({ anchor: doc.offsetAt(s.anchor), head: doc.offsetAt(s.active) })) };
+  return view ? { document: view.document, selections: [...view.selections] } : undefined;
 }

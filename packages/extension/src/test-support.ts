@@ -20,6 +20,8 @@ export function registerTestCommands(context: vscode.ExtensionContext): void {
         return { document: activeDocument()?.uri.toString(), view: !!view, ready: view?.ready, pagesSent: view?.pagesSent, selection: view?.selections[0], focused: focusedDocument().key, focusedText: focusedDocument().script?.getText(), pageCount: (() => { const d = activeDocument(); return d ? pageCountOf(d) : undefined; })() };
       }),
       vscode.commands.registerCommand("highwater.test.revealInView", (offset: number) => activeView()?.reveal(offset, "center", true)),
+      // Selects in the active Highwater Editor (offsets in the document), as the writer would; resolves once the page has.
+      vscode.commands.registerCommand("highwater.test.selectInView", (anchor: number, head: number) => activeView()?.apply([], [{ anchor, head }]) ?? false),
       vscode.commands.registerCommand("highwater.test.swapLog", () => swapLog.splice(0)),
       // Scripts open in VS Code's text editor while this is false (the Highwater Editor otherwise).
       vscode.commands.registerCommand("highwater.test.textEditorDefault", (on: boolean) => void (editorDefaults.highwater = !on)),

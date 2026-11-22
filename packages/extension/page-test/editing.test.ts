@@ -177,6 +177,22 @@ describe("the cursor at a wrapped line", () => {
   }
 });
 
+describe("completion", () => {
+  it("offers the script's character names for a cue being typed", async () => {
+    const text = "INT. KITCHEN - DAY\n\nBOBBY\nHi.\n\n";
+    const e = await openEditor(text, "fountain");
+    await e.select(text.length);
+    await e.page.keyboard.type("BO", { delay: 40 });
+    await e.page.waitForSelector(".cm-tooltip-autocomplete", { timeout: 5000 });
+    expect(await e.page.locator(".cm-tooltip-autocomplete").innerText()).toContain("BOBBY");
+    // CodeMirror ignores accepting for a moment after the list opens (interactionDelay, 75 ms).
+    await e.page.waitForTimeout(150);
+    await e.page.keyboard.press("Tab");
+    expect(await e.text()).toBe(`${text}BOBBY`);
+    await e.close();
+  });
+});
+
 describe("edit rules", () => {
   it("puts a scene heading in capitals as it is typed", async () => {
     const e = await openEditor("INT. HALL - DAY\n\nAction.\n\n", "fountain");

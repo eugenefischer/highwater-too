@@ -1,51 +1,12 @@
 import * as vscode from "vscode";
-import { completionTermsOf } from "./highland-editor/international-settings.ts";
-import { currentInternational } from "./script-terms.ts";
 import { askText } from "./ask.ts";
 import { join } from "node:path";
-import { LANGUAGES, type ParseCache } from "./language.ts";
-import { markerText, nextMarker, suggest, vocabulary } from "./syntax/completion.ts";
+import { markerText, nextMarker } from "./syntax/completion.ts";
 import { activeOffsets, editActive, revealOffset } from "./surface.ts";
 
-const KINDS = {
-  character: vscode.CompletionItemKind.Value,
-  scene: vscode.CompletionItemKind.Keyword,
-  location: vscode.CompletionItemKind.Reference,
-  time: vscode.CompletionItemKind.EnumMember,
-  transition: vscode.CompletionItemKind.Keyword,
-} as const;
-
-/** M9: completion in screenplays, markers, and the syntax cheat sheet. */
-export function registerWritingTools(context: vscode.ExtensionContext, cache: ParseCache): void {
+/** Markers and the syntax cheat sheet (completion is the Highwater Editor's own: highland-editor/complete.ts). */
+export function registerWritingTools(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.languages.registerCompletionItemProvider(
-      { language: LANGUAGES.fountain },
-      {
-        provideCompletionItems(document, position, _token, context) {
-          const before = document.lineAt(position.line).text.slice(0, position.character);
-          const afterBlank = position.line === 0 || document.lineAt(position.line - 1).isEmptyOrWhitespace;
-          // The Document settings' Auto-complete locations and Auto-complete character names.
-          const config = vscode.workspace.getConfiguration("highwater");
-          const locations = config.get<boolean>("autoCompleteLocations", true);
-          const characters = config.get<boolean>("autoCompleteCharacterNames", true);
-          let list = suggest(before, afterBlank, vocabulary(cache.get(document)), completionTermsOf(currentInternational())).filter((s) => (s.kind !== "location" || locations) && (s.kind !== "character" || characters));
-          // A typed space only brings up a heading's location or time, never the cue list.
-          if (context.triggerKind === vscode.CompletionTriggerKind.TriggerCharacter) list = list.filter((s) => s.kind === "location" || s.kind === "time");
-          // Not what is already typed: the line being typed is in the parse too ("INT. K" makes a location "K").
-          list = list.filter((s) => s.label !== before.slice(s.replaceFrom).trim());
-          return list.map((s, i) => {
-            const item = new vscode.CompletionItem({ label: s.label, description: s.kind }, KINDS[s.kind]);
-            item.insertText = s.insert;
-            item.range = new vscode.Range(position.line, s.replaceFrom, position.line, position.character);
-            item.sortText = String(i).padStart(4, "0");
-            // After a heading's prefix, offer the script's locations; after a location, the times.
-            if (s.kind === "scene" || s.kind === "location") item.command = { command: "editor.action.triggerSuggest", title: "" };
-            return item;
-          });
-        },
-      },
-      " ",
-    ),
     vscode.commands.registerCommand("highwater.insertMarker", async () => {
       const active = activeOffsets();
       if (!active) return;

@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.83",
+  "version": "0.6.84",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -1582,12 +1582,12 @@
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.quickSuggestions": {
-          "other": true,
+          "other": false,
           "comments": false,
           "strings": false
         },
         "editor.wordBasedSuggestions": "off",
-        "editor.suggestOnTriggerCharacters": true,
+        "editor.suggestOnTriggerCharacters": false,
         "editor.unicodeHighlight.ambiguousCharacters": false,
         "editor.unicodeHighlight.invisibleCharacters": false,
         "editor.renderWhitespace": "none",
@@ -1654,35 +1654,35 @@
         },
         {
           "command": "highwater.bold",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.italic",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.underline",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.strikethrough",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.highlight",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.note",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.centre",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.omit",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.toggleInvisibles",
@@ -1698,15 +1698,15 @@
         },
         {
           "command": "highwater.copyToBin",
-          "when": "highwater.docLang =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.cutToBin",
-          "when": "highwater.docLang =~ /^highland-/ && resourceScheme =~ /^(highland|file)$/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.titlePageBuilder",
-          "when": "highwater.docLang =~ /^highland-(fountain|markdown)$/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor' && highwater.docLang =~ /^highland-(fountain|markdown)$/"
         },
         {
           "command": "highwater.preview",
@@ -1742,11 +1742,11 @@
         },
         {
           "command": "highwater.insertMarker",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.nextMarker",
-          "when": "highwater.docLang =~ /^highland-/"
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         },
         {
           "command": "highwater.showSidebarPanel",
@@ -1962,19 +1962,7 @@
         "command": "highwater.bold",
         "key": "ctrl+b",
         "mac": "cmd+b",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
-      },
-      {
-        "command": "highwater.bold",
-        "key": "ctrl+b",
-        "mac": "cmd+b",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "highwater.italic",
-        "key": "ctrl+i",
-        "mac": "cmd+i",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.italic",
@@ -1986,19 +1974,7 @@
         "command": "highwater.underline",
         "key": "ctrl+u",
         "mac": "cmd+u",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
-      },
-      {
-        "command": "highwater.underline",
-        "key": "ctrl+u",
-        "mac": "cmd+u",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "highwater.highlight",
-        "key": "ctrl+shift+=",
-        "mac": "ctrl+shift+=",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.highlight",
@@ -2010,18 +1986,7 @@
         "command": "highwater.centre",
         "key": "ctrl+shift+.",
         "mac": "cmd+shift+.",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
-      },
-      {
-        "command": "highwater.centre",
-        "key": "ctrl+shift+.",
-        "mac": "cmd+shift+.",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "highwater.omit",
-        "mac": "cmd+y",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.omit",
@@ -2032,28 +1997,12 @@
         "command": "highwater.note",
         "key": "ctrl+/",
         "mac": "cmd+/",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
-      },
-      {
-        "command": "highwater.note",
-        "key": "ctrl+/",
-        "mac": "cmd+/",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "editor.action.transformToUppercase",
-        "mac": "ctrl+u",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.upperCase",
         "mac": "ctrl+u",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "editor.action.transformToLowercase",
-        "mac": "ctrl+shift+u",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.lowerCase",
@@ -2070,19 +2019,7 @@
         "command": "highwater.cutToBin",
         "mac": "alt+cmd+x",
         "key": "ctrl+alt+x",
-        "when": "editorTextFocus && editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-/"
-      },
-      {
-        "command": "highwater.cutToBin",
-        "mac": "alt+cmd+x",
-        "key": "ctrl+alt+x",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "highwater.copyToBin",
-        "mac": "alt+cmd+c",
-        "key": "ctrl+alt+c",
-        "when": "editorTextFocus && editorHasSelection && resourceScheme =~ /^(highland|file)$/ && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.copyToBin",
@@ -2112,12 +2049,6 @@
         "args": "assets"
       },
       {
-        "command": "highwater.openScratchpad",
-        "mac": "cmd+5",
-        "key": "ctrl+5",
-        "when": "editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
-      },
-      {
         "command": "highwater.showSidebarPanel",
         "mac": "cmd+5",
         "key": "ctrl+5",
@@ -2140,19 +2071,7 @@
         "command": "highwater.insertMarker",
         "key": "ctrl+m",
         "mac": "ctrl+m",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
-      },
-      {
-        "command": "highwater.insertMarker",
-        "key": "ctrl+m",
-        "mac": "ctrl+m",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "highwater.nextMarker",
-        "key": "ctrl+alt+m",
-        "mac": "ctrl+alt+m",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/"
       },
       {
         "command": "highwater.nextMarker",
@@ -2165,12 +2084,6 @@
         "key": "ctrl+g",
         "mac": "ctrl+g",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "command": "highwater.toggleInvisibles",
-        "key": "ctrl+shift+i",
-        "mac": "cmd+shift+i",
-        "when": "editorTextFocus && editorLangId =~ /^highland-/ && config.highwater.highlandShortcuts"
       },
       {
         "command": "highwater.toggleInvisibles",
