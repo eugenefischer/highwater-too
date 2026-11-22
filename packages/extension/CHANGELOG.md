@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.81
+
+- No change in use. The keys the editor page leaves to VS Code (⌘B, ⌃M, ⌘E and the rest of Highwater's keybindings) are now read from the extension's keybindings when it is built, instead of a list kept by hand beside them, which had drifted (it held keys with no keybinding off a Mac, and missed ⌘⇧= and ⌃⌥P). A unit test checks every keybinding converts, and the page tests check the keys reach VS Code and do nothing in the page.
 ## 0.6.80
 
 - No change in use. The Highwater Editor's page now has automated tests in Chromium (`npm run test:page -w highwater-too`, run by CI on Ubuntu and macOS, so both the Ctrl and ⌘ key paths are tested): typing and the edits sent to the extension, changes made elsewhere, undo and redo (one step for typing over a selection; the keys kept from VS Code; text boxes' own undo), Highwater's keys passed on to VS Code, the cursor at wrapped lines, capitals in scene headings, the hidden history line, and read-only Compare. They fail on 0.6.77's page, which had the arrow-key and undo bugs.

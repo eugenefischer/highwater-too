@@ -77,9 +77,24 @@ describe("keys", () => {
   it("passes Highwater's own keys on to VS Code and does nothing with them itself", async () => {
     const e = await openEditor("Some words.\n", "markdown");
     await e.select(0, 4);
-    await e.page.keyboard.press(`${mod}+b`);
-    expect(await e.text()).toBe("Some words.\n");
-    expect(await e.forwarded()).toContain(`${mod}+b`);
+    const keys = [`${mod}+b`, `${mod}+i`, `${mod}+/`, `${mod}+e`, "Control+m", "Control+g", `${mod}+Alt+x`];
+    for (const [i, k] of keys.entries()) {
+      await e.page.keyboard.press(k);
+      expect(await e.text(), k).toBe("Some words.\n");
+      expect((await e.forwarded()).length, k).toBe(i + 1);
+    }
+    expect(await e.selection()).toMatchObject({ anchor: 0, head: 4 });
+    await e.close();
+  });
+
+  it.skipIf(process.platform === "darwin")("keeps Ctrl+Y as redo away from Macs (Omit is ⌘Y on a Mac only)", async () => {
+    const e = await openEditor("Words.\n", "markdown");
+    await e.select(6);
+    await e.page.keyboard.type(" More");
+    await e.page.keyboard.press("Control+z");
+    expect(await e.text()).toBe("Words.\n");
+    await e.page.keyboard.press("Control+y");
+    expect(await e.text()).toBe("Words. More\n");
     await e.close();
   });
 });

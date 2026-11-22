@@ -34,6 +34,7 @@ import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, 
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 import { idLineGuard, onlyAddsIdLine } from "./id-line.ts";
 import { typewriter } from "./typewriter.ts";
+import { pageKeys, type Keybinding } from "./page-keys.ts";
 import { wrapStops } from "./wrap-stops.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: FromPage): void };
@@ -195,17 +196,30 @@ const styling = StateField.define<DecorationSet>({
  * Keys that belong to Highwater (bold, italic, underline, note, omit, centre, highlight, case,
  * markers, panes, Preview): CodeMirror must leave them alone so VS Code's keybindings get them.
  */
-const HIGHLAND_KEYS = new Set(["Mod-b", "Mod-i", "Mod-u", "Mod-/", "Mod-y", "Mod-Shift-.", "Ctrl-Shift-=", "Ctrl-u", "Ctrl-Shift-u", "Ctrl-m", "Ctrl-Alt-m", "Mod-e", "Mod-0", "Mod-1", "Mod-2", "Mod-3", "Mod-4", "Mod-5", "Mod-Alt-x", "Mod-Alt-c", "Ctrl-g", "Mod-Shift-i", "Mod-=", "Mod--", "Mod-Alt-0"]);
+// The custom editor's keybindings from package.json, put in by scripts/build.mjs (see page-keys.ts).
+declare const HIGHWATER_KEYBINDINGS: Keybinding[];
 const isMac = /Mac/.test(navigator.platform);
 
 /**
- * CodeMirror's bindings minus Highwater's keys, which instead do nothing here (no browser bold for
- * ⌘B): the webview passes every key press on to VS Code, whose keybindings run the commands.
+ * CodeMirror's bindings minus the keys VS Code runs Highwater's commands for, which instead do
+ * nothing here (no browser bold for ⌘B): the webview passes every key press on to VS Code.
  */
 function withoutHighlandKeys(bindings: readonly KeyBinding[]): KeyBinding[] {
-  const used = (k: string | undefined) => k !== undefined && HIGHLAND_KEYS.has(k.replace(/^Cmd-/, "Mod-"));
-  const kept = bindings.filter((b) => !used(isMac ? (b.mac ?? b.key) : b.key));
-  return [...[...HIGHLAND_KEYS].map((key) => ({ key, run: () => true })), ...kept];
+  const vscodeKeys = pageKeys(HIGHWATER_KEYBINDINGS, isMac);
+  const taken = new Set(vscodeKeys.map(normal));
+  const kept = bindings.filter((b) => {
+    const k = isMac ? (b.mac ?? b.key) : b.key;
+    return k === undefined || !taken.has(normal(k));
+  });
+  return [...vscodeKeys.map((key) => ({ key, run: () => true })), ...kept];
+}
+
+/** A CodeMirror key name with Mod and Cmd resolved for this machine and modifiers in one order. */
+function normal(name: string): string {
+  const parts = name.split(/-(?!$)/);
+  const key = parts.pop()!;
+  const mods = new Set(parts.map((p) => (p === "Mod" ? (isMac ? "Meta" : "Ctrl") : p === "Cmd" ? "Meta" : p === "Control" ? "Ctrl" : p)));
+  return [...["Alt", "Ctrl", "Meta", "Shift"].filter((m) => mods.has(m)), key].join("-");
 }
 
 /** Show Invisibles: spaces and tabs marked, and "¶" at each line's end, as in Highland 2. */

@@ -1,5 +1,5 @@
 // Bundles the extension (and, with --e2e, the end-to-end suite) and copies the PDF engine's assets.
-import { cpSync } from "node:fs";
+import { cpSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,9 @@ const common = {
 
 await build({ ...common, entryPoints: [join(root, "src/extension.ts")], outfile: join(root, "dist/extension.cjs"), sourcemap: true });
 // The Highwater Editor's page, for the webview.
-await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/webview.ts")], outfile: join(root, "dist/highland-editor.js") });
+// The page leaves the custom editor's keybindings to VS Code (src/highland-editor/page-keys.ts).
+const keybindings = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).contributes.keybindings;
+await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/webview.ts")], outfile: join(root, "dist/highland-editor.js"), define: { HIGHWATER_KEYBINDINGS: JSON.stringify(keybindings) } });
 // Its spelling worker, and the dictionary it loads: Hunspell's en_US from SCOWL (MIT and BSD; licence copied).
 await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/spell-worker.ts")], outfile: join(root, "dist/spell-worker.js") });
 const dictionary = dirname(require.resolve("dictionary-en")); // its exports hide the files themselves

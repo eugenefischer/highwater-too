@@ -59,7 +59,7 @@ window.highwaterTest = { view: null, posted: [], forwarded: [] };
 window.acquireVsCodeApi = () => ({ postMessage: (m) => window.highwaterTest.posted.push(JSON.parse(JSON.stringify(m))) });
 window.addEventListener("keydown", (e) => {
   const mods = (e.metaKey ? "Meta+" : "") + (e.ctrlKey ? "Control+" : "") + (e.altKey ? "Alt+" : "") + (e.shiftKey ? "Shift+" : "");
-  if (mods && mods !== "Shift+") window.highwaterTest.forwarded.push(mods + e.key);
+  if (mods && mods !== "Shift+" && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) window.highwaterTest.forwarded.push(mods + e.key);
 });
 </script>`;
   html = html.replace("<head>", `<head>${stand}`);
