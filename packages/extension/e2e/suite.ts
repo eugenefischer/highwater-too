@@ -233,6 +233,9 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.commands.executeCommand("highwater.copyToBin");
       await until("the Bin item in the file", async () => JSON.stringify((await readBundle(path)).bundle.binItems) === JSON.stringify([line.text]));
       assert.equal((await readBundle(path)).bundle.text, documentAt(highland(path)).getText(), "the script is untouched");
+      // In the Highwater Editor the Scratchpad is a sidebar panel; from the text editor, it opens as a text tab.
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      await openScript(path);
       await vscode.commands.executeCommand("highwater.openScratchpad");
       await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.path.endsWith("/scratchpad.txt") === true);
       assert.equal((await readBundle(path)).bundle.scratchpad, "");
@@ -377,6 +380,9 @@ const tests: [string, () => Promise<void>][] = [
         await until("the Bin item kept with the history", async () => binFile() === "A kettle boils.");
         const [, entry] = Object.entries(index().documents).find(([, e]) => e.paths.includes(path))!;
         assert.equal(await readFile(path, "utf8"), "INT. KITCHEN - NIGHT\n\nA kettle boils.\n", "the file is untouched");
+        // In the Highwater Editor the Scratchpad is a sidebar panel; from the text editor, it opens as a text tab.
+        await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path));
         await vscode.commands.executeCommand("highwater.openScratchpad");
         await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.scheme === "highwater-extras");
         // Edit and save the document itself, not through an editor: VS Code replaces editors as
