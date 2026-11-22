@@ -492,17 +492,25 @@ const templateWindow = new TemplateWindow(
   window.addEventListener("blur", hide);
 }
 
-// ⌘Z and ⇧⌘Z in the sidebar (outside its text boxes) undo and redo the page's history, which holds
-// the Bin's drags and deletions; in the Scratchpad or a card being edited, they stay that box's own.
+// Undo and redo (⌘Z, ⇧⌘Z; Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z elsewhere) run the page's own history,
+// which groups typing as Highland does and holds the Bin's drags and deletions, in the text and
+// in the sidebar alike. The key must not reach VS Code: the webview passes every key press on, and
+// VS Code's Undo for a custom text editor undoes the document's last edit, a single key press,
+// whose text then replaced what the page's undo had just restored (EJ, 2026-11-22: a flash of the
+// replaced line, then the typing less one letter). In a text box (the Scratchpad, a card being
+// edited, Find), the box's own undo runs.
 window.addEventListener(
   "keydown",
   (e) => {
-    if (!view || !(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "z") return;
-    const t = e.target as HTMLElement | null;
-    if (!t || !t.closest("#sidebar") || t.closest("textarea, input")) return;
-    e.preventDefault();
+    if (e.altKey || !(isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)) return;
+    const key = e.key.toLowerCase();
+    const again = (key === "z" && e.shiftKey) || (!isMac && key === "y" && !e.shiftKey);
+    if (key !== "z" && !again) return;
     e.stopPropagation();
-    (e.shiftKey ? redo : undo)(view);
+    const t = e.target as HTMLElement | null;
+    if (t?.closest("textarea, input")) return;
+    e.preventDefault();
+    if (view) (again ? redo : undo)(view);
   },
   true,
 );

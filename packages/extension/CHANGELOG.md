@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.79
+
+- ⌘Z after replacing a selection by typing undid one letter at a time, with a flash of the old text each time. The page's own undo ran, and VS Code also undid the document's last edit (one key press), whose text then replaced the page's. Undo and redo keys now stay in the page: one ⌘Z brings back what was replaced, as in Highland (EJ). In the Scratchpad, a card being edited or Find, ⌘Z is that box's own undo and no longer also undoes the document.
+- Edit ▸ Undo in VS Code's menu still uses VS Code's undo, one key press at a time.
 ## 0.6.78
 
 - Arrow keys at a line that wraps after a space: the place after the space shows both at the end of the line and at the start of the next, and Right and Left now stop at both. Before, Right from the end of the line jumped past the next line's first letter, and Left from the start of a line jumped before the space (EJ).
