@@ -34,6 +34,7 @@ import { columnMinimum, columnWidth, inlineMarks, lineStyles, paragraphNumbers, 
 import { nextMisspelling, Spelling, spellingMenu, spellingPlugin } from "./spelling.ts";
 import { idLineGuard, onlyAddsIdLine } from "./id-line.ts";
 import { typewriter } from "./typewriter.ts";
+import { wrapStops } from "./wrap-stops.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: FromPage): void };
 const vscode = acquireVsCodeApi();
@@ -314,6 +315,7 @@ function start(text: string): void {
         binHistory,
         search({ top: true }),
         keymap.of([{ key: "Mod-;", run: (v) => (void nextMisspelling(v, spelling), true) }]),
+        wrapStops,
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
         EditorView.lineWrapping,
         // A Bin item or an image dropped from the sidebar goes in exactly where it is let go, as in

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.78
+
+- Arrow keys at a line that wraps after a space: the place after the space shows both at the end of the line and at the start of the next, and Right and Left now stop at both. Before, Right from the end of the line jumped past the next line's first letter, and Left from the start of a line jumped before the space (EJ).
 ## 0.6.77
 
 - Rich Text export now puts everything where the PDF does:
