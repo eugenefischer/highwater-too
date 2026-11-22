@@ -23,7 +23,7 @@ import { registerStatusBar } from "./status.ts";
 import { registerPageCounts } from "./page-count.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { registerHighlandEditor } from "./highland-editor/provider.ts";
-import { registerSurface } from "./surface.ts";
+import { registerSurface, showDocument } from "./surface.ts";
 import { registerTestCommands } from "./test-support.ts";
 
 /** VS Code glue only; all format, parsing and layout logic lives in the other packages. */
@@ -81,7 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
         else {
           const doc = await vscode.workspace.openTextDocument(uri);
           const md = /\.(md|markdown)$/i.test(uri.fsPath) && doc.languageId === "markdown";
-          await vscode.window.showTextDocument(md ? await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown) : doc, { preview: false });
+          await showDocument(md ? await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown) : doc);
         }
       }
     }),

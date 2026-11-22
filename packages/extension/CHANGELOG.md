@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.83
+
+- VS Code now opens .fountain files and .highland files straight in the Highwater Editor (it is their default editor), and .md files too once you choose Highwater Too for them (the choice now also sets VS Code's editor association; a choice made before is brought up to date). Before, they opened as text and the extension switched them over, which took about 250 lines of tab-watching code: the source of the brief flash of text on opening and of several flaky tests. That code is gone.
+- VS Code's Reopen Editor With… → Text Editor is still there; VS Code itself remembers the choice.
+- A result from VS Code's Search across files opens its document at the top, not at the result's line (VS Code doesn't pass the line to a custom editor). ⌘F in the document finds it (EJ: Highland 2 had no search across files).
 ## 0.6.82
 
 - Highwater's commands in the editor (⌘B and the other writing keys, case changes, markers, Insert from the Bin, the Title Page Builder) now make their change in the page itself, as typing does, instead of changing the document and having the page copy the result. Each is one step for ⌘Z (before, the page worked the step out by comparing texts), keeps the hidden history line out of reach, is refused while comparing with a save, and keeps the typing line in place with Typewriter Scrolling. Changes from elsewhere (Revert, Edit ▸ Undo, the file changed on disk) still come in as before.

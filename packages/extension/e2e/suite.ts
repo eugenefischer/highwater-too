@@ -498,23 +498,17 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "opens scripts in the Highwater Editor, except after Reopen Editor With → Text Editor",
+    "VS Code opens a .fountain file in the Highwater Editor, and Reopen Editor With → Text Editor stays text",
     async () => {
-      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
-      // Every tab event and the extension's own decisions over the whole test, printed with any
-      // failure, so a failure says what happened rather than leaving it to be guessed at.
       const events: string[] = [];
       const note = (what: string) => events.push(`${Date.now() % 1_000_000} ${what}`);
       const name = (t: vscode.Tab) => `${t.label}:${t.input instanceof vscode.TabInputCustom ? "highwater" : t.input instanceof vscode.TabInputText ? "text" : "other"}${t.isActive ? "*" : ""}`;
       const watch = vscode.window.tabGroups.onDidChangeTabs((e) => note(`tabs opened=[${e.opened.map(name)}] closed=[${e.closed.map(name)}] changed=[${e.changed.map(name)}]`));
-      const watchEditor = vscode.window.onDidChangeActiveTextEditor((ed) => note(`active text editor ${ed?.document.uri.path.split("/").pop() ?? "none"}`));
-      await vscode.commands.executeCommand("highwater.test.swapLog"); // from here on
-      const record = async () => `\nTest's view:\n${events.join("\n")}\nExtension's log:\n${((await vscode.commands.executeCommand<string[]>("highwater.test.swapLog")) ?? []).join("\n")}`;
       const until = async (what: string, test: () => boolean) => {
         try {
           await waitFor(what, test);
         } catch (e) {
-          throw new Error(`${(e as Error).message}${await record()}`);
+          throw new Error(`${(e as Error).message}\n${events.join("\n")}`);
         }
       };
       try {
@@ -526,24 +520,18 @@ const tests: [string, () => Promise<void>][] = [
             .flatMap((g) => g.tabs)
             .filter((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri)
             .map((t) => (t.input instanceof vscode.TabInputCustom ? "highland" : "text"));
-        const doc = await vscode.workspace.openTextDocument(path);
-        await until("Fountain language", () => doc.languageId === "highland-fountain");
-        note("showTextDocument");
-        await vscode.window.showTextDocument(doc, { preview: false });
-        await until("the Highwater Editor instead of text", () => kinds().join() === "highland");
-        // VS Code's own Reopen Editor With… → Text Editor (the editor menu in the breadcrumbs bar)
-        // is the writer's choice: it stays text, not switched straight back.
-        note("reopenActiveEditorWith default");
+        // As the Explorer opens it: VS Code picks the editor (the Highwater Editor is the default for .fountain).
+        await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(path));
+        await until("the Highwater Editor", () => kinds().join() === "highland");
+        assert.ok(!events.some((e) => e.includes("Default.fountain:text")), `opened as text first:\n${events.join("\n")}`);
+        // VS Code's own Reopen Editor With… → Text Editor: the writer's choice, which nothing undoes.
         await vscode.commands.executeCommand("reopenActiveEditorWith", "default");
-        note(`reopenActiveEditorWith returned; tabs now ${kinds().join()}`);
         await until("the text editor from Reopen Editor With", () => kinds().join() === "text");
         await new Promise((r) => setTimeout(r, 1500));
-        assert.equal(kinds().join(), "text", `Reopen Editor With → Text Editor was undone.${await record()}`);
+        assert.equal(kinds().join(), "text", `Reopen Editor With → Text Editor was undone.\n${events.join("\n")}`);
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       } finally {
         watch.dispose();
-        watchEditor.dispose();
-        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
       }
     },
   ],
@@ -593,37 +581,22 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "a .highland script's own URI with a line (as a Search result opens it) opens the Highwater Editor on that line",
+    "a .highland script's own URI (as a Search result opens it) opens the Highwater Editor, not text",
     async () => {
-      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
-      await vscode.commands.executeCommand("highwater.test.swapLog"); // from here on
+      const path = await copyOf("SearchResult");
+      const script = highland(path).toString();
+      let shownAsText = false;
+      const watch = vscode.window.tabGroups.onDidChangeTabs((e) => {
+        for (const t of [...e.opened, ...e.changed]) if (t.input instanceof vscode.TabInputText && t.input.uri.toString() === script) shownAsText = true;
+      });
       try {
-        const path = await copyOf("SearchResult");
-        const doc = await vscode.workspace.openTextDocument(highland(path));
-        await waitFor("Fountain language", () => vscode.workspace.textDocuments.some((d) => d.uri.toString() === highland(path).toString() && d.languageId === "highland-fountain"));
-        const live = vscode.workspace.textDocuments.find((d) => d.uri.toString() === highland(path).toString())!;
-        const line = Math.min(10, live.lineCount - 1);
-        await vscode.commands.executeCommand("vscode.open", highland(path), { selection: new vscode.Range(line, 0, line, 0) });
-        type Surface = { view: boolean; selection?: { anchor: number; head: number } };
-        const want = live.offsetAt(new vscode.Position(line, 0));
-        const end = Date.now() + 10_000;
-        let now: Surface = { view: false };
-        while (!((now = await vscode.commands.executeCommand<Surface>("highwater.test.surface")).view && now.selection?.head === want)) {
-          if (Date.now() > end) {
-            // Which tabs there were, to tell a slow swap from a lost one (it failed once on macOS).
-            const tabs = vscode.window.tabGroups.all.map((g) => ({
-              active: g.isActive,
-              tabs: g.tabs.map((t) => ({ label: t.label, active: t.isActive, kind: t.input instanceof vscode.TabInputCustom ? `custom:${t.input.viewType}` : t.input instanceof vscode.TabInputText ? "text" : typeof t.input })),
-            }));
-            const swaps = ((await vscode.commands.executeCommand<string[]>("highwater.test.swapLog")) ?? []).join("\n");
-            throw new Error(`The Highwater Editor did not keep the line: ${JSON.stringify({ ...now, focusedText: undefined })} (wanted ${want}); tabs ${JSON.stringify(tabs)}\nExtension's log:\n${swaps}`);
-          }
-          await new Promise((r) => setTimeout(r, 100));
-        }
-        void doc;
+        // A Search result's line can't reach a custom editor: the document opens at the top.
+        await vscode.commands.executeCommand("vscode.open", highland(path), { selection: new vscode.Range(3, 0, 3, 0) });
+        await waitFor("the Highwater Editor", () => vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.input instanceof vscode.TabInputCustom && t.input.viewType === "highwater.highlandEditor" && t.input.uri.toString() === script)), 15_000);
+        assert.ok(!shownAsText, "the script showed as text");
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       } finally {
-        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
+        watch.dispose();
       }
     },
   ],

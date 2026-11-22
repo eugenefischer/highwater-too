@@ -17,7 +17,7 @@ import { renderRtf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags } from "./syntax/edits.ts";
 import { toBundle, toPlain, toTextBundle } from "./to-bundle.ts";
-import { activeDocument } from "./surface.ts";
+import { activeDocument, showDocument } from "./surface.ts";
 
 /**
  * Converting a work between a .highland file and a plain .fountain, .md or .txt file. A conversion
@@ -153,7 +153,7 @@ async function convertToPlain(store: BundleStore, chosen?: vscode.Uri, uri?: vsc
   let opened = await vscode.workspace.openTextDocument(path);
   if (ext === "md" && opened.languageId !== LANGUAGES.markdown) opened = await vscode.languages.setTextDocumentLanguage(opened, LANGUAGES.markdown);
   if (ext === "txt" && opened.languageId !== LANGUAGES.plain) opened = await vscode.languages.setTextDocumentLanguage(opened, LANGUAGES.plain);
-  await vscode.window.showTextDocument(opened, { preview: false });
+  await showDocument(opened);
   await offerTrash(vscode.Uri.file(bundle), null, history !== null);
 }
 

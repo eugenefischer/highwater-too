@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.82",
+  "version": "0.6.83",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -453,25 +453,16 @@
         "displayName": "Highwater Editor",
         "selector": [
           {
-            "filenamePattern": "*.highland"
+            "filenamePattern": "highland:/**/*.highland"
           },
           {
             "filenamePattern": "*.fountain"
           },
           {
             "filenamePattern": "*.spmd"
-          },
-          {
-            "filenamePattern": "*.md"
-          },
-          {
-            "filenamePattern": "*.markdown"
-          },
-          {
-            "filenamePattern": "*.txt"
           }
         ],
-        "priority": "option"
+        "priority": "default"
       }
     ],
     "configuration": {

@@ -10,8 +10,9 @@ import * as vscode from "vscode";
 export const HIGHLAND_EDITOR = "highwater.highlandEditor";
 
 /**
- * Scripts open in the Highwater Editor. The end-to-end tests that drive VS Code's text editor turn
- * this off (highwater.test.textEditorDefault); nothing else does.
+ * Scripts the extension itself opens (showDocument) go to the Highwater Editor. The end-to-end
+ * tests that drive VS Code's text editor turn this off (highwater.test.textEditorDefault); nothing
+ * else does. (Scripts VS Code opens go to the Highwater Editor by its own default: package.json.)
  */
 export const editorDefaults = { highwater: true };
 

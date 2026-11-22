@@ -9,7 +9,7 @@ import { openHighland } from "./open.ts";
 import { bundleOf, renderDocument, renderDocx, templateOf } from "./render-document.ts";
 import { BundleStore, splitBundlePath } from "./store.ts";
 import { changeCase, toggleBoneyard, toggleCentre, toggleWrap, type TextEdit } from "./syntax/edits.ts";
-import { activeDocument, activeOffsets, editActive, onDidChangeActiveSurface } from "./surface.ts";
+import { activeDocument, activeOffsets, editActive, HIGHLAND_EDITOR, onDidChangeActiveSurface, showDocument } from "./surface.ts";
 
 const NEW: Record<string, { mode: DocumentMode; template: string; name: string }> = {
   screenplay: { mode: "fountain", template: "Screenplay", name: "Untitled Screenplay" },
@@ -17,6 +17,7 @@ const NEW: Record<string, { mode: DocumentMode; template: string; name: string }
 };
 
 export function registerCommands(context: vscode.ExtensionContext, store: BundleStore): void {
+  void keepMarkdownEditorAssociations();
   const wrap = (open: string, close = open) => () => applyToSelections((text, s, e) => toggleWrap(text, s, e, open, close));
   context.subscriptions.push(
     vscode.commands.registerCommand("highwater.bold", wrap("**")),
@@ -153,7 +154,7 @@ async function newAnyDocument(kind?: NewKind, target?: vscode.Uri): Promise<void
   await vscode.workspace.fs.writeFile(file, new Uint8Array());
   // .md files stay Markdown unless the writer chose otherwise, so set this one's language directly.
   const doc = await vscode.languages.setTextDocumentLanguage(await vscode.workspace.openTextDocument(file), spec.language);
-  await vscode.window.showTextDocument(doc, { preview: false });
+  await showDocument(doc);
 }
 
 
@@ -256,7 +257,11 @@ async function exportDocx(context: vscode.ExtensionContext, store: BundleStore, 
 
 const MD_PATTERNS = ["*.md", "*.markdown"];
 
-/** Opens .md files as Highwater Markdown, everywhere or in this workspace, through files.associations. */
+/**
+ * Opens .md files as Highwater Markdown, everywhere or in this workspace: files.associations gives
+ * them the language, and workbench.editorAssociations has VS Code open them in the Highwater Editor
+ * (which is the default editor only for .fountain files and .highland files' scripts).
+ */
 async function useForMarkdown(): Promise<void> {
   const choices = [
     { label: "Everywhere", description: "user settings", target: vscode.ConfigurationTarget.Global },
@@ -273,6 +278,7 @@ async function useForMarkdown(): Promise<void> {
   const next = { ...current };
   for (const p of MD_PATTERNS) next[p] = LANGUAGES.markdown;
   await config.update("associations", next, picked.target);
+  await setEditorAssociations(picked.target, true);
   void vscode.window.showInformationMessage(`.md files now open as Highwater Markdown (${picked.label.toLowerCase()}). Files already open change when reopened.`);
 }
 
@@ -289,7 +295,36 @@ async function stopUsingForMarkdown(): Promise<void> {
     const next = { ...value };
     for (const p of MD_PATTERNS) if (next[p] === LANGUAGES.markdown) delete next[p];
     await config.update("associations", Object.keys(next).length ? next : undefined, target);
+    await setEditorAssociations(target, false);
     changed = true;
   }
   void vscode.window.showInformationMessage(changed ? ".md files open as ordinary Markdown again." : ".md files were not set to open with Highwater Too.");
+}
+
+/** Adds (or removes) the Highwater Editor as the editor for .md files in one settings scope. */
+async function setEditorAssociations(target: vscode.ConfigurationTarget, on: boolean): Promise<void> {
+  const config = vscode.workspace.getConfiguration("workbench");
+  const inspect = config.inspect<Record<string, string>>("editorAssociations");
+  const current = (target === vscode.ConfigurationTarget.Global ? inspect?.globalValue : inspect?.workspaceValue) ?? {};
+  const next = { ...current };
+  for (const p of MD_PATTERNS) {
+    if (on) next[p] = HIGHLAND_EDITOR;
+    else if (next[p] === HIGHLAND_EDITOR) delete next[p];
+  }
+  if (JSON.stringify(next) === JSON.stringify(current)) return;
+  await config.update("editorAssociations", Object.keys(next).length ? next : undefined, target);
+}
+
+/**
+ * .md files set to open as Highwater Markdown before 0.6.83 have the language but not the editor
+ * association (scripts were switched into the Highwater Editor then): add it where it's missing.
+ */
+async function keepMarkdownEditorAssociations(): Promise<void> {
+  const inspect = vscode.workspace.getConfiguration("files").inspect<Record<string, string>>("associations");
+  for (const [value, target] of [
+    [inspect?.globalValue, vscode.ConfigurationTarget.Global],
+    [inspect?.workspaceValue, vscode.ConfigurationTarget.Workspace],
+  ] as const) {
+    if (value && MD_PATTERNS.some((p) => value[p] === LANGUAGES.markdown)) await setEditorAssociations(target, true).catch(() => undefined);
+  }
 }

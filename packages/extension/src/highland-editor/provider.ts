@@ -17,8 +17,7 @@ import { sidebarHost } from "./sidebar-host.ts";
 import { pageHtml } from "./page-html.ts";
 import { postTo, type FromPage, type PanelName, type ToPage } from "./messages.ts";
 import { askText } from "../ask.ts";
-import { roleOf } from "../focus.ts";
-import { activeOffsets, activeView, editorDefaults, HIGHLAND_EDITOR, highlandViews, highwaterOpener, revealOffset, viewOf, type HighlandView } from "../surface.ts";
+import { activeView, HIGHLAND_EDITOR, highlandViews, highwaterOpener, revealOffset, viewOf, type HighlandView } from "../surface.ts";
 import { debounce } from "../debounce.ts";
 
 export { HIGHLAND_EDITOR };
@@ -371,135 +370,13 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
   }
 }
 
-/**
- * Switches the active tab between the text editor and the Highwater Editor in place, as
- * Reopen Editor With… does: one tab per document, and no save-or-discard question for unsaved
- * changes (two tabs of a document in different editors would each ask on closing).
- */
-/** True while a swap is under way: its new tab must not be taken for a second one. */
-let swapping = false;
-/** What the switching between editors decided and why, for the end-to-end tests (highwater.test.swapLog). */
+/** Notes for the end-to-end tests' log (highwater.test.swapLog): which editor opened what, and the cursor's moves. */
 export const swapLog: string[] = [];
 function log(what: string): void {
   // The clock's last six digits in ms, to line up with the test's own record.
   swapLog.push(`${Date.now() % 1_000_000} ${what}`);
   if (swapLog.length > 400) swapLog.splice(0, 100);
 }
-/** Documents the writer switched to the text editor (Reopen Editor With…): left as text until closed. */
-const wantsText = new Set<string>();
-
-/**
- * The tab in front, and the one before it with when it stopped being in front: VS Code's Reopen
- * Editor With… swaps a Highwater tab for a text tab of the same document (sometimes before the
- * Highwater panel reports its closing), and that is how it is told from a text tab opened anew.
- */
-let front: { uri: string; highwater: boolean } | null = null;
-let before: { uri: string; highwater: boolean; until: number } | null = null;
-function noteFront(): void {
-  const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-  const now =
-    input instanceof vscode.TabInputCustom && input.viewType === HIGHLAND_EDITOR
-      ? { uri: input.uri.toString(), highwater: true }
-      : input instanceof vscode.TabInputText
-        ? { uri: input.uri.toString(), highwater: false }
-        : null;
-  if (now?.uri === front?.uri && now?.highwater === front?.highwater) return;
-  if (front) before = { ...front, until: Date.now() };
-  front = now;
-  log(`front ${now ? `${now.highwater ? "highwater" : "text"} ${now.uri.split("/").pop()}` : "none"}`);
-  // From a Highwater tab straight to a text tab of the same document: the writer chose the text
-  // editor (Reopen Editor With…, or the breadcrumbs bar's editor menu), if the Highwater tab is gone.
-  // Not gated on \`swapping\`: that stays on for half a second after our own swap to the Highwater
-  // Editor, and a choice made in that time was missed (CI's log, 0.6.28).
-  // (A Search result opened as text beside a Highwater tab keeps that tab: it goes back there.)
-  if (now && !now.highwater && before?.highwater && before.uri === now.uri && Date.now() - before.until < 2000) {
-    reopenedAsText.set(now.uri, Date.now());
-    log("reopened as text");
-  }
-}
-const reopenedAsText = new Map<string, number>();
-
-/** A Highwater tab of this document is open (in any group). */
-function hasHighwaterTab(uri: string): boolean {
-  return vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.input instanceof vscode.TabInputCustom && t.input.viewType === HIGHLAND_EDITOR && t.input.uri.toString() === uri));
-}
-
-/** The writer turned this document's Highwater tab into a text tab just now: leave it as text. */
-function choseText(uri: string): boolean {
-  const recent = (at: number | undefined) => at !== undefined && Date.now() - at < 2000;
-  if (recent(reopenedAsText.get(uri)) && !hasHighwaterTab(uri)) wantsText.add(uri);
-  log(`choseText ${uri.split("/").pop()}: reopened=${recent(reopenedAsText.get(uri))} tab=${hasHighwaterTab(uri)} → ${wantsText.has(uri)}`);
-  return wantsText.has(uri);
-}
-
-/**
- * Swaps run one at a time. Two at once (a second swap asked for while the switch into the
- * Highwater Editor was still finishing) left VS Code with both tabs open (CI's log on Linux, 0.6.28).
- */
-let swapQueue: Promise<void> = Promise.resolve();
-let swapDepth = 0;
-
-function swapActive(target: vscode.Uri, viewType: string): Promise<void> {
-  const name = target.path.split("/").pop();
-  const to = viewType === HIGHLAND_EDITOR ? "highwater" : viewType;
-  log(`swapActive ${name} → ${to} asked`);
-  const run = swapQueue.then(async () => {
-    swapDepth++;
-    swapping = true;
-    log(`swapActive ${name} → ${to} starts`);
-    try {
-      await swapInPlace(target, viewType);
-    } finally {
-      log(`swapActive ${name} → ${to} done`);
-      // The old tab closes just after the command returns. (Counted, so an earlier swap's timer
-      // doesn't end a later one's.)
-      setTimeout(() => (swapping = --swapDepth > 0), 500);
-    }
-  });
-  swapQueue = run.catch(() => undefined);
-  return run;
-}
-
-async function swapInPlace(target: vscode.Uri, viewType: string): Promise<void> {
-  const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
-  const input = tab?.input;
-  const active = input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom ? input.uri.toString() : undefined;
-  // Where the cursor is, to put it back in the other editor (a Search result's line, say).
-  const here = activeOffsets();
-  const at = here && here.document.uri.toString() === target.toString() ? here.selections[0]?.head : undefined;
-  log(`swapInPlace ${target.path.split("/").pop()}: cursor ${at ?? "unknown"} (active editor ${vscode.window.activeTextEditor?.document.uri.path.split("/").pop() ?? "none"})`);
-  let swapped = false;
-  if (active === target.toString()) {
-    try {
-      await vscode.commands.executeCommand("reopenActiveEditorWith", viewType);
-      swapped = true;
-    } catch {
-      // An older VS Code without the command: open beside instead.
-    }
-  }
-  if (!swapped) await vscode.commands.executeCommand("vscode.openWith", target, viewType);
-  if (at === undefined || at === 0) return;
-  const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === target.toString());
-  if (!doc) return;
-  if (viewType === HIGHLAND_EDITOR) {
-    // The new Highwater Editor can register a moment after the command returns: wait for it, then
-    // put the cursor there (held until its page has started).
-    let view = viewOf(doc, true);
-    for (let waited = 0; !view && waited < 5000; waited += 100) {
-      await new Promise((r) => setTimeout(r, 100));
-      view = viewOf(doc, true);
-    }
-    log(`swapInPlace ${target.path.split("/").pop()}: ${view ? `cursor put at ${at}` : "no Highwater Editor after 5 s"}`);
-    view?.reveal(at, "center", true);
-  } else {
-    const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
-    if (!editor) return;
-    const pos = doc.positionAt(at);
-    editor.selection = new vscode.Selection(pos, pos);
-    editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-  }
-}
-
 
 /** One step of text size, from the size shown now (VS Code's editor size × 1.4 when not set). */
 async function zoom(step: number): Promise<void> {
@@ -514,55 +391,6 @@ const MIN_FONT = 8;
 const MAX_FONT = 48;
 
 /**
- * Turns a script's text tab into the Highwater Editor (the default) once things settle, if it
- * is still the active tab: a .md file is given its Highwater language just after it opens.
- */
-const swapsPending = new Set<string>();
-function swapSoon(uri: vscode.Uri): void {
-  const key = uri.toString();
-  if (swapsPending.has(key)) return log(`swapSoon ${key.split("/").pop()} (already pending)`);
-  swapsPending.add(key);
-  log(`swapSoon ${key.split("/").pop()}`);
-  // VS Code reports a new tab, its activation and the document's language in separate steps, and
-  // on a slow machine (CI's macOS) not at once: keep looking for up to 3 s while the tab is open.
-  const end = Date.now() + 3000;
-  const attempt = (): void => {
-    const again = (): void => {
-      if (Date.now() < end) setTimeout(attempt, 150);
-      else swapsPending.delete(key);
-    };
-    noteFront();
-    // Already in the Highwater Editor (our own swap, say): this loop's work is done. Left running,
-    // it swapped the document back after the writer chose the text editor (CI's log, 0.6.28).
-    const inFront = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-    if (inFront instanceof vscode.TabInputCustom && inFront.viewType === HIGHLAND_EDITOR && inFront.uri.toString() === key) {
-      swapsPending.delete(key);
-      return log(`swapSoon ${key.split("/").pop()}: already in the Highwater Editor`);
-    }
-    // Reopen Editor With… under way: wait for its Highwater tab to go, then leave the text be.
-    if (Date.now() - (reopenedAsText.get(key) ?? 0) < 2000 && hasHighwaterTab(key)) return again();
-    if (choseText(key)) {
-      swapsPending.delete(key);
-      return;
-    }
-    const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs);
-    if (!tabs.some((t) => t.input instanceof vscode.TabInputText && t.input.uri.toString() === key)) return again();
-    const active = vscode.window.tabGroups.activeTabGroup.activeTab;
-    const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === key);
-    if (swapping || !(active?.input instanceof vscode.TabInputText) || active.input.uri.toString() !== key || !doc || !doc.languageId.startsWith("highland-")) return again();
-    // The text editor itself, not only its tab: it holds the line it was opened at (a Search
-    // result's), which the swap carries over. Its tab can be in front before it exists.
-    if (vscode.window.activeTextEditor?.document.uri.toString() !== key) return again();
-    swapsPending.delete(key);
-    if (roleOf(doc).kind !== "script" || viewOf(doc, true)) return log(`swapSoon: not swapping (view open=${!!viewOf(doc, true)})`);
-    log(`swapSoon: swapping ${key.split("/").pop()} to the Highwater Editor`);
-    void swapActive(uri, HIGHLAND_EDITOR);
-  };
-  // Straight away (a script that already has its language swaps at once), then every 150 ms.
-  setTimeout(attempt, 0);
-}
-
-/**
  * The document's parse: the shared one, except for a moment after opening, before VS Code has
  * given the script its language, when the page treats it as Fountain (as the cache would not).
  */
@@ -572,15 +400,14 @@ function parsed(cache: ParseCache, doc: vscode.TextDocument): Document {
 
 /** A document in the Highwater Editor, asked for by the extension (the writing history's choices). */
 async function openInHighwater(doc: vscode.TextDocument): Promise<HighlandView | undefined> {
-  const uri = doc.uri.toString();
-  wantsText.delete(uri); // asked for here, so no longer the writer's text-editor choice
   const open = viewOf(doc, true);
   if (open) {
     open.panel.reveal(open.panel.viewColumn, false);
     return open;
   }
+  // From the text editor (the writer reopened the script as text): that tab becomes the Highwater Editor.
   const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
-  if (tab?.input instanceof vscode.TabInputText && tab.input.uri.toString() === uri) await swapActive(doc.uri, HIGHLAND_EDITOR);
+  if (tab?.input instanceof vscode.TabInputText && tab.input.uri.toString() === doc.uri.toString()) await vscode.commands.executeCommand("reopenActiveEditorWith", HIGHLAND_EDITOR);
   else await vscode.commands.executeCommand("vscode.openWith", doc.uri, HIGHLAND_EDITOR, { preview: false });
   for (let waited = 0; waited < 10_000; waited += 100) {
     const view = viewOf(doc, true);
@@ -590,7 +417,13 @@ async function openInHighwater(doc: vscode.TextDocument): Promise<HighlandView |
   return undefined;
 }
 
-/** The Highwater Editor, its commands, and turning scripts opened as text into Highwater Editor tabs. */
+/**
+ * The Highwater Editor and its commands. VS Code opens scripts in it itself: it is the default
+ * editor for .fountain files and the scripts inside .highland files (package.json, priority
+ * "default"), and for .md files once the writer chooses Highwater for them (commands.ts sets
+ * workbench.editorAssociations). Reopen Editor With… → Text Editor is VS Code's own and stays.
+ * A Search result opens at the top: a custom editor isn't given the line it was opened at.
+ */
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore, cache: () => ParseCache): void {
   registerSidebarNote(context);
   registerThemes(context);
@@ -666,61 +499,11 @@ export function registerHighlandEditor(context: vscode.ExtensionContext, store: 
       const config = vscode.workspace.getConfiguration("highwater");
       await config.update("paragraphNumbers", !config.get<boolean>("paragraphNumbers", false), vscode.ConfigurationTarget.Global);
     }),
-    // A script opened as text (from Search, the Explorer's Open With, a link) becomes a Highwater
-    // Editor tab, unless the writer chose the text editor for it (Reopen Editor With… → Text Editor).
-    vscode.window.tabGroups.onDidChangeTabGroups(() => noteFront()),
-    vscode.window.tabGroups.onDidChangeTabs((e) => {
-      noteFront();
-      for (const closed of e.closed) {
-        const input = closed.input;
-        if (!(input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom)) continue;
-        const uri = input.uri.toString();
-        const still = vscode.window.tabGroups.all.flatMap((g) => g.tabs).some((t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri);
-        if (!still && wantsText.delete(uri)) log(`wantsText cleared for ${uri.split("/").pop()} (its last tab closed)`);
-      }
-      if (swapping || !editorDefaults.highwater) return;
-      for (const opened of e.opened) {
-        // Not opened.isActive: a tab is usually reported active only in a later event. Checked below.
-        if (!(opened.input instanceof vscode.TabInputText)) continue;
-        swapSoon(opened.input.uri);
-      }
-    }),
     // For the end-to-end tests' log: when a script's text editor gets its cursor (a Search result's
     // line arrives a moment after the editor itself; CI's Ubuntu run, 0.6.63).
     vscode.window.onDidChangeTextEditorSelection((e) => {
       if (!e.textEditor.document.languageId.startsWith("highland-")) return;
       log(`selection ${e.textEditor.document.uri.path.split("/").pop()}: ${e.textEditor.document.offsetAt(e.selections[0]!.active)} (${e.kind === undefined ? "api" : vscode.TextEditorSelectionChangeKind[e.kind]})`);
-    }),
-    // Also when a script's text tab comes to the front: the tab events don't always say it is active.
-    vscode.window.onDidChangeActiveTextEditor((e) => {
-      if (e && editorDefaults.highwater) swapSoon(e.document.uri);
-    }),
-    // A script opened in the text editor (from Search, say) while it is open in the Highwater
-    // Editor: show it there instead, at the same place, so there is one tab per document. Only when it has no unsaved
-    // changes, as closing a tab of a changed document asks to save or discard.
-    vscode.window.tabGroups.onDidChangeTabs((e) => {
-      if (swapping) return;
-      for (const opened of e.opened) {
-        if (!(opened.input instanceof vscode.TabInputText)) continue;
-        const uri = opened.input.uri.toString();
-        // Look again once things settle: a swap or a closing tab may be under way.
-        setTimeout(() => {
-          if (swapping || choseText(uri) || !hasHighwaterTab(uri)) return;
-          const tab = vscode.window.tabGroups.all.flatMap((g) => g.tabs).find((t) => t.input instanceof vscode.TabInputText && t.input.uri.toString() === uri);
-          if (!tab || tab.isDirty) return;
-          const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri);
-          const view = doc && viewOf(doc, true);
-          if (!view) return;
-          // Where the text editor was opened to (a search result's line), to show the same place.
-          const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
-          const at = editor ? doc.offsetAt(editor.selection.active) : undefined;
-          log(`search handler: closing the text tab of ${uri.split("/").pop()}`);
-          void vscode.window.tabGroups.close(tab).then(() => {
-            view.panel.reveal(view.panel.viewColumn, false);
-            if (at !== undefined) view.reveal(at, "center", true);
-          });
-        }, 300);
-      }
     }),
   );
 }
