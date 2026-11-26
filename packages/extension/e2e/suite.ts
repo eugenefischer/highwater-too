@@ -714,6 +714,8 @@ const tests: [string, () => Promise<void>][] = [
       const config = () => vscode.workspace.getConfiguration("highwater");
       await config().update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
       await config().update("writingHistory", true, vscode.ConfigurationTarget.Global);
+      // Open goes where the writer's scripts open: the Highwater Editor (the suite turns that off).
+      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
       try {
         const path = join(dir, "Shelf.fountain");
         await writeFile(path, "INT. LIBRARY - NIGHT\n\nA shelf of scripts.\n");
@@ -750,6 +752,7 @@ const tests: [string, () => Promise<void>][] = [
         }, 20_000);
         await vscode.commands.executeCommand("workbench.action.closeAllEditors");
       } finally {
+        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
         await config().update("writingHistory", false, vscode.ConfigurationTarget.Global);
       }
     },
