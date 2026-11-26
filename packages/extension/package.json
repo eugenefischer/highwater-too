@@ -2,7 +2,7 @@
   "name": "highwater-too",
   "displayName": "Highwater Too",
   "description": "Write screenplays and manuscripts in .highland files, with preview and PDF export, plus a git writing history.",
-  "version": "0.6.87",
+  "version": "0.6.88",
   "private": true,
   "publisher": "eugenefischer",
   "license": "MIT",
@@ -2153,8 +2153,15 @@
     "views": {
       "highwater": [
         {
+          "type": "webview",
+          "id": "highwater.works",
+          "name": "Works",
+          "when": "activeCustomEditorId != 'highwater.highlandEditor'"
+        },
+        {
           "id": "highwater.inEditor",
-          "name": "Highwater Editor"
+          "name": "Highwater Editor",
+          "when": "activeCustomEditorId == 'highwater.highlandEditor'"
         }
       ]
     },
@@ -2163,11 +2170,6 @@
         "view": "highwater.inEditor",
         "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highwater Editor's own sidebar, at the left of the page.\n[Show or Hide the Sidebar (⌘0)](command:highwater.toggleEditorSidebar)\nThis sidebar closes whenever you go back to the page.",
         "when": "activeCustomEditorId == 'highwater.highlandEditor'"
-      },
-      {
-        "view": "highwater.inEditor",
-        "contents": "The Navigator, Bin, Assets, Scratchpad, Writing History and Works are in the Highwater Editor's own sidebar, at the left of the page.\n[Open Document…](command:highwater.open)\n[New Document…](command:highwater.newDocument)",
-        "when": "activeCustomEditorId != 'highwater.highlandEditor'"
       }
     ],
     "themes": [

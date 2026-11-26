@@ -18,6 +18,14 @@ export interface PageAddresses {
   dict(file: string): string;
 }
 
+/** The Works panel (sidebar/works.ts), in the editor's sidebar and in the Works view (works-view-html.ts). */
+export const WORKS_SECTION = `    <section data-panel="works" hidden>
+      <div class="sb-head sb-head-help"><span id="workcomputer"></span><button id="workhelp" class="sb-button sb-help" data-tip="Help" aria-label="Works help" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
+      <div class="sb-scroll" id="workscroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
+      <div id="workstatus" hidden></div>
+      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
+    </section>`;
+
 export function pageHtml(p: PageAddresses): string {
   return `<!doctype html>
 <html><head><meta charset="utf-8">
@@ -70,12 +78,7 @@ ${css}</style></head>
         <button id="histgear" class="sb-button" data-tip="More writing history actions" aria-label="More writing history actions" aria-haspopup="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button>
       </div>
     </section>
-    <section data-panel="works" hidden>
-      <div class="sb-head sb-head-help"><span id="workcomputer"></span><button id="workhelp" class="sb-button sb-help" data-tip="Help" aria-label="Works help" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg></button></div>
-      <div class="sb-scroll" id="workscroll"><div id="worklist" class="sb-rows" tabindex="0" role="listbox" aria-label="Works"></div><div id="worknote" class="sb-note sb-loading">Loading works…</div></div>
-      <div id="workstatus" hidden></div>
-      <div class="sb-foot"><input id="workfilter" type="search" placeholder="Filter" aria-label="Filter the works"><button id="workrefresh" class="sb-button" data-tip="Sync with the mirror" aria-label="Sync with the mirror" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button></div>
-    </section>
+${WORKS_SECTION}
   </div>
   <div id="sbgrip" aria-hidden="true"></div>
 </div>

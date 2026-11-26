@@ -56,7 +56,7 @@ The sidebar on the left of the page (⌘0 shows or hides it) has Highland's pane
 - **Assets** (⌘4): the document's images. Drag one into the text to insert it.
 - **Scratchpad** (⌘5): notes, saved as you type.
 - **Writing History:** this document's saves (see [Writing history](#writing-history)).
-- **Works:** everything in your writing history.
+- **Works:** everything in your writing history. With no Highwater Editor in front, the Works panel is also in VS Code's own sidebar (the Highwater Too icon in the Activity Bar), under **Open Document…** and **New Document…**, so you can open a work, or restore one from the mirror, with no document open.
 
 ## Print and export
 

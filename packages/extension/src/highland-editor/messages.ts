@@ -240,7 +240,9 @@ export type FromPage =
   | { type: "worksRefresh" }
   | { type: "workAction"; i: number; action: string }
   | { type: "workRename"; i: number; title: string; file?: string }
-  | { type: "workSaves"; i: number };
+  | { type: "workSaves"; i: number }
+  /** The Works view's Open Document… and New Document… (works-view.ts). */
+  | { type: "worksViewCommand"; command: "highwater.open" | "highwater.newDocument" };
 
 /** Sends a message to a Highwater Editor page (as `void panel.webview.postMessage(msg)`, typed). */
 export function postTo(panel: { webview: { postMessage(message: unknown): unknown } }, msg: ToPage): void {

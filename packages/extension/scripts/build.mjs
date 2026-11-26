@@ -28,6 +28,8 @@ await build({ ...common, entryPoints: [join(root, "src/extension.ts")], outfile:
 // The page leaves the custom editor's keybindings to VS Code (src/highland-editor/page-keys.ts).
 const keybindings = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).contributes.keybindings;
 await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/webview.ts")], outfile: join(root, "dist/highland-editor.js"), define: { HIGHWATER_KEYBINDINGS: JSON.stringify(keybindings) } });
+// The Works view's page, in VS Code's own sidebar (src/highland-editor/works-view.ts).
+await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/works-view.ts")], outfile: join(root, "dist/works-view.js") });
 // Its spelling worker, and the dictionary it loads: Hunspell's en_US from SCOWL (MIT and BSD; licence copied).
 await build({ bundle: true, platform: "browser", format: "iife", target: "chrome120", logLevel: "warning", entryPoints: [join(root, "src/highland-editor/spell-worker.ts")], outfile: join(root, "dist/spell-worker.js") });
 const dictionary = dirname(require.resolve("dictionary-en")); // its exports hide the files themselves

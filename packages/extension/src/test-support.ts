@@ -11,6 +11,7 @@ import { swapLog } from "./highland-editor/provider.ts";
 import { pageCountOf } from "./page-count.ts";
 import { activeDocument, activeView, editorDefaults } from "./surface.ts";
 import { historyApi } from "./history.ts";
+import { worksViewForTests } from "./highland-editor/works-view-provider.ts";
 
 export function registerTestCommands(context: vscode.ExtensionContext): void {
   if (context.extensionMode === vscode.ExtensionMode.Test) {
@@ -36,6 +37,11 @@ export function registerTestCommands(context: vscode.ExtensionContext): void {
       // Scripts open in VS Code's text editor while this is false (the Highwater Editor otherwise).
       vscode.commands.registerCommand("highwater.test.textEditorDefault", (on: boolean) => void (editorDefaults.highwater = !on)),
       // Revert to This Save, as the Writing History panel asks for it: true if it went through.
+      // The Works view in VS Code's sidebar: whether its page is ready and which works it lists; with a message, as if the page sent it.
+      vscode.commands.registerCommand("highwater.test.worksView", (msg?: unknown) => {
+        const handled = msg ? worksViewForTests.receive(msg as never) : undefined;
+        return { ready: worksViewForTests.ready, works: worksViewForTests.works, handled };
+      }),
       vscode.commands.registerCommand("highwater.test.revert", (key: string, hash: string) => historyApi?.revert(key, hash) ?? false),
     );
   }

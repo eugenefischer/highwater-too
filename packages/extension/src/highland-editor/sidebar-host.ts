@@ -6,17 +6,16 @@
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { parseSave } from "../save-message.ts";
-import { computerName } from "@highwater/history";
 import { plainExtras } from "../extras.ts";
 import { bundleOf } from "../render-document.ts";
 import { extrasApi } from "../bin-assets.ts";
 import type { AssetItem, Owner } from "../document-extras.ts";
 import { historyApi } from "../history.ts";
-import type { WorkNode } from "../works.ts";
+import { worksHost } from "./works-host.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
 import { pageForm } from "./offsets.ts";
-import type { FromPage, ToPage, WorkRow, WorkSaveRow } from "./messages.ts";
+import type { FromPage, ToPage } from "./messages.ts";
 import { NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
 import { debounce } from "../debounce.ts";
 
@@ -187,40 +186,8 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       menu,
     });
   };
-  // Works: every work in the writing history; a work here opens, others can be restored.
-  /** What the Works panel's More menu calls showing a work's file, as VS Code names it on each system. */
-  const REVEAL_LABEL = process.platform === "darwin" ? "Reveal in Finder" : process.platform === "win32" ? "Reveal in File Explorer" : "Reveal in File Manager";
-  let workNodes: WorkNode[] = [];
-  const sendWorks = async () => {
-    const remote = !!vscode.workspace.getConfiguration("highwater").get<string>("historyRemote", "").trim();
-    const m = historyApi?.mirror();
-    const mirror = remote && m ? { busy: m.busy, at: m.at?.getTime() ?? null, error: m.error, signIn: m.signIn } : null;
-    if (!historyApi) return post({ type: "works", items: [], mirror, computer: computerName(), reveal: REVEAL_LABEL });
-    workNodes = (await historyApi.works.getChildren().catch(() => [])) as WorkNode[];
-    const items = workNodes.map((n, i): WorkRow => {
-      const w = n.work;
-      const words = w.latest ? parseSave(w.latest.message).words : "";
-      return {
-        i,
-        title: w.title,
-        file: n.here ? basename(n.here) : (w.file ?? ""),
-        at: w.lastSave?.getTime() ?? null,
-        words,
-        kind: n.here ? "here" : w.local ? "local" : "remote",
-      };
-    });
-    post({ type: "works", items, mirror, computer: computerName(), reveal: REVEAL_LABEL });
-  };
-  const sendWorkSaves = async (i: number) => {
-    const node = workNodes[i];
-    if (!node || !historyApi) return;
-    const saves = (await historyApi.works.getChildren(node).catch(() => [])) as WorkNode[];
-    post({
-      type: "workSaves",
-      i,
-      saves: saves.map((n) => (n.kind === "save" ? { at: n.commit.date.getTime(), ...parseSave(n.commit.message) } : null)).filter((s): s is WorkSaveRow => s !== null),
-    });
-  };
+  // Works: every work in the writing history (works-host.ts).
+  const works = worksHost(post);
   /** Compare: the save's text to the page, which marks what changed since (compare.ts). */
   const compareInPage = async (hash: string, at?: Date) => {
     const k = bundle() ?? plain();
@@ -232,24 +199,12 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       void vscode.window.showErrorMessage(`Could not read that save: ${(e as Error).message}`);
     }
   };
-  const workAction = async (i: number, action: string) => {
-    const node = workNodes[i];
-    if (!node || !historyApi) return;
-    const w = historyApi.works;
-    if (action === "open") await w.open(node);
-    else if (action === "restore") await w.restore(node);
-    else if (action === "remove") await w.remove(node);
-    else if (action === "delete") await w.delete(node);
-    else if (action === "reveal" && node.here) await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(node.here));
-  };
-  const historyChanged = debounce(200, () => {
-    void sendHistory();
-    void sendWorks();
-  });
+  const historyChanged = debounce(200, () => void sendHistory());
   let historyWatch: vscode.Disposable | undefined;
 
   const subscriptions: vscode.Disposable[] = [
     { dispose: () => historyWatch?.dispose() },
+    works,
     // The Scratchpad changed elsewhere (another window on the same file, a restored save).
     plainExtras().onDidChangeFile((events) => {
       const p = plain();
@@ -339,15 +294,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
         if (k && historyApi) void historyApi.revert(k, msg.hash).then((done) => done && post({ type: "compareEnd" }));
       } else if (msg.type === "historyCommand" && typeof msg.command === "string" && HISTORY_COMMANDS.has(msg.command)) {
         void vscode.commands.executeCommand(msg.command).then(() => sendHistory());
-      } else if (msg.type === "worksRefresh") void vscode.commands.executeCommand("highwater.works.refresh");
-      else if (msg.type === "workAction" && typeof msg.i === "number" && typeof msg.action === "string") void workAction(msg.i, msg.action);
-      else if (msg.type === "workSaves" && typeof msg.i === "number") void sendWorkSaves(msg.i);
-      else if (msg.type === "workRename" && typeof msg.i === "number" && typeof msg.title === "string") {
-        const node = workNodes[msg.i];
-        const i = msg.i;
-        const file = typeof msg.file === "string" ? msg.file : undefined;
-        if (node && historyApi) void historyApi.works.rename(node, msg.title, file).then((error) => post({ type: "workRenamed", i, ...(error ? { error } : {}) }));
-      } else return false;
+      } else if (!works.handle(msg)) return false;
       return true;
     },
     ready() {
@@ -358,7 +305,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
       void sendAssets();
       historyWatch ??= historyApi?.onDidChange(historyChanged);
       void sendHistory();
-      void sendWorks();
+      works.ready();
     },
     dispose() {
       disposed = true;

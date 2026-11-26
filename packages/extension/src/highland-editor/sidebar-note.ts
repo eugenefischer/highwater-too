@@ -2,9 +2,10 @@ import * as vscode from "vscode";
 import { activeView, onDidChangeActiveSurface } from "../surface.ts";
 
 /**
- * VS Code's Highwater Too sidebar: one view, only a note pointing to the Highwater Editor's own
- * sidebar, which has the panels. Whenever a Highwater Editor is given focus, the Highwater Too
- * sidebar closes if it is open.
+ * VS Code's Highwater Too sidebar, while a Highwater Editor is in front: only a note pointing to
+ * the editor's own sidebar, which has the panels (with no Highwater Editor in front, the sidebar
+ * has the Works view instead: works-view-provider.ts). Whenever a Highwater Editor is given focus,
+ * the Highwater Too sidebar closes if it is open.
  */
 export const NOTE_VIEW = "highwater.inEditor";
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.88
+
+- **The Works panel in VS Code's own Highwater Too sidebar** (EJ): with no Highwater Editor in front, the Highwater Too icon in the Activity Bar shows **Open Document…**, **New Document…** and the Works panel, the same as in the editor's sidebar (open, restore, More, the saves, Filter, syncing with the mirror), so a work can be opened, or restored from the mirror, with no document open. With a Highwater Editor in front it still shows the note, and still closes when you go back to the page.
+- The Works panel's sync button no longer shows when there is no mirror (its stylesheet overrode its being hidden).
 ## 0.6.87
 
 - **A manuscript's title page can be YAML front matter** (EJ): Highland's fields in lower case (`title`, `credit`, `author`, `source`, `contact`, `notes`, `copyright`, `draft_date`, `date`, `revision`, and `tl`, `tr`, `cc`, `bl`, `br`), a `|` block for a field of several lines. It prints exactly as the same fields in Highland's form, in the pages, PDF, Word and RTF, and gives a new work its title. Other front matter keys are left out of the title page; `Title:` lines after a YAML title page are ordinary text.

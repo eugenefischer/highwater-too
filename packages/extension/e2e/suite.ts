@@ -708,6 +708,53 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "the Works view in VS Code's sidebar lists the works with no document open, and opens one",
+    async () => {
+      const historyDir = join(dir, "history");
+      const config = () => vscode.workspace.getConfiguration("highwater");
+      await config().update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
+      await config().update("writingHistory", true, vscode.ConfigurationTarget.Global);
+      try {
+        const path = join(dir, "Shelf.fountain");
+        await writeFile(path, "INT. LIBRARY - NIGHT\n\nA shelf of scripts.\n");
+        const doc = await vscode.workspace.openTextDocument(path);
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(doc.uri, doc.positionAt(doc.getText().length), "\nIt hums.\n");
+        assert.ok(await vscode.workspace.applyEdit(edit), "the edit applies");
+        await doc.save();
+        await waitFor("the work in the writing history", () => {
+          try {
+            const index = JSON.parse(readFileSync(join(historyDir, "index.json"), "utf8")) as { documents: Record<string, { paths: string[] }> };
+            return Object.values(index.documents).some((d) => d.paths.some((p) => p.endsWith("Shelf.fountain")));
+          } catch {
+            return false;
+          }
+        }, 20_000);
+        await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+        type WorksView = { ready: boolean; works: { title: string; file: string; kind: string }[]; handled?: boolean };
+        const view = (msg?: object) => vscode.commands.executeCommand<WorksView>("highwater.test.worksView", msg);
+        // VS Code's own command for showing a view.
+        await vscode.commands.executeCommand("highwater.works.focus");
+        let works: WorksView["works"] = [];
+        await until("the Works view, listing the work", async () => {
+          const v = await view();
+          works = v.works;
+          return v.ready && works.some((w) => w.file === "Shelf.fountain" && w.kind === "here");
+        }, 20_000);
+        const i = works.findIndex((w) => w.file === "Shelf.fountain");
+        // The view's Open button, as the page posts it.
+        assert.equal((await view({ type: "workAction", i, action: "open" })).handled, true);
+        await until("the work open in the Highwater Editor", async () => {
+          const s = await vscode.commands.executeCommand<{ document?: string; view: boolean }>("highwater.test.surface");
+          return s.view && !!s.document?.endsWith("/Shelf.fountain");
+        }, 20_000);
+        await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+      } finally {
+        await config().update("writingHistory", false, vscode.ConfigurationTarget.Global);
+      }
+    },
+  ],
+  [
     "converts a manuscript's title page to YAML front matter and back",
     async () => {
       const path = join(dir, "TitleForms.md");

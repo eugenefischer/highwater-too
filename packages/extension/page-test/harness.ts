@@ -43,18 +43,14 @@ let browser: Browser | null = null;
 let file: string | null = null;
 
 /** page-html.ts imports its stylesheet as text (esbuild's text loader), so it is bundled the same way here. */
-async function pageHtml(addresses: object): Promise<string> {
-  const r = await build({ entryPoints: [join(dirname(fileURLToPath(import.meta.url)), "../src/highland-editor/page-html.ts")], bundle: true, format: "esm", write: false, loader: { ".css": "text" }, platform: "node", logLevel: "warning" });
-  const mod = (await import(`data:text/javascript;base64,${Buffer.from(r.outputFiles[0]!.text).toString("base64")}`)) as { pageHtml(a: object): string };
-  return mod.pageHtml(addresses);
+async function pageHtml(addresses: object, module = "page-html.ts", fn = "pageHtml"): Promise<string> {
+  const r = await build({ entryPoints: [join(dirname(fileURLToPath(import.meta.url)), `../src/highland-editor/${module}`)], bundle: true, format: "esm", write: false, loader: { ".css": "text" }, platform: "node", logLevel: "warning" });
+  const mod = (await import(`data:text/javascript;base64,${Buffer.from(r.outputFiles[0]!.text).toString("base64")}`)) as Record<string, (a: object) => string>;
+  return mod[fn]!(addresses);
 }
 
-async function harnessFile(): Promise<string> {
-  if (file) return file;
-  const url = (x: string) => pathToFileURL(join(dist, x)).href;
-  let html = await pageHtml({ cspSource: "", nonce: "n", script: url("highland-editor.js"), spellWorker: url("spell-worker.js"), font: (x: string) => url(`fonts/${x}`), pdfjs: (x: string) => url(`pdfjs/${x}`), dict: (x: string) => url(`dictionary-en/${x}`) });
-  html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, "");
-  const stand = `<script>
+/** The stand-in for VS Code's webview API: every message the page posts is kept in `highwaterTest.posted`. */
+const STAND_IN = `<script>
 window.highwaterTest = { view: null, posted: [], forwarded: [] };
 window.acquireVsCodeApi = () => ({ postMessage: (m) => window.highwaterTest.posted.push(JSON.parse(JSON.stringify(m))) });
 window.addEventListener("keydown", (e) => {
@@ -62,7 +58,13 @@ window.addEventListener("keydown", (e) => {
   if (mods && mods !== "Shift+" && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) window.highwaterTest.forwarded.push(mods + e.key);
 });
 </script>`;
-  html = html.replace("<head>", `<head>${stand}`);
+
+async function harnessFile(): Promise<string> {
+  if (file) return file;
+  const url = (x: string) => pathToFileURL(join(dist, x)).href;
+  let html = await pageHtml({ cspSource: "", nonce: "n", script: url("highland-editor.js"), spellWorker: url("spell-worker.js"), font: (x: string) => url(`fonts/${x}`), pdfjs: (x: string) => url(`pdfjs/${x}`), dict: (x: string) => url(`dictionary-en/${x}`) });
+  html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, "");
+  html = html.replace("<head>", `<head>${STAND_IN}`);
   const dir = mkdtempSync(join(tmpdir(), "highwater-page-"));
   file = join(dir, "page.html");
   writeFileSync(file, html);
@@ -103,6 +105,39 @@ export async function openEditor(text: string, mode: Mode, o: { width?: number; 
     selection: () => page.evaluate(`(() => { const m = ${T}.view.state.selection.main; return { anchor: m.anchor, head: m.head, assoc: m.assoc }; })()`),
     select: (anchor, head = anchor) => page.evaluate(`${T}.view.dispatch({ selection: { anchor: ${anchor}, head: ${head} } })`),
     evaluate: (fn) => page.evaluate(`(${fn})(${T}.view)`),
+    close: async () => {
+      await page.close();
+      if (errors.length) throw new Error(`Errors in the page: ${errors.join("; ")}`);
+    },
+  };
+}
+
+export interface WorksViewPage {
+  page: Page;
+  post(message: ToPage): Promise<void>;
+  posted(): Promise<FromPage[]>;
+  close(): Promise<void>;
+}
+
+let worksFile: string | null = null;
+
+/** The Works view's page (works-view-html.ts and the built dist/works-view.js), as VS Code's sidebar shows it, `width` wide. */
+export async function openWorksView(o: { width?: number; height?: number } = {}): Promise<WorksViewPage> {
+  if (!worksFile) {
+    let html = await pageHtml({ cspSource: "", nonce: "n", script: pathToFileURL(join(dist, "works-view.js")).href }, "works-view-html.ts", "worksViewHtml");
+    html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, "").replace("<head>", `<head>${STAND_IN}`);
+    worksFile = join(mkdtempSync(join(tmpdir(), "highwater-works-")), "works.html");
+    writeFileSync(worksFile, html);
+  }
+  browser ??= await chromium.launch(process.env.HIGHWATER_CHROMIUM ? { executablePath: process.env.HIGHWATER_CHROMIUM } : {});
+  const page = await browser.newPage({ viewport: { width: o.width ?? 300, height: o.height ?? 600 } });
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto(pathToFileURL(worksFile).href);
+  return {
+    page,
+    post: (m) => page.evaluate((msg) => window.postMessage(msg, "*"), m as unknown as object),
+    posted: () => page.evaluate("window.highwaterTest.posted"),
     close: async () => {
       await page.close();
       if (errors.length) throw new Error(`Errors in the page: ${errors.join("; ")}`);

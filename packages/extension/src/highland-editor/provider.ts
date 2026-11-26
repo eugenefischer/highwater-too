@@ -13,6 +13,7 @@ import { handleThemeMessage, registerThemes, themesMessage, themeVars } from "./
 import { affectsSettings, backupInfoMessage, currentGeneral, handleSettingsMessage, registerSettings, settingsMessage } from "./settings-host.ts";
 import { historyApi } from "../history.ts";
 import { editorFocused, registerSidebarNote } from "./sidebar-note.ts";
+import { registerWorksView } from "./works-view-provider.ts";
 import { sidebarHost } from "./sidebar-host.ts";
 import { pageHtml } from "./page-html.ts";
 import { postTo, type FromPage, type PanelName, type ToPage } from "./messages.ts";
@@ -508,6 +509,7 @@ async function openInHighwater(doc: vscode.TextDocument): Promise<HighlandView |
  */
 export function registerHighlandEditor(context: vscode.ExtensionContext, store: () => BundleStore, cache: () => ParseCache): void {
   registerSidebarNote(context);
+  registerWorksView(context);
   registerThemes(context);
   registerSettings(context);
   highwaterOpener.open = openInHighwater;

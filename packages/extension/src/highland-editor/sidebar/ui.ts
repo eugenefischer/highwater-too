@@ -86,9 +86,13 @@ export function openHelp(anchor: HTMLElement, html: string): void {
   const height = Math.min(560, window.innerHeight - 24);
   const middle = a.top + a.height / 2;
   const top = Math.max(12, Math.min(window.innerHeight - height - 12, middle - 24));
-  pop.style.left = `${Math.round(side.right + 10)}px`;
-  pop.style.top = `${Math.round(top)}px`;
-  pop.style.height = `${height}px`;
+  // In the Works view (works-view.ts) there is no room beside the panel: the help covers it instead.
+  const inside = document.body.classList.contains("works-view");
+  pop.classList.toggle("inside", inside);
+  pop.style.left = `${Math.round(inside ? 8 : side.right + 10)}px`;
+  pop.style.width = inside ? `${window.innerWidth - 16}px` : "";
+  pop.style.top = `${Math.round(inside ? 8 : top)}px`;
+  pop.style.height = `${inside ? window.innerHeight - 16 : height}px`;
   pop.style.setProperty("--arrow", `${Math.round(Math.max(16, Math.min(height - 16, middle - top)))}px`);
   $("sbhelptext").scrollTop = 0;
   pop.focus();
