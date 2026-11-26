@@ -492,6 +492,9 @@ body.previewing #preview { display: flex; }
 .cm-editor .cm-button[name="next"] { background: var(--hl-accent); color: var(--hl-accent-fg); border-color: transparent; }
 .cm-editor .cm-panel.cm-search [name="close"] { color: var(--hl-panel-fg); font-size: 1.3em; top: 4px; right: 6px; }
 .cm-editor .cm-panel.cm-search input[type="checkbox"] { accent-color: var(--hl-accent); }
+/* The number of matches, beside the search field (search-count.ts), as in VS Code's find widget. */
+.cm-editor .cm-panel.cm-search .hl-search-count { min-width: 6.5em; white-space: nowrap; font-size: 0.92em; color: var(--hl-muted); font-variant-numeric: tabular-nums; }
+.cm-editor .cm-panel.cm-search .hl-search-count.none { color: var(--vscode-errorForeground, #f48771); }
 /* Spelling (highwater.spellCheck): red dots under a misspelling, as macOS draws them in Highland 2. */
 .hl-misspelled { text-decoration: underline dotted #ff3b30; text-decoration-thickness: 2px; text-underline-offset: 3px; text-decoration-skip-ink: none; }
 .hl-spellmenu { position: fixed; z-index: 100; min-width: 12em; padding: 4px 0; background: var(--vscode-menu-background, var(--vscode-editorWidget-background, Canvas)); color: var(--vscode-menu-foreground, var(--vscode-editorWidget-foreground, CanvasText)); border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, transparent)); border-radius: 5px; box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0,0,0,.3)); font: 13px var(--vscode-font-family); }

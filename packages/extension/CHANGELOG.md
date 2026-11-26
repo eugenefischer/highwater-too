@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.89
+
+- **The Find box (⌘F) shows the number of matches** (EJ), beside the search field, as VS Code's find widget does: "3 of 12" when a match is selected (after Enter or the arrows), "12 matches" otherwise, and "No results" in red when nothing matches. It follows typing, Match case, By word and Regexp, and edits to the text.
 ## 0.6.88
 
 - **The Works panel in VS Code's own Highwater Too sidebar** (EJ): with no Highwater Editor in front, the Highwater Too icon in the Activity Bar shows **Open Document…**, **New Document…** and the Works panel, the same as in the editor's sidebar (open, restore, More, the saves, Filter, syncing with the mirror), so a work can be opened, or restored from the mirror, with no document open. With a Highwater Editor in front it still shows the note, and still closes when you go back to the page.

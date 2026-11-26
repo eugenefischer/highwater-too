@@ -268,3 +268,22 @@ describe("edit rules", () => {
     await e.close();
   });
 });
+
+describe("Find", () => {
+  it("shows how many matches there are, and which one is selected", async () => {
+    const e = await openEditor("The cat sat.\n\nThe hat.\n\nThe end.\n", "markdown");
+    await e.select(0);
+    await e.page.keyboard.press(`${mod}+f`);
+    await e.page.waitForSelector(".cm-search input[name=search]");
+    const count = () => e.page.textContent(".cm-search .hl-search-count");
+    await e.page.keyboard.type("the");
+    await e.page.waitForFunction(() => document.querySelector(".hl-search-count")?.textContent === "3 matches");
+    await e.page.keyboard.press("Enter");
+    expect(await count()).toBe("1 of 3");
+    await e.page.keyboard.press("Enter");
+    expect(await count()).toBe("2 of 3");
+    await e.page.keyboard.type("x");
+    expect(await count()).toBe("No results");
+    await e.close();
+  });
+});

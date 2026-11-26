@@ -37,6 +37,7 @@ import { typewriter } from "./typewriter.ts";
 import { pageKeys, type Keybinding } from "./page-keys.ts";
 import { wrapStops } from "./wrap-stops.ts";
 import { installTooltips } from "./sidebar/tips.ts";
+import { searchCount } from "./search-count.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: FromPage): void };
 const vscode = acquireVsCodeApi();
@@ -329,6 +330,7 @@ function start(text: string): void {
         history(),
         binHistory,
         search({ top: true }),
+        searchCount,
         keymap.of([{ key: "Mod-;", run: (v) => (void nextMisspelling(v, spelling), true) }]),
         wrapStops,
         keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
