@@ -287,3 +287,17 @@ describe("Find", () => {
     await e.close();
   });
 });
+
+describe("the end-to-end tests' typing", () => {
+  it("types a burst letter by letter, each its own edit, and one undo takes it all back", async () => {
+    const e = await openEditor("Start.\n", "markdown");
+    await e.select(6);
+    await e.post({ type: "testType", text: " One two" });
+    await e.page.waitForFunction(() => (window as unknown as { highwaterTest: { posted: { type: string }[] } }).highwaterTest.posted.some((m) => m.type === "testTyped"));
+    expect(await e.text()).toBe("Start. One two\n");
+    expect((await e.posted()).filter((m) => m.type === "edit").length).toBe(8);
+    await e.page.keyboard.press(`${mod}+z`);
+    expect(await e.text()).toBe("Start.\n");
+    await e.close();
+  });
+});

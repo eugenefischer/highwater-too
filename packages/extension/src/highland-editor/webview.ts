@@ -665,6 +665,21 @@ function apply(id: number, changes: { from: number; to: number; insert: string }
 }
 
 /** The end-to-end tests: types a letter at a time, as key presses do (one undo step), and says what happened. */
+/**
+ * A turn of the page's event loop, for testType: a message to itself, which (unlike setTimeout) the
+ * browser doesn't slow down in a page it takes to be in the background. On CI's Mac runner a 15 ms
+ * timeout took a second, so each letter was an undo step of its own and the undo test failed.
+ */
+const turn = (() => {
+  const channel = new MessageChannel();
+  const waiting: (() => void)[] = [];
+  channel.port1.onmessage = () => waiting.shift()?.();
+  return () => new Promise<void>((r) => {
+    waiting.push(r);
+    channel.port2.postMessage(null);
+  });
+})();
+
 async function testType(text: string): Promise<void> {
   let typed = 0;
   try {
@@ -673,7 +688,8 @@ async function testType(text: string): Promise<void> {
       const at = view.state.selection.main;
       view.dispatch({ changes: { from: at.from, to: at.to, insert: ch }, selection: { anchor: at.from + ch.length }, userEvent: "input.type" });
       typed++;
-      await new Promise((r) => setTimeout(r, 15));
+      // Each letter its own edit for the extension, as when typing, but all one burst for undo.
+      await turn();
     }
     vscode.postMessage({ type: "testTyped", typed, text: view?.state.doc.toString() ?? "" });
   } catch (e) {
