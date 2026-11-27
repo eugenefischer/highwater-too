@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { Annotation, EditorSelection, EditorState } from "@codemirror/state";
 import { idLineGuard, idLineRange, onlyAddsIdLine } from "../src/highland-editor/id-line.ts";
 import { idForm, idLineAddition, idNote, noteId, withoutIdNote, withoutTrailingIdNote } from "../src/extras-folder.ts";
+import { parse } from "@highwater/parser";
+import { documentStats } from "../src/syntax/stats.ts";
+import { navigatorItems } from "../src/syntax/navigator.ts";
 
 const ID = "1a2b3c4d-5e6f-7a8b-9c0d-112233445566";
 
@@ -74,4 +77,23 @@ describe("the ID line of a linked plain file", () => {
     expect(onlyAddsIdLine("", "\n\nMore text.\n")).toBe(false);
     expect(onlyAddsIdLine("x", `[[highwater: ${ID}]]`)).toBe(false);
   });
+});
+
+describe("every way of writing the ID line", () => {
+  // One definition: the history, printing, counting, the Navigator and the editor's hidden line agree on each form.
+  const forms = [`[[highwater: ${ID}]]`, `[[highwater:${ID}]]`, `[[ highwater: ${ID} ]]`, `<!-- highwater: ${ID} -->`, `<!--highwater:${ID}-->`];
+  for (const form of forms)
+    it(`reads ${form} everywhere`, () => {
+      const text = `Text here.\n\n${form}\n`;
+      expect(noteId(text)).toBe(ID);
+      expect(withoutTrailingIdNote(text)).toBe("Text here.\n");
+      expect(withoutIdNote(text)).toBe("Text here.\n");
+      expect(idLineRange(text)).not.toBeNull();
+      expect(onlyAddsIdLine("", `\n\n${form}\n`)).toBe(true);
+      if (form.startsWith("[[")) {
+        const doc = parse(text, { mode: "fountain" });
+        expect(documentStats(doc).words).toBe(2);
+        expect(navigatorItems(doc).some((i) => i.label.includes("highwater"))).toBe(false);
+      }
+    });
 });

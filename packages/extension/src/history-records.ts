@@ -1,11 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { extname } from "node:path";
 import type { CommitInfo, DocumentFiles, History } from "@highwater/history";
 import type { PlainExtras } from "./extras.ts";
 import { ID_NOTE, idForm, idNote, noteId } from "./extras-folder.ts";
 import type { BundleStore } from "./store.ts";
 import { withoutSavedText } from "./to-bundle.ts";
 import { INFO_KEY } from "./history-location.ts";
+import { TEXT_FILES } from "@highwater/bundle";
+import { modeFromFileName } from "@highwater/parser";
 
 /** One entry of a .highland file as an editor holds it (not as on disk). */
 export interface Instead {
@@ -39,8 +40,8 @@ export function historyRecords(deps: { store: BundleStore; extras: PlainExtras; 
       }
       return { id, files };
     }
-    const ext = extname(key).toLowerCase();
-    const scriptName = ext === ".fountain" || ext === ".spmd" ? "text.fountain" : ext === ".txt" ? "text.txt" : "text.md";
+    // The script's kind by the file's extension, the one rule (@highwater/parser modeFromFileName).
+    const scriptName = TEXT_FILES[modeFromFileName(key)];
     const script = await readFile(key, "utf8");
     // Its Bin, Scratchpad, settings and images, kept outside the file.
     return { id: noteId(script), files: { scriptName, script, ...(await extras.historyFiles(key)) } };

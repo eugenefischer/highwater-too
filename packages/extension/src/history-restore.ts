@@ -23,6 +23,7 @@ import type { BundleStore } from "./store.ts";
 import { showDocument } from "./surface.ts";
 import { toBundle } from "./to-bundle.ts";
 import { afterPull, type WorksHost } from "./works.ts";
+import { modeFromFileName } from "@highwater/parser";
 
 /** What the work commands share with the rest of the writing history (see registerHistory). */
 export interface RestoreCore {
@@ -237,7 +238,7 @@ export function restoreCommands(core: RestoreCore) {
       return;
     }
     let doc = await vscode.workspace.openTextDocument(path);
-    if (/\.(md|markdown)$/i.test(path) && doc.languageId === "markdown") doc = await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown);
+    if (modeFromFileName(path) === "markdown" && doc.languageId === "markdown") doc = await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown);
     await showDocument(doc);
   }
 

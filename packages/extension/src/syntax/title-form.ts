@@ -112,8 +112,7 @@ export function yamlHead(doc: Document, titleYaml: readonly string[]): FormEdit 
 function highlandHead(doc: Document, titleLines: readonly string[]): FormEdit {
   const other = otherYamlLines(doc);
   const front = other.length ? `---\n${other.join("\n")}\n---\n\n` : "";
-  // Without a byte-order mark before Highland's first key: the title page wouldn't be read after one.
-  return { start: 0, end: bodyStart(doc), text: `${front ? bom(doc) : ""}${front}${titleLines.length ? `${titleLines.join("\n")}\n\n` : ""}` };
+  return { start: 0, end: bodyStart(doc), text: `${bom(doc)}${front}${titleLines.length ? `${titleLines.join("\n")}\n\n` : ""}` };
 }
 
 /** Highland's title page as YAML front matter (other front matter kept). Null if there's none, or it is YAML already. */

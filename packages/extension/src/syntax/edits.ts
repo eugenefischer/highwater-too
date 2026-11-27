@@ -1,4 +1,4 @@
-import { findOverlays } from "@highwater/parser";
+import { findOverlays, wordAt } from "@highwater/parser";
 
 /** A text replacement plus where the selection should end up (offsets). */
 export interface TextEdit {
@@ -103,9 +103,9 @@ export function changeCase(text: string, start: number, end: number, upper: bool
   let from = start;
   let to = end;
   if (from === to) {
-    const word = /[\p{L}\p{N}'’_-]/u;
-    while (from > 0 && word.test(text[from - 1]!)) from--;
-    while (to < text.length && word.test(text[to]!)) to++;
+    // The word at the cursor, by Highwater's one rule for words (@highwater/parser words.ts).
+    const word = wordAt(text, from);
+    if (word) ({ from, to } = word);
   }
   const inner = text.slice(from, to);
   return { start: from, end: to, text: upper ? inner.toUpperCase() : inner.toLowerCase(), selectionStart: start, selectionEnd: end };

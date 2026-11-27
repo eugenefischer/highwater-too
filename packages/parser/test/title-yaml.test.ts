@@ -88,4 +88,16 @@ describe("the little YAML a title page needs", () => {
     expect(yamlScalar("2026-11-23")).toBe('"2026-11-23"');
     expect(yamlScalar("*Italic* title")).toBe('"*Italic* title"');
   });
+
+  it("folds a value that goes on over indented lines, plain, quoted or a list, as YAML does", () => {
+    const src = `---\ntitle: A Title That\n  Goes On # a comment\nauthor: "Someone With\n  A Long Name"\ncontact: 'one line\n\n  and the next'\nnotes: [a,\n  b]\ndate: 2026\n---\n`;
+    const inner = { start: 4, end: src.lastIndexOf("---") };
+    expect(yamlEntries(src, inner).map((e) => [e.key, e.values.map((v) => v.text)])).toEqual([
+      ["title", ["A Title That Goes On"]],
+      ["author", ["Someone With A Long Name"]],
+      ["contact", ["one line", "and the next"]],
+      ["notes", ["a", "b"]],
+      ["date", ["2026"]],
+    ]);
+  });
 });

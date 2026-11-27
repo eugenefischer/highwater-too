@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.91
+
+Fixes from an audit of fixes made too narrowly (EJ, 2026-11-28): each rule is now defined once and used everywhere it applies.
+
+- **Words** follow one rule everywhere: letters, accents and digits, with an apostrophe inside a word joining it. In the Highwater Editor, double-click, ⌥← ⌥→ (with ⇧ to select) and ⌥⌫ ⌥⌦ now take "don’t" and "O'BRIEN" whole; before, they stopped at the apostrophe. An apostrophe at a word's edge (a quotation mark) and a hyphen separate words, in the Highwater Editor as before and now also in VS Code's text editor and in Upper/Lower Case with nothing selected.
+- **Hidden things stay hidden**: one rule in the page's stylesheet instead of one per element (0.6.88's sync button showed because its element had none).
+- **Printed line breaks** follow one rule in every template: the eight prose templates now also break after "!" or "?" run into the next word, as the scripts and the Manuscript template did (Highland's print does this), and every template can break after an en dash run into a word, as after a hyphen or em dash.
+- **YAML title pages**: a value that goes on over indented lines (plain, quoted, or a list) is read whole, as YAML folds it. Before, only its first line was read, and Convert Title Page to Highland Style dropped the rest.
+- **"+" list items** print "+" in Word exports too, as in PDF and RTF.
+- **The line linking a plain file to its writing history** is recognised the same way by the history, printing, word counts, the Navigator, spelling and the editor (it had seven copies of its pattern, which had drifted apart).
+- **A file's kind by its extension** is decided by one rule: a `.markdown` script in a `.highland` file now gives a new work its title from its title page or heading, as `.md` does.
+- **Completion** of character names, scene headings and transitions works on lines in capitals of any alphabet (ÉLODIE, JOSÉ, ØYVIND), by the same test the parser uses for a character cue.
+- **A byte-order mark** at the start of a file no longer hides a title page after it: the parser skips it, so the title-page conversion no longer has to drop it.
+- **Word counts** treat an accent typed as a separate mark as part of its letter.
+- **End-to-end tests** now open scripts in the Highwater Editor, as writers do; only the tests of VS Code's text editor itself use it.
 ## 0.6.90
 
 - The arrow keys stop at both sides of every wrapped line, not only where the line wraps after a space (EJ): where it wraps after a dash or hyphen with no space ("a seat —whatever", "fabricator-scale"), or inside a word too long for the line, Right at the end of the line went straight past the start of the next one. 0.6.78 had only looked at wraps after a space.

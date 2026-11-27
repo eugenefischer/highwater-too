@@ -38,6 +38,7 @@ import { pageKeys, type Keybinding } from "./page-keys.ts";
 import { wrapStops } from "./wrap-stops.ts";
 import { installTooltips } from "./sidebar/tips.ts";
 import { searchCount } from "./search-count.ts";
+import { withWordRule, wordDoubleClick } from "./word-moves.ts";
 
 declare function acquireVsCodeApi(): { postMessage(message: FromPage): void };
 const vscode = acquireVsCodeApi();
@@ -333,7 +334,8 @@ function start(text: string): void {
         searchCount,
         keymap.of([{ key: "Mod-;", run: (v) => (void nextMisspelling(v, spelling), true) }]),
         wrapStops,
-        keymap.of(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])),
+        keymap.of(withWordRule(withoutHighlandKeys([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]))),
+        wordDoubleClick,
         EditorView.lineWrapping,
         // A Bin item or an image dropped from the sidebar goes in exactly where it is let go, as in
         // Highland, with a caret showing the place while it is dragged.

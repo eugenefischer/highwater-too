@@ -54,3 +54,23 @@ describe("modeFromFileName", () => {
     expect(modeFromFileName("text.txt")).toBe("plain");
   });
 });
+
+describe("a byte-order mark at the start", () => {
+  // It is no part of the first line's text, whatever that line is; the tiling still covers it.
+  const cases: [string, "fountain" | "markdown", string][] = [
+    ["Title: A Story\nAuthor: Someone\n\nINT. HALL - DAY\n\nText.\n", "fountain", "titlePage"],
+    ["INT. HALL - DAY\n\nText.\n", "fountain", "sceneHeading"],
+    ["MARA\nHello.\n", "fountain", "dialogue"],
+    ["# Chapter\n\nText.\n", "markdown", "heading"],
+    ["Title: A Story\n\nText.\n", "markdown", "titlePage"],
+  ];
+  for (const [text, mode, kind] of cases)
+    it(`leaves ${kind} in ${mode} as it would be without it`, () => {
+      const plain = parse(text, { mode });
+      const marked = parse(`\ufeff${text}`, { mode });
+      expect(plain.titlePage?.kind ?? plain.elements[0]?.kind).toBe(kind);
+      expect(marked.titlePage?.kind ?? marked.elements[0]?.kind).toBe(kind);
+      expect(marked.elements.map((e) => e.kind)).toEqual(plain.elements.map((e) => e.kind));
+      expect(splitLines(`\ufeff${text}`)[0]!.span.start).toBe(0);
+    });
+});

@@ -4,17 +4,20 @@ import type { Line } from "./ast.ts";
 export function splitLines(source: string): Line[] {
   const lines: Line[] = [];
   let start = 0;
+  // A byte-order mark before the first line is no part of its text (a title page or scene heading
+  // after it is still one); the line's span keeps it.
+  const bom = source.charCodeAt(0) === 0xfeff ? 1 : 0;
   const n = source.length;
   for (let i = 0; i < n; i++) {
     const c = source.charCodeAt(i);
     if (c === 10 || c === 13) {
       const contentEnd = i;
       if (c === 13 && source.charCodeAt(i + 1) === 10) i++;
-      lines.push({ span: { start, end: i + 1 }, content: { start, end: contentEnd } });
+      lines.push({ span: { start, end: i + 1 }, content: { start: lines.length === 0 ? Math.min(bom, contentEnd) : start, end: contentEnd } });
       start = i + 1;
     }
   }
-  lines.push({ span: { start, end: n }, content: { start, end: n } });
+  lines.push({ span: { start, end: n }, content: { start: lines.length === 0 ? Math.min(bom, n) : start, end: n } });
   return lines;
 }
 

@@ -1,4 +1,5 @@
 import { createDocument, HIGHLAND_KEY, HighlandBundle, type DocumentMode } from "@highwater/bundle";
+import { modeFromFileName } from "@highwater/parser";
 import type { DocumentFiles } from "@highwater/history";
 import { detectAssetsFolder, relinkAssets, withoutIdNote, type ExtrasFiles } from "./extras-folder.ts";
 
@@ -21,7 +22,7 @@ const isImage = (path: string) => /^assets\/[^/]+$/.test(path);
  * Carries the document ID.
  */
 export function toBundle(files: DocumentFiles, id: string): HighlandBundle {
-  const mode: DocumentMode = files.scriptName.endsWith(".fountain") ? "fountain" : files.scriptName.endsWith(".txt") ? "plain" : "markdown";
+  const mode: DocumentMode = modeFromFileName(files.scriptName);
   const others = files.others ?? [];
   const infoEntry = others.find((o) => o.path === "info.json");
   const info = infoEntry ? parseJson(infoEntry.data) : null;

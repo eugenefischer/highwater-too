@@ -9,12 +9,6 @@ import * as vscode from "vscode";
 /** The view type of the Highwater Editor. */
 export const HIGHLAND_EDITOR = "highwater.highlandEditor";
 
-/**
- * Scripts the extension itself opens (showDocument) go to the Highwater Editor. The end-to-end
- * tests that drive VS Code's text editor turn this off (highwater.test.textEditorDefault); nothing
- * else does. (Scripts VS Code opens go to the Highwater Editor by its own default: package.json.)
- */
-export const editorDefaults = { highwater: true };
 
 /**
  * Opens a document in the Highwater Editor (in place of its text tab, if that is in front), or
@@ -147,11 +141,11 @@ export async function showDocument(doc: vscode.TextDocument, viewColumn?: vscode
     await vscode.window.showTextDocument(doc, { viewColumn: textTab.group.viewColumn, preview: false });
     return;
   }
-  // A script opens in the Highwater Editor (unless the end-to-end tests turned that off).
+  // A script opens in the Highwater Editor (scripts VS Code opens go there by its own default: package.json).
   // A .highland file's script counts even before VS Code has given it its language (it does so a
   // moment after opening): otherwise it would show as text first, then switch.
   const script = doc.languageId.startsWith("highland-") || (doc.uri.scheme === "highland" && /\.highland$/i.test(doc.uri.path));
-  if (script && editorDefaults.highwater) {
+  if (script) {
     await vscode.commands.executeCommand("vscode.openWith", doc.uri, HIGHLAND_EDITOR, { viewColumn: viewColumn ?? vscode.ViewColumn.Active, preview: false });
     return;
   }

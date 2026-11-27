@@ -29,6 +29,10 @@ describe("word count", () => {
     expect(countWords("Don't stop — the twenty-two cats ate 3.5 pies.")).toBe(8);
   });
 
+  it("counts a letter with an accent typed as a separate mark as part of its word", () => {
+    expect(countWords("Zoe\u0301 and Zoé")).toBe(3);
+  });
+
   it("skips notes, boneyards, sections, synopses, directives and the title page", () => {
     const doc = parse("Title: Many Words Here\n\n# Section words\n\n= synopsis words\n\nShe runs [[not counted]] home. /* nor this */\n\nChapter {{SERIES}}", { mode: "fountain" });
     expect(documentStats(doc).words).toBe(4);
@@ -120,6 +124,9 @@ describe("case keys", () => {
     expect(changeCase("she said hello", 4, 8, true)).toEqual({ start: 4, end: 8, text: "SAID", selectionStart: 4, selectionEnd: 8 });
     expect(changeCase("INT. O’BRIEN’S BAR", 7, 7, false)).toEqual({ start: 5, end: 14, text: "o’brien’s", selectionStart: 7, selectionEnd: 7 });
     expect(changeCase("a  b", 2, 2, true)).toEqual({ start: 2, end: 2, text: "", selectionStart: 2, selectionEnd: 2 });
+    // The same words as everywhere else: an apostrophe at a word's edge is a quotation mark, a hyphen separates.
+    expect(changeCase("say 'hello' now", 6, 6, true).text).toBe("HELLO");
+    expect(changeCase("Jean-Luc", 1, 1, true)).toMatchObject({ start: 0, end: 4, text: "JEAN" });
   });
 });
 

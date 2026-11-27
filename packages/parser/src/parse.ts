@@ -11,6 +11,7 @@ export interface ParseOptions {
 }
 
 /** Fountain for .fountain, Markdown for .md / .markdown, plain text otherwise (the template never decides). */
+/** A file's kind by its extension: the one rule, wherever a file's kind is decided from its name. */
 export function modeFromFileName(name: string): Mode {
   const lower = name.toLowerCase();
   if (lower.endsWith(".fountain") || lower.endsWith(".spmd")) return "fountain";

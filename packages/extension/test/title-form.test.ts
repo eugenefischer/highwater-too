@@ -41,8 +41,14 @@ describe("converting a manuscript's title page", () => {
     expect(toHighlandTitlePage(md(HIGHLAND))).toBeNull();
   });
 
-  it("drops a byte-order mark before Highland's first key, where it would hide the title page", () => {
-    expect(toHighland(`\ufeff${YAML}`)).toBe(HIGHLAND);
+  it("keeps a byte-order mark at the start, in both directions, and reads the title page after it", () => {
+    expect(toHighland(`\ufeff${YAML}`)).toBe(`\ufeff${HIGHLAND}`);
+    expect(toYaml(`\ufeff${HIGHLAND}`)).toBe(`\ufeff${YAML}`);
+  });
+
+  it("keeps every line of a YAML value that goes on over several lines", () => {
+    const folded = "---\ntitle: The Enrichment and\n  Decay of Ionia\nauthor: Eugene Fischer\n---\n\nText.\n";
+    expect(toHighland(folded)).toBe("Title: The Enrichment and Decay of Ionia\nAuthor: Eugene Fischer\n\nText.\n");
   });
 });
 

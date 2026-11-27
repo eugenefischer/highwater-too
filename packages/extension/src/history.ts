@@ -20,6 +20,7 @@ import { historyAt, historyRoot } from "./history-location.ts";
 import { historyRecords, type Instead } from "./history-records.ts";
 import { historyStatus } from "./history-status.ts";
 import { registerHistoryCommands } from "./history-commands.ts";
+import { modeFromFileName } from "@highwater/parser";
 
 const NOTICE_KEY = "highwater.historyNoticeShown";
 
@@ -296,7 +297,7 @@ export function registerHistory(context: vscode.ExtensionContext, store: BundleS
       if (!key) return;
       reasons.set(e.document.uri.toString(), e.reason);
       // Settings → Backup's Link plain files: the save puts the ID line at the end if it's missing.
-      if (enabled() && linkPlainFiles() && e.document.uri.scheme === "file" && /\.(fountain|spmd|md|markdown)$/i.test(key) && !noteId(e.document.getText())) e.waitUntil(idLineEdits(e.document, key));
+      if (enabled() && linkPlainFiles() && e.document.uri.scheme === "file" && modeFromFileName(key) !== "plain" && !noteId(e.document.getText())) e.waitUntil(idLineEdits(e.document, key));
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
       const key = keyOf(doc);

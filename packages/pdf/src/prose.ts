@@ -3,7 +3,7 @@ import { Measurer, resolveFonts, variantOf, type ResolvedFonts } from "./fonts.t
 import { imageSize } from "./manuscript.ts";
 import { extraBlankLines, sameParagraph, styledValue } from "./screenplay.ts";
 import { addPrintMarks } from "./marks.ts";
-import { onlyNotes, plain, printContext, sliceRuns, SYNOPSIS_COLOR, toRuns, trimStartRuns, type InlineContext } from "./text.ts";
+import { breaksBefore, listMarker, onlyNotes, plain, printContext, sliceRuns, SYNOPSIS_COLOR, toRuns, trimStartRuns, type InlineContext } from "./text.ts";
 import type { ProseTemplate, TextSpec } from "./prose-templates.ts";
 import { assignSources, type Graphic, type Layout, type Page, type PlacedText, type PrintMarks, type Run, type SourceRange } from "./types.ts";
 
@@ -338,12 +338,10 @@ export function wrapMeasured(runs: Run[], first: number, rest: number, width: (r
       lines.push(sliceRuns(runs, start));
       break;
     }
-    // Break opportunities: after a run of spaces, or after a hyphen inside a word.
+    // Break opportunities: at a space, or where the shared rule allows one (text.ts breaksBefore).
     let best = -1;
     for (let i = start + 1; i < text.length; i++) {
-      const isSpace = text[i] === " ";
-      const afterHyphen = (text[i - 1] === "-" || text[i - 1] === "—") && text[i] !== " " && text[i - 1] !== " ";
-      if (!isSpace && !afterHyphen) continue;
+      if (text[i] !== " " && !breaksBefore(text, i, start)) continue;
       if (!fitsTo(i)) break;
       best = i;
     }
@@ -574,7 +572,7 @@ function toUnits(elements: Element[], doc: Document, T: ProseTemplate, ctx: Inli
       case "list": {
         e.items.forEach((item, index) => {
           const textX = T.left + (T.indent.rule === "all" ? T.indent.first : 0) + T.list.text + item.level * T.list.nested;
-          const marker = item.ordered ? item.marker : item.marker === "*" ? "•" : item.marker;
+          const marker = listMarker(item);
           const markerRuns = dress([{ text: `${marker} `, style: {} }], B);
           // Lists stop as far in from the right as the left margin is beyond an inch (Novel: 468).
           const right = T.right - (T.left - 72);

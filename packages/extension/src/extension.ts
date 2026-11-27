@@ -25,6 +25,7 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 import { registerHighlandEditor } from "./highland-editor/provider.ts";
 import { registerSurface, showDocument } from "./surface.ts";
 import { registerTestCommands } from "./test-support.ts";
+import { modeFromFileName } from "@highwater/parser";
 
 /** VS Code glue only; all format, parsing and layout logic lives in the other packages. */
 export function activate(context: vscode.ExtensionContext): void {
@@ -80,7 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
         else if (/\.fdx$/i.test(uri.fsPath)) await importFdx(uri);
         else {
           const doc = await vscode.workspace.openTextDocument(uri);
-          const md = /\.(md|markdown)$/i.test(uri.fsPath) && doc.languageId === "markdown";
+          const md = modeFromFileName(uri.fsPath) === "markdown" && doc.languageId === "markdown";
           await showDocument(md ? await vscode.languages.setTextDocumentLanguage(doc, LANGUAGES.markdown) : doc);
         }
       }

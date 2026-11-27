@@ -1,4 +1,4 @@
-import { inlineText, type Document, type Element, type Inline } from "@highwater/parser";
+import { inlineText, isIdNoteText, type Document, type Element, type Inline } from "@highwater/parser";
 
 /** Highland's reading speed for prose. */
 export const READING_WPM = 250;
@@ -13,7 +13,9 @@ export interface DocumentStats {
   minutes: number;
 }
 
-const WORD = /[\p{L}\p{N}]+(?:['’.\-][\p{L}\p{N}]+)*/gu;
+// Counting, not editing: a hyphenated word or an abbreviation counts once. Combining marks (an
+// accent typed as a separate character) are part of their letter.
+const WORD = /[\p{L}\p{M}\p{N}]+(?:['’.\-][\p{L}\p{M}\p{N}]+)*/gu;
 
 export function countWords(text: string): number {
   let n = 0;
@@ -55,7 +57,7 @@ function notesOf(e: Element): string[] {
   const walk = (nodes: Inline[]) => {
     for (const n of nodes) {
       // The note tying a plain file to its writing history is not the writer's words.
-      if (n.kind === "note" && !/^\s*highwater:\s*[0-9A-Za-z-]{8,}\s*$/.test(n.text)) out.push(n.text);
+      if (n.kind === "note" && !isIdNoteText(n.text)) out.push(n.text);
       else if (n.kind === "styled" || n.kind === "link") walk(n.children);
     }
   };

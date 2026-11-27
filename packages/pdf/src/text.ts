@@ -222,12 +222,7 @@ export function wrapRuns(runs: Run[], width: number, restWidth = width): Run[][]
           brk = i;
           break;
         }
-        if ((text[i - 1] === "-" || text[i - 1] === "—") && i - 1 > lineStart && text[i] !== "-") {
-          brk = i;
-          break;
-        }
-        // Apple also breaks after "!" or "?" run into the next word ("availability!Come", Astounding).
-        if ((text[i - 1] === "!" || text[i - 1] === "?") && i - 1 > lineStart && /[\p{L}\p{N}]/u.test(text[i]!)) {
+        if (breaksBefore(text, i, lineStart)) {
           brk = i;
           break;
         }
@@ -309,7 +304,7 @@ function wrapByWidth(runs: Run[], first: number, rest: number, width: (runs: Run
       for (let i = start + 1; i < end; i++) {
         const c = text[i]!;
         const prev = text[i - 1]!;
-        const ok = (c === " " && prev !== " ") || ((prev === "-" || prev === "—") && c !== "-" && c !== " " && i - 1 > start) || ((prev === "!" || prev === "?") && /[\p{L}\p{N}]/u.test(c) && i - 1 > start);
+        const ok = (c === " " && prev !== " ") || breaksBefore(text, i, start);
         if (!ok) continue;
         if (!fitsTo(i)) break;
         best = i;
@@ -383,4 +378,32 @@ export function sentenceEnds(text: string): number[] {
     if (end > 0 && end < text.trimEnd().length) out.push(end);
   }
   return out;
+}
+
+/**
+ * What a list item's marker prints as, in every export (PDF, Word, RTF; every template): a number
+ * as written, "-" and "+" as written, "*" as a bullet (Highland's print).
+ */
+export function listMarker(item: { ordered: boolean; marker: string }): string {
+  return item.ordered || item.marker === "-" || item.marker === "+" ? item.marker : "•";
+}
+
+/** Dashes a line may break after when a word follows straight on (hyphen, en dash, em dash). */
+const BREAK_AFTER = new Set(["-", "–", "—"]);
+
+/**
+ * Whether a printed line may break between `text[i - 1]` and `text[i]` other than at a space
+ * (every wrapper in the PDF engine, scripts and prose alike, uses this one rule):
+ * - after a hyphen or dash run straight into the next character, unless that is a space or another
+ *   dash, and not when the dash opens the line;
+ * - after "!" or "?" run straight into a letter or digit ("availability!Come", Astounding: Apple's
+ *   line breaking, which Highland's print uses).
+ */
+export function breaksBefore(text: string, i: number, lineStart: number): boolean {
+  if (i - 1 <= lineStart || i >= text.length) return false;
+  const prev = text[i - 1]!;
+  const c = text[i]!;
+  if (BREAK_AFTER.has(prev)) return c !== " " && !BREAK_AFTER.has(c);
+  if (prev === "!" || prev === "?") return /[\p{L}\p{N}]/u.test(c);
+  return false;
 }

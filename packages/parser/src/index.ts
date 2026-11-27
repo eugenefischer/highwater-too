@@ -15,3 +15,5 @@ export { inlineText, parseInline, parseInlineLines } from "./inline.ts";
 export { collectDirectives, directivesInLine, formatTimestamp, parseDirective, seriesCounter } from "./directives.ts";
 export { resolveIncludes, type IncludeFile, type IncludeLoader, type IncludeProblem, type IncludeResult, type MergedElement, type ResolvedDocument, type ResolvedInclude } from "./includes.ts";
 export { isSceneHeadingText, isTransitionText, sceneHeadingPrefix, scriptTerms, scriptTermsGeneration, setScriptTerms, type ScriptTerms } from "./terms.ts";
+export { WORD_SOURCE, wordAt, wordCharAt, wordRegExp, wordsOf } from "./words.ts";
+export { ID_NOTE, ONLY_ID_NOTE, TRAILING_ID_NOTE, idInNote, isIdNoteText } from "./id-note.ts";

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
-import { writeBundle } from "@highwater/bundle";
+import { TEXT_FILES, writeBundle } from "@highwater/bundle";
 import * as vscode from "vscode";
 import { ask } from "./ask.ts";
 import { EXTRAS_SCHEME, plainExtras } from "./extras.ts";
@@ -18,6 +18,7 @@ import { BundleStore, splitBundlePath } from "./store.ts";
 import { stripRevisionTags } from "./syntax/edits.ts";
 import { toBundle, toPlain, toTextBundle } from "./to-bundle.ts";
 import { activeDocument, showDocument } from "./surface.ts";
+import { modeFromFileName } from "@highwater/parser";
 
 /**
  * Converting a work between a .highland file and a plain .fountain, .md or .txt file. A conversion
@@ -65,8 +66,7 @@ async function convertToHighland(uri?: vscode.Uri, chosen?: vscode.Uri): Promise
 
   const extras = plainExtras();
   const history = currentHistory();
-  const ext = extname(path).toLowerCase();
-  const scriptName = ext === ".fountain" || ext === ".spmd" ? "text.fountain" : ext === ".md" || ext === ".markdown" ? "text.md" : "text.txt";
+  const scriptName = TEXT_FILES[modeFromFileName(path)];
   const text = await readFile(path, "utf8");
   const id = (history && (await extras.documentId(path))) || randomUUID();
   const folder = await extras.folder(path);

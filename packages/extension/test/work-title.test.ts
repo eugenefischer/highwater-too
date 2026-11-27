@@ -25,4 +25,10 @@ describe("a new work's title", () => {
     expect(workTitle("Just text.\n", "text.txt", "Notes.txt", all)).toBe("Notes");
     expect(workTitle("", "text.md", "Draft 3.highland", all)).toBe("Draft 3");
   });
+
+  it("knows the script's kind by any of the names it may have, as everywhere else", () => {
+    for (const name of ["text.md", "text.markdown", "Story.MD"]) expect(workTitle("# The Title\n\nText.\n", name, "s", all), name).toBe("The Title");
+    for (const name of ["text.fountain", "Script.spmd"]) expect(workTitle("Title: A Script\n\nINT. ROOM - DAY\n", name, "s", all), name).toBe("A Script");
+    expect(workTitle("# Not a heading in plain text\n", "text.txt", "plain", all)).toBe("plain");
+  });
 });

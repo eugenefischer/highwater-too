@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { WORD_SOURCE } from "@highwater/parser";
 
 const config = JSON.parse(readFileSync(fileURLToPath(new URL("../language-configuration.json", import.meta.url)), "utf8")) as { wordPattern: { pattern: string; flags: string } };
 
@@ -10,6 +11,10 @@ describe("language configuration", () => {
   it("compiles its word pattern as Unicode, so names are whole words", () => {
     expect(config.wordPattern.flags).toContain("u");
     const re = new RegExp(config.wordPattern.pattern, `${config.wordPattern.flags}g`);
-    expect("MARLOWE Zoë O’Brien Jean-Luc 1917".match(re)).toEqual(["MARLOWE", "Zoë", "O’Brien", "Jean-Luc", "1917"]);
+    expect("MARLOWE Zoë O’Brien 1917".match(re)).toEqual(["MARLOWE", "Zoë", "O’Brien", "1917"]);
+  });
+
+  it("is Highwater's one rule for words, the one the Highwater Editor, spelling and Upper/Lower Case use", () => {
+    expect(config.wordPattern.pattern).toBe(WORD_SOURCE);
   });
 });

@@ -1,4 +1,5 @@
 import type { Document, Element, Inline, Span } from "@highwater/parser";
+import { isIdNoteText } from "@highwater/parser";
 
 /** Highland's Navigator item types, named as in navigatorFilters.json. */
 export const NAVIGATOR_TYPES = ["sceneHeaders", "sectionHeaders", "synopses", "notes", "images", "links", "referenceLinks", "includedFiles", "markers"] as const;
@@ -85,7 +86,7 @@ export function navigatorItems(doc: Document, filters: NavigatorFilters = DEFAUL
     for (const n of nodes) {
       // The note tying a plain file to its writing history ("highwater: <ID>") is not the writer's.
       if (n.kind === "note") {
-        if (!/^\s*highwater:\s*[0-9A-Za-z-]{8,}\s*$/.test(n.text)) add("notes", n.text, n.span);
+        if (!isIdNoteText(n.text)) add("notes", n.text, n.span);
       }
       else if (n.kind === "image") add("images", n.alt || n.src, n.span);
       else if (n.kind === "link") {

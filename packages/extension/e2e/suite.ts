@@ -25,14 +25,24 @@ async function waitFor(what: string, test: () => boolean, ms = 10_000): Promise<
   }
 }
 
-/** Opens a .highland script and waits until it has its Highland language (which reopens the document). */
-async function openScript(path: string, language = "highland-fountain"): Promise<vscode.TextEditor> {
-  const uri = highland(path).toString();
-  await vscode.workspace.openTextDocument(highland(path));
-  await waitFor(`${language} on ${path}`, () => vscode.workspace.textDocuments.some((d) => d.uri.toString() === uri && d.languageId === language));
-  const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri)!;
-  return vscode.window.showTextDocument(doc);
+/**
+ * Opens a .highland file's script as the writer does, in the Highwater Editor, and waits until the
+ * page is ready and the document has its language. (The tests use the editor writers use: VS Code's
+ * text editor is a plain view, tested only where that is the point.)
+ */
+async function openScript(path: string, language = "highland-fountain"): Promise<vscode.TextDocument> {
+  return openInEditor(highland(path), language);
 }
+
+/** Types at the end of the document in the active Highwater Editor, as the writer would, and waits for it in the document. */
+async function typeAtEnd(uri: vscode.Uri, text: string): Promise<void> {
+  await selectInView(documentAt(uri).getText().length);
+  await vscode.commands.executeCommand("highwater.test.typeInView", text);
+  await until("the typing in the document", async () => documentAt(uri).getText().endsWith(text));
+}
+
+/** What the Highwater Editor's sidebar shows (the page reports it as it changes). */
+const sidebarState = () => vscode.commands.executeCommand<{ panel?: string; open?: boolean } | undefined>("highwater.test.sidebarState");
 
 type Surface = { document?: string; view: boolean; ready?: boolean; selection?: { anchor: number; head: number }; focused?: string; focusedText?: string };
 const surface = () => vscode.commands.executeCommand<Surface>("highwater.test.surface");
@@ -71,17 +81,21 @@ async function selectInView(anchor: number, head = anchor): Promise<void> {
 
 const tests: [string, () => Promise<void>][] = [
   [
-    "treats a whole name as one word (completion, double-click and word moves depend on it)",
+    "VS Code's text editor finds words by Highwater's rule (the Highwater Editor's own word tests are page tests)",
     async () => {
       // Not "Plain.fountain" or "Kettle.fountain": other tests open those.
       const path = join(dir, "Words.fountain");
-      await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello, Zoë.\n");
+      await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello, Zoë. Don’t, O'BRIEN.\n");
       const doc = await vscode.workspace.openTextDocument(path);
       await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
       const range = doc.getWordRangeAtPosition(new vscode.Position(2, 3));
       assert.equal(range && doc.getText(range), "MARLOWE");
       const accented = doc.getWordRangeAtPosition(new vscode.Position(3, 9));
       assert.equal(accented && doc.getText(accented), "Zoë");
+      const contraction = doc.getWordRangeAtPosition(new vscode.Position(3, 14));
+      assert.equal(contraction && doc.getText(contraction), "Don’t");
+      const name = doc.getWordRangeAtPosition(new vscode.Position(3, 22));
+      assert.equal(name && doc.getText(name), "O'BRIEN");
     },
   ],
   [
@@ -98,13 +112,17 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.workspace.getConfiguration("highwater").update("historyFolder", join(dir, "history"), vscode.ConfigurationTarget.Global);
       const path = await copyOf("Save");
       const before = (await readBundle(path)).bundle;
-      const editor = await openScript(path);
-      await editor.edit((e) => e.insert(new vscode.Position(0, 0), "EDITED IN VS CODE\n\n"));
-      assert.equal(await editor.document.save(), true);
+      const uri = highland(path);
+      await openScript(path);
+      await selectInView(0);
+      await vscode.commands.executeCommand("highwater.test.typeInView", "EDITED IN VS CODE\n\n");
+      await until("the typing in the document", async () => documentAt(uri).getText().startsWith("EDITED IN VS CODE\n\n"));
+      assert.equal(await documentAt(uri).save(), true);
       const after = (await readBundle(path)).bundle;
       assert.equal(after.text, "EDITED IN VS CODE\n\n" + before.text);
       for (const p of before.paths) if (p !== before.textPath && p !== "info.json") assert.deepEqual(after.get(p), before.get(p), p);
       assert.equal((await readdir(join(dir, "history", "backups", "Save"))).length, 1);
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     },
   ],
   [
@@ -118,13 +136,15 @@ const tests: [string, () => Promise<void>][] = [
       ] as const) {
         const file = vscode.Uri.file(join(dir, name));
         await vscode.commands.executeCommand("highwater.newDocument", kind, file);
-        const want = name.endsWith(".highland") ? highland(file.fsPath).toString() : file.toString();
-        await waitFor(`${name} open as ${language}`, () => {
-          const doc = vscode.window.activeTextEditor?.document;
-          return doc?.uri.toString() === want && doc.languageId === language;
+        const want = name.endsWith(".highland") ? highland(file.fsPath) : file;
+        // It opens where the writer writes: the Highwater Editor.
+        await until(`${name} open in the Highwater Editor as ${language}`, async () => {
+          const s = await surface();
+          return s.view && s.ready === true && s.document === want.toString() && documentAt(want)?.languageId === language;
         });
-        assert.equal(vscode.window.activeTextEditor!.document.getText(), "", name);
+        assert.equal(documentAt(want).getText(), "", name);
       }
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     },
   ],
   [
@@ -141,31 +161,31 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "opening a .highland file from the Explorer opens its script",
-    async () => {
-      const path = await copyOf("Explorer");
-      await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(path));
-      await waitFor("the script editor", () => vscode.window.activeTextEditor?.document.uri.toString() === highland(path).toString());
-    },
-  ],
-  [
     "reloads an unmodified editor when another program saves the file",
     async () => {
       const path = await copyOf("External");
-      const doc = (await openScript(path)).document;
+      const uri = highland(path);
+      await openScript(path);
       await new Promise((r) => setTimeout(r, 500)); // let the watcher start
       const { bundle } = await readBundle(path);
       bundle.text = "Changed by Highland.";
       await writeBundle(path, bundle);
-      await waitFor("the editor to reload", () => doc.getText() === "Changed by Highland.");
-      assert.equal(doc.isDirty, false);
+      await waitFor("the editor to reload", () => documentAt(uri).getText() === "Changed by Highland.");
+      // The Highwater Editor takes the new text without sending anything back.
+      await new Promise((r) => setTimeout(r, 1000));
+      assert.equal(documentAt(uri).getText(), "Changed by Highland.");
+      assert.equal(documentAt(uri).isDirty, false);
+      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     },
   ],
   [
     "gives scripts the Highwater Fountain language, an outline, highlighting and folding",
     async () => {
       const path = await copyOf("Language");
-      const doc = (await openScript(path)).document;
+      // Language features need no editor (they serve both).
+      await vscode.workspace.openTextDocument(highland(path));
+      await waitFor("highland-fountain", () => documentAt(highland(path))?.languageId === "highland-fountain");
+      const doc = documentAt(highland(path));
       const symbols = (await vscode.commands.executeCommand<vscode.DocumentSymbol[]>("vscode.executeDocumentSymbolProvider", doc.uri)) ?? [];
       const all: string[] = [];
       const walk = (ss: vscode.DocumentSymbol[]) => ss.forEach((x) => (all.push(x.name), walk(x.children)));
@@ -212,11 +232,11 @@ const tests: [string, () => Promise<void>][] = [
     "exports a screenplay as a PDF from inside VS Code",
     async () => {
       const path = await copyOf("Export");
-      const editor = await openScript(path);
-      const before = editor.document.getText();
+      const doc = await openScript(path);
+      const before = doc.getText();
       const out = vscode.Uri.file(join(dir, "Export.pdf"));
       // As the editor title button calls it: the document's URI first, then (tests only) the target.
-      await vscode.commands.executeCommand("highwater.exportPdf", editor.document.uri, { target: out });
+      await vscode.commands.executeCommand("highwater.exportPdf", doc.uri, { target: out });
       assert.equal((await readBundle(path)).bundle.text, before, "the script is untouched");
       const bytes = await readFile(out.fsPath);
       assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
@@ -235,11 +255,14 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.commands.executeCommand("highwater.copyToBin");
       await until("the Bin item in the file", async () => JSON.stringify((await readBundle(path)).bundle.binItems) === JSON.stringify([line.text]));
       assert.equal((await readBundle(path)).bundle.text, documentAt(highland(path)).getText(), "the script is untouched");
-      // In the Highwater Editor the Scratchpad is a sidebar panel; from the text editor, it opens as a text tab.
-      await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-      await openScript(path);
+      // In the Highwater Editor the Scratchpad is a panel of its sidebar.
+      await vscode.commands.executeCommand("highwater.showSidebarPanel", "navigator");
+      await until("the Navigator in the sidebar", async () => (await sidebarState())?.panel === "navigator");
       await vscode.commands.executeCommand("highwater.openScratchpad");
-      await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.path.endsWith("/scratchpad.txt") === true);
+      await until("the Scratchpad in the sidebar", async () => {
+        const s = await sidebarState();
+        return s?.panel === "scratchpad" && s.open === true;
+      });
       assert.equal((await readBundle(path)).bundle.scratchpad, "");
       await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     },
@@ -262,8 +285,9 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
       try {
         const path = await copyOf("History");
-        const editor = await openScript(path);
-        await editor.edit((e) => e.insert(editor.document.lineAt(editor.document.lineCount - 1).range.end, "\n\nShe writes it down."));
+        const uri = highland(path);
+        await openScript(path);
+        await typeAtEnd(uri, "\n\nShe writes it down.");
         await vscode.commands.executeCommand("workbench.action.files.save");
         await waitFor("a commit on the document's branch", () => {
           try {
@@ -282,7 +306,7 @@ const tests: [string, () => Promise<void>][] = [
         const remote = join(dir, "remote.git");
         execFileSync("git", ["init", "-q", "--bare", remote]);
         await vscode.workspace.getConfiguration("highwater").update("historyRemote", remote, vscode.ConfigurationTarget.Global);
-        await editor.edit((e) => e.insert(editor.document.lineAt(editor.document.lineCount - 1).range.end, "\n\nAnd sends it away."));
+        await typeAtEnd(uri, "\n\nAnd sends it away.");
         await vscode.commands.executeCommand("workbench.action.files.save");
         await waitFor("the branch on the mirror", () => {
           try {
@@ -305,9 +329,8 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.workspace.getConfiguration("highwater").update("writingHistory", true, vscode.ConfigurationTarget.Global);
       try {
         const path = await copyOf("Revert");
-        const editor = await openScript(path);
-        const doc = editor.document;
-        const append = (text: string) => editor.edit((e) => e.insert(doc.lineAt(doc.lineCount - 1).range.end, text));
+        const doc = await openScript(path);
+        const append = (text: string) => typeAtEnd(doc.uri, text);
         const repo = join(historyDir, "history.git");
         const log = (): { hash: string; date: Date; message: string; text: string }[] => {
           try {
@@ -382,11 +405,11 @@ const tests: [string, () => Promise<void>][] = [
         await until("the Bin item kept with the history", async () => binFile() === "A kettle boils.");
         const [, entry] = Object.entries(index().documents).find(([, e]) => e.paths.includes(path))!;
         assert.equal(await readFile(path, "utf8"), "INT. KITCHEN - NIGHT\n\nA kettle boils.\n", "the file is untouched");
-        // In the Highwater Editor the Scratchpad is a sidebar panel; from the text editor, it opens as a text tab.
-        await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path));
+        // In the Highwater Editor the Scratchpad is a panel of its sidebar.
+        await vscode.commands.executeCommand("highwater.showSidebarPanel", "navigator");
+        await until("the Navigator in the sidebar", async () => (await sidebarState())?.panel === "navigator");
         await vscode.commands.executeCommand("highwater.openScratchpad");
-        await waitFor("scratchpad tab", () => vscode.window.activeTextEditor?.document.uri.scheme === "highwater-extras");
+        await until("the Scratchpad in the sidebar", async () => (await sidebarState())?.panel === "scratchpad");
         // Edit and save the document itself, not through an editor: VS Code replaces editors as
         // tabs and the sidebar change, and an edit through a replaced one is refused.
         const script = await vscode.workspace.openTextDocument(path);
@@ -438,7 +461,11 @@ const tests: [string, () => Promise<void>][] = [
         assert.deepEqual(b.binItems, ["The clock strikes."]);
         const id = (b.info as { highwaterToo?: { documentId?: string } }).highwaterToo?.documentId;
         assert.ok(id, "the .highland file carries the work's ID");
-        await waitFor("the .highland editor", () => vscode.window.activeTextEditor?.document.uri.scheme === "highland" && vscode.window.activeTextEditor.document.languageId === "highland-fountain");
+        await until("the .highland file in the Highwater Editor", async () => {
+          const s = await surface();
+          const script = vscode.Uri.file(highland).with({ scheme: "highland" });
+          return s.view && s.document === script.toString() && documentAt(script)?.languageId === "highland-fountain";
+        });
         await vscode.commands.executeCommand("highwater.convertToFountain", undefined, { target: vscode.Uri.file(path) });
         const trash = (await vscode.commands.executeCommand<{ message: string; choices: string[] }[]>("highwater.test.asked")).filter((q) => q.message.includes("to the Trash?"));
         assert.deepEqual(trash.map((q) => q.choices), [["Move to Trash", "Keep"], ["Move to Trash", "Keep"]], "both conversions offered the Trash, with Keep");
@@ -515,9 +542,9 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const path = join(dir, "ManuscriptExport.highland");
       await copyFile(join(dirname(fixture), "ManuscriptEdgeCases.highland"), path);
-      const editor = await openScript(path, "highland-markdown");
+      const doc = await openScript(path, "highland-markdown");
       const out = vscode.Uri.file(join(dir, "ManuscriptExport.pdf"));
-      await vscode.commands.executeCommand("highwater.exportPdf", editor.document.uri, { target: out });
+      await vscode.commands.executeCommand("highwater.exportPdf", doc.uri, { target: out });
       const bytes = await readFile(out.fsPath);
       assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
       assert.ok(new TextDecoder("latin1").decode(bytes).includes("/Subtype /Image"), "the image is in the PDF");
@@ -599,7 +626,6 @@ const tests: [string, () => Promise<void>][] = [
   [
     "opens a .highland file from the Explorer straight into the Highwater Editor, never showing it as text first",
     async () => {
-      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
       const path = await copyOf("NoFlash");
       const script = highland(path).toString();
       let shownAsText = false;
@@ -614,7 +640,6 @@ const tests: [string, () => Promise<void>][] = [
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
       } finally {
         watch.dispose();
-        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
       }
     },
   ],
@@ -714,8 +739,6 @@ const tests: [string, () => Promise<void>][] = [
       const config = () => vscode.workspace.getConfiguration("highwater");
       await config().update("historyFolder", historyDir, vscode.ConfigurationTarget.Global);
       await config().update("writingHistory", true, vscode.ConfigurationTarget.Global);
-      // Open goes where the writer's scripts open: the Highwater Editor (the suite turns that off).
-      await vscode.commands.executeCommand("highwater.test.textEditorDefault", false);
       try {
         const path = join(dir, "Shelf.fountain");
         await writeFile(path, "INT. LIBRARY - NIGHT\n\nA shelf of scripts.\n");
@@ -752,7 +775,6 @@ const tests: [string, () => Promise<void>][] = [
         }, 20_000);
         await vscode.commands.executeCommand("workbench.action.closeAllEditors");
       } finally {
-        await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
         await config().update("writingHistory", false, vscode.ConfigurationTarget.Global);
       }
     },
@@ -807,7 +829,10 @@ const tests: [string, () => Promise<void>][] = [
       await writeFile(fdx, xml);
       await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(fdx));
       const path = join(dir, "Imported.highland");
-      await waitFor("the converted script open", () => vscode.window.activeTextEditor?.document.uri.toString() === highland(path).toString());
+      await until("the converted script open in the Highwater Editor", async () => {
+        const s = await surface();
+        return s.view && s.document === highland(path).toString();
+      });
       assert.equal((await readBundle(path)).bundle.text, "INT. HALL - DAY\n\nThe clock strikes.\n");
       assert.equal(await readFile(fdx, "utf8"), xml, "the .fdx file is unchanged");
     },
@@ -817,9 +842,9 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const path = join(dir, "DocxExport.highland");
       await copyFile(join(dirname(fixture), "ManuscriptEdgeCases.highland"), path);
-      const editor = await openScript(path, "highland-markdown");
+      const doc = await openScript(path, "highland-markdown");
       const out = vscode.Uri.file(join(dir, "DocxExport.docx"));
-      await vscode.commands.executeCommand("highwater.exportDocx", editor.document.uri, { target: out });
+      await vscode.commands.executeCommand("highwater.exportDocx", doc.uri, { target: out });
       const bytes = await readFile(out.fsPath);
       assert.equal(new TextDecoder().decode(bytes.slice(0, 2)), "PK");
       assert.ok(new TextDecoder("latin1").decode(bytes).includes("word/document.xml"));
@@ -851,10 +876,9 @@ const tests: [string, () => Promise<void>][] = [
 export async function run(): Promise<void> {
   // Writing history only in its own test: its info.json write would race the other tests' checks.
   await vscode.workspace.getConfiguration("highwater").update("writingHistory", false, vscode.ConfigurationTarget.Global);
-  // The tests drive text editors; the Highwater Editor's own tests open it explicitly.
-  // The extension starts when a document opens; its test commands are needed before that.
+  // The extension starts when a document opens; its test commands are needed before that. Scripts
+  // open in the Highwater Editor, as for the writer.
   await vscode.extensions.getExtension("eugenefischer.highwater-too")!.activate();
-  await vscode.commands.executeCommand("highwater.test.textEditorDefault", true);
   const failed: string[] = [];
   for (const [name, test] of tests) {
     try {

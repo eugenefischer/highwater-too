@@ -1,7 +1,6 @@
 /**
  * Commands only the end-to-end tests use (registered in Test mode only): what the panes follow,
- * scrolling the Highwater Editor, the editor-swap log, scripts opening as text (for the tests of
- * the text editor), and Revert to a save. ask.ts registers the tests' scripted
+ * scrolling the Highwater Editor, the editor-swap log, the sidebar's panel, and Revert to a save. ask.ts registers the tests' scripted
  * answers itself, since they work through its questions.
  */
 import * as vscode from "vscode";
@@ -9,7 +8,7 @@ import { postTo } from "./highland-editor/messages.ts";
 import { focusedDocument } from "./focus.ts";
 import { swapLog } from "./highland-editor/provider.ts";
 import { pageCountOf } from "./page-count.ts";
-import { activeDocument, activeView, editorDefaults } from "./surface.ts";
+import { activeDocument, activeView } from "./surface.ts";
 import { historyApi } from "./history.ts";
 import { worksViewForTests } from "./highland-editor/works-view-provider.ts";
 
@@ -34,14 +33,14 @@ export function registerTestCommands(context: vscode.ExtensionContext): void {
       }),
       vscode.commands.registerCommand("highwater.test.selectInView", (anchor: number, head: number) => activeView()?.apply([], [{ anchor, head }]) ?? false),
       vscode.commands.registerCommand("highwater.test.swapLog", () => swapLog.splice(0)),
-      // Scripts open in VS Code's text editor while this is false (the Highwater Editor otherwise).
-      vscode.commands.registerCommand("highwater.test.textEditorDefault", (on: boolean) => void (editorDefaults.highwater = !on)),
       // Revert to This Save, as the Writing History panel asks for it: true if it went through.
       // The Works view in VS Code's sidebar: whether its page is ready and which works it lists; with a message, as if the page sent it.
       vscode.commands.registerCommand("highwater.test.worksView", (msg?: unknown) => {
         const handled = msg ? worksViewForTests.receive(msg as never) : undefined;
         return { ready: worksViewForTests.ready, works: worksViewForTests.works, handled };
       }),
+      // What the Highwater Editor's sidebar shows, as its page last reported it.
+      vscode.commands.registerCommand("highwater.test.sidebarState", () => context.globalState.get("highwater.sidebar")),
       vscode.commands.registerCommand("highwater.test.revert", (key: string, hash: string) => historyApi?.revert(key, hash) ?? false),
     );
   }

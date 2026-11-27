@@ -1,7 +1,7 @@
 import { seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
 import { extraBlankLines, pageText, styledValue } from "./screenplay.ts";
 import { addPrintMarks } from "./marks.ts";
-import { onlyNotes, plain, printContext, runsWidth, setMeasure, SYNOPSIS_COLOR, toRuns, wrapRuns, type InlineContext } from "./text.ts";
+import { listMarker, onlyNotes, plain, printContext, runsWidth, setMeasure, SYNOPSIS_COLOR, toRuns, wrapRuns, type InlineContext } from "./text.ts";
 import { Measurer, resolveFonts, type FontFaces } from "./fonts.ts";
 import { defaultFontDir } from "./render.ts";
 import { assignSources, CHAR, type Graphic, type Layout, type Page, type PlacedText, type PrintMarks, type Run, type SourceRange } from "./types.ts";
@@ -450,7 +450,7 @@ function toUnits(elements: Element[], source: string, ctx: InlineContext, o: Uni
         // later items split anywhere, their first line opening (it may take the page's extra line).
         e.items.forEach((item, index) => {
           const textX = item.level === 0 ? M.list.textX : M.list.nestedX + item.level * M.list.level;
-          const marker = item.ordered ? item.marker : item.marker === "-" || item.marker === "+" ? item.marker : "•";
+          const marker = listMarker(item);
           const lines = wrapRuns(toRuns(item.inline, ctx), (M.list.right - textX) / CHAR);
           lines.forEach((r, k) => {
             const items: Line["items"] = [{ x: textX, runs: r }];

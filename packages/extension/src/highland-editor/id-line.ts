@@ -1,5 +1,6 @@
 import { EditorSelection, EditorState, StateField, type Extension, type Text, type Transaction } from "@codemirror/state";
 import { Decoration, EditorView } from "@codemirror/view";
+import { ONLY_ID_NOTE, TRAILING_ID_NOTE } from "@highwater/parser";
 
 /**
  * The line tying a plain file to its writing history (Settings → Backup's Link plain files; EJ,
@@ -8,7 +9,7 @@ import { Decoration, EditorView } from "@codemirror/view";
  * cursor out of it, and lets no edit touch it: Select All and Delete, Find and Replace, or typing at
  * the very end change only the text before it. With the setting off, the line shows as written.
  */
-const ID_LINE = /\n?[ \t]*(?:\[\[\s*highwater:\s*[0-9A-Za-z-]{8,}\s*\]\]|<!--\s*highwater:\s*[0-9A-Za-z-]{8,}\s*-->)[ \t]*\s*$/;
+const ID_LINE = TRAILING_ID_NOTE;
 
 /**
  * The hidden range: the ID line with the one blank line before it (as a save adds it), to the end
@@ -67,5 +68,5 @@ export function idLineGuard(isRemote: (tr: Transaction) => boolean): Extension {
 
 /** True when a change from the extension only adds the ID line at the end (kept out of undo). */
 export function onlyAddsIdLine(removed: string, inserted: string): boolean {
-  return removed === "" && /^\s*(?:\[\[\s*highwater:\s*[0-9A-Za-z-]{8,}\s*\]\]|<!--\s*highwater:\s*[0-9A-Za-z-]{8,}\s*-->)\s*$/.test(inserted);
+  return removed === "" && ONLY_ID_NOTE.test(inserted);
 }

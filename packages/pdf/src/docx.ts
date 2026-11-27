@@ -5,7 +5,7 @@ import { strToU8, zipSync } from "fflate";
 import { seriesCounter, type Directive, type Document, type Element, type PageTextPart, type PageTextSlots, type TitleField } from "@highwater/parser";
 import { imageSize, layoutManuscript, manuscriptHeadingPages, MANUSCRIPT, type ManuscriptOptions } from "./manuscript.ts";
 import { extraBlankLines, styledValue } from "./screenplay.ts";
-import { plain, toRuns, type InlineContext } from "./text.ts";
+import { listMarker, plain, toRuns, type InlineContext } from "./text.ts";
 import type { Run } from "./types.ts";
 
 /**
@@ -467,7 +467,7 @@ class Parts {
         const suffix = m ? m[2] : ".";
         lvls.push(`<w:lvl w:ilvl="${l}"><w:start w:val="${start}"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%${l + 1}${esc(suffix ?? ".")}"/><w:lvlJc w:val="left"/>${ind}</w:lvl>`);
       } else {
-        const bullet = first?.marker === "-" ? "-" : "•";
+        const bullet = listMarker({ ordered: false, marker: first?.marker ?? "*" });
         lvls.push(`<w:lvl w:ilvl="${l}"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="${bullet}"/><w:lvlJc w:val="left"/>${ind}<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr></w:lvl>`);
       }
     }

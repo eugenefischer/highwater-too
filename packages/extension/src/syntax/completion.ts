@@ -63,9 +63,10 @@ export function suggest(before: string, afterBlank: boolean, vocab: ScriptVocabu
     }
     return vocab.locations.map((l) => ({ label: l, kind: "location" as const, insert: `${l} - `, replaceFrom: heading.length }));
   }
-  // Otherwise only on a line typed in capitals so far, two letters at least: a cue, heading or
-  // transition being started, not the capital that opens every line of action.
-  if (!/^[A-Z][A-Z0-9 .'’&/-]+$/.test(before)) return [];
+  // Otherwise only on a line typed in capitals so far, two characters at least: a cue, heading or
+  // transition being started, not the capital that opens every line of action. Capitals in any
+  // alphabet (ÉLODIE, JOSÉ), by the parser's own test for a cue: no lower-case letter.
+  if (!/^\p{Lu}[^\p{Ll}]+$/u.test(before)) return [];
   const out: Suggestion[] = [];
   for (const c of vocab.characters) out.push({ label: c, kind: "character", insert: c, replaceFrom: 0 });
   for (const p of lists.prefixes) out.push({ label: p.trim(), kind: "scene", insert: p, replaceFrom: 0 });

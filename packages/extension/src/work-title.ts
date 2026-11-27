@@ -1,4 +1,4 @@
-import { parse, type Mode } from "@highwater/parser";
+import { modeFromFileName, parse, type Mode } from "@highwater/parser";
 
 /** Settings → Backup's "Title new works with" choices (the file name is always the fallback). */
 export interface TitleSources {
@@ -14,7 +14,9 @@ export interface TitleSources {
  * the file's name without its extension. Markup, notes and boneyards are left out.
  */
 export function workTitle(script: string, scriptName: string, fileName: string, sources: TitleSources): string {
-  const mode: Mode | null = scriptName.endsWith(".fountain") ? "fountain" : scriptName.endsWith(".md") ? "markdown" : null;
+  // (Plain text has no title page or headings.)
+  const kind = modeFromFileName(scriptName);
+  const mode: Mode | null = kind === "plain" ? null : kind;
   if (mode && (sources.titlePage || sources.heading)) {
     const doc = parse(script, { mode });
     if (sources.titlePage && doc.titlePage) {

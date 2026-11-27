@@ -1,7 +1,7 @@
 import { inlineText, seriesCounter, type Directive, type Document, type Element, type Inline, type PageTextPart, type PageTextSlots } from "@highwater/parser";
 import { imageSize, layoutManuscript, manuscriptHeadingPages, MANUSCRIPT } from "./manuscript.ts";
 import { layoutScreenplay, SCREENPLAY, type ScriptTemplate } from "./screenplay.ts";
-import { onlyNotes, plain, printContext, runsWidth, SYNOPSIS_COLOR, toRuns, type InlineContext, type PrintContext } from "./text.ts";
+import { listMarker, onlyNotes, plain, printContext, runsWidth, SYNOPSIS_COLOR, toRuns, type InlineContext, type PrintContext } from "./text.ts";
 import { CHAR, type Page, type PrintMarks, type Run, type TextStyle } from "./types.ts";
 
 /**
@@ -479,7 +479,7 @@ export function manuscriptRtf(doc: Document, options: RtfOptions = {}): string {
       case "list":
         for (const item of e.items) {
           const x = item.level === 0 ? M.list.textX : M.list.nestedX + item.level * M.list.level;
-          const marker = item.ordered ? item.marker : item.marker === "-" || item.marker === "+" ? item.marker : "\u2022";
+          const marker = listMarker(item);
           // A hanging indent: the marker before the text, the text's lines aligned.
           para({ li: x - M.left, fi: -(marker.length + 1) * CHAR, ri: M.right - M.list.right, extra: `\\tx${tw(x - M.left)}` }, `${Rtf.text(marker)}\\tab ${rtf.runs(toRuns(item.inline, c))}`);
         }

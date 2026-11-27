@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { closeBrowser, openEditor } from "./harness.ts";
+import { wordsOf } from "@highwater/parser";
+import { closeBrowser, openEditor, openWorksView } from "./harness.ts";
 
 /**
  * What the Highwater Editor's page does with typing, keys and messages, in Chromium. Offsets are
@@ -301,5 +302,65 @@ describe("the end-to-end tests' typing", () => {
     await e.page.keyboard.press(`${mod}+z`);
     expect(await e.text()).toBe("Start.\n");
     await e.close();
+  });
+});
+
+describe("words in the Highwater Editor", () => {
+  // Highwater's one rule for words (@highwater/parser words.ts): apostrophes inside a word join it.
+  const text = "Don’t say O'BRIEN's name, 'quoted' Jean-Luc—or naïve rock 'n' roll.\n";
+  const wordMod = process.platform === "darwin" ? "Alt" : "Control";
+
+  it("double-click selects the same word the rule finds, at every letter of every word", async () => {
+    const e = await openEditor(text, "markdown");
+    for (const w of wordsOf(text)) {
+      for (let at = w.from; at < w.to; at++) {
+        const box = await e.evaluate<{ x: number; y: number }>(`(v) => { const a = v.coordsAtPos(${at}, 1), b = v.coordsAtPos(${at + 1}, -1); return { x: (a.left + b.left) / 2, y: (a.top + a.bottom) / 2 }; }`);
+        await e.page.mouse.dblclick(box.x, box.y);
+        const s = await e.selection();
+        expect([Math.min(s.anchor, s.head), Math.max(s.anchor, s.head)], `${w.text} at ${at}`).toEqual([w.from, w.to]);
+      }
+    }
+    await e.close();
+  });
+
+  it("word moves and word deletion take a word with an apostrophe whole", async () => {
+    const e = await openEditor(text, "markdown");
+    await e.select(0);
+    const stops: number[] = [];
+    for (let k = 0; k < 6; k++) {
+      await e.page.keyboard.press(`${wordMod}+ArrowRight`);
+      stops.push((await e.selection()).head);
+    }
+    // Ends of "Don’t", "say", "O'BRIEN's", then the comma, "name"... as CodeMirror moves, with the rule's words.
+    expect(stops.slice(0, 3)).toEqual([5, 9, 19]);
+    await e.select(19);
+    await e.page.keyboard.press(`${wordMod}+Backspace`);
+    expect(await e.text()).toBe(text.replace("O'BRIEN's", ""));
+    await e.close();
+  });
+});
+
+describe("hidden elements", () => {
+  // Every element with the hidden attribute is out of sight, whatever its own rules say (one rule, page.css).
+  const shown = (page: import("playwright").Page) =>
+    page.evaluate(() => [...document.querySelectorAll<HTMLElement>("[hidden]")].filter((el) => getComputedStyle(el).display !== "none").map((el) => el.id || el.className || el.tagName));
+
+  it("stay hidden in the editor, in every sidebar panel", async () => {
+    const e = await openEditor("# Chapter\n\nText.\n", "markdown");
+    expect(await e.page.locator("[hidden]").count()).toBeGreaterThan(5);
+    expect(await shown(e.page)).toEqual([]);
+    for (const panel of await e.page.$$eval("#sbicons [data-panel]", (b) => b.map((x) => (x as HTMLElement).dataset.panel!))) {
+      await e.page.click(`#sbicons [data-panel="${panel}"]`);
+      expect(await shown(e.page), panel).toEqual([]);
+    }
+    await e.close();
+  });
+
+  it("stay hidden in the Works view", async () => {
+    const v = await openWorksView();
+    await v.post({ type: "works", items: [], mirror: null, computer: "Desk", reveal: "Reveal in Finder" });
+    await v.page.waitForFunction(() => !document.getElementById("worknote")!.classList.contains("sb-loading"));
+    expect(await shown(v.page)).toEqual([]);
+    await v.close();
   });
 });

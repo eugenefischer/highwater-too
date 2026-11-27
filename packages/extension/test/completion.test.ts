@@ -19,6 +19,12 @@ describe("completion", () => {
     expect(suggest("Bo", true, vocab)).toEqual([]);
     expect(suggest("B", true, vocabulary(parse(script, { mode: "fountain" })))).toEqual([]); // the capital that starts any action line
   });
+  it("offers them on a line in capitals of any alphabet, as the parser reads a cue", () => {
+    const accented = vocabulary(parse("INT. CAFÉ - DAY\n\nÉLODIE\nBonjour.\n\nJOSÉ\nHola.\n\nØYVIND\nHei.\n", { mode: "fountain" }));
+    expect(accented.characters).toEqual(["ÉLODIE", "JOSÉ", "ØYVIND"]);
+    for (const typed of ["ÉL", "JOSÉ", "ØY", "JO", "ÉLODIE (V.O"]) expect(suggest(typed, true, accented).some((x) => x.kind === "character"), typed).toBe(true);
+    for (const typed of ["Él", "José", "É"]) expect(suggest(typed, true, accented), typed).toEqual([]);
+  });
   it("offers locations after a scene prefix, then times after the dash", () => {
     expect(suggest("INT. K", true, vocab).map((x) => [x.label, x.insert, x.replaceFrom])).toEqual([
       ["KITCHEN", "KITCHEN - ", 5],

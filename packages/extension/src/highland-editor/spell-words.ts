@@ -2,7 +2,7 @@
  * Spelling in the Highwater Editor: which words to check, as pure functions (tested). The
  * dictionary (Hunspell's American English, via nspell) runs in a worker; see spelling.ts.
  */
-import { hiddenRanges, type Document } from "@highwater/parser";
+import { ID_NOTE, hiddenRanges, wordsOf, type Document } from "@highwater/parser";
 import { lineStyles } from "./line-styles.ts";
 
 export interface Word {
@@ -22,8 +22,8 @@ export interface SpellContext {
 /** Scene heading prefixes, which no dictionary has. */
 const SCENE_WORDS = new Set(["int", "ext", "est"]);
 
-/** Addresses, link targets, link definitions, e-mail addresses and Highwater's own notes. */
-const NOT_WORDS = /\b(?:https?:\/\/|www\.)\S+|\]\([^)]*\)|\]\[[^\]]*\]|^[ \t]*\[[^\]\n]+\]:[^\n]*|\S+@\S+\.\S+|\[\[highwater:[^\]]*\]\]/gim;
+/** Addresses, link targets, link definitions and e-mail addresses. */
+const NOT_WORDS = /\b(?:https?:\/\/|www\.)\S+|\]\([^)]*\)|\]\[[^\]]*\]|^[ \t]*\[[^\]\n]+\]:[^\n]*|\S+@\S+\.\S+/gim;
 
 export function spellContext(doc: Document): SpellContext {
   const skip: { from: number; to: number }[] = [];
@@ -32,6 +32,8 @@ export function spellContext(doc: Document): SpellContext {
   for (const d of doc.directives) add(d.span.start, d.span.end);
   for (const f of doc.titlePage?.fields ?? []) add(f.keySpan.start, f.keySpan.end + 1);
   for (const m of doc.source.matchAll(NOT_WORDS)) add(m.index, m.index + m[0].length);
+  // The line tying the file to its writing history, in either form.
+  for (const m of doc.source.matchAll(new RegExp(ID_NOTE.source, "g"))) add(m.index, m.index + m[0].length);
   const names = new Set<string>();
   const src = doc.source;
   for (const [from, style] of lineStyles(doc)) {
@@ -45,12 +47,9 @@ export function spellContext(doc: Document): SpellContext {
   return { skip, names };
 }
 
-const TOKEN = /[\p{L}\p{M}\p{N}]+(?:['’][\p{L}\p{M}\p{N}]+)*/gu;
-
+/** The words of `text`, by Highwater's one rule for words (@highwater/parser words.ts). */
 function tokens(text: string, offset: number): Word[] {
-  const out: Word[] = [];
-  for (const m of text.matchAll(TOKEN)) out.push({ from: offset + m.index, to: offset + m.index + m[0].length, text: m[0] });
-  return out;
+  return wordsOf(text).map((w) => ({ from: offset + w.from, to: offset + w.to, text: w.text }));
 }
 
 /** The form the dictionary knows: straight apostrophes. */

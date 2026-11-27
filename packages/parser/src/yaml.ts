@@ -74,7 +74,20 @@ export function yamlEntries(source: string, inner: Span): YamlEntry[] {
         at += part.length + 1;
       }
     } else if (rest !== "") {
-      values.push({ text: unquote(rest), span: { start: restStart, end: restStart + rest.length } });
+      // A value may go on over the indented lines after it (a plain or quoted scalar, or a flow
+      // list): YAML folds those lines into one, a blank line making a line break.
+      const more = body.filter((l) => l.text.trim() === "" || /^[ \t]/.test(l.text));
+      const lastText = [...more].reverse().find((l) => l.text.trim() !== "");
+      if (!lastText) values.push({ text: unquote(rest), span: { start: restStart, end: restStart + rest.length } });
+      else {
+        // (A comment ends a plain line; inside quotes "#" is text.)
+        const plain = !/^["'[]/.test(rest);
+        const folded = fold([rest, ...more.slice(0, more.indexOf(lastText) + 1).map((l) => (plain ? stripComment(l.text) : l.text).trim())]);
+        const end = lastText.start + lastText.text.replace(/[ \t]+$/, "").length;
+        if (folded.startsWith("[") && folded.endsWith("]")) {
+          for (const part of splitFlow(folded.slice(1, -1))) if (part.trim()) values.push({ text: unquote(part.trim()), span: { start: restStart, end } });
+        } else for (const text of unquote(folded).split("\n")) values.push({ text, span: { start: restStart, end } });
+      }
     } else {
       for (const l of body) {
         const item = /^([ \t]*)-(?:[ \t]+(.*?))?[ \t]*$/.exec(l.text);
@@ -89,6 +102,22 @@ export function yamlEntries(source: string, inner: Span): YamlEntry[] {
     i = j;
   }
   return entries;
+}
+
+/** YAML's folding of a scalar's lines: joined by a space, a blank line making a line break. */
+function fold(lines: string[]): string {
+  let out = "";
+  let blank = false;
+  for (const line of lines) {
+    if (line === "") {
+      out += "\n";
+      blank = true;
+    } else {
+      out += out === "" || blank ? line : ` ${line}`;
+      blank = false;
+    }
+  }
+  return out;
 }
 
 /** Without a trailing ` # comment` (outside quotes). */
