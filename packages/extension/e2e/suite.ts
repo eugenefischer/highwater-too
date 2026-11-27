@@ -81,7 +81,7 @@ async function selectInView(anchor: number, head = anchor): Promise<void> {
 
 const tests: [string, () => Promise<void>][] = [
   [
-    "VS Code's text editor finds words by Highwater's rule (the Highwater Editor's own word tests are page tests)",
+    "VS Code takes Highwater's word pattern for its languages (the Highwater Editor's own word tests are page tests)",
     async () => {
       // Not "Plain.fountain" or "Kettle.fountain": other tests open those.
       const path = join(dir, "Words.fountain");
@@ -89,23 +89,22 @@ const tests: [string, () => Promise<void>][] = [
       await writeFile(path, `INT. HALL - DAY\n\nMARLOWE\n${line}\n`);
       const doc = await vscode.workspace.openTextDocument(path);
       await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
-      // Asked of the text editor itself: ⌘D (Add Selection to Next Find Match) with nothing selected
-      // selects the word at the cursor by the language's word pattern. (TextDocument.getWordRangeAtPosition
-      // in the extension host doesn't use a contributed pattern: it split O'BRIEN in CI.)
-      const editor = await vscode.window.showTextDocument(doc, { preview: false });
-      const wordAt = async (lineNo: number, character: number) => {
-        editor.selection = new vscode.Selection(lineNo, character, lineNo, character);
-        await vscode.commands.executeCommand("editor.action.addSelectionToNextFindMatch");
-        const text = doc.getText(editor.selection);
-        await vscode.commands.executeCommand("cancelSelection");
-        return text;
+      // The language's word pattern (language-configuration.json), as VS Code gives it to extensions:
+      // TextDocument.getWordRangeAtPosition uses it once the window has read the language's
+      // configuration and sent it over (VS Code source: mainThreadLanguageFeatures $setWordDefinitions);
+      // until then it uses VS Code's default, which splits O'BRIEN at the straight apostrophe.
+      // (Double-click and word moves in VS Code's text editor follow editor.wordSeparators instead.)
+      const wordAt = (character: number) => {
+        const r = doc.getWordRangeAtPosition(new vscode.Position(3, character));
+        return r ? doc.getText(r) : null;
       };
-      assert.equal(await wordAt(2, 3), "MARLOWE");
+      const name = line.indexOf("O'BRIEN") + 2;
+      await waitFor(`Highwater's word pattern for highland-fountain (O'BRIEN read as "${wordAt(name)}")`, () => wordAt(name) === "O'BRIEN");
+      assert.equal(doc.getText(doc.getWordRangeAtPosition(new vscode.Position(2, 3))!), "MARLOWE");
       for (const [word, inside] of [["Zoë", "Zoë"], ["Don’t", "Don’t"], ["O'BRIEN", "O'BRIEN"], ["quoted", "quoted"], ["Jean", "Jean-Luc"]] as const) {
         const at = line.indexOf(inside) + 2;
-        assert.equal(await wordAt(3, at), word, `the word around column ${at}`);
+        assert.equal(wordAt(at), word, `the word around column ${at}`);
       }
-      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     },
   ],
   [
