@@ -178,13 +178,17 @@ describe("keys", () => {
 
 describe("the cursor at a wrapped line", () => {
   const para = "The person he spoke to first, he later recalled, was Diana Glampers. He hadn't put nametags in his ambient, like most did, he just remembered her introduction with a kind of startled pleasure that someone would bother to say her whole name aloud at a party like this one, where nobody did.";
+  // Wraps after a dash or hyphen with no space (EJ's "a seat —whatever"), and inside a word too long for a line.
+  const dashes = "In other people's it might have been a voice, or a change in the lighting, or a virtual butler escorting them to a seat —whatever they wanted the world to look and sound like—using only fabricator-scale hardware, well-known, self-evident, half-remembered, never-to-be-repeated, —and so on— Pneumonoultramicroscopicsilicovolcanoconiosispneumonoultramicroscopicsilicovolcanoconiosis ends it.";
   for (const columnWidth of ["narrow", "medium", "wide"]) {
-    it(`stops at both sides of every wrap after a space (${columnWidth} column)`, async () => {
-      const e = await openEditor(`# Chapter\n\n${para}\n\n${para.replace(/ /g, "  ")}\n`, "markdown", { settings: { general: { columnWidth } } });
+    it(`stops at both sides of every wrap, after a space, a dash or a hyphen, or inside a word (${columnWidth} column)`, async () => {
+      const e = await openEditor(`# Chapter\n\n${para}\n\n${para.replace(/ /g, "  ")}\n\n${dashes}\n`, "markdown", { settings: { general: { columnWidth } } });
       const wraps = await e.evaluate<number[]>(`(v) => { const d = v.state.doc.toString(); const out = [];
         for (let p = 1; p < d.length; p++) { const a = v.coordsAtPos(p, -1), b = v.coordsAtPos(p, 1); if (a && b && b.top - a.top > 3 && d[p - 1] !== "\\n") out.push(p); } return out; }`);
-      expect(wraps.length).toBeGreaterThan(3);
       const text = await e.text();
+      expect(wraps.length).toBeGreaterThan(3);
+      // The dash paragraph has wraps after something other than a space at every width.
+      expect(wraps.some((n) => text[n - 1] !== " ")).toBe(true);
       for (const n of wraps) {
         await e.select(n - 1);
         const seen: [number, number][] = [];
@@ -193,16 +197,14 @@ describe("the cursor at a wrapped line", () => {
           const s = await e.selection();
           seen.push([s.head, s.assoc]);
         }
-        if (text[n - 1] === " ")
-          expect(seen, `wrap at ${n}`).toEqual([
-            [n, -1],
-            [n, 1],
-            [n + 1, -1],
-            [n, 1],
-            [n, -1],
-            [n - 1, 1],
-          ]);
-        else expect(seen.map((s) => s[0]), `wrap at ${n}`).toEqual([n, n + 1, n + 2, n + 1, n, n - 1]);
+        expect(seen, `wrap at ${n} after ${JSON.stringify(text.slice(n - 3, n))}`).toEqual([
+          [n, -1],
+          [n, 1],
+          [n + 1, -1],
+          [n, 1],
+          [n, -1],
+          [n - 1, 1],
+        ]);
       }
       await e.close();
     });

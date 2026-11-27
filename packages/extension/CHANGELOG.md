@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.90
+
+- The arrow keys stop at both sides of every wrapped line, not only where the line wraps after a space (EJ): where it wraps after a dash or hyphen with no space ("a seat —whatever", "fabricator-scale"), or inside a word too long for the line, Right at the end of the line went straight past the start of the next one. 0.6.78 had only looked at wraps after a space.
 ## 0.6.89
 
 - **The Find box (⌘F) shows the number of matches** (EJ), beside the search field, as VS Code's find widget does: "3 of 12" when a match is selected (after Enter or the arrows), "12 matches" otherwise, and "No results" in red when nothing matches. It follows typing, Match case, By word and Regexp, and edits to the text.
