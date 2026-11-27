@@ -15,7 +15,7 @@ import { worksHost } from "./works-host.ts";
 import { assetMarkdown, binDetail, binLabel } from "../syntax/workspace.ts";
 import type { BundleStore } from "../store.ts";
 import { pageForm } from "./offsets.ts";
-import type { FromPage, ToPage } from "./messages.ts";
+import { postTo, type FromPage, type ToPage } from "./messages.ts";
 import { NAVIGATOR_TYPES, type NavigatorFilters } from "../syntax/navigator.ts";
 import { debounce } from "../debounce.ts";
 
@@ -56,12 +56,7 @@ export function sidebarHost(context: vscode.ExtensionContext, store: () => Bundl
   let disposed = false;
   // Lists are read asynchronously, so the tab may have closed by the time one is ready.
   const post = (msg: ToPage) => {
-    if (disposed) return;
-    try {
-      void panel.webview.postMessage(msg).then(undefined, () => undefined);
-    } catch {
-      // The webview was disposed.
-    }
+    if (!disposed) postTo(panel, msg);
   };
   const bundle = () => bundleOf(document());
   const plain = () => (!bundle() && document().uri.scheme === "file" ? document().uri.fsPath : undefined);

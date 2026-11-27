@@ -16,7 +16,7 @@ import { editorFocused, registerSidebarNote } from "./sidebar-note.ts";
 import { registerWorksView } from "./works-view-provider.ts";
 import { sidebarHost } from "./sidebar-host.ts";
 import { pageHtml } from "./page-html.ts";
-import { postTo, type FromPage, type PanelName, type ToPage } from "./messages.ts";
+import { postTo, whileOpen, type FromPage, type PanelName, type ToPage } from "./messages.ts";
 import { askText } from "../ask.ts";
 import { activeView, HIGHLAND_EDITOR, highlandViews, highwaterOpener, revealOffset, viewOf, type HighlandView } from "../surface.ts";
 import { debounce } from "../debounce.ts";
@@ -148,13 +148,14 @@ export class HighlandEditorProvider implements vscode.CustomTextEditorProvider {
     let inFlight = 0;
     /** When a step last brought no change in time: one that still arrives is the stepping's, not an Edit ▸ Undo. */
     let stepTimedOut = 0;
+    const open = whileOpen(panel);
     const walk = async (dir: "undo" | "redo", target: string) => {
       log(`walk ${dir} to ${JSON.stringify(target.slice(-40))}`);
       walking = true;
       try {
         for (let i = 0; i < WALK_LIMIT && pageForm(document.getText()) !== target; i++) {
-          // VS Code's Undo and Redo act on the active editor: only while this one is it.
-          if (!panel.active) break;
+          // VS Code's Undo and Redo act on the active editor: only while this one is it (and open: the steps take awaits).
+          if (!open() || !panel.active) break;
           const version = document.version;
           await vscode.commands.executeCommand(dir);
           // The change reaches the extension host as an event of its own: give it a moment.

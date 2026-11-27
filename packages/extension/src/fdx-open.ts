@@ -5,6 +5,7 @@ import { createDocument, writeBundle } from "@highwater/bundle";
 import { fdxToFountain } from "@highwater/pdf";
 import * as vscode from "vscode";
 import { openHighland } from "./open.ts";
+import { whileOpen } from "./highland-editor/messages.ts";
 
 export const FDX_VIEW_TYPE = "highwater.importFdx";
 
@@ -19,13 +20,15 @@ export class FdxOpener implements vscode.CustomReadonlyEditorProvider {
   }
 
   async resolveCustomEditor(document: vscode.CustomDocument, panel: vscode.WebviewPanel): Promise<void> {
+    const open = whileOpen(panel);
     panel.webview.html = page(`Converting ${document.uri.fsPath} to a .highland file…`);
     try {
       await importFdx(document.uri, panel.viewColumn);
       panel.dispose();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      panel.webview.html = page(`Could not convert this Final Draft file: ${message}`);
+      // (Closed meanwhile: nowhere to say so.)
+      if (open()) panel.webview.html = page(`Could not convert this Final Draft file: ${message}`);
     }
   }
 }

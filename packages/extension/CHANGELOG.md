@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.92
+
+- A message to an editor tab or Works view that had just closed (sent after a layout or a file read finished) no longer raises an error ("Webview is disposed", seen in CI). Every message to a page goes through one function that drops it when the page is gone, and code that touches a panel after waiting checks it is still open first: Undo/Redo stepping, and the error message of opening a .highland or Final Draft file whose tab was closed meanwhile.
 ## 0.6.91
 
 Fixes from an audit of fixes made too narrowly (EJ, 2026-11-28): each rule is now defined once and used everywhere it applies.

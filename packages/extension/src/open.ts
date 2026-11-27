@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { toHighlandUri } from "./fs-provider.ts";
 import { showDocument } from "./surface.ts";
+import { whileOpen } from "./highland-editor/messages.ts";
 
 export const OPEN_VIEW_TYPE = "highwater.open";
 
@@ -16,13 +17,15 @@ export class OpenRedirect implements vscode.CustomReadonlyEditorProvider {
   }
 
   async resolveCustomEditor(document: vscode.CustomDocument, panel: vscode.WebviewPanel): Promise<void> {
+    const open = whileOpen(panel);
     panel.webview.html = `<p style="font-family: sans-serif; padding: 1em">Opening ${escapeHtml(document.uri.fsPath)}…</p>`;
     try {
       await openHighland(document.uri, panel.viewColumn);
       panel.dispose();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      panel.webview.html = `<p style="font-family: sans-serif; padding: 1em">Could not open this file as a .highland document: ${escapeHtml(message)}</p>`;
+      // (Closed meanwhile: nowhere to say so.)
+      if (open()) panel.webview.html = `<p style="font-family: sans-serif; padding: 1em">Could not open this file as a .highland document: ${escapeHtml(message)}</p>`;
     }
   }
 }

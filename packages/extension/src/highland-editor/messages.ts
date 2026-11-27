@@ -244,9 +244,30 @@ export type FromPage =
   /** The Works view's Open Document… and New Document… (works-view.ts). */
   | { type: "worksViewCommand"; command: "highwater.open" | "highwater.newDocument" };
 
-/** Sends a message to a Highwater Editor page (as `void panel.webview.postMessage(msg)`, typed). */
-export function postTo(panel: { webview: { postMessage(message: unknown): unknown } }, msg: ToPage): void {
-  void panel.webview.postMessage(msg);
+/**
+ * Whether a panel is still open, for code that touches it after an await: once it is closed, VS
+ * Code throws "Webview is disposed" from its webview, title, viewColumn, active, visible and
+ * reveal (VS Code source: extHostWebviewPanels.ts, assertNotDisposed).
+ */
+export function whileOpen(panel: { onDidDispose(listener: () => void): unknown }): () => boolean {
+  let open = true;
+  panel.onDidDispose(() => (open = false));
+  return () => open;
+}
+
+/**
+ * Sends a message to a page (the Highwater Editor's, or the Works view's), typed. Every message the
+ * extension sends to a page goes through here. The page may be gone: messages often go out after an
+ * await (a layout, a file read), and its tab or view may have closed meanwhile. VS Code then throws
+ * "Webview is disposed", synchronously from `.webview` or as a rejected promise (CI, 2026-11-27: an
+ * unhandled rejection from sendTemplate); a message to a closed page is dropped instead.
+ */
+export function postTo(panel: { readonly webview: { postMessage(message: unknown): PromiseLike<boolean> } }, msg: ToPage): void {
+  try {
+    void Promise.resolve(panel.webview.postMessage(msg)).then(undefined, () => undefined);
+  } catch {
+    // The page is gone.
+  }
 }
 
 export type BackupAction = "setFolder" | "revealFolder" | "setUpMirror" | "signIn" | "forgetSignIn" | "syncNow";

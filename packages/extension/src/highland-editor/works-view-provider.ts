@@ -6,7 +6,7 @@
  * While a Highwater Editor is in front, the sidebar has only the note (sidebar-note.ts) instead.
  */
 import * as vscode from "vscode";
-import type { FromPage, ToPage } from "./messages.ts";
+import { postTo, type FromPage, type ToPage } from "./messages.ts";
 import { worksHost, type WorksHost } from "./works-host.ts";
 import { worksViewHtml } from "./works-view-html.ts";
 
@@ -30,7 +30,7 @@ export function registerWorksView(context: vscode.ExtensionContext): void {
         const post = (msg: ToPage) => {
           if (disposed) return;
           if (msg.type === "works") worksViewForTests.works = msg.items.map((w) => ({ title: w.title, file: w.file, kind: w.kind }));
-          void webview.postMessage(msg).then(undefined, () => undefined);
+          postTo(view, msg);
         };
         const host: WorksHost = worksHost(post);
         const receive = (msg: FromPage): boolean => {
