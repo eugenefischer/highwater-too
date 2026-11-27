@@ -85,17 +85,27 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       // Not "Plain.fountain" or "Kettle.fountain": other tests open those.
       const path = join(dir, "Words.fountain");
-      await writeFile(path, "INT. HALL - DAY\n\nMARLOWE\nHello, Zoë. Don’t, O'BRIEN.\n");
+      const line = "Hello, Zoë. Don’t, O'BRIEN, 'quoted' Jean-Luc.";
+      await writeFile(path, `INT. HALL - DAY\n\nMARLOWE\n${line}\n`);
       const doc = await vscode.workspace.openTextDocument(path);
       await waitFor("Fountain language", () => doc.languageId === "highland-fountain");
-      const range = doc.getWordRangeAtPosition(new vscode.Position(2, 3));
-      assert.equal(range && doc.getText(range), "MARLOWE");
-      const accented = doc.getWordRangeAtPosition(new vscode.Position(3, 9));
-      assert.equal(accented && doc.getText(accented), "Zoë");
-      const contraction = doc.getWordRangeAtPosition(new vscode.Position(3, 14));
-      assert.equal(contraction && doc.getText(contraction), "Don’t");
-      const name = doc.getWordRangeAtPosition(new vscode.Position(3, 22));
-      assert.equal(name && doc.getText(name), "O'BRIEN");
+      // Asked of the text editor itself: ⌘D (Add Selection to Next Find Match) with nothing selected
+      // selects the word at the cursor by the language's word pattern. (TextDocument.getWordRangeAtPosition
+      // in the extension host doesn't use a contributed pattern: it split O'BRIEN in CI.)
+      const editor = await vscode.window.showTextDocument(doc, { preview: false });
+      const wordAt = async (lineNo: number, character: number) => {
+        editor.selection = new vscode.Selection(lineNo, character, lineNo, character);
+        await vscode.commands.executeCommand("editor.action.addSelectionToNextFindMatch");
+        const text = doc.getText(editor.selection);
+        await vscode.commands.executeCommand("cancelSelection");
+        return text;
+      };
+      assert.equal(await wordAt(2, 3), "MARLOWE");
+      for (const [word, inside] of [["Zoë", "Zoë"], ["Don’t", "Don’t"], ["O'BRIEN", "O'BRIEN"], ["quoted", "quoted"], ["Jean", "Jean-Luc"]] as const) {
+        const at = line.indexOf(inside) + 2;
+        assert.equal(await wordAt(3, at), word, `the word around column ${at}`);
+      }
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     },
   ],
   [
@@ -255,7 +265,8 @@ const tests: [string, () => Promise<void>][] = [
       await vscode.commands.executeCommand("highwater.copyToBin");
       await until("the Bin item in the file", async () => JSON.stringify((await readBundle(path)).bundle.binItems) === JSON.stringify([line.text]));
       assert.equal((await readBundle(path)).bundle.text, documentAt(highland(path)).getText(), "the script is untouched");
-      // In the Highwater Editor the Scratchpad is a panel of its sidebar.
+      // In the Highwater Editor the Scratchpad is a panel of its sidebar; showing it writes nothing.
+      const scratchpad = (await readBundle(path)).bundle.scratchpad;
       await vscode.commands.executeCommand("highwater.showSidebarPanel", "navigator");
       await until("the Navigator in the sidebar", async () => (await sidebarState())?.panel === "navigator");
       await vscode.commands.executeCommand("highwater.openScratchpad");
@@ -263,7 +274,7 @@ const tests: [string, () => Promise<void>][] = [
         const s = await sidebarState();
         return s?.panel === "scratchpad" && s.open === true;
       });
-      assert.equal((await readBundle(path)).bundle.scratchpad, "");
+      assert.equal((await readBundle(path)).bundle.scratchpad, scratchpad, "the file's Scratchpad is untouched");
       await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     },
   ],
